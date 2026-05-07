@@ -7,9 +7,69 @@ import SwiftUI
 import Cocoa
 import Combine
 import DiskArbitration
-import ServiceManagement // Required for Launch at Login
+import ServiceManagement
 
-// MARK: - 0. Log Manager
+// MARK: - 0. Global Hotkey Manager
+class GlobalHotkeyManager {
+    static let shared = GlobalHotkeyManager()
+    
+    private var eventTap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
+
+    // Checks if permission is granted. Can optionally trigger the macOS system prompt.
+    func isTrusted(promptSystem: Bool) -> Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: promptSystem] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
+
+    func start() {
+        // Double-check permission quietly before trying to start
+        guard isTrusted(promptSystem: false) else { return }
+        
+        // Prevent creating multiple taps if it's already running
+        if eventTap != nil { return }
+
+        let eventMask = (1 << CGEventType.keyDown.rawValue)
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: CGEventMask(eventMask),
+            callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
+                let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+                let flags = event.flags
+                
+                if flags.contains(.maskCommand) && flags.contains(.maskControl) && flags.contains(.maskAlternate) && keyCode == 14 {
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: NSNotification.Name("TriggerGlobalEject"), object: nil)
+                    }
+                    return nil // Swallow the key to prevent the beep
+                }
+                return Unmanaged.passRetained(event)
+            }, userInfo: nil) else { return }
+
+        self.eventTap = tap
+        self.runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        
+        if let runLoopSource = self.runLoopSource {
+            CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+            CGEvent.tapEnable(tap: tap, enable: true)
+            LogManager.shared.log("✅ Global shortcut (⌃⌥⌘E) activated.")
+        }
+    }
+    
+    func stop() {
+        if let tap = eventTap, let source = runLoopSource {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+            LogManager.shared.log("ℹ️ Global shortcut disabled.")
+        }
+        eventTap = nil
+        runLoopSource = nil
+    }
+}
+
+// MARK: - 0.5 Log Manager
 class LogManager: ObservableObject {
     static let shared = LogManager()
     @Published var logs: String = ""
@@ -92,6 +152,18 @@ class DriveManager: ObservableObject {
                 self?.fetchDrives()
             }
             .store(in: &cancellables)
+            
+        // Listen for the Global Hotkey Notification
+        NotificationCenter.default.publisher(for: NSNotification.Name("TriggerGlobalEject"))
+            .sink { [weak self] _ in
+                self?.ejectAllCameraCards()
+            }
+            .store(in: &cancellables)
+            
+        // Only start listening for global keystrokes if the user previously enabled it
+        if UserDefaults.standard.bool(forKey: "isShortcutEnabled") {
+            GlobalHotkeyManager.shared.start()
+        }
     }
     
     private func detectCardType(for volumeURL: URL) -> CardType {
@@ -262,10 +334,12 @@ struct DebugLogView: View {
 // MARK: - 4. The Menu Bar View
 struct EjectorMenuView: View {
     @StateObject private var manager = DriveManager()
-    @AppStorage("enableDebugLogs") private var enableDebugLogs = false
     
-    // Check macOS system status for the login item
+    @AppStorage("enableDebugLogs") private var enableDebugLogs = false
+    @AppStorage("isShortcutEnabled") private var isShortcutEnabled = false
+    
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var showingAccessibilityAlert = false
     
     @Environment(\.openWindow) private var openWindow
     
@@ -274,19 +348,23 @@ struct EjectorMenuView: View {
     
     func showInstructions() {
         let alert = NSAlert()
-        alert.messageText = "Ejector Help & Instructions"
+        alert.messageText = "Easy Ejector Help & Instructions"
         alert.informativeText = """
-        • Smart Sorting: Ejector automatically looks for camera folders (like DCIM) to separate your media cards from permanent SSDs.
+        • Smart Sorting: Ejector automatically finds camera folders (DCIM, etc.) to separate media cards from permanent SSDs.
         
-        • Ejecting: Click any drive in the list to safely unmount it.
+        • Manual Ejecting: You can always click any drive in this menu to safely unmount it. No special permissions are required for this.
         
-        • Bulk Eject Shortcut: Press ⌃⌥⌘E (Control+Option+Command+E) at any time to instantly eject all Camera Cards without touching your external SSDs.
+        • Global Keyboard Shortcut (Optional): Press ⌃⌥⌘E to instantly eject all Camera Cards from any app. 
         
-        • Troubleshooting: If a drive isn't showing up correctly, check the 'Enable Debug Logging' box in the menu, then click 'Show Debug Window' to see exactly how your Mac is identifying the drive.
+        • Why 'Accessibility' Permission?: To hear that shortcut while you are using other apps (like Photoshop), macOS requires 'Accessibility' permission. If you don't want to use the shortcut, you do not need to enable this.
+        
+        • Troubleshooting: If a drive is missing, enable 'Debug Logging' and use the 'Show Debug Window' to see how your Mac identifies the hardware.
         """
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Got It")
-        NSApp.activate(ignoringOtherApps: true)
+        
+        // Optimized for macOS 14+ to bring the alert to the front
+        NSApp.activate()
         alert.runModal()
     }
     
@@ -300,6 +378,7 @@ struct EjectorMenuView: View {
                     Button(action: { manager.ejectAllCameraCards() }) {
                         Label("Eject All Camera Cards", systemImage: "eject.fill")
                     }
+                    // We leave this modifier here simply to render the visual "⌃⌥⌘E" hint in the menu
                     .keyboardShortcut("e", modifiers: [.control, .option, .command])
                 }
                 
@@ -346,20 +425,44 @@ struct EjectorMenuView: View {
                 showInstructions()
             }
             
-            // The Launch at Login Toggle
             Toggle("Launch at Login", isOn: $launchAtLogin)
-                .onChange(of: launchAtLogin) { newValue in
+                .onChange(of: launchAtLogin) { oldValue, newValue in
                     do {
                         if newValue {
                             try SMAppService.mainApp.register()
+                            LogManager.shared.log("✅ Launch at Login enabled")
                         } else {
                             try SMAppService.mainApp.unregister()
+                            LogManager.shared.log("✅ Launch at Login disabled")
                         }
                     } catch {
-                        print("Failed to toggle login item: \(error)")
-                        // Revert the toggle visually if macOS blocks the action
-                        launchAtLogin = SMAppService.mainApp.status == .enabled
+                        LogManager.shared.log("❌ Failed to toggle login item: \(error.localizedDescription)")
+                        launchAtLogin = (SMAppService.mainApp.status == .enabled)
                     }
+                }
+            
+            Toggle("Enable Global Eject Shortcut (⌃⌥⌘E)", isOn: $isShortcutEnabled)
+                .onChange(of: isShortcutEnabled) { oldValue, newValue in
+                    if newValue {
+                        if GlobalHotkeyManager.shared.isTrusted(promptSystem: true) {
+                            GlobalHotkeyManager.shared.start()
+                        } else {
+                            showingAccessibilityAlert = true
+                            isShortcutEnabled = false
+                        }
+                    } else {
+                        GlobalHotkeyManager.shared.stop()
+                    }
+                }
+                .alert("Accessibility Permission Required", isPresented: $showingAccessibilityAlert) {
+                    Button("Open System Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    Button("Cancel", role: .cancel) { }
+                } message: {
+                    Text("To use the global keyboard shortcut from inside other apps, macOS requires Ejector to have Accessibility permission.\n\nPlease enable it in System Settings, then try turning this shortcut on again.")
                 }
             
             Toggle("Enable Debug Logging", isOn: $enableDebugLogs)
