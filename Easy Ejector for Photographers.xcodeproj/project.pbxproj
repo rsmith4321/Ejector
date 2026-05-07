@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		303A1AA52FAC2B2400CFBD1A /* Ejector.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ejector.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		303A1AA52FAC2B2400CFBD1A /* Easy Ejector for Photographers.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Easy Ejector for Photographers.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -40,7 +40,7 @@
 		303A1AA62FAC2B2400CFBD1A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				303A1AA52FAC2B2400CFBD1A /* Ejector.app */,
+				303A1AA52FAC2B2400CFBD1A /* Easy Ejector for Photographers.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,9 +48,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		303A1AA42FAC2B2400CFBD1A /* Ejector */ = {
+		303A1AA42FAC2B2400CFBD1A /* Easy Ejector for Photographers */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 303A1AB02FAC2B2500CFBD1A /* Build configuration list for PBXNativeTarget "Ejector" */;
+			buildConfigurationList = 303A1AB02FAC2B2500CFBD1A /* Build configuration list for PBXNativeTarget "Easy Ejector for Photographers" */;
 			buildPhases = (
 				303A1AA12FAC2B2400CFBD1A /* Sources */,
 				303A1AA22FAC2B2400CFBD1A /* Frameworks */,
@@ -63,11 +63,11 @@
 			fileSystemSynchronizedGroups = (
 				303A1AA72FAC2B2400CFBD1A /* Ejector */,
 			);
-			name = Ejector;
+			name = "Easy Ejector for Photographers";
 			packageProductDependencies = (
 			);
 			productName = Ejector;
-			productReference = 303A1AA52FAC2B2400CFBD1A /* Ejector.app */;
+			productReference = 303A1AA52FAC2B2400CFBD1A /* Easy Ejector for Photographers.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -85,7 +85,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 303A1AA02FAC2B2400CFBD1A /* Build configuration list for PBXProject "Ejector" */;
+			buildConfigurationList = 303A1AA02FAC2B2400CFBD1A /* Build configuration list for PBXProject "Easy Ejector for Photographers" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -99,7 +99,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				303A1AA42FAC2B2400CFBD1A /* Ejector */,
+				303A1AA42FAC2B2400CFBD1A /* Easy Ejector for Photographers */,
 			);
 		};
 /* End PBXProject section */
@@ -342,7 +342,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		303A1AA02FAC2B2400CFBD1A /* Build configuration list for PBXProject "Ejector" */ = {
+		303A1AA02FAC2B2400CFBD1A /* Build configuration list for PBXProject "Easy Ejector for Photographers" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				303A1AAE2FAC2B2500CFBD1A /* Debug */,
@@ -351,7 +351,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		303A1AB02FAC2B2500CFBD1A /* Build configuration list for PBXNativeTarget "Ejector" */ = {
+		303A1AB02FAC2B2500CFBD1A /* Build configuration list for PBXNativeTarget "Easy Ejector for Photographers" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				303A1AB12FAC2B2500CFBD1A /* Debug */,
