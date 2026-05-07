@@ -7,6 +7,7 @@ import SwiftUI
 import Cocoa
 import Combine
 import DiskArbitration
+import ServiceManagement // Required for Launch at Login
 
 // MARK: - 0. Log Manager
 class LogManager: ObservableObject {
@@ -19,7 +20,6 @@ class LogManager: ObservableObject {
             formatter.dateFormat = "HH:mm:ss"
             let timestamp = formatter.string(from: Date())
             self.logs += "[\(timestamp)] \(message)\n"
-            // We still print to the Xcode console for your own development use
             print("[\(timestamp)] \(message)")
         }
     }
@@ -50,7 +50,6 @@ struct Drive: Identifiable {
     let isRemovable: Bool
     let isInternal: Bool
     
-    // SF Symbol for representing this drive type
     var iconName: String {
         if isCameraCard {
             switch cardType ?? .unknown {
@@ -72,13 +71,11 @@ class DriveManager: ObservableObject {
     @Published var drives: [Drive] = []
     private var cancellables = Set<AnyCancellable>()
     
-    // Helper to check our debug setting
     private var isDebugEnabled: Bool {
         UserDefaults.standard.bool(forKey: "enableDebugLogs")
     }
 
     init() {
-        // Automatically updates the list when macOS detects a drive change
         let center = NSWorkspace.shared.notificationCenter
         center.publisher(for: NSWorkspace.didMountNotification)
             .merge(with: center.publisher(for: NSWorkspace.didUnmountNotification))
@@ -89,7 +86,6 @@ class DriveManager: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Lightweight periodic refresh as a fallback
         Timer.publish(every: 15, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
@@ -98,7 +94,6 @@ class DriveManager: ObservableObject {
             .store(in: &cancellables)
     }
     
-    // Attempts to classify camera card type via DiskArbitration metadata
     private func detectCardType(for volumeURL: URL) -> CardType {
         guard let session = DASessionCreate(kCFAllocatorDefault),
               let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, volumeURL as CFURL),
@@ -122,7 +117,6 @@ class DriveManager: ObservableObject {
         return .unknown
     }
     
-    // Fetches currently mounted removable volumes
     func fetchDrives() {
         let keys: [URLResourceKey] = [.volumeNameKey, .volumeIsRemovableKey, .volumeIsEjectableKey, .volumeIsInternalKey]
         
@@ -133,7 +127,7 @@ class DriveManager: ObservableObject {
         var foundDrives: [Drive] = []
         
         if isDebugEnabled {
-            LogManager.shared.clear() // Clear logs on a fresh scan
+            LogManager.shared.clear()
             LogManager.shared.log("--- Starting Drive Scan ---")
         }
         
@@ -151,8 +145,6 @@ class DriveManager: ObservableObject {
                 LogManager.shared.log("   Internal: \(isInternal) | Removable: \(isRemovable) | Ejectable: \(isEjectable)")
             }
             
-            // 1. MAC STUDIO FIX:
-            // Skip the main Mac hard drive, BUT allow the built-in SD card reader
             if isInternal && !isRemovable && !isEjectable {
                 if isDebugEnabled {
                     LogManager.shared.log("   ❌ Skipped (Internal System Drive)")
@@ -161,12 +153,10 @@ class DriveManager: ObservableObject {
                 continue
             }
             
-            // 2. Skip the root system volume and only consider volumes mounted under /Volumes
             if url.path == "/" { continue }
             let isUnderVolumes = url.path.hasPrefix("/Volumes/")
             guard isUnderVolumes else { continue }
 
-            // --- CAMERA CARD DETECTION (Universal Support) ---
             let cameraFolderNames = [
                 "DCIM", "PRIVATE", "MISC", "AVCHD", "MP_ROOT", "CONTENTS",
                 "XDROOT", "BPAV", "NIKON", "CANONMSC", "FUJI", "GOPRO", "SONY"
@@ -205,7 +195,6 @@ class DriveManager: ObservableObject {
         }
     }
     
-    // Ejects the selected drive with a fallback to NSWorkspace if needed
     func eject(drive: Drive) {
         FileManager.default.unmountVolume(at: drive.url, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
             DispatchQueue.main.async {
@@ -220,13 +209,12 @@ class DriveManager: ObservableObject {
                     }
                 } else {
                     if self.isDebugEnabled { LogManager.shared.log("✅ Successfully ejected \(drive.name)") }
-                    self.fetchDrives() // Refresh the list
+                    self.fetchDrives()
                 }
             }
         }
     }
     
-    // Eject all detected camera cards
     func ejectAllCameraCards() {
         let cards = drives.filter { $0.isCameraCard }
         for drive in cards {
@@ -246,7 +234,7 @@ struct DebugLogView: View {
                     .font(.system(.body, design: .monospaced))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
-                    .textSelection(.enabled) // Allows the user to highlight text naturally
+                    .textSelection(.enabled)
             }
             .background(Color(NSColor.textBackgroundColor))
             
@@ -276,7 +264,9 @@ struct EjectorMenuView: View {
     @StateObject private var manager = DriveManager()
     @AppStorage("enableDebugLogs") private var enableDebugLogs = false
     
-    // Requires macOS 13+ to open a window from a MenuBar app easily
+    // Check macOS system status for the login item
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    
     @Environment(\.openWindow) private var openWindow
     
     var cameraCards: [Drive] { manager.drives.filter { $0.isCameraCard } }
@@ -306,8 +296,6 @@ struct EjectorMenuView: View {
                 Text("No external drives found")
                     .foregroundColor(.secondary)
             } else {
-                
-                // Bulk action for Camera Cards ONLY
                 if !cameraCards.isEmpty {
                     Button(action: { manager.ejectAllCameraCards() }) {
                         Label("Eject All Camera Cards", systemImage: "eject.fill")
@@ -319,7 +307,6 @@ struct EjectorMenuView: View {
                     Divider()
                 }
                 
-                // Section 1: All Camera Cards
                 if !cameraCards.isEmpty {
                     Text("Camera Cards")
                         .font(.caption)
@@ -338,7 +325,6 @@ struct EjectorMenuView: View {
                     Divider()
                 }
                 
-                // Section 2: Other External Volumes (Individual Eject Only)
                 if !otherExternalVolumes.isEmpty {
                     Text("Other External Volumes")
                         .font(.caption)
@@ -360,13 +346,27 @@ struct EjectorMenuView: View {
                 showInstructions()
             }
             
+            // The Launch at Login Toggle
+            Toggle("Launch at Login", isOn: $launchAtLogin)
+                .onChange(of: launchAtLogin) { newValue in
+                    do {
+                        if newValue {
+                            try SMAppService.mainApp.register()
+                        } else {
+                            try SMAppService.mainApp.unregister()
+                        }
+                    } catch {
+                        print("Failed to toggle login item: \(error)")
+                        // Revert the toggle visually if macOS blocks the action
+                        launchAtLogin = SMAppService.mainApp.status == .enabled
+                    }
+                }
+            
             Toggle("Enable Debug Logging", isOn: $enableDebugLogs)
             
-            // Only show the Debug Window button if logging is actually turned on
             if enableDebugLogs {
                 Button("Show Debug Window") {
                     openWindow(id: "debugWindow")
-                    // Brings the new window to the front over other apps
                     NSApp.activate(ignoringOtherApps: true)
                 }
             }
@@ -395,7 +395,6 @@ struct EjectorApp: App {
             EjectorMenuView()
         }
         
-        // This registers the window so it can be opened from the Menu Bar button
         WindowGroup("Ejector Debug Logs", id: "debugWindow") {
             DebugLogView()
         }
