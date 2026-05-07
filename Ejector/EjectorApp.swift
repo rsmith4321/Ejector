@@ -356,7 +356,7 @@ struct EjectorMenuView: View {
         
         • Global Keyboard Shortcut (Optional): Press ⌃⌥⌘E to instantly eject all Camera Cards from any app. 
         
-        • Why 'Accessibility' Permission?: To hear that shortcut while you are using other apps (like Photoshop), macOS requires 'Accessibility' permission. If you don't want to use the shortcut, you do not need to enable this.
+        • Why 'Accessibility' Permission?: To use that shortcut while you are using other apps (like Photoshop), macOS requires 'Accessibility' permission. If you don't want to use the shortcut, you do not need to enable this.
         
         • Troubleshooting: If a drive is missing, enable 'Debug Logging' and use the 'Show Debug Window' to see how your Mac identifies the hardware.
         """
@@ -493,6 +493,23 @@ struct EjectorMenuView: View {
 // MARK: - 5. The App Entry Point
 @main
 struct EjectorApp: App {
+    
+    // Add this init block to enforce a strict single-instance rule
+    init() {
+        // Safely get the app's unique Bundle Identifier
+        if let bundleID = Bundle.main.bundleIdentifier {
+            // Check macOS for any currently running apps with this exact ID
+            let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            
+            // If the count is greater than 1, it means the original is already running
+            // and THIS one is a duplicate trying to start.
+            if runningApps.count > 1 {
+                print("🚫 Another instance of Ejector is already running. Terminating duplicate.")
+                NSApplication.shared.terminate(nil)
+            }
+        }
+    }
+    
     var body: some Scene {
         MenuBarExtra("Ejector", systemImage: "eject.fill") {
             EjectorMenuView()
