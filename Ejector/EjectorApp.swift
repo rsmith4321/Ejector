@@ -2,24 +2,125 @@
 //  EjectorApp.swift
 //  Ejector
 //
-//  Created by Ryan Smith on 5/6/26.
-//
 
 import SwiftUI
 import Cocoa
 import Combine
+import DiskArbitration
+
+// MARK: - 0. Log Manager
+class LogManager: ObservableObject {
+    static let shared = LogManager()
+    @Published var logs: String = ""
+
+    func log(_ message: String) {
+        DispatchQueue.main.async {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm:ss"
+            let timestamp = formatter.string(from: Date())
+            self.logs += "[\(timestamp)] \(message)\n"
+            // We still print to the Xcode console for your own development use
+            print("[\(timestamp)] \(message)")
+        }
+    }
+
+    func clear() {
+        DispatchQueue.main.async {
+            self.logs = ""
+        }
+    }
+}
+
+// MARK: - Card Type Classification
+enum CardType: String {
+    case sd = "SD"
+    case cfexpress = "CFexpress"
+    case xqd = "XQD"
+    case unknown = "Unknown"
+}
 
 // MARK: - 1. Drive Model
 struct Drive: Identifiable {
     let id = UUID()
     let name: String
     let url: URL
-    let isCameraOrRemovableMedia: Bool
+    let isCameraCard: Bool
+    let cardType: CardType?
+    let isEjectable: Bool
+    let isRemovable: Bool
+    let isInternal: Bool
+    
+    // SF Symbol for representing this drive type
+    var iconName: String {
+        if isCameraCard {
+            switch cardType ?? .unknown {
+            case .sd:
+                return "sdcard"
+            case .cfexpress, .xqd:
+                return "memorychip"
+            case .unknown:
+                return "externaldrive.badge.questionmark"
+            }
+        } else {
+            return "externaldrive"
+        }
+    }
 }
 
 // MARK: - 2. Drive Manager (The Brains)
 class DriveManager: ObservableObject {
     @Published var drives: [Drive] = []
+    private var cancellables = Set<AnyCancellable>()
+    
+    // Helper to check our debug setting
+    private var isDebugEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "enableDebugLogs")
+    }
+
+    init() {
+        // Automatically updates the list when macOS detects a drive change
+        let center = NSWorkspace.shared.notificationCenter
+        center.publisher(for: NSWorkspace.didMountNotification)
+            .merge(with: center.publisher(for: NSWorkspace.didUnmountNotification))
+            .merge(with: center.publisher(for: NSWorkspace.didRenameVolumeNotification))
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.fetchDrives()
+            }
+            .store(in: &cancellables)
+        
+        // Lightweight periodic refresh as a fallback
+        Timer.publish(every: 15, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.fetchDrives()
+            }
+            .store(in: &cancellables)
+    }
+    
+    // Attempts to classify camera card type via DiskArbitration metadata
+    private func detectCardType(for volumeURL: URL) -> CardType {
+        guard let session = DASessionCreate(kCFAllocatorDefault),
+              let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, volumeURL as CFURL),
+              let desc = DADiskCopyDescription(disk) as? [String: Any] else {
+            return .unknown
+        }
+
+        let model = (desc[kDADiskDescriptionDeviceModelKey as String] as? String) ?? ""
+        let vendor = (desc[kDADiskDescriptionDeviceVendorKey as String] as? String) ?? ""
+        let proto = (desc[kDADiskDescriptionDeviceProtocolKey as String] as? String) ?? ""
+        let bus = (desc[kDADiskDescriptionBusNameKey as String] as? String) ?? ""
+
+        let haystack = (model + " " + vendor + " " + proto + " " + bus).lowercased()
+
+        if haystack.contains("secure digital") || haystack.contains("sdxc") || haystack.contains("sdhc") || haystack.contains(" sd ") || bus.lowercased() == "sd" {
+            return .sd
+        }
+        if haystack.contains("cfexpress") { return .cfexpress }
+        if haystack.contains("xqd") { return .xqd }
+
+        return .unknown
+    }
     
     // Fetches currently mounted removable volumes
     func fetchDrives() {
@@ -31,66 +132,173 @@ class DriveManager: ObservableObject {
         
         var foundDrives: [Drive] = []
         
+        if isDebugEnabled {
+            LogManager.shared.clear() // Clear logs on a fresh scan
+            LogManager.shared.log("--- Starting Drive Scan ---")
+        }
+        
         for url in paths {
             guard let components = try? url.resourceValues(forKeys: Set(keys)) else { continue }
             
-            // 1. Skip the Mac's main internal hard drive entirely
-            if components.volumeIsInternal == true {
+            let isEjectable = components.volumeIsEjectable ?? false
+            let isRemovable = components.volumeIsRemovable ?? false
+            let isInternal = components.volumeIsInternal ?? false
+            let name = components.volumeName ?? url.lastPathComponent
+            
+            if isDebugEnabled {
+                LogManager.shared.log("🔎 Inspecting: \(name)")
+                LogManager.shared.log("   Path: \(url.path)")
+                LogManager.shared.log("   Internal: \(isInternal) | Removable: \(isRemovable) | Ejectable: \(isEjectable)")
+            }
+            
+            // 1. MAC STUDIO FIX:
+            // Skip the main Mac hard drive, BUT allow the built-in SD card reader
+            if isInternal && !isRemovable && !isEjectable {
+                if isDebugEnabled {
+                    LogManager.shared.log("   ❌ Skipped (Internal System Drive)")
+                    LogManager.shared.log("-------------------------------------------------")
+                }
                 continue
             }
             
-            // 2. Process external drives
-            if components.volumeIsRemovable == true || components.volumeIsEjectable == true {
-                let name = components.volumeName ?? url.lastPathComponent
-                
-                // Check A: Does macOS think it's an SD card or USB stick?
-                var isCameraMedia = components.volumeIsRemovable == true
-                
-                // Check B: The DCIM Heuristic (Catches CFExpress cards)
-                if !isCameraMedia {
-                    let dcimURL = url.appendingPathComponent("DCIM")
-                    var isDirectory: ObjCBool = false
-                    if FileManager.default.fileExists(atPath: dcimURL.path, isDirectory: &isDirectory), isDirectory.boolValue {
-                        isCameraMedia = true
-                    }
-                }
-                
-                // (Optional Check C): Check the name as a fallback
-                if name.uppercased().contains("CFEXPRESS") {
-                    isCameraMedia = true
-                }
-                
-                foundDrives.append(Drive(name: name, url: url, isCameraOrRemovableMedia: isCameraMedia))
+            // 2. Skip the root system volume and only consider volumes mounted under /Volumes
+            if url.path == "/" { continue }
+            let isUnderVolumes = url.path.hasPrefix("/Volumes/")
+            guard isUnderVolumes else { continue }
+
+            // --- CAMERA CARD DETECTION (Universal Support) ---
+            let cameraFolderNames = [
+                "DCIM", "PRIVATE", "MISC", "AVCHD", "MP_ROOT", "CONTENTS",
+                "XDROOT", "BPAV", "NIKON", "CANONMSC", "FUJI", "GOPRO", "SONY"
+            ]
+            let hasCameraStructure = cameraFolderNames.contains { folder in
+                let folderURL = url.appendingPathComponent(folder, isDirectory: true)
+                return FileManager.default.fileExists(atPath: folderURL.path)
             }
+
+            let hardwareType = self.detectCardType(for: url)
+            let isHardwareCamera = (hardwareType == .sd || hardwareType == .cfexpress || hardwareType == .xqd)
+            
+            let isCameraCard = isHardwareCamera || hasCameraStructure || (isInternal && isRemovable)
+            
+            var finalCardType: CardType? = isCameraCard ? hardwareType : nil
+            if isInternal && isRemovable && hardwareType == .unknown {
+                finalCardType = .sd
+            }
+            
+            if isDebugEnabled {
+                if isCameraCard {
+                    LogManager.shared.log("   📸 Classified as Camera Card (\(finalCardType?.rawValue ?? "Unknown Format"))")
+                } else {
+                    LogManager.shared.log("   💾 Classified as Standard External Volume")
+                }
+                LogManager.shared.log("-------------------------------------------------")
+            }
+
+            foundDrives.append(Drive(name: name, url: url, isCameraCard: isCameraCard, cardType: finalCardType, isEjectable: isEjectable, isRemovable: isRemovable, isInternal: isInternal))
         }
+        
+        foundDrives.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         
         DispatchQueue.main.async {
             self.drives = foundDrives
         }
     }
     
-    // Ejects the selected drive
+    // Ejects the selected drive with a fallback to NSWorkspace if needed
     func eject(drive: Drive) {
         FileManager.default.unmountVolume(at: drive.url, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
             DispatchQueue.main.async {
                 if let error = error {
-                    print("Failed to eject \(drive.name): \(error.localizedDescription)")
+                    if self.isDebugEnabled { LogManager.shared.log("⚠️ FileManager eject failed for \(drive.name): \(error.localizedDescription). Trying NSWorkspace...") }
+                    do {
+                        try NSWorkspace.shared.unmountAndEjectDevice(at: drive.url)
+                        if self.isDebugEnabled { LogManager.shared.log("✅ Successfully ejected \(drive.name) via NSWorkspace") }
+                        self.fetchDrives()
+                    } catch let ejectError {
+                        if self.isDebugEnabled { LogManager.shared.log("❌ Failed to eject \(drive.name) via NSWorkspace: \(ejectError.localizedDescription)") }
+                    }
                 } else {
-                    print("Successfully ejected \(drive.name)")
+                    if self.isDebugEnabled { LogManager.shared.log("✅ Successfully ejected \(drive.name)") }
                     self.fetchDrives() // Refresh the list
                 }
             }
         }
     }
+    
+    // Eject all detected camera cards
+    func ejectAllCameraCards() {
+        let cards = drives.filter { $0.isCameraCard }
+        for drive in cards {
+            eject(drive: drive)
+        }
+    }
 }
 
-// MARK: - 3. The Menu Bar View
+// MARK: - 3. The Debug Window View
+struct DebugLogView: View {
+    @StateObject private var logManager = LogManager.shared
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                Text(logManager.logs.isEmpty ? "No logs captured yet. Try hitting 'Refresh List' from the menu bar." : logManager.logs)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .textSelection(.enabled) // Allows the user to highlight text naturally
+            }
+            .background(Color(NSColor.textBackgroundColor))
+            
+            Divider()
+            
+            HStack {
+                Button("Clear") {
+                    logManager.clear()
+                }
+                Spacer()
+                Button("Copy to Clipboard") {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(logManager.logs, forType: .string)
+                }
+                .keyboardShortcut("c", modifiers: [.command])
+            }
+            .padding()
+            .background(Color(NSColor.windowBackgroundColor))
+        }
+        .frame(minWidth: 500, minHeight: 400)
+    }
+}
+
+// MARK: - 4. The Menu Bar View
 struct EjectorMenuView: View {
     @StateObject private var manager = DriveManager()
+    @AppStorage("enableDebugLogs") private var enableDebugLogs = false
     
-    // Updated to use our smart property
-    var removableMedia: [Drive] { manager.drives.filter { $0.isCameraOrRemovableMedia } }
-    var externalDisks: [Drive] { manager.drives.filter { !$0.isCameraOrRemovableMedia } }
+    // Requires macOS 13+ to open a window from a MenuBar app easily
+    @Environment(\.openWindow) private var openWindow
+    
+    var cameraCards: [Drive] { manager.drives.filter { $0.isCameraCard } }
+    var otherExternalVolumes: [Drive] { manager.drives.filter { !$0.isCameraCard } }
+    
+    func showInstructions() {
+        let alert = NSAlert()
+        alert.messageText = "Ejector Help & Instructions"
+        alert.informativeText = """
+        • Smart Sorting: Ejector automatically looks for camera folders (like DCIM) to separate your media cards from permanent SSDs.
+        
+        • Ejecting: Click any drive in the list to safely unmount it.
+        
+        • Bulk Eject Shortcut: Press ⌃⌥⌘E (Control+Option+Command+E) at any time to instantly eject all Camera Cards without touching your external SSDs.
+        
+        • Troubleshooting: If a drive isn't showing up correctly, check the 'Enable Debug Logging' box in the menu, then click 'Show Debug Window' to see exactly how your Mac is identifying the drive.
+        """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Got It")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+    }
     
     var body: some View {
         VStack(alignment: .leading) {
@@ -99,38 +307,67 @@ struct EjectorMenuView: View {
                     .foregroundColor(.secondary)
             } else {
                 
-                // Section 1: Camera Cards (SD, CFExpress) and USBs
-                if !removableMedia.isEmpty {
-                    Text("Camera Cards & USBs")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal)
-                        .padding(.top, 4)
-                    
-                    ForEach(removableMedia) { drive in
-                        Button(action: { manager.eject(drive: drive) }) {
-                            Text("⏏️ Eject \(drive.name)")
-                        }
+                // Bulk action for Camera Cards ONLY
+                if !cameraCards.isEmpty {
+                    Button(action: { manager.ejectAllCameraCards() }) {
+                        Label("Eject All Camera Cards", systemImage: "eject.fill")
                     }
+                    .keyboardShortcut("e", modifiers: [.control, .option, .command])
                 }
                 
-                if !removableMedia.isEmpty && !externalDisks.isEmpty {
+                if (!cameraCards.isEmpty || !otherExternalVolumes.isEmpty) {
                     Divider()
                 }
                 
-                // Section 2: Pure External SSDs and Hard Drives
-                if !externalDisks.isEmpty {
-                    Text("External SSDs")
+                // Section 1: All Camera Cards
+                if !cameraCards.isEmpty {
+                    Text("Camera Cards")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                        .padding(.top, 4)
+
+                    ForEach(cameraCards) { drive in
+                        Button(action: { manager.eject(drive: drive) }) {
+                            Label("Eject \(drive.name)", systemImage: drive.iconName)
+                        }
+                    }
+                }
+                
+                if !cameraCards.isEmpty && !otherExternalVolumes.isEmpty {
+                    Divider()
+                }
+                
+                // Section 2: Other External Volumes (Individual Eject Only)
+                if !otherExternalVolumes.isEmpty {
+                    Text("Other External Volumes")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .padding(.horizontal)
                         .padding(.top, 4)
                     
-                    ForEach(externalDisks) { drive in
+                    ForEach(otherExternalVolumes) { drive in
                         Button(action: { manager.eject(drive: drive) }) {
-                            Text("⏏️ Eject \(drive.name)")
+                            Label("Eject \(drive.name)", systemImage: drive.iconName)
                         }
                     }
+                }
+            }
+            
+            Divider()
+            
+            Button("Help & Instructions") {
+                showInstructions()
+            }
+            
+            Toggle("Enable Debug Logging", isOn: $enableDebugLogs)
+            
+            // Only show the Debug Window button if logging is actually turned on
+            if enableDebugLogs {
+                Button("Show Debug Window") {
+                    openWindow(id: "debugWindow")
+                    // Brings the new window to the front over other apps
+                    NSApp.activate(ignoringOtherApps: true)
                 }
             }
             
@@ -150,13 +387,18 @@ struct EjectorMenuView: View {
     }
 }
 
-// MARK: - 4. The App Entry Point
+// MARK: - 5. The App Entry Point
 @main
 struct EjectorApp: App {
     var body: some Scene {
-        // MenuBarExtra tells macOS to put this in the top right menu bar, not in a window
         MenuBarExtra("Ejector", systemImage: "eject.fill") {
             EjectorMenuView()
         }
+        
+        // This registers the window so it can be opened from the Menu Bar button
+        WindowGroup("Ejector Debug Logs", id: "debugWindow") {
+            DebugLogView()
+        }
+        .defaultSize(width: 550, height: 400)
     }
 }
