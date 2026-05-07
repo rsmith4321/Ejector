@@ -101,7 +101,7 @@ enum CardType: String {
 
 // MARK: - 1. Drive Model
 struct Drive: Identifiable {
-    let id = UUID()
+    var id: String { url.path } // <-- The Fix: A stable, permanent ID
     let name: String
     let url: URL
     let isCameraCard: Bool
@@ -110,6 +110,7 @@ struct Drive: Identifiable {
     let isRemovable: Bool
     let isInternal: Bool
     
+    // SF Symbol for representing this drive type
     var iconName: String {
         if isCameraCard {
             switch cardType ?? .unknown {
