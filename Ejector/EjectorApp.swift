@@ -364,7 +364,6 @@ struct EjectorMenuView: View {
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Got It")
         
-        // Optimized for macOS 14+ to bring the alert to the front
         NSApp.activate()
         alert.runModal()
     }
@@ -375,46 +374,31 @@ struct EjectorMenuView: View {
                 Text("No external drives found")
                     .foregroundColor(.secondary)
             } else {
+                
                 if !cameraCards.isEmpty {
                     Button(action: { manager.ejectAllCameraCards() }) {
                         Label("Eject All Camera Cards", systemImage: "eject.fill")
                     }
-                    // We leave this modifier here simply to render the visual "⌃⌥⌘E" hint in the menu
                     .keyboardShortcut("e", modifiers: [.control, .option, .command])
                 }
                 
-                if (!cameraCards.isEmpty || !otherExternalVolumes.isEmpty) {
-                    Divider()
-                }
-                
+                // Using Section natively handles the dividers and index math!
                 if !cameraCards.isEmpty {
-                    Text("Camera Cards")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal)
-                        .padding(.top, 4)
-
-                    ForEach(cameraCards) { drive in
-                        Button(action: { manager.eject(drive: drive) }) {
-                            Label("Eject \(drive.name)", systemImage: drive.iconName)
+                    Section("Camera Cards") {
+                        ForEach(cameraCards) { drive in
+                            Button(action: { manager.eject(drive: drive) }) {
+                                Label("Eject \(drive.name)", systemImage: drive.iconName)
+                            }
                         }
                     }
                 }
                 
-                if !cameraCards.isEmpty && !otherExternalVolumes.isEmpty {
-                    Divider()
-                }
-                
                 if !otherExternalVolumes.isEmpty {
-                    Text("Other External Volumes")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal)
-                        .padding(.top, 4)
-                    
-                    ForEach(otherExternalVolumes) { drive in
-                        Button(action: { manager.eject(drive: drive) }) {
-                            Label("Eject \(drive.name)", systemImage: drive.iconName)
+                    Section("Other External Volumes") {
+                        ForEach(otherExternalVolumes) { drive in
+                            Button(action: { manager.eject(drive: drive) }) {
+                                Label("Eject \(drive.name)", systemImage: drive.iconName)
+                            }
                         }
                     }
                 }
@@ -471,7 +455,7 @@ struct EjectorMenuView: View {
             if enableDebugLogs {
                 Button("Show Debug Window") {
                     openWindow(id: "debugWindow")
-                    NSApp.activate(ignoringOtherApps: true)
+                    NSApp.activate()
                 }
             }
             
