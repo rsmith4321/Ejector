@@ -15,18 +15,18 @@ class GlobalHotkeyManager {
     
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-
+    
     func isTrusted(promptSystem: Bool) -> Bool {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: promptSystem] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
     }
-
+    
     func start() {
         guard isTrusted(promptSystem: false) else { return }
         
         // If it's already running, stop it first so we can restart with a new key
         if eventTap != nil { stop() }
-
+        
         let eventMask = (1 << CGEventType.keyDown.rawValue)
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -52,7 +52,7 @@ class GlobalHotkeyManager {
                 }
                 return Unmanaged.passRetained(event)
             }, userInfo: nil) else { return }
-
+        
         self.eventTap = tap
         self.runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         
@@ -78,7 +78,7 @@ class GlobalHotkeyManager {
 class LogManager: ObservableObject {
     static let shared = LogManager()
     @Published var logs: String = ""
-
+    
     func log(_ message: String) {
         DispatchQueue.main.async {
             let formatter = DateFormatter()
@@ -88,7 +88,7 @@ class LogManager: ObservableObject {
             print("[\(timestamp)] \(message)")
         }
     }
-
+    
     func clear() {
         DispatchQueue.main.async {
             self.logs = ""
@@ -135,32 +135,32 @@ class DriveManager: ObservableObject {
     private var isDebugEnabled: Bool {
         UserDefaults.standard.bool(forKey: "enableDebugLogs")
     }
-
+    
     init() {
-            let center = NSWorkspace.shared.notificationCenter
-            center.publisher(for: NSWorkspace.didMountNotification)
-                .merge(with: center.publisher(for: NSWorkspace.didUnmountNotification))
-                .merge(with: center.publisher(for: NSWorkspace.didRenameVolumeNotification))
-                .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
-                .sink { [weak self] _ in
-                    self?.fetchDrives()
-                }
-                .store(in: &cancellables)
-                
-            // Listen for the Global Hotkey Notification
-            NotificationCenter.default.publisher(for: NSNotification.Name("TriggerGlobalEject"))
-                .sink { [weak self] _ in
-                    self?.ejectAllCameraCards()
-                }
-                .store(in: &cancellables)
-                
-            if UserDefaults.standard.bool(forKey: "isShortcutEnabled") {
-                GlobalHotkeyManager.shared.start()
+        let center = NSWorkspace.shared.notificationCenter
+        center.publisher(for: NSWorkspace.didMountNotification)
+            .merge(with: center.publisher(for: NSWorkspace.didUnmountNotification))
+            .merge(with: center.publisher(for: NSWorkspace.didRenameVolumeNotification))
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.fetchDrives()
             }
-            
-            // --- NEW: Perform the initial scan when the app first launches ---
-            self.fetchDrives()
+            .store(in: &cancellables)
+        
+        // Listen for the Global Hotkey Notification
+        NotificationCenter.default.publisher(for: NSNotification.Name("TriggerGlobalEject"))
+            .sink { [weak self] _ in
+                self?.ejectAllCameraCards()
+            }
+            .store(in: &cancellables)
+        
+        if UserDefaults.standard.bool(forKey: "isShortcutEnabled") {
+            GlobalHotkeyManager.shared.start()
         }
+        
+        // --- NEW: Perform the initial scan when the app first launches ---
+        self.fetchDrives()
+    }
     
     private func detectCardType(for volumeURL: URL) -> CardType {
         guard let session = DASessionCreate(kCFAllocatorDefault),
@@ -168,20 +168,20 @@ class DriveManager: ObservableObject {
               let desc = DADiskCopyDescription(disk) as? [String: Any] else {
             return .unknown
         }
-
+        
         let model = (desc[kDADiskDescriptionDeviceModelKey as String] as? String) ?? ""
         let vendor = (desc[kDADiskDescriptionDeviceVendorKey as String] as? String) ?? ""
         let proto = (desc[kDADiskDescriptionDeviceProtocolKey as String] as? String) ?? ""
         let bus = (desc[kDADiskDescriptionBusNameKey as String] as? String) ?? ""
-
+        
         let haystack = (model + " " + vendor + " " + proto + " " + bus).lowercased()
-
+        
         if haystack.contains("secure digital") || haystack.contains("sdxc") || haystack.contains("sdhc") || haystack.contains(" sd ") || bus.lowercased() == "sd" {
             return .sd
         }
         if haystack.contains("cfexpress") { return .cfexpress }
         if haystack.contains("xqd") { return .xqd }
-
+        
         return .unknown
     }
     
@@ -224,7 +224,7 @@ class DriveManager: ObservableObject {
             if url.path == "/" { continue }
             let isUnderVolumes = url.path.hasPrefix("/Volumes/")
             guard isUnderVolumes else { continue }
-
+            
             let cameraFolderNames = [
                 "DCIM", "PRIVATE", "MISC", "AVCHD", "MP_ROOT", "CONTENTS",
                 "XDROOT", "BPAV", "NIKON", "CANONMSC", "FUJI", "GOPRO", "SONY"
@@ -233,7 +233,7 @@ class DriveManager: ObservableObject {
                 let folderURL = url.appendingPathComponent(folder, isDirectory: true)
                 return FileManager.default.fileExists(atPath: folderURL.path)
             }
-
+            
             let hardwareType = self.detectCardType(for: url)
             let isHardwareCamera = (hardwareType == .sd || hardwareType == .cfexpress || hardwareType == .xqd)
             
@@ -252,7 +252,7 @@ class DriveManager: ObservableObject {
                 }
                 LogManager.shared.log("-------------------------------------------------")
             }
-
+            
             foundDrives.append(Drive(name: name, url: url, isCameraCard: isCameraCard, cardType: finalCardType, isEjectable: isEjectable, isRemovable: isRemovable, isInternal: isInternal))
         }
         
@@ -294,7 +294,7 @@ class DriveManager: ObservableObject {
 // MARK: - 3. The Debug Window View
 struct DebugLogView: View {
     @StateObject private var logManager = LogManager.shared
-
+    
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
@@ -330,7 +330,7 @@ struct DebugLogView: View {
 // MARK: - 4. The Menu Bar View
 struct EjectorMenuView: View {
     @StateObject private var manager = DriveManager()
-    
+    @AppStorage("warnBeforeEjectingSSD") private var warnBeforeEjectingSSD = true
     @AppStorage("enableDebugLogs") private var enableDebugLogs = false
     @AppStorage("isShortcutEnabled") private var isShortcutEnabled = false
     
@@ -355,9 +355,9 @@ struct EjectorMenuView: View {
     }
     
     func showInstructions() {
-            let alert = NSAlert()
-            alert.messageText = "Easy Ejector Help & Instructions"
-            alert.informativeText = """
+        let alert = NSAlert()
+        alert.messageText = "Easy Ejector Help & Instructions"
+        alert.informativeText = """
                 • Smart Sorting: Ejector automatically finds camera folders (DCIM, etc.) to separate media cards from permanent SSDs. This is very useful for CFExpress cards that are not viewed as media by the OS.
                 
                 • Manual Ejecting: You can always click any drive in this menu to safely unmount it. No special permissions are required for this.
@@ -368,24 +368,43 @@ struct EjectorMenuView: View {
                 
                 • Troubleshooting: If a drive is missing, enable 'Debug Logging' and use the 'Show Debug Window' to see how your Mac identifies the hardware.
                 """
-            alert.alertStyle = .informational
-            
-            // 1. Add the buttons (The first one added becomes the primary "Return" key button)
-            alert.addButton(withTitle: "Got It")
-            alert.addButton(withTitle: "Visit Website")
-            
-            NSApp.activate()
-            
-            // 2. Capture which button the user clicks
-            let response = alert.runModal()
-            
-            // 3. If they clicked the second button, open your website
-            if response == .alertSecondButtonReturn {
-                if let url = URL(string: "https://www.ryansmithphotography.com/easyejector") {
-                    NSWorkspace.shared.open(url)
-                }
+        alert.alertStyle = .informational
+        
+        // 1. Add the buttons (The first one added becomes the primary "Return" key button)
+        alert.addButton(withTitle: "Got It")
+        alert.addButton(withTitle: "Visit Website")
+        
+        NSApp.activate()
+        
+        // 2. Capture which button the user clicks
+        let response = alert.runModal()
+        
+        // 3. If they clicked the second button, open your website
+        if response == .alertSecondButtonReturn {
+            if let url = URL(string: "https://www.ryansmithphotography.com/easyejector") {
+                NSWorkspace.shared.open(url)
             }
         }
+    }
+    func confirmAndEject(drive: Drive) {
+        let alert = NSAlert()
+        alert.messageText = "Confirm Ejection"
+        alert.informativeText = "Are you sure you want to unmount '\(drive.name)'? It is not recognized as a camera card."
+        alert.alertStyle = .warning
+        
+        alert.addButton(withTitle: "Eject")
+        alert.addButton(withTitle: "Cancel")
+        
+        // This is crucial: it brings the alert to the front of the screen
+        NSApp.activate()
+        
+        let response = alert.runModal()
+        
+        // If they click the first button ("Eject")
+        if response == .alertFirstButtonReturn {
+            manager.eject(drive: drive)
+        }
+    }
     
     var body: some View {
         VStack(alignment: .leading) {
@@ -397,7 +416,7 @@ struct EjectorMenuView: View {
                 .padding(.horizontal)
                 .padding(.top, 4)
                 .padding(.bottom, 2)
-                
+            
             Divider()
             
             if manager.drives.isEmpty {
@@ -431,7 +450,15 @@ struct EjectorMenuView: View {
                     // --- Reverted to native Section for Apple's standard rendering ---
                     Section("Other External Volumes") {
                         ForEach(otherExternalVolumes) { drive in
-                            Button(action: { manager.eject(drive: drive) }) {
+                            Button(action: {
+                                if warnBeforeEjectingSSD {
+                                    // Call the new native NSAlert function
+                                    confirmAndEject(drive: drive)
+                                } else {
+                                    // Eject immediately if the user disabled the warning
+                                    manager.eject(drive: drive)
+                                }
+                            }) {
                                 Label("Eject \(drive.name)", systemImage: drive.iconName)
                             }
                         }
@@ -498,6 +525,7 @@ struct EjectorMenuView: View {
                     }
                 }
             }
+            Toggle("Confirm Before Ejecting SSDs", isOn: $warnBeforeEjectingSSD)
             
             Toggle("Enable Debug Logging", isOn: $enableDebugLogs)
             
@@ -518,6 +546,7 @@ struct EjectorMenuView: View {
                 NSApplication.shared.terminate(nil)
             }
         }
+        
     }
 }
 
