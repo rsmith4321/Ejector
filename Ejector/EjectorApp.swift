@@ -344,13 +344,11 @@ struct EjectorMenuView: View {
     @AppStorage("enableDebugLogs") private var enableDebugLogs = false
     @AppStorage("isShortcutEnabled") private var isShortcutEnabled = false
     
-    // --- NEW VARIABLES ADDED HERE ---
     @AppStorage("shortcutKeyCode") private var shortcutKeyCode = 14
     let availableKeys: [(name: String, code: Int)] = [
         ("D", 2), ("E", 14), ("F", 3), ("G", 5), ("K", 40),
         ("M", 46), ("R", 15), ("T", 17), ("X", 7)
     ]
-    // --------------------------------
     
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var showingAccessibilityAlert = false
@@ -359,37 +357,59 @@ struct EjectorMenuView: View {
     
     var cameraCards: [Drive] { manager.drives.filter { $0.isCameraCard } }
     var otherExternalVolumes: [Drive] { manager.drives.filter { !$0.isCameraCard } }
+    
     // Dynamically finds the character for the visual menu hint
-        var currentShortcutLetter: KeyEquivalent {
-            let matchedKey = availableKeys.first(where: { $0.code == shortcutKeyCode })?.name ?? "E"
-            return KeyEquivalent(Character(matchedKey.lowercased()))
-        }
+    var currentShortcutLetter: KeyEquivalent {
+        let matchedKey = availableKeys.first(where: { $0.code == shortcutKeyCode })?.name ?? "E"
+        return KeyEquivalent(Character(matchedKey.lowercased()))
+    }
     
     func showInstructions() {
-        let alert = NSAlert()
-        alert.messageText = "Easy Ejector Help & Instructions"
-        alert.informativeText = """
-            • Smart Sorting: Ejector automatically finds camera folders (DCIM, etc.) to separate media cards from permanent SSDs. This is especially helpful for CFexpress cards, which macOS often mistakes for standard hard drives.
+            let alert = NSAlert()
+            alert.messageText = "Easy Ejector Help & Instructions"
+            alert.informativeText = """
+                • Smart Sorting: Ejector automatically finds camera folders (DCIM, etc.) to separate media cards from permanent SSDs. This is very useful for CFExpress cards that are not viewed as media by the OS.
+                
+                • Manual Ejecting: You can always click any drive in this menu to safely unmount it. No special permissions are required for this.
+                
+                • Global Keyboard Shortcut (Optional): Press ⌃⌥⌘ + your chosen letter to instantly eject all Camera Cards from any app.
+                
+                • Why does it need 'Accessibility' Permission?: To use the eject shortcut while you are using other apps (like Photoshop), macOS requires 'Accessibility' permission. If you don't want to use the keyboard shortcut, you do not need to enable this.
+                
+                • Troubleshooting: If a drive is missing, enable 'Debug Logging' and use the 'Show Debug Window' to see how your Mac identifies the hardware.
+                """
+            alert.alertStyle = .informational
             
-            • Manual Ejecting: Click any drive in this menu to safely unmount it. No special permissions are required for this.
+            // 1. Add the buttons (The first one added becomes the primary "Return" key button)
+            alert.addButton(withTitle: "Got It")
+            alert.addButton(withTitle: "Visit Website")
             
-            • Global Keyboard Shortcut (Optional): Press ⌃⌥⌘ + your chosen letter to instantly eject all Camera Cards from any app. 
+            NSApp.activate()
             
-            • Why 'Accessibility' Permission?: To trigger the eject shortcut while using other apps (like Lightroom or Photoshop), macOS requires 'Accessibility' permission. If you prefer to manually click the menu, you do not need to enable this.
+            // 2. Capture which button the user clicks
+            let response = alert.runModal()
             
-            • Troubleshooting: If a drive is missing, enable 'Debug Logging' and click 'Show Debug Window' to see exactly how your Mac is identifying the hardware.
-            
-            • Support & Updates: Visit https://www.ryansmithphotography.com/easyejector for tutorials, troubleshooting, and contact information.
-            """
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "Got It")
-        
-        NSApp.activate()
-        alert.runModal()
-    }
+            // 3. If they clicked the second button, open your website
+            if response == .alertSecondButtonReturn {
+                if let url = URL(string: "https://www.ryansmithphotography.com/easyejector") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        }
     
     var body: some View {
         VStack(alignment: .leading) {
+            
+            // --- The boldest native title possible ---
+            Text("Easy Ejector")
+                .font(.headline)
+                .fontWeight(.bold)
+                .padding(.horizontal)
+                .padding(.top, 4)
+                .padding(.bottom, 2)
+                
+            Divider()
+            
             if manager.drives.isEmpty {
                 Text("No external drives found")
                     .foregroundColor(.secondary)
@@ -399,11 +419,11 @@ struct EjectorMenuView: View {
                     Button(action: { manager.ejectAllCameraCards() }) {
                         Label("Eject All Camera Cards", systemImage: "eject.fill")
                     }
-                    // Now uses the dynamic letter for the visual hint!
                     .keyboardShortcut(currentShortcutLetter, modifiers: [.control, .option, .command])
                 }
                 
                 if !cameraCards.isEmpty {
+                    // --- Reverted to native Section for Apple's standard rendering ---
                     Section("Camera Cards") {
                         ForEach(cameraCards) { drive in
                             Button(action: { manager.eject(drive: drive) }) {
@@ -413,7 +433,12 @@ struct EjectorMenuView: View {
                     }
                 }
                 
+                if (!cameraCards.isEmpty && !otherExternalVolumes.isEmpty) {
+                    Divider()
+                }
+                
                 if !otherExternalVolumes.isEmpty {
+                    // --- Reverted to native Section for Apple's standard rendering ---
                     Section("Other External Volumes") {
                         ForEach(otherExternalVolumes) { drive in
                             Button(action: { manager.eject(drive: drive) }) {
@@ -470,7 +495,6 @@ struct EjectorMenuView: View {
                     Text("To use the global keyboard shortcut from inside other apps, macOS requires Ejector to have Accessibility permission.\n\nPlease enable it in System Settings, then try turning this shortcut on again.")
                 }
             
-            // --- NEW PICKER ADDED HERE ---
             if isShortcutEnabled {
                 Picker("Shortcut Letter (⌃⌥⌘ +)", selection: $shortcutKeyCode) {
                     ForEach(availableKeys, id: \.code) { key in
@@ -479,13 +503,11 @@ struct EjectorMenuView: View {
                 }
                 .padding(.horizontal)
                 .onChange(of: shortcutKeyCode) { oldValue, newValue in
-                    // Instantly restart the event tap with the newly selected letter
                     if GlobalHotkeyManager.shared.isTrusted(promptSystem: false) {
                         GlobalHotkeyManager.shared.start()
                     }
                 }
             }
-            // -----------------------------
             
             Toggle("Enable Debug Logging", isOn: $enableDebugLogs)
             
