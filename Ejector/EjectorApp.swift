@@ -359,6 +359,11 @@ struct EjectorMenuView: View {
     
     var cameraCards: [Drive] { manager.drives.filter { $0.isCameraCard } }
     var otherExternalVolumes: [Drive] { manager.drives.filter { !$0.isCameraCard } }
+    // Dynamically finds the character for the visual menu hint
+        var currentShortcutLetter: KeyEquivalent {
+            let matchedKey = availableKeys.first(where: { $0.code == shortcutKeyCode })?.name ?? "E"
+            return KeyEquivalent(Character(matchedKey.lowercased()))
+        }
     
     func showInstructions() {
         let alert = NSAlert()
@@ -394,8 +399,8 @@ struct EjectorMenuView: View {
                     Button(action: { manager.ejectAllCameraCards() }) {
                         Label("Eject All Camera Cards", systemImage: "eject.fill")
                     }
-                    // This is just the visual hint in the menu, we default it to E here
-                    .keyboardShortcut("e", modifiers: [.control, .option, .command])
+                    // Now uses the dynamic letter for the visual hint!
+                    .keyboardShortcut(currentShortcutLetter, modifiers: [.control, .option, .command])
                 }
                 
                 if !cameraCards.isEmpty {
