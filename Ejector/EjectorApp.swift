@@ -16,18 +16,16 @@ class GlobalHotkeyManager {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
 
-    // Checks if permission is granted. Can optionally trigger the macOS system prompt.
     func isTrusted(promptSystem: Bool) -> Bool {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: promptSystem] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
     }
 
     func start() {
-        // Double-check permission quietly before trying to start
         guard isTrusted(promptSystem: false) else { return }
         
-        // Prevent creating multiple taps if it's already running
-        if eventTap != nil { return }
+        // If it's already running, stop it first so we can restart with a new key
+        if eventTap != nil { stop() }
 
         let eventMask = (1 << CGEventType.keyDown.rawValue)
         guard let tap = CGEvent.tapCreate(
@@ -36,14 +34,21 @@ class GlobalHotkeyManager {
             options: .defaultTap,
             eventsOfInterest: CGEventMask(eventMask),
             callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
+                
                 let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
                 let flags = event.flags
                 
-                if flags.contains(.maskCommand) && flags.contains(.maskControl) && flags.contains(.maskAlternate) && keyCode == 14 {
+                // THE FIX: Read the user's chosen keycode INSIDE the closure
+                // to avoid capturing external context.
+                let savedKey = UserDefaults.standard.integer(forKey: "shortcutKeyCode")
+                let targetKeyCode = savedKey == 0 ? 14 : savedKey
+                
+                // Compare against our dynamic targetKeyCode
+                if flags.contains(.maskCommand) && flags.contains(.maskControl) && flags.contains(.maskAlternate) && keyCode == targetKeyCode {
                     DispatchQueue.main.async {
                         NotificationCenter.default.post(name: NSNotification.Name("TriggerGlobalEject"), object: nil)
                     }
-                    return nil // Swallow the key to prevent the beep
+                    return nil // Swallow the key
                 }
                 return Unmanaged.passRetained(event)
             }, userInfo: nil) else { return }
@@ -54,7 +59,7 @@ class GlobalHotkeyManager {
         if let runLoopSource = self.runLoopSource {
             CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
             CGEvent.tapEnable(tap: tap, enable: true)
-            LogManager.shared.log("✅ Global shortcut (⌃⌥⌘E) activated.")
+            LogManager.shared.log("✅ Global shortcut activated.")
         }
     }
     
@@ -339,6 +344,14 @@ struct EjectorMenuView: View {
     @AppStorage("enableDebugLogs") private var enableDebugLogs = false
     @AppStorage("isShortcutEnabled") private var isShortcutEnabled = false
     
+    // --- NEW VARIABLES ADDED HERE ---
+    @AppStorage("shortcutKeyCode") private var shortcutKeyCode = 14
+    let availableKeys: [(name: String, code: Int)] = [
+        ("D", 2), ("E", 14), ("F", 3), ("G", 5), ("K", 40),
+        ("M", 46), ("R", 15), ("T", 17), ("X", 7)
+    ]
+    // --------------------------------
+    
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var showingAccessibilityAlert = false
     
@@ -351,16 +364,18 @@ struct EjectorMenuView: View {
         let alert = NSAlert()
         alert.messageText = "Easy Ejector Help & Instructions"
         alert.informativeText = """
-        • Smart Sorting: Ejector automatically finds camera folders (DCIM, etc.) to separate media cards from permanent SSDs.
-        
-        • Manual Ejecting: You can always click any drive in this menu to safely unmount it. No special permissions are required for this.
-        
-        • Global Keyboard Shortcut (Optional): Press ⌃⌥⌘E to instantly eject all Camera Cards from any app. 
-        
-        • Why 'Accessibility' Permission?: To use that shortcut while you are using other apps (like Photoshop), macOS requires 'Accessibility' permission. If you don't want to use the shortcut, you do not need to enable this.
-        
-        • Troubleshooting: If a drive is missing, enable 'Debug Logging' and use the 'Show Debug Window' to see how your Mac identifies the hardware.
-        """
+            • Smart Sorting: Ejector automatically finds camera folders (DCIM, etc.) to separate media cards from permanent SSDs. This is especially helpful for CFexpress cards, which macOS often mistakes for standard hard drives.
+            
+            • Manual Ejecting: Click any drive in this menu to safely unmount it. No special permissions are required for this.
+            
+            • Global Keyboard Shortcut (Optional): Press ⌃⌥⌘ + your chosen letter to instantly eject all Camera Cards from any app. 
+            
+            • Why 'Accessibility' Permission?: To trigger the eject shortcut while using other apps (like Lightroom or Photoshop), macOS requires 'Accessibility' permission. If you prefer to manually click the menu, you do not need to enable this.
+            
+            • Troubleshooting: If a drive is missing, enable 'Debug Logging' and click 'Show Debug Window' to see exactly how your Mac is identifying the hardware.
+            
+            • Support & Updates: Visit https://www.ryansmithphotography.com/easyejector for tutorials, troubleshooting, and contact information.
+            """
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Got It")
         
@@ -379,10 +394,10 @@ struct EjectorMenuView: View {
                     Button(action: { manager.ejectAllCameraCards() }) {
                         Label("Eject All Camera Cards", systemImage: "eject.fill")
                     }
+                    // This is just the visual hint in the menu, we default it to E here
                     .keyboardShortcut("e", modifiers: [.control, .option, .command])
                 }
                 
-                // Using Section natively handles the dividers and index math!
                 if !cameraCards.isEmpty {
                     Section("Camera Cards") {
                         ForEach(cameraCards) { drive in
@@ -426,7 +441,7 @@ struct EjectorMenuView: View {
                     }
                 }
             
-            Toggle("Enable Global Eject Shortcut (⌃⌥⌘E)", isOn: $isShortcutEnabled)
+            Toggle("Enable Global Eject Shortcut", isOn: $isShortcutEnabled)
                 .onChange(of: isShortcutEnabled) { oldValue, newValue in
                     if newValue {
                         if GlobalHotkeyManager.shared.isTrusted(promptSystem: true) {
@@ -449,6 +464,23 @@ struct EjectorMenuView: View {
                 } message: {
                     Text("To use the global keyboard shortcut from inside other apps, macOS requires Ejector to have Accessibility permission.\n\nPlease enable it in System Settings, then try turning this shortcut on again.")
                 }
+            
+            // --- NEW PICKER ADDED HERE ---
+            if isShortcutEnabled {
+                Picker("Shortcut Letter (⌃⌥⌘ +)", selection: $shortcutKeyCode) {
+                    ForEach(availableKeys, id: \.code) { key in
+                        Text(key.name).tag(key.code)
+                    }
+                }
+                .padding(.horizontal)
+                .onChange(of: shortcutKeyCode) { oldValue, newValue in
+                    // Instantly restart the event tap with the newly selected letter
+                    if GlobalHotkeyManager.shared.isTrusted(promptSystem: false) {
+                        GlobalHotkeyManager.shared.start()
+                    }
+                }
+            }
+            // -----------------------------
             
             Toggle("Enable Debug Logging", isOn: $enableDebugLogs)
             
