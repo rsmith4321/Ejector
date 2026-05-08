@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		303A1AA52FAC2B2400CFBD1A /* Ejector.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ejector.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		303A1AA52FAC2B2400CFBD1A /* Easy Ejector.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Easy Ejector.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -40,7 +40,7 @@
 		303A1AA62FAC2B2400CFBD1A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				303A1AA52FAC2B2400CFBD1A /* Ejector.app */,
+				303A1AA52FAC2B2400CFBD1A /* Easy Ejector.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -67,7 +67,7 @@
 			packageProductDependencies = (
 			);
 			productName = Ejector;
-			productReference = 303A1AA52FAC2B2400CFBD1A /* Ejector.app */;
+			productReference = 303A1AA52FAC2B2400CFBD1A /* Easy Ejector.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -278,7 +278,7 @@
 				);
 				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.Ejector;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Easy Ejector";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
@@ -326,7 +326,7 @@
 				);
 				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.Ejector;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Easy Ejector";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
