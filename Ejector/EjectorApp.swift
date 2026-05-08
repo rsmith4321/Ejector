@@ -118,14 +118,9 @@ struct Drive: Identifiable {
     // SF Symbol for representing this drive type
     var iconName: String {
         if isCameraCard {
-            switch cardType ?? .unknown {
-            case .sd:
-                return "sdcard"
-            case .cfexpress, .xqd:
-                return "memorychip"
-            case .unknown:
-                return "externaldrive.badge.questionmark"
-            }
+            // Apple doesn't have a CFexpress symbol, so we use
+            // the universal "sdcard" for all camera media.
+            return "sdcard"
         } else {
             return "externaldrive"
         }
@@ -417,7 +412,7 @@ struct EjectorMenuView: View {
                 
                 if !cameraCards.isEmpty {
                     Button(action: { manager.ejectAllCameraCards() }) {
-                        Label("Eject All Camera Cards", systemImage: "eject.fill")
+                        Label("Eject All Cards", systemImage: "eject.fill")
                     }
                     .keyboardShortcut(currentShortcutLetter, modifiers: [.control, .option, .command])
                 }
