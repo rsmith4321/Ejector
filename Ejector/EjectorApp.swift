@@ -366,6 +366,8 @@ struct EjectorMenuView: View {
                 
                 • Why does it need 'Accessibility' Permission?: To use the eject shortcut while you are using other apps (like Photoshop), macOS requires 'Accessibility' permission. If you don't want to use the keyboard shortcut, you do not need to enable this.
                 
+                • Confirm Before Eject SSD: This option warns you if you are ejecting a SSD or Hard Disk that is NOT detected as a camera card.
+                
                 • Troubleshooting: If a drive is missing, enable 'Debug Logging' and use the 'Show Debug Window' to see how your Mac identifies the hardware.
                 """
         alert.alertStyle = .informational
