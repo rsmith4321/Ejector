@@ -137,35 +137,30 @@ class DriveManager: ObservableObject {
     }
 
     init() {
-        let center = NSWorkspace.shared.notificationCenter
-        center.publisher(for: NSWorkspace.didMountNotification)
-            .merge(with: center.publisher(for: NSWorkspace.didUnmountNotification))
-            .merge(with: center.publisher(for: NSWorkspace.didRenameVolumeNotification))
-            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.fetchDrives()
+            let center = NSWorkspace.shared.notificationCenter
+            center.publisher(for: NSWorkspace.didMountNotification)
+                .merge(with: center.publisher(for: NSWorkspace.didUnmountNotification))
+                .merge(with: center.publisher(for: NSWorkspace.didRenameVolumeNotification))
+                .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+                .sink { [weak self] _ in
+                    self?.fetchDrives()
+                }
+                .store(in: &cancellables)
+                
+            // Listen for the Global Hotkey Notification
+            NotificationCenter.default.publisher(for: NSNotification.Name("TriggerGlobalEject"))
+                .sink { [weak self] _ in
+                    self?.ejectAllCameraCards()
+                }
+                .store(in: &cancellables)
+                
+            if UserDefaults.standard.bool(forKey: "isShortcutEnabled") {
+                GlobalHotkeyManager.shared.start()
             }
-            .store(in: &cancellables)
-        
-        Timer.publish(every: 15, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                self?.fetchDrives()
-            }
-            .store(in: &cancellables)
             
-        // Listen for the Global Hotkey Notification
-        NotificationCenter.default.publisher(for: NSNotification.Name("TriggerGlobalEject"))
-            .sink { [weak self] _ in
-                self?.ejectAllCameraCards()
-            }
-            .store(in: &cancellables)
-            
-        // Only start listening for global keystrokes if the user previously enabled it
-        if UserDefaults.standard.bool(forKey: "isShortcutEnabled") {
-            GlobalHotkeyManager.shared.start()
+            // --- NEW: Perform the initial scan when the app first launches ---
+            self.fetchDrives()
         }
-    }
     
     private func detectCardType(for volumeURL: URL) -> CardType {
         guard let session = DASessionCreate(kCFAllocatorDefault),
@@ -522,9 +517,6 @@ struct EjectorMenuView: View {
             Button("Quit Ejector") {
                 NSApplication.shared.terminate(nil)
             }
-        }
-        .onAppear {
-            manager.fetchDrives()
         }
     }
 }
