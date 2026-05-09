@@ -407,7 +407,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                             } else {
                                 body = "Ejected \(drive.name)"
                             }
-                            self.sendNotification(title: "Easy Ejector", body: body)
+                            self.sendNotification(title: "Easy Eject", body: body)
                         }
                     }
                     completion?(success, cleanedCount)
@@ -445,7 +445,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                     } else {
                         body = "Ejected \(ejectedCount) camera \(noun)"
                     }
-                    self.sendNotification(title: "Easy Ejector", body: body)
+                    self.sendNotification(title: "Easy Eject", body: body)
                 }
             }
         }
@@ -561,7 +561,7 @@ struct EjectorMenuView: View {
         VStack(alignment: .leading) {
 
             // --- The boldest native title possible ---
-            Text("Easy Ejector")
+            Text("Easy Eject")
                 .font(.headline)
                 .fontWeight(.bold)
                 .padding(.horizontal)
@@ -627,12 +627,12 @@ struct EjectorMenuView: View {
                 manager.fetchDrives()
             }
 
-            Button("About Easy Ejector") {
+            Button("About Easy Eject") {
                 NSApp.activate()
                 NSApp.orderFrontStandardAboutPanel()
             }
 
-            Button("Quit Ejector") {
+            Button("Quit Easy Eject") {
                 NSApplication.shared.terminate(nil)
             }
         }
@@ -709,7 +709,7 @@ struct SettingsView: View {
                     }
                     Button("Later", role: .cancel) { }
                 } message: {
-                    Text("To clean hidden files from your drives, Easy Ejector needs Full Disk Access.\n\n1. Click 'Open Settings & Show App' below.\n2. Drag Easy Ejector from the Finder window into the Full Disk Access list.\n3. Toggle the switch next to Easy Ejector to turn it on.\n4. macOS will ask you to quit and reopen the app for it to take effect.")
+                    Text("To clean hidden files from your drives, Easy Eject needs Full Disk Access.\n\n1. Click 'Open Settings & Show App' below.\n2. Drag Easy Eject from the Finder window into the Full Disk Access list.\n3. Toggle the switch next to Easy Eject to turn it on.\n4. macOS will ask you to quit and reopen the app for it to take effect.")
                 }
 
                 Toggle("Confirm Before Ejecting SSDs", isOn: $warnBeforeEjectingSSD)
@@ -734,7 +734,7 @@ struct SettingsView: View {
                         }
                         Button("Later", role: .cancel) { }
                     } message: {
-                        Text("macOS has notifications turned off for Easy Ejector. To receive eject confirmations, open Notification Settings and enable notifications for this app.")
+                        Text("macOS has notifications turned off for Easy Eject. To receive eject confirmations, open Notification Settings and enable notifications for this app.")
                     }
             }
 
@@ -765,7 +765,7 @@ struct SettingsView: View {
                         }
                         Button("Cancel", role: .cancel) { }
                     } message: {
-                        Text("To use the global keyboard shortcut from inside other apps, macOS requires Ejector to have Accessibility permission.\n\nIn System Settings, find Easy Ejector in the list and toggle it on. If it's not in the list, click the '+' button and add it from your Applications folder.\n\nIt will begin working immediately without restarting the app.")
+                        Text("To use the global keyboard shortcut from inside other apps, macOS requires Easy Eject to have Accessibility permission.\n\nIn System Settings, find Easy Eject in the list and toggle it on. If it's not in the list, click the '+' button and add it from your Applications folder.\n\nIt will begin working immediately without restarting the app.")
                     }
                 
                 if isShortcutEnabled {
@@ -862,7 +862,7 @@ struct EjectorApp: App {
         }
         
         // --- NEW: The Welcome & Disclaimer Window ---
-        Window("Welcome to Easy Ejector", id: "welcomeWindow") {
+        Window("Welcome to Easy Eject", id: "welcomeWindow") {
             WelcomeView()
         }
         .windowStyle(.hiddenTitleBar)
@@ -873,7 +873,7 @@ struct EjectorApp: App {
         }
         .defaultSize(width: 500, height: 520)
 
-        WindowGroup("Ejector Debug Logs", id: "debugWindow") {
+        WindowGroup("Easy Eject Debug Logs", id: "debugWindow") {
             DebugLogView()
         }
         .defaultSize(width: 550, height: 400)
@@ -979,7 +979,7 @@ struct WelcomeView: View {
                 .frame(width: 60, height: 60)
                 .foregroundColor(.blue)
 
-            Text("Welcome to Easy Ejector")
+            Text("Welcome to Easy Eject")
                 .font(.title)
                 .fontWeight(.bold)
 
@@ -987,7 +987,7 @@ struct WelcomeView: View {
                 // MUST be a LazyVStack so the bottom sensor doesn't load immediately
                 LazyVStack(alignment: .leading, spacing: 10) {
                     Text("""
-                    Easy Ejector is a utility to simplify ejection of camera cards and remove extra unneeded macOS metadata files.
+                    Easy Eject is a utility to simplify ejection of camera cards and remove extra unneeded macOS metadata files.
 
                     **Important Disclaimer:**
                     This software is provided "as is", without warranty of any kind, express or implied. In no event shall the developer be liable for any claim, damages, or other liability, including but not limited to data loss or hardware issues, arising from the use of this software.

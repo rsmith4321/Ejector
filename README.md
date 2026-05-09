@@ -1,8 +1,8 @@
-# Easy Ejector for Photographers
+# Easy Eject for Photographers
 
 **The missing "Eject" button for macOS photographers, videographers, and content creators.**
 
-Easy Ejector is a lightweight macOS menu bar utility that intelligently detects camera memory cards and lets you safely eject them with a single click or keyboard shortcut. It also scrubs hidden macOS metadata that causes errors on cameras, emulators, and PCs.
+Easy Eject is a lightweight macOS menu bar utility that intelligently detects camera memory cards and lets you safely eject them with a single click or keyboard shortcut. It also scrubs hidden macOS metadata that causes errors on cameras, emulators, and PCs.
 
 ## The Problem
 
@@ -18,7 +18,7 @@ On top of that, macOS silently litters every drive with invisible metadata files
 
 ### Smart Sorting
 
-Instead of relying on flawed hardware flags, Easy Ejector uses two detection methods:
+Instead of relying on flawed hardware flags, Easy Eject uses two detection methods:
 
 1. **Hardware detection** via DiskArbitration — identifies SD, CFexpress, and XQD card reader protocols
 2. **Folder structure scanning** — detects brand-specific camera directories:
@@ -56,7 +56,7 @@ The scrubber safely skips macOS-managed directories (`.Spotlight-V100`, `.Trashe
 ## Installation
 
 1. Download the latest release from [Releases](https://github.com/rsmith4321/Ejector/releases/latest).
-2. Move **Easy Ejector** to your Applications folder.
+2. Move **Easy Eject** to your Applications folder.
 3. **First launch:** Right-click the app and select **Open**, then click **Open** in the dialog. You only need to do this once (required because the app is distributed outside the Mac App Store).
 
 ## Permissions

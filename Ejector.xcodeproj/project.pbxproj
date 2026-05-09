@@ -7,7 +7,8 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		303A1AA52FAC2B2400CFBD1A /* Easy Ejector.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Easy Ejector.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		303A1AA52FAC2B2400CFBD1A /* Easy Eject.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Easy Eject.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		305169E02FAF864500D6218B /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -30,6 +31,7 @@
 		303A1A9C2FAC2B2400CFBD1A = {
 			isa = PBXGroup;
 			children = (
+				305169E02FAF864500D6218B /* README.md */,
 				303A1AA72FAC2B2400CFBD1A /* Ejector */,
 				303A1AA62FAC2B2400CFBD1A /* Products */,
 			);
@@ -38,7 +40,7 @@
 		303A1AA62FAC2B2400CFBD1A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				303A1AA52FAC2B2400CFBD1A /* Easy Ejector.app */,
+				303A1AA52FAC2B2400CFBD1A /* Easy Eject.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -61,7 +63,7 @@
 			);
 			name = Ejector;
 			productName = Ejector;
-			productReference = 303A1AA52FAC2B2400CFBD1A /* Easy Ejector.app */;
+			productReference = 303A1AA52FAC2B2400CFBD1A /* Easy Eject.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -259,7 +261,7 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Easy Ejector for Photographers";
+				INFOPLIST_KEY_CFBundleDisplayName = "Easy Eject";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -269,7 +271,7 @@
 				);
 				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.Ejector;
-				PRODUCT_NAME = "Easy Ejector";
+				PRODUCT_NAME = "Easy Eject";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
@@ -308,7 +310,7 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Easy Ejector for Photographers";
+				INFOPLIST_KEY_CFBundleDisplayName = "Easy Eject";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -318,7 +320,7 @@
 				);
 				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.Ejector;
-				PRODUCT_NAME = "Easy Ejector";
+				PRODUCT_NAME = "Easy Eject";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
