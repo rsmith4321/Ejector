@@ -79,6 +79,7 @@ class GlobalHotkeyManager {
 class LogManager: ObservableObject {
     static let shared = LogManager()
     @Published var logs: String = ""
+    private static let maxLines = 500
 
     private let formatter: DateFormatter = {
         let f = DateFormatter()
@@ -91,6 +92,11 @@ class LogManager: ObservableObject {
             let timestamp = self.formatter.string(from: Date())
             self.logs += "[\(timestamp)] \(message)\n"
             print("[\(timestamp)] \(message)")
+
+            let lines = self.logs.components(separatedBy: "\n")
+            if lines.count > Self.maxLines {
+                self.logs = lines.suffix(Self.maxLines).joined(separator: "\n")
+            }
         }
     }
     
