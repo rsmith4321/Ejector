@@ -8,6 +8,7 @@ import Cocoa
 import Combine
 import DiskArbitration
 import ServiceManagement
+import UserNotifications
 
 // MARK: - 0. Global Hotkey Manager
 class GlobalHotkeyManager {
@@ -132,7 +133,7 @@ struct Drive: Identifiable {
 }
 
 // MARK: - 2. Drive Manager (The Brains)
-class DriveManager: ObservableObject {
+class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     @Published var drives: [Drive] = []
     private var cancellables = Set<AnyCancellable>()
     
@@ -140,7 +141,11 @@ class DriveManager: ObservableObject {
         UserDefaults.standard.bool(forKey: "enableDebugLogs")
     }
     
-    init() {
+    override init() {
+        super.init()
+
+        UserDefaults.standard.register(defaults: ["showEjectNotifications": true])
+
         let center = NSWorkspace.shared.notificationCenter
         center.publisher(for: NSWorkspace.didMountNotification)
             .merge(with: center.publisher(for: NSWorkspace.didUnmountNotification))
@@ -150,20 +155,46 @@ class DriveManager: ObservableObject {
                 self?.fetchDrives()
             }
             .store(in: &cancellables)
-        
-        // Listen for the Global Hotkey Notification
+
         NotificationCenter.default.publisher(for: NSNotification.Name("TriggerGlobalEject"))
             .sink { [weak self] _ in
                 self?.ejectAllCameraCards()
             }
             .store(in: &cancellables)
-        
+
         if UserDefaults.standard.bool(forKey: "isShortcutEnabled") {
             GlobalHotkeyManager.shared.start()
         }
-        
-        // --- NEW: Perform the initial scan when the app first launches ---
+
         self.fetchDrives()
+
+        let notificationCenter = UNUserNotificationCenter.current()
+        notificationCenter.delegate = self
+        notificationCenter.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error = error {
+                LogManager.shared.log("❌ Notification auth error: \(error.localizedDescription)")
+            } else if !granted {
+                LogManager.shared.log("ℹ️ Notification permission not granted")
+            }
+        }
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner])
+    }
+
+    private func sendNotification(title: String, body: String) {
+        guard UserDefaults.standard.bool(forKey: "showEjectNotifications") else { return }
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                LogManager.shared.log("❌ Notification error: \(error.localizedDescription)")
+            }
+        }
     }
     
     private func detectCardType(for volumeURL: URL) -> CardType {
@@ -263,6 +294,7 @@ class DriveManager: ObservableObject {
         
         DispatchQueue.main.async {
             self.drives = foundDrives
+            UserDefaults.standard.set(foundDrives.filter { $0.isCameraCard }.count, forKey: "cameraCardCount")
         }
     }
     
@@ -283,16 +315,18 @@ class DriveManager: ObservableObject {
         return names
     }
 
-    private func cleanHiddenMetadata(at volURL: URL) {
+    @discardableResult
+    private func cleanHiddenMetadata(at volURL: URL) -> Int {
         let fileManager = FileManager.default
         let skipDirectories: Set<String> = [".Spotlight-V100", ".Trashes", ".fseventsd", ".TemporaryItems"]
+        var deletedCount = 0
 
         if self.isDebugEnabled { LogManager.shared.log("🧹 Starting metadata cleanup for: \(volURL.lastPathComponent)") }
 
         // Walk the volume tree, deleting .DS_Store and __MACOSX and collecting directories.
         var directories: [URL] = [volURL]
         let keys: [URLResourceKey] = [.isDirectoryKey]
-        guard let enumerator = fileManager.enumerator(at: volURL, includingPropertiesForKeys: keys, options: [.skipsPackageDescendants]) else { return }
+        guard let enumerator = fileManager.enumerator(at: volURL, includingPropertiesForKeys: keys, options: [.skipsPackageDescendants]) else { return 0 }
 
         for case let fileURL as URL in enumerator {
             let fileName = fileURL.lastPathComponent
@@ -309,6 +343,7 @@ class DriveManager: ObservableObject {
             if fileName == ".DS_Store" || fileName == "__MACOSX" {
                 do {
                     try fileManager.removeItem(at: fileURL)
+                    deletedCount += 1
                     if self.isDebugEnabled { LogManager.shared.log("🗑️ Deleted: \(fileName)") }
                 } catch {
                     if self.isDebugEnabled { LogManager.shared.log("⚠️ Could not delete \(fileName): \(error.localizedDescription)") }
@@ -323,6 +358,7 @@ class DriveManager: ObservableObject {
                 let fileURL = dirURL.appendingPathComponent(name)
                 do {
                     try fileManager.removeItem(at: fileURL)
+                    deletedCount += 1
                     if self.isDebugEnabled { LogManager.shared.log("🗑️ Deleted: \(name)") }
                 } catch {
                     if self.isDebugEnabled { LogManager.shared.log("⚠️ Could not delete \(name): \(error.localizedDescription)") }
@@ -330,42 +366,88 @@ class DriveManager: ObservableObject {
             }
         }
 
-        if self.isDebugEnabled { LogManager.shared.log("✨ Cleanup complete.") }
+        if self.isDebugEnabled { LogManager.shared.log("✨ Cleanup complete. Removed \(deletedCount) file\(deletedCount == 1 ? "" : "s").") }
+        return deletedCount
     }
     
-    func eject(drive: Drive, clean: Bool = false) {
-            DispatchQueue.global(qos: .userInitiated).async {
-                if clean {
-                    self.cleanHiddenMetadata(at: drive.url)
-                    if self.isDebugEnabled { LogManager.shared.log("⏳ Waiting for macOS file system to settle...") }
-                    Thread.sleep(forTimeInterval: 0.5)
-                }
-                
-                // Proceed with standard ejection once cleanup is complete
-                FileManager.default.unmountVolume(at: drive.url, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
-                    DispatchQueue.main.async {
-                        if let error = error {
-                            if self.isDebugEnabled { LogManager.shared.log("⚠️ FileManager eject failed for \(drive.name): \(error.localizedDescription). Trying NSWorkspace...") }
-                            do {
-                                try NSWorkspace.shared.unmountAndEjectDevice(at: drive.url)
-                                if self.isDebugEnabled { LogManager.shared.log("✅ Successfully ejected \(drive.name) via NSWorkspace") }
-                                self.fetchDrives()
-                            } catch let ejectError {
-                                if self.isDebugEnabled { LogManager.shared.log("❌ Failed to eject \(drive.name) via NSWorkspace: \(ejectError.localizedDescription)") }
+    func eject(drive: Drive, clean: Bool = false, notify: Bool = true, completion: ((Bool, Int) -> Void)? = nil) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            var cleanedCount = 0
+            if clean {
+                cleanedCount = self.cleanHiddenMetadata(at: drive.url)
+                if self.isDebugEnabled { LogManager.shared.log("⏳ Waiting for macOS file system to settle...") }
+                Thread.sleep(forTimeInterval: 0.5)
+            }
+
+            FileManager.default.unmountVolume(at: drive.url, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
+                DispatchQueue.main.async {
+                    var success = false
+                    if let error = error {
+                        if self.isDebugEnabled { LogManager.shared.log("⚠️ FileManager eject failed for \(drive.name): \(error.localizedDescription). Trying NSWorkspace...") }
+                        do {
+                            try NSWorkspace.shared.unmountAndEjectDevice(at: drive.url)
+                            if self.isDebugEnabled { LogManager.shared.log("✅ Successfully ejected \(drive.name) via NSWorkspace") }
+                            success = true
+                        } catch let ejectError {
+                            if self.isDebugEnabled { LogManager.shared.log("❌ Failed to eject \(drive.name) via NSWorkspace: \(ejectError.localizedDescription)") }
+                        }
+                    } else {
+                        if self.isDebugEnabled { LogManager.shared.log("✅ Successfully ejected \(drive.name)") }
+                        success = true
+                    }
+
+                    if success {
+                        self.fetchDrives()
+                        if notify {
+                            let body: String
+                            if clean && cleanedCount > 0 {
+                                body = "Removed \(cleanedCount) hidden file\(cleanedCount == 1 ? "" : "s") and ejected \(drive.name)"
+                            } else if clean {
+                                body = "No hidden files found — ejected \(drive.name)"
+                            } else {
+                                body = "Ejected \(drive.name)"
                             }
-                        } else {
-                            if self.isDebugEnabled { LogManager.shared.log("✅ Successfully ejected \(drive.name)") }
-                            self.fetchDrives()
+                            self.sendNotification(title: "Easy Ejector", body: body)
                         }
                     }
+                    completion?(success, cleanedCount)
                 }
             }
         }
-    
+    }
+
     func ejectAllCameraCards(clean: Bool = false) {
         let cards = drives.filter { $0.isCameraCard }
+        guard !cards.isEmpty else { return }
+        if cards.count == 1 {
+            eject(drive: cards[0], clean: clean)
+            return
+        }
+
+        let totalCards = cards.count
+        var ejectedCount = 0
+        var totalCleaned = 0
+        var completed = 0
+
         for drive in cards {
-            eject(drive: drive, clean: clean)
+            eject(drive: drive, clean: clean, notify: false) { success, cleanedCount in
+                if success { ejectedCount += 1 }
+                totalCleaned += cleanedCount
+                completed += 1
+
+                if completed == totalCards {
+                    let noun = ejectedCount == 1 ? "card" : "cards"
+                    let body: String
+                    if clean && totalCleaned > 0 {
+                        body = "Removed \(totalCleaned) hidden file\(totalCleaned == 1 ? "" : "s") and ejected \(ejectedCount) camera \(noun)"
+                    } else if clean {
+                        body = "No hidden files found — ejected \(ejectedCount) camera \(noun)"
+                    } else {
+                        body = "Ejected \(ejectedCount) camera \(noun)"
+                    }
+                    self.sendNotification(title: "Easy Ejector", body: body)
+                }
+            }
         }
     }
 }
@@ -429,49 +511,6 @@ struct EjectorMenuView: View {
     var currentShortcutLetter: KeyEquivalent {
         let matchedKey = availableKeys.first(where: { $0.code == shortcutKeyCode })?.name ?? "E"
         return KeyEquivalent(Character(matchedKey.lowercased()))
-    }
-    
-    func showInstructions() {
-        let alert = NSAlert()
-        alert.messageText = "Easy Ejector Help & Instructions"
-        alert.informativeText = """
-                        • Smart Sorting: Ejector automatically detects camera folders (DCIM, GOPRO, NIKON, etc.) and card reader hardware (SD, CFexpress, XQD) to separate media cards from permanent SSDs. This is especially helpful for CFexpress cards, which macOS often mistakes for standard hard drives.
-
-                        • Camera Cards — One-Click Eject: Camera cards appear as single buttons for fast ejection. The behavior of these buttons is controlled by the "Camera Card Eject Mode" setting (see below).
-
-                        • Camera Card Eject Mode (in Settings): Choose the default action for all camera card buttons and the keyboard shortcut. "Eject" performs a standard safe unmount. "Clean & Eject" removes invisible macOS junk files (.DS_Store, ._ resource forks) from the card before ejecting — this prevents database errors, "file not found" warnings, and phantom files on cameras, emulators, and PCs.
-
-                        • Other External Volumes: Non-camera drives (SSDs, hard drives, thumb drives) show a submenu with both "Eject" and "Clean & Eject" options, so you can choose per drive.
-
-                        • Confirm Before Ejecting SSDs (in Settings): When enabled, a warning dialog appears before ejecting any drive that is NOT detected as a camera card. This prevents accidentally unmounting a working drive.
-
-                        • Global Keyboard Shortcut (in Settings): Press ⌃⌥⌘ + your chosen letter to instantly eject all camera cards from any app. The shortcut uses whichever Camera Card Eject Mode you have selected.
-
-                        • Accessibility Permission: Required only for the global keyboard shortcut to work inside other apps (like Lightroom or Photoshop). If you prefer to click the menu manually, you do not need this.
-
-                        • Full Disk Access: Required for the "Clean & Eject" feature to scan and delete hidden files across your drives. If the cleaner is failing or drives are missing from the menu, enable "Full Disk Access" for Easy Ejector in System Settings > Privacy & Security.
-
-                        • Debug Logging (in Settings): Enable this to see exactly how your Mac identifies each drive's hardware type. Use "Show Debug Window" in the menu to view detailed logs for troubleshooting.
-
-                        • Support & Updates: Visit https://www.ryansmithphotography.com/easyejector for tutorials, troubleshooting, and contact information.
-                        """
-        alert.alertStyle = .informational
-        
-        // 1. Add the buttons (The first one added becomes the primary "Return" key button)
-        alert.addButton(withTitle: "Got It")
-        alert.addButton(withTitle: "Visit Website")
-        
-        NSApp.activate()
-        
-        // 2. Capture which button the user clicks
-        let response = alert.runModal()
-        
-        // 3. If they clicked the second button, open your website
-        if response == .alertSecondButtonReturn {
-            if let url = URL(string: "https://www.ryansmithphotography.com/easyejector") {
-                NSWorkspace.shared.open(url)
-            }
-        }
     }
     
     func confirmAndEject(drive: Drive, clean: Bool = false) {
@@ -565,31 +604,34 @@ struct EjectorMenuView: View {
             }
             
             Divider()
-            
+
             Button("Help & Instructions") {
-                showInstructions()
+                openWindow(id: "helpWindow")
+                NSApp.activate()
             }
-            
-            Divider()
-            
-            // --- NEW: The Native Settings Link ---
+
             SettingsLink {
                 Text("Settings...")
             }
-            
+
             if enableDebugLogs {
                 Button("Show Debug Window") {
                     openWindow(id: "debugWindow")
                     NSApp.activate()
                 }
             }
-            
+
             Divider()
-            
+
             Button("Refresh List") {
                 manager.fetchDrives()
             }
-            
+
+            Button("About Easy Ejector") {
+                NSApp.activate()
+                NSApp.orderFrontStandardAboutPanel()
+            }
+
             Button("Quit Ejector") {
                 NSApplication.shared.terminate(nil)
             }
@@ -605,9 +647,11 @@ struct SettingsView: View {
     @AppStorage("isShortcutEnabled") private var isShortcutEnabled = false
     @AppStorage("shortcutKeyCode") private var shortcutKeyCode = 14
     @AppStorage("enableDebugLogs") private var enableDebugLogs = false
-    
+    @AppStorage("showEjectNotifications") private var showEjectNotifications = true
+
     @State private var showingAccessibilityAlert = false
     @State private var showingFullDiskAccessAlert = false
+    @State private var showingNotificationAlert = false
     
     let availableKeys: [(name: String, code: Int)] = [
         ("D", 2), ("E", 14), ("F", 3), ("G", 5), ("K", 40),
@@ -621,9 +665,11 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            
+        VStack(alignment: .leading, spacing: 20) {
+
             // --- 1. General Settings ---
+            Text("General")
+                .font(.headline)
             VStack(alignment: .leading, spacing: 12) {
                 Toggle("Launch at Login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { oldValue, newValue in
@@ -642,21 +688,17 @@ struct SettingsView: View {
                     }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Camera Card Eject Mode")
-                    Picker("", selection: $cleanCardsOnEject) {
-                        Text("Eject").tag(false)
-                        Text("Clean & Eject").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .onChange(of: cleanCardsOnEject) { oldValue, newValue in
-                        if newValue && !hasFullDiskAccess() {
-                            showingFullDiskAccessAlert = true
+                    Toggle("Clean Camera Cards Before Ejecting", isOn: $cleanCardsOnEject)
+                        .toggleStyle(.switch)
+                        .onChange(of: cleanCardsOnEject) { oldValue, newValue in
+                            if newValue && !hasFullDiskAccess() {
+                                showingFullDiskAccessAlert = true
+                            }
                         }
-                    }
-                    Text("Sets the default action for all camera card buttons and the keyboard shortcut. Clean & Eject removes hidden macOS files (.DS_Store, ._ files) that can cause errors on cameras.")
+                    Text("Removes hidden macOS files (.DS_Store, ._ files) that can cause errors on cameras. Applies to all camera card buttons and the keyboard shortcut.")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .alert("Full Disk Access Recommended", isPresented: $showingFullDiskAccessAlert) {
                     Button("Open Settings & Show App") {
@@ -671,11 +713,36 @@ struct SettingsView: View {
                 }
 
                 Toggle("Confirm Before Ejecting SSDs", isOn: $warnBeforeEjectingSSD)
+
+                Toggle("Show Eject Notifications", isOn: $showEjectNotifications)
+                    .onChange(of: showEjectNotifications) { oldValue, newValue in
+                        if newValue {
+                            UNUserNotificationCenter.current().getNotificationSettings { settings in
+                                DispatchQueue.main.async {
+                                    if settings.authorizationStatus == .denied {
+                                        showingNotificationAlert = true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .alert("Notifications Not Allowed", isPresented: $showingNotificationAlert) {
+                        Button("Open Notification Settings") {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        Button("Later", role: .cancel) { }
+                    } message: {
+                        Text("macOS has notifications turned off for Easy Ejector. To receive eject confirmations, open Notification Settings and enable notifications for this app.")
+                    }
             }
-            
+
             Divider()
-            
+
             // --- 2. Shortcut Settings ---
+            Text("Keyboard Shortcut")
+                .font(.headline)
             VStack(alignment: .leading, spacing: 12) {
                 Toggle("Enable Global Eject Shortcut", isOn: $isShortcutEnabled)
                     .onChange(of: isShortcutEnabled) { oldValue, newValue in
@@ -731,22 +798,36 @@ struct SettingsView: View {
             }
             
             Divider()
-            
-            // --- 3. Debug Settings ---
+
+            // --- 3. Debug ---
+            Text("Debug")
+                .font(.headline)
             VStack(alignment: .leading, spacing: 12) {
                 Toggle("Enable Debug Logging", isOn: $enableDebugLogs)
             }
-            
-            Spacer()
+
+            Divider()
+
+            HStack {
+                Spacer()
+                Button("Done") {
+                    NSApp.keyWindow?.close()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
         }
-        .padding(30)
-        .frame(width: 400, height: 420)
+        .padding(24)
+        .frame(width: 400)
     }
 }
 
 // MARK: - 6. The App Entry Point
 @main
 struct EjectorApp: App {
+    
+    @AppStorage("hasAcceptedDisclaimer") private var hasAcceptedDisclaimer = false
+    @AppStorage("cameraCardCount") private var cameraCardCount = 0
+    @Environment(\.openWindow) private var openWindow
     
     // Add this init block to enforce a strict single-instance rule
     init() {
@@ -765,10 +846,33 @@ struct EjectorApp: App {
     }
     
     var body: some Scene {
-        MenuBarExtra("Ejector", systemImage: "eject.fill") {
+        MenuBarExtra {
             EjectorMenuView()
+                .onAppear {
+                    if !hasAcceptedDisclaimer {
+                        openWindow(id: "welcomeWindow")
+                        NSApp.activate()
+                    }
+                }
+        } label: {
+            Image(systemName: "eject.fill")
+            if cameraCardCount > 0 {
+                Text("\(cameraCardCount)")
+            }
         }
         
+        // --- NEW: The Welcome & Disclaimer Window ---
+        Window("Welcome to Easy Ejector", id: "welcomeWindow") {
+            WelcomeView()
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 480, height: 420) // Slightly taller window
+        
+        Window("Help & Instructions", id: "helpWindow") {
+            HelpView()
+        }
+        .defaultSize(width: 500, height: 520)
+
         WindowGroup("Ejector Debug Logs", id: "debugWindow") {
             DebugLogView()
         }
@@ -778,5 +882,153 @@ struct EjectorApp: App {
         Settings {
             SettingsView()
         }
+    }
+}
+
+// MARK: - 7. Help View
+struct HelpView: View {
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+
+                    helpSection("Smart Sorting", icon: "sdcard") {
+                        Text("Automatically detects camera folders (DCIM, GOPRO, NIKON, etc.) and card reader hardware (SD, CFexpress, XQD) to separate media cards from permanent SSDs. Especially helpful for CFexpress cards, which macOS often mistakes for standard hard drives.")
+                    }
+
+                    helpSection("Camera Cards", icon: "eject") {
+                        Text("Camera cards appear as single buttons for fast ejection. Enable \"Clean Camera Cards Before Ejecting\" in Settings to automatically remove hidden macOS junk files before ejecting.")
+                    }
+
+                    helpSection("Clean & Eject", icon: "sparkles") {
+                        Text("Removes invisible macOS files (.DS_Store, ._ resource forks, __MACOSX folders) that cause database errors, phantom files, and warnings on cameras, emulators, and PCs.")
+                        Text("Non-camera drives (SSDs, thumb drives) show a submenu with both Eject and Clean & Eject options.")
+                            .padding(.top, 2)
+                    }
+
+                    helpSection("Keyboard Shortcut", icon: "keyboard") {
+                        Text("Press ⌃⌥⌘ + your chosen letter to instantly eject all camera cards from any app. Configure the shortcut key in Settings.")
+                    }
+
+                    helpSection("Notifications", icon: "bell") {
+                        Text("A macOS notification confirms each eject and shows how many hidden files were cleaned. Useful when ejecting via the keyboard shortcut from inside another app. Toggle in Settings.")
+                    }
+
+                    helpSection("Menu Bar Badge", icon: "number.circle") {
+                        Text("When camera cards are connected, a count appears next to the menu bar icon showing how many cards are mounted.")
+                    }
+
+                    helpSection("Permissions", icon: "lock.shield") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("**Accessibility** — Required only for the global keyboard shortcut to work inside other apps.")
+                            Text("**Full Disk Access** — Required for Clean & Eject to scan and delete hidden files. Enable in System Settings > Privacy & Security.")
+                        }
+                    }
+
+                    helpSection("Debug Logging", icon: "ladybug") {
+                        Text("Enable in Settings to see how your Mac identifies each drive. Use \"Show Debug Window\" to view detailed logs for troubleshooting.")
+                    }
+                }
+                .padding(24)
+            }
+
+            Divider()
+
+            HStack {
+                Button("Visit Website") {
+                    if let url = URL(string: "https://www.ryansmithphotography.com/easyejector") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                Spacer()
+                Button("Done") {
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding(16)
+        }
+    }
+
+    @ViewBuilder
+    private func helpSection(_ title: String, icon: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: icon)
+                .font(.headline)
+            content()
+                .font(.callout)
+                .foregroundColor(.secondary)
+        }
+    }
+}
+
+// MARK: - 8. Welcome & Disclaimer View
+struct WelcomeView: View {
+    @AppStorage("hasAcceptedDisclaimer") private var hasAcceptedDisclaimer = false
+    @Environment(\.dismiss) var dismiss
+    
+    // --- NEW: State to track if they reached the bottom ---
+    @State private var hasReadToBottom = false
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "eject.circle.fill")
+                .resizable()
+                .frame(width: 60, height: 60)
+                .foregroundColor(.blue)
+
+            Text("Welcome to Easy Ejector")
+                .font(.title)
+                .fontWeight(.bold)
+
+            ScrollView {
+                // MUST be a LazyVStack so the bottom sensor doesn't load immediately
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    Text("""
+                    Easy Ejector is a utility to simplify ejection of camera cards and remove extra unneeded macOS metadata files.
+
+                    **Important Disclaimer:**
+                    This software is provided "as is", without warranty of any kind, express or implied. In no event shall the developer be liable for any claim, damages, or other liability, including but not limited to data loss or hardware issues, arising from the use of this software.
+                    
+                    The "Clean & Eject" feature involves the automated deletion of hidden macOS metadata files. Please ensure you have backups of your critical data before using this utility.
+                    """)
+                    .font(.subheadline)
+                    .multilineTextAlignment(.leading)
+                    
+                    // Extra padding to ensure enough scrollable content
+                    Spacer().frame(height: 20)
+                    
+                    // --- NEW: The Invisible Sensor ---
+                    // Triggers the state change ONLY when scrolled into view
+                    Color.clear
+                        .frame(height: 1)
+                        .onAppear {
+                            hasReadToBottom = true
+                        }
+                }
+                .padding()
+            }
+            // Force the scroll view to be smaller than the text to guarantee scrolling
+            .frame(height: 160)
+            .background(Color(NSColor.textBackgroundColor).opacity(0.5))
+            .cornerRadius(8)
+            // Add a subtle border to make it look like a text document box
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+            )
+
+            Button(hasReadToBottom ? "I Accept & Understand" : "Please scroll to the bottom...") {
+                hasAcceptedDisclaimer = true
+                dismiss() // Closes the welcome window
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(!hasReadToBottom) // Disable until scrolled
+            .padding(.bottom, 10)
+        }
+        .padding(30)
     }
 }
