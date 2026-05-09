@@ -346,7 +346,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                 directories.append(fileURL)
             }
 
-            if fileName == ".DS_Store" || fileName == "__MACOSX" {
+            if fileName == ".DS_Store" || fileName == "__MACOSX" || fileName == ".apdisk" {
                 do {
                     try fileManager.removeItem(at: fileURL)
                     deletedCount += 1
