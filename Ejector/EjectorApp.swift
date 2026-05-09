@@ -117,21 +117,28 @@ enum CardType: String {
 
 // MARK: - 1. Drive Model
 struct Drive: Identifiable {
-    var id: String { url.path } // <-- The Fix: A stable, permanent ID
+    var id: String { url.path }
     let name: String
     let url: URL
     let isCameraCard: Bool
+    let isEmulatorCard: Bool
     let cardType: CardType?
     let isEjectable: Bool
     let isRemovable: Bool
     let isInternal: Bool
-    
-    // SF Symbol for representing this drive type
+
+    var displayName: String {
+        if let cardType = cardType, cardType != .unknown {
+            return "\(name) (\(cardType.rawValue))"
+        }
+        return name
+    }
+
     var iconName: String {
         if isCameraCard {
-            // Apple doesn't have a CFexpress symbol, so we use
-            // the universal "sdcard" for all camera media.
             return "sdcard"
+        } else if isEmulatorCard {
+            return "gamecontroller"
         } else {
             return "externaldrive"
         }
@@ -164,7 +171,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
 
         NotificationCenter.default.publisher(for: NSNotification.Name("TriggerGlobalEject"))
             .sink { [weak self] _ in
-                self?.ejectAllCameraCards()
+                self?.ejectAllCards()
             }
             .store(in: &cancellables)
 
@@ -273,34 +280,43 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                 let folderURL = url.appendingPathComponent(folder, isDirectory: true)
                 return FileManager.default.fileExists(atPath: folderURL.path)
             }
-            
+
+            let emulatorFolderNames = ["roms", "retroarch", "bios", ".emulationstation"]
+            let dirContents = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
+            let dirContentsLower = Set(dirContents.map { $0.lowercased() })
+            let emulatorHits = emulatorFolderNames.filter { dirContentsLower.contains($0) }.count
+            let hasEmulatorStructure = emulatorHits >= 2
+
             let hardwareType = self.detectCardType(for: url)
             let isHardwareCamera = (hardwareType == .sd || hardwareType == .cfexpress || hardwareType == .xqd)
-            
-            let isCameraCard = isHardwareCamera || hasCameraStructure || (isInternal && isRemovable)
-            
+
+            let isEmulatorCard = hasEmulatorStructure && hardwareType == .sd
+            let isCameraCard = !isEmulatorCard && (isHardwareCamera || hasCameraStructure || (isInternal && isRemovable))
+
             var finalCardType: CardType? = isCameraCard ? hardwareType : nil
             if isInternal && isRemovable && hardwareType == .unknown {
                 finalCardType = .sd
             }
-            
+
             if isDebugEnabled {
                 if isCameraCard {
                     LogManager.shared.log("   📸 Classified as Camera Card (\(finalCardType?.rawValue ?? "Unknown Format"))")
+                } else if isEmulatorCard {
+                    LogManager.shared.log("   🎮 Classified as Emulator Card")
                 } else {
                     LogManager.shared.log("   💾 Classified as Standard External Volume")
                 }
                 LogManager.shared.log("-------------------------------------------------")
             }
-            
-            foundDrives.append(Drive(name: name, url: url, isCameraCard: isCameraCard, cardType: finalCardType, isEjectable: isEjectable, isRemovable: isRemovable, isInternal: isInternal))
+
+            foundDrives.append(Drive(name: name, url: url, isCameraCard: isCameraCard, isEmulatorCard: isEmulatorCard, cardType: finalCardType, isEjectable: isEjectable, isRemovable: isRemovable, isInternal: isInternal))
         }
         
         foundDrives.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         
         DispatchQueue.main.async {
             self.drives = foundDrives
-            UserDefaults.standard.set(foundDrives.filter { $0.isCameraCard }.count, forKey: "cameraCardCount")
+            UserDefaults.standard.set(foundDrives.filter { $0.isCameraCard || $0.isEmulatorCard }.count, forKey: "cameraCardCount")
         }
     }
     
@@ -422,8 +438,8 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         }
     }
 
-    func ejectAllCameraCards(clean: Bool = false) {
-        let cards = drives.filter { $0.isCameraCard }
+    func ejectAllCards(clean: Bool = false) {
+        let cards = drives.filter { $0.isCameraCard || $0.isEmulatorCard }
         guard !cards.isEmpty else { return }
         if cards.count == 1 {
             eject(drive: cards[0], clean: clean)
@@ -511,7 +527,8 @@ struct EjectorMenuView: View {
     @Environment(\.openWindow) private var openWindow
     
     var cameraCards: [Drive] { manager.drives.filter { $0.isCameraCard } }
-    var otherExternalVolumes: [Drive] { manager.drives.filter { !$0.isCameraCard } }
+    var emulatorCards: [Drive] { manager.drives.filter { $0.isEmulatorCard } }
+    var otherExternalVolumes: [Drive] { manager.drives.filter { !$0.isCameraCard && !$0.isEmulatorCard } }
     
     // Dynamically finds the character for the visual menu hint
     var currentShortcutLetter: KeyEquivalent {
@@ -629,22 +646,34 @@ struct EjectorMenuView: View {
                     .foregroundColor(.secondary)
             } else {
 
-                if !cameraCards.isEmpty {
-                    Button(action: { manager.ejectAllCameraCards(clean: cleanCardsOnEject) }) {
+                if !cameraCards.isEmpty || !emulatorCards.isEmpty {
+                    Button(action: { manager.ejectAllCards(clean: cleanCardsOnEject) }) {
                         Label(cleanCardsOnEject ? "Clean & Eject All Cards" : "Eject All Cards", systemImage: cleanCardsOnEject ? "sparkles" : "eject.fill")
                     }
                     .keyboardShortcut(currentShortcutLetter, modifiers: [.control, .option, .command])
+                }
 
+                if !cameraCards.isEmpty {
                     Section("Camera Cards") {
                         ForEach(cameraCards) { drive in
                             Button(action: { manager.eject(drive: drive, clean: cleanCardsOnEject) }) {
-                                Label(cleanCardsOnEject ? "Clean & Eject \(drive.name)" : "Eject \(drive.name)", systemImage: drive.iconName)
+                                Label(cleanCardsOnEject ? "Clean & Eject \(drive.displayName)" : "Eject \(drive.displayName)", systemImage: drive.iconName)
                             }
                         }
                     }
                 }
 
-                if !cameraCards.isEmpty && !otherExternalVolumes.isEmpty {
+                if !emulatorCards.isEmpty {
+                    Section("Emulator Cards") {
+                        ForEach(emulatorCards) { drive in
+                            Button(action: { manager.eject(drive: drive, clean: cleanCardsOnEject) }) {
+                                Label(cleanCardsOnEject ? "Clean & Eject \(drive.displayName)" : "Eject \(drive.displayName)", systemImage: drive.iconName)
+                            }
+                        }
+                    }
+                }
+
+                if (!cameraCards.isEmpty || !emulatorCards.isEmpty) && !otherExternalVolumes.isEmpty {
                     Divider()
                 }
 
@@ -746,14 +775,14 @@ struct SettingsView: View {
                     }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Toggle("Clean Camera Cards Before Ejecting", isOn: $cleanCardsOnEject)
+                    Toggle("Clean Cards Before Ejecting", isOn: $cleanCardsOnEject)
                         .toggleStyle(.switch)
                         .onChange(of: cleanCardsOnEject) { oldValue, newValue in
                             if newValue && !hasFullDiskAccess() {
                                 showingFullDiskAccessAlert = true
                             }
                         }
-                    Text("Removes hidden macOS files (.DS_Store, ._ files) that can cause errors on cameras. Applies to all camera card buttons and the keyboard shortcut.")
+                    Text("Removes hidden macOS files (.DS_Store, ._ files) that cause errors on cameras and phantom entries on emulators. Applies to all camera and emulator card buttons and the keyboard shortcut.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -956,18 +985,30 @@ struct HelpView: View {
                         Text("Automatically detects camera folders (DCIM, GOPRO, NIKON, etc.) and card reader hardware (SD, CFexpress, XQD) to separate media cards from permanent SSDs. Especially helpful for CFexpress cards, which macOS often mistakes for standard hard drives.")
                     }
 
+                    helpSection("Smart Grouping", icon: "rectangle.3.group") {
+                        Text("Many cameras label all cards as \"Untitled.\" Easy Eject displays the card type next to the name — e.g., \"Untitled (CFexpress)\" and \"Untitled (SD)\" — so you always know which card you're ejecting.")
+                    }
+
                     helpSection("Camera Cards", icon: "eject") {
-                        Text("Camera cards appear as single buttons for fast ejection. Enable \"Clean Camera Cards Before Ejecting\" in Settings to automatically remove hidden macOS junk files before ejecting.")
+                        Text("Camera cards (SD, CFexpress, XQD) appear as single buttons for fast ejection. Enable \"Clean Cards Before Ejecting\" in Settings to automatically remove hidden macOS junk files before ejecting.")
+                    }
+
+                    helpSection("Emulator Cards", icon: "gamecontroller") {
+                        Text("SD cards with emulator folder structures (Roms, RetroArch, BIOS, EmulationStation) are automatically detected and grouped separately from camera cards. Clean & Eject removes ._ files that cause phantom game entries in ROM libraries.")
                     }
 
                     helpSection("Clean & Eject", icon: "sparkles") {
-                        Text("Removes invisible macOS files (.DS_Store, ._ resource forks, __MACOSX folders) that cause database errors, phantom files, and warnings on cameras, emulators, and PCs.")
+                        Text("Removes invisible macOS files that cause problems on other systems:")
+                            .padding(.bottom, 2)
+                        Text("• .**_ AppleDouble files** — the #1 cause of ghost games on retro consoles\n• **.DS_Store** — Mac folder settings that clutter Windows and Linux\n• **__MACOSX folders** — junk created when extracting zip files\n• **.apdisk** — Apple disk identification files created for network sharing")
                         Text("Non-camera drives (SSDs, thumb drives) show a submenu with both Eject and Clean & Eject options.")
+                            .padding(.top, 2)
+                        Text("If your card has thousands of metadata files, cleaning may take several seconds. You'll receive a notification when it's done.")
                             .padding(.top, 2)
                     }
 
                     helpSection("Keyboard Shortcut", icon: "keyboard") {
-                        Text("Press ⌃⌥⌘ + your chosen letter to instantly eject all camera cards from any app. Configure the shortcut key in Settings.")
+                        Text("Press ⌃⌥⌘ + your chosen letter to instantly eject all camera and emulator cards from any app. Configure the shortcut key in Settings.")
                     }
 
                     helpSection("Notifications", icon: "bell") {
@@ -975,7 +1016,7 @@ struct HelpView: View {
                     }
 
                     helpSection("Menu Bar Badge", icon: "number.circle") {
-                        Text("When camera cards are connected, a count appears next to the menu bar icon showing how many cards are mounted.")
+                        Text("When camera or emulator cards are connected, a count appears next to the menu bar icon showing how many cards are mounted.")
                     }
 
                     helpSection("Permissions", icon: "lock.shield") {
@@ -1045,12 +1086,21 @@ struct WelcomeView: View {
                 // MUST be a LazyVStack so the bottom sensor doesn't load immediately
                 LazyVStack(alignment: .leading, spacing: 10) {
                     Text("""
-                    Easy Eject is a utility to simplify ejection of camera cards and remove extra unneeded macOS metadata files.
+                    Easy Eject lives in your menu bar and makes it easy to safely eject camera cards, emulator cards, and external drives.
+
+                    **How it works:**
+                    • Click the ⏏ icon in your menu bar to see all connected drives
+                    • Camera cards (SD, CFexpress, XQD) are automatically detected and grouped
+                    • Emulator cards (RetroArch, EmulationStation, ROM libraries) are detected and grouped separately
+                    • Cards display their type (e.g., "Untitled (CFexpress)") so you can tell them apart
+                    • One click to eject, or eject all cards at once
+                    • Enable "Clean & Eject" in Settings to remove hidden macOS junk files (.DS_Store, ._ files, .apdisk, __MACOSX) that cause errors on cameras, emulators, and PCs
+                    • Set up a keyboard shortcut to eject from any app
 
                     **Important Disclaimer:**
                     This software is provided "as is", without warranty of any kind, express or implied. In no event shall the developer be liable for any claim, damages, or other liability, including but not limited to data loss or hardware issues, arising from the use of this software.
-                    
-                    The "Clean & Eject" feature involves the automated deletion of hidden macOS metadata files. Please ensure you have backups of your critical data before using this utility.
+
+                    The "Clean & Eject" feature involves the automated deletion of hidden macOS metadata files. Please ensure you have backups of your critical data before using this utility. If your card contains thousands of metadata files, cleaning may take several seconds — you'll receive a notification when it's done.
                     """)
                     .font(.subheadline)
                     .multilineTextAlignment(.leading)
