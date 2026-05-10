@@ -25,7 +25,6 @@ class GlobalHotkeyManager {
     func start() {
         guard isTrusted(promptSystem: false) else { return }
         
-        // If it's already running, stop it first so we can restart with a new key
         if eventTap != nil { stop() }
         
         let eventMask = (1 << CGEventType.keyDown.rawValue)
@@ -39,17 +38,14 @@ class GlobalHotkeyManager {
                 let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
                 let flags = event.flags
                 
-                // THE FIX: Read the user's chosen keycode INSIDE the closure
-                // to avoid capturing external context.
                 let savedKey = UserDefaults.standard.integer(forKey: "shortcutKeyCode")
                 let targetKeyCode = savedKey == 0 ? 14 : savedKey
-                
-                // Compare against our dynamic targetKeyCode
+
                 if flags.contains(.maskCommand) && flags.contains(.maskControl) && flags.contains(.maskAlternate) && keyCode == targetKeyCode {
                     DispatchQueue.main.async {
                         NotificationCenter.default.post(name: NSNotification.Name("TriggerGlobalEject"), object: nil)
                     }
-                    return nil // Swallow the key
+                    return nil
                 }
                 return Unmanaged.passUnretained(event)
             }, userInfo: nil) else { return }
@@ -210,26 +206,31 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         }
     }
     
-    private func detectCardType(for volumeURL: URL) -> CardType {
+    private func diskDescription(for volumeURL: URL) -> [String: Any]? {
         guard let session = DASessionCreate(kCFAllocatorDefault),
               let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, volumeURL as CFURL),
               let desc = DADiskCopyDescription(disk) as? [String: Any] else {
-            return .unknown
+            return nil
         }
-        
+        return desc
+    }
+
+    private func detectCardType(from desc: [String: Any]?) -> CardType {
+        guard let desc = desc else { return .unknown }
+
         let model = (desc[kDADiskDescriptionDeviceModelKey as String] as? String) ?? ""
         let vendor = (desc[kDADiskDescriptionDeviceVendorKey as String] as? String) ?? ""
         let proto = (desc[kDADiskDescriptionDeviceProtocolKey as String] as? String) ?? ""
         let bus = (desc[kDADiskDescriptionBusNameKey as String] as? String) ?? ""
-        
+
         let haystack = (model + " " + vendor + " " + proto + " " + bus).lowercased()
-        
+
         if haystack.contains("secure digital") || haystack.contains("sdxc") || haystack.contains("sdhc") || haystack.contains(" sd ") || bus.lowercased() == "sd" {
             return .sd
         }
         if haystack.contains("cfexpress") { return .cfexpress }
         if haystack.contains("xqd") { return .xqd }
-        
+
         return .unknown
     }
     
@@ -287,17 +288,14 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             let emulatorHits = emulatorFolderNames.filter { dirContentsLower.contains($0) }.count
             let hasEmulatorStructure = emulatorHits >= 2
 
-            let hardwareType = self.detectCardType(for: url)
+            let desc = self.diskDescription(for: url)
+            let hardwareType = self.detectCardType(from: desc)
             if isDebugEnabled {
-                if let session = DASessionCreate(kCFAllocatorDefault),
-                   let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, url as CFURL),
-                   let desc = DADiskCopyDescription(disk) as? [String: Any] {
-                    let model = (desc[kDADiskDescriptionDeviceModelKey as String] as? String) ?? "(none)"
-                    let vendor = (desc[kDADiskDescriptionDeviceVendorKey as String] as? String) ?? "(none)"
-                    let proto = (desc[kDADiskDescriptionDeviceProtocolKey as String] as? String) ?? "(none)"
-                    let bus = (desc[kDADiskDescriptionBusNameKey as String] as? String) ?? "(none)"
-                    LogManager.shared.log("   Hardware — Model: \(model) | Vendor: \(vendor) | Protocol: \(proto) | Bus: \(bus)")
-                }
+                let model = (desc?[kDADiskDescriptionDeviceModelKey as String] as? String) ?? "(none)"
+                let vendor = (desc?[kDADiskDescriptionDeviceVendorKey as String] as? String) ?? "(none)"
+                let proto = (desc?[kDADiskDescriptionDeviceProtocolKey as String] as? String) ?? "(none)"
+                let bus = (desc?[kDADiskDescriptionBusNameKey as String] as? String) ?? "(none)"
+                LogManager.shared.log("   Hardware — Model: \(model) | Vendor: \(vendor) | Protocol: \(proto) | Bus: \(bus)")
             }
             let isHardwareCamera = (hardwareType == .sd || hardwareType == .cfexpress || hardwareType == .xqd)
 
@@ -309,13 +307,9 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                 if isInternal && isRemovable {
                     finalCardType = .sd
                 } else if hasCameraStructure {
-                    if let session = DASessionCreate(kCFAllocatorDefault),
-                       let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, url as CFURL),
-                       let desc = DADiskCopyDescription(disk) as? [String: Any] {
-                        let proto = (desc[kDADiskDescriptionDeviceProtocolKey as String] as? String) ?? ""
-                        if proto.lowercased().contains("pci") {
-                            finalCardType = .cfexpress
-                        }
+                    let proto = (desc?[kDADiskDescriptionDeviceProtocolKey as String] as? String) ?? ""
+                    if proto.lowercased().contains("pci") {
+                        finalCardType = .cfexpress
                     }
                 }
             }
@@ -367,7 +361,6 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
 
         if self.isDebugEnabled { LogManager.shared.log("🧹 Starting metadata cleanup for: \(volURL.lastPathComponent)") }
 
-        // Walk the volume tree, deleting .DS_Store and __MACOSX and collecting directories.
         var directories: [URL] = [volURL]
         let keys: [URLResourceKey] = [.isDirectoryKey]
         guard let enumerator = fileManager.enumerator(at: volURL, includingPropertiesForKeys: keys, options: [.skipsPackageDescendants]) else { return 0 }
@@ -395,8 +388,6 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             }
         }
 
-        // macOS hides ._ AppleDouble files from FileManager on FAT/exFAT.
-        // Use POSIX readdir on each directory to find them all, including orphans.
         for dirURL in directories {
             for name in rawFileNames(in: dirURL.path) where name.hasPrefix("._") {
                 let fileURL = dirURL.appendingPathComponent(name)
@@ -483,11 +474,11 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                     let noun = ejectedCount == 1 ? "card" : "cards"
                     let body: String
                     if clean && totalCleaned > 0 {
-                        body = "Removed \(totalCleaned) hidden file\(totalCleaned == 1 ? "" : "s") and ejected \(ejectedCount) camera \(noun)"
+                        body = "Removed \(totalCleaned) hidden file\(totalCleaned == 1 ? "" : "s") and ejected \(ejectedCount) \(noun)"
                     } else if clean {
-                        body = "No hidden files found — ejected \(ejectedCount) camera \(noun)"
+                        body = "No hidden files found — ejected \(ejectedCount) \(noun)"
                     } else {
-                        body = "Ejected \(ejectedCount) camera \(noun)"
+                        body = "Ejected \(ejectedCount) \(noun)"
                     }
                     self.sendNotification(title: "Easy Eject", body: body)
                 }
@@ -552,7 +543,6 @@ struct EjectorMenuView: View {
     var emulatorCards: [Drive] { manager.drives.filter { $0.isEmulatorCard } }
     var otherExternalVolumes: [Drive] { manager.drives.filter { !$0.isCameraCard && !$0.isEmulatorCard } }
     
-    // Dynamically finds the character for the visual menu hint
     var currentShortcutLetter: KeyEquivalent {
         let matchedKey = availableKeys.first(where: { $0.code == shortcutKeyCode })?.name ?? "E"
         return KeyEquivalent(Character(matchedKey.lowercased()))
@@ -653,7 +643,6 @@ struct EjectorMenuView: View {
     var body: some View {
         VStack(alignment: .leading) {
 
-            // --- The boldest native title possible ---
             Text("Easy Eject")
                 .font(.headline)
                 .fontWeight(.bold)
@@ -776,7 +765,6 @@ struct SettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
 
-            // --- 1. General Settings ---
             Text("General")
                 .font(.headline)
             VStack(alignment: .leading, spacing: 12) {
@@ -849,7 +837,6 @@ struct SettingsView: View {
 
             Divider()
 
-            // --- 2. Shortcut Settings ---
             Text("Keyboard Shortcut")
                 .font(.headline)
             VStack(alignment: .leading, spacing: 12) {
@@ -896,19 +883,16 @@ struct SettingsView: View {
                     }
                 }
             }
-            // --- NEW: The Magic Auto-Detector ---
             .onReceive(timer) { _ in
-                // If they are currently looking at the alert AND they grant permission...
                 if showingAccessibilityAlert && GlobalHotkeyManager.shared.isTrusted(promptSystem: false) {
-                    showingAccessibilityAlert = false // Dismiss the alert
-                    isShortcutEnabled = true          // Flip the toggle ON
-                    GlobalHotkeyManager.shared.start() // Start the hotkey!
+                    showingAccessibilityAlert = false
+                    isShortcutEnabled = true
+                    GlobalHotkeyManager.shared.start()
                 }
             }
             
             Divider()
 
-            // --- 3. Debug ---
             Text("Debug")
                 .font(.headline)
             VStack(alignment: .leading, spacing: 12) {
@@ -938,17 +922,10 @@ struct EjectorApp: App {
     @AppStorage("cameraCardCount") private var cameraCardCount = 0
     @Environment(\.openWindow) private var openWindow
     
-    // Add this init block to enforce a strict single-instance rule
     init() {
-        // Safely get the app's unique Bundle Identifier
         if let bundleID = Bundle.main.bundleIdentifier {
-            // Check macOS for any currently running apps with this exact ID
             let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
-            
-            // If the count is greater than 1, it means the original is already running
-            // and THIS one is a duplicate trying to start.
             if runningApps.count > 1 {
-                print("🚫 Another instance of Ejector is already running. Terminating duplicate.")
                 NSApplication.shared.terminate(nil)
             }
         }
@@ -970,13 +947,12 @@ struct EjectorApp: App {
             }
         }
         
-        // --- NEW: The Welcome & Disclaimer Window ---
         Window("Welcome to Easy Eject", id: "welcomeWindow") {
             WelcomeView()
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 480, height: 420) // Slightly taller window
-        
+        .defaultSize(width: 480, height: 420)
+
         Window("Help & Instructions", id: "helpWindow") {
             HelpView()
         }
@@ -987,7 +963,6 @@ struct EjectorApp: App {
         }
         .defaultSize(width: 550, height: 400)
         
-        // --- NEW: Register the Settings Window ---
         Settings {
             SettingsView()
         }
@@ -1092,7 +1067,6 @@ struct WelcomeView: View {
     @AppStorage("hasAcceptedDisclaimer") private var hasAcceptedDisclaimer = false
     @Environment(\.dismiss) var dismiss
     
-    // --- NEW: State to track if they reached the bottom ---
     @State private var hasReadToBottom = false
 
     var body: some View {
@@ -1107,7 +1081,6 @@ struct WelcomeView: View {
                 .fontWeight(.bold)
 
             ScrollView {
-                // MUST be a LazyVStack so the bottom sensor doesn't load immediately
                 LazyVStack(alignment: .leading, spacing: 10) {
                     Text("""
                     Easy Eject lives in your menu bar and makes it easy to safely eject camera cards, emulator cards, and external drives.
@@ -1129,11 +1102,8 @@ struct WelcomeView: View {
                     .font(.subheadline)
                     .multilineTextAlignment(.leading)
                     
-                    // Extra padding to ensure enough scrollable content
                     Spacer().frame(height: 20)
-                    
-                    // --- NEW: The Invisible Sensor ---
-                    // Triggers the state change ONLY when scrolled into view
+
                     Color.clear
                         .frame(height: 1)
                         .onAppear {
@@ -1142,11 +1112,9 @@ struct WelcomeView: View {
                 }
                 .padding()
             }
-            // Force the scroll view to be smaller than the text to guarantee scrolling
             .frame(height: 160)
             .background(Color(NSColor.textBackgroundColor).opacity(0.5))
             .cornerRadius(8)
-            // Add a subtle border to make it look like a text document box
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
