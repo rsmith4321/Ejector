@@ -273,44 +273,48 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             let isUnderVolumes = url.path.hasPrefix("/Volumes/")
             guard isUnderVolumes else { continue }
             
-            let cameraFolderNames = [
-                "DCIM", "PRIVATE", "MISC", "AVCHD", "MP_ROOT", "CONTENTS",
-                "XDROOT", "BPAV", "NIKON", "CANONMSC", "FUJI", "GOPRO", "SONY"
-            ]
-            let hasCameraStructure = cameraFolderNames.contains { folder in
-                let folderURL = url.appendingPathComponent(folder, isDirectory: true)
-                return FileManager.default.fileExists(atPath: folderURL.path)
-            }
-
-            let emulatorFolderNames = ["roms", "retroarch", "bios", ".emulationstation"]
-            let dirContents = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
-            let dirContentsLower = Set(dirContents.map { $0.lowercased() })
-            let emulatorHits = emulatorFolderNames.filter { dirContentsLower.contains($0) }.count
-            let hasEmulatorStructure = emulatorHits >= 2
-
             let desc = self.diskDescription(for: url)
             let hardwareType = self.detectCardType(from: desc)
+            let proto = (desc?[kDADiskDescriptionDeviceProtocolKey as String] as? String) ?? ""
             if isDebugEnabled {
                 let model = (desc?[kDADiskDescriptionDeviceModelKey as String] as? String) ?? "(none)"
                 let vendor = (desc?[kDADiskDescriptionDeviceVendorKey as String] as? String) ?? "(none)"
-                let proto = (desc?[kDADiskDescriptionDeviceProtocolKey as String] as? String) ?? "(none)"
                 let bus = (desc?[kDADiskDescriptionBusNameKey as String] as? String) ?? "(none)"
-                LogManager.shared.log("   Hardware — Model: \(model) | Vendor: \(vendor) | Protocol: \(proto) | Bus: \(bus)")
+                LogManager.shared.log("   Hardware — Model: \(model) | Vendor: \(vendor) | Protocol: \(proto.isEmpty ? "(none)" : proto) | Bus: \(bus)")
             }
             let isHardwareCamera = (hardwareType == .sd || hardwareType == .cfexpress || hardwareType == .xqd)
 
-            let isEmulatorCard = hasEmulatorStructure && hardwareType == .sd
+            let protoLower = proto.lowercased()
+            let canBeCard = isHardwareCamera || (isInternal && isRemovable) || protoLower.contains("pci") || protoLower.contains("secure digital") || isEjectable
+
+            var hasCameraStructure = false
+            var isEmulatorCard = false
+            if canBeCard {
+                let cameraFolderNames = [
+                    "DCIM", "PRIVATE", "MISC", "AVCHD", "MP_ROOT", "CONTENTS",
+                    "XDROOT", "BPAV", "NIKON", "CANONMSC", "FUJI", "GOPRO", "SONY"
+                ]
+                hasCameraStructure = cameraFolderNames.contains { folder in
+                    let folderURL = url.appendingPathComponent(folder, isDirectory: true)
+                    return FileManager.default.fileExists(atPath: folderURL.path)
+                }
+
+                if hardwareType == .sd {
+                    let emulatorFolderNames = ["roms", "retroarch", "bios", ".emulationstation"]
+                    let dirContents = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
+                    let dirContentsLower = Set(dirContents.map { $0.lowercased() })
+                    let emulatorHits = emulatorFolderNames.filter { dirContentsLower.contains($0) }.count
+                    isEmulatorCard = emulatorHits >= 2
+                }
+            }
             let isCameraCard = !isEmulatorCard && (isHardwareCamera || hasCameraStructure || (isInternal && isRemovable))
 
             var finalCardType: CardType? = isCameraCard ? hardwareType : nil
             if isCameraCard && hardwareType == .unknown {
                 if isInternal && isRemovable {
                     finalCardType = .sd
-                } else if hasCameraStructure {
-                    let proto = (desc?[kDADiskDescriptionDeviceProtocolKey as String] as? String) ?? ""
-                    if proto.lowercased().contains("pci") {
-                        finalCardType = .cfexpress
-                    }
+                } else if hasCameraStructure && protoLower.contains("pci") {
+                    finalCardType = .cfexpress
                 }
             }
 
@@ -528,7 +532,7 @@ struct EjectorMenuView: View {
     @StateObject private var manager = DriveManager()
     
     @AppStorage("warnBeforeEjectingSSD") private var warnBeforeEjectingSSD = true
-    @AppStorage("cleanCardsOnEject") private var cleanCardsOnEject = true
+    @AppStorage("cleanCardsOnEject") private var cleanCardsOnEject = false
     @AppStorage("enableDebugLogs") private var enableDebugLogs = false
     @AppStorage("shortcutKeyCode") private var shortcutKeyCode = 14
     
@@ -740,14 +744,13 @@ struct EjectorMenuView: View {
 // MARK: - 5. The Settings Window
 struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
-    @AppStorage("cleanCardsOnEject") private var cleanCardsOnEject = true
+    @AppStorage("cleanCardsOnEject") private var cleanCardsOnEject = false
     @AppStorage("warnBeforeEjectingSSD") private var warnBeforeEjectingSSD = true
     @AppStorage("isShortcutEnabled") private var isShortcutEnabled = false
     @AppStorage("shortcutKeyCode") private var shortcutKeyCode = 14
     @AppStorage("enableDebugLogs") private var enableDebugLogs = false
     @AppStorage("showEjectNotifications") private var showEjectNotifications = true
 
-    @State private var showingAccessibilityAlert = false
     @State private var showingFullDiskAccessAlert = false
     @State private var showingNotificationAlert = false
     
@@ -796,6 +799,21 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    if cleanCardsOnEject {
+                        HStack(spacing: 4) {
+                            Image(systemName: hasFullDiskAccess() ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundColor(hasFullDiskAccess() ? .green : .orange)
+                            Text(hasFullDiskAccess() ? "Full Disk Access enabled" : "Full Disk Access required")
+                                .font(.caption)
+                                .foregroundColor(hasFullDiskAccess() ? .green : .orange)
+                            if !hasFullDiskAccess() {
+                                Button("Grant Access") {
+                                    showingFullDiskAccessAlert = true
+                                }
+                                .font(.caption)
+                            }
+                        }
+                    }
                 }
                 .alert("Full Disk Access Recommended", isPresented: $showingFullDiskAccessAlert) {
                     Button("Open Settings & Show App") {
@@ -843,28 +861,33 @@ struct SettingsView: View {
                 Toggle("Enable Global Eject Shortcut", isOn: $isShortcutEnabled)
                     .onChange(of: isShortcutEnabled) { oldValue, newValue in
                         if newValue {
-                            if GlobalHotkeyManager.shared.isTrusted(promptSystem: true) {
+                            if GlobalHotkeyManager.shared.isTrusted(promptSystem: false) {
                                 GlobalHotkeyManager.shared.start()
                             } else {
-                                showingAccessibilityAlert = true
-                                isShortcutEnabled = false
+                                _ = GlobalHotkeyManager.shared.isTrusted(promptSystem: true)
                             }
                         } else {
                             GlobalHotkeyManager.shared.stop()
                         }
                     }
-                    .alert("Accessibility Permission Required", isPresented: $showingAccessibilityAlert) {
-                        Button("Open System Settings") {
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }
-                        Button("Cancel", role: .cancel) { }
-                    } message: {
-                        Text("To use the global keyboard shortcut from inside other apps, macOS requires Easy Eject to have Accessibility permission.\n\nIn System Settings, find Easy Eject in the list and toggle it on. If it's not in the list, click the '+' button and add it from your Applications folder.\n\nIt will begin working immediately without restarting the app.")
-                    }
                 
                 if isShortcutEnabled {
+                    HStack(spacing: 4) {
+                        Image(systemName: GlobalHotkeyManager.shared.isTrusted(promptSystem: false) ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundColor(GlobalHotkeyManager.shared.isTrusted(promptSystem: false) ? .green : .orange)
+                        Text(GlobalHotkeyManager.shared.isTrusted(promptSystem: false) ? "Accessibility enabled" : "Accessibility required")
+                            .font(.caption)
+                            .foregroundColor(GlobalHotkeyManager.shared.isTrusted(promptSystem: false) ? .green : .orange)
+                        if !GlobalHotkeyManager.shared.isTrusted(promptSystem: false) {
+                            Button("Grant Access") {
+                                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }
+                            .font(.caption)
+                        }
+                    }
+
                     HStack {
                         Text("Shortcut Letter (⌃⌥⌘ +)")
                         Picker("", selection: $shortcutKeyCode) {
@@ -884,9 +907,7 @@ struct SettingsView: View {
                 }
             }
             .onReceive(timer) { _ in
-                if showingAccessibilityAlert && GlobalHotkeyManager.shared.isTrusted(promptSystem: false) {
-                    showingAccessibilityAlert = false
-                    isShortcutEnabled = true
+                if isShortcutEnabled && GlobalHotkeyManager.shared.isTrusted(promptSystem: false) {
                     GlobalHotkeyManager.shared.start()
                 }
             }
@@ -911,6 +932,11 @@ struct SettingsView: View {
         }
         .padding(24)
         .frame(width: 400)
+        .onAppear {
+            if GlobalHotkeyManager.shared.isTrusted(promptSystem: false) && isShortcutEnabled {
+                GlobalHotkeyManager.shared.start()
+            }
+        }
     }
 }
 
@@ -950,8 +976,8 @@ struct EjectorApp: App {
         Window("Welcome to Easy Eject", id: "welcomeWindow") {
             WelcomeView()
         }
-        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 480, height: 420)
+        .defaultPosition(.center)
 
         Window("Help & Instructions", id: "helpWindow") {
             HelpView()
