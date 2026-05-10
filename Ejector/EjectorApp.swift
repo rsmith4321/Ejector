@@ -288,14 +288,36 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             let hasEmulatorStructure = emulatorHits >= 2
 
             let hardwareType = self.detectCardType(for: url)
+            if isDebugEnabled {
+                if let session = DASessionCreate(kCFAllocatorDefault),
+                   let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, url as CFURL),
+                   let desc = DADiskCopyDescription(disk) as? [String: Any] {
+                    let model = (desc[kDADiskDescriptionDeviceModelKey as String] as? String) ?? "(none)"
+                    let vendor = (desc[kDADiskDescriptionDeviceVendorKey as String] as? String) ?? "(none)"
+                    let proto = (desc[kDADiskDescriptionDeviceProtocolKey as String] as? String) ?? "(none)"
+                    let bus = (desc[kDADiskDescriptionBusNameKey as String] as? String) ?? "(none)"
+                    LogManager.shared.log("   Hardware — Model: \(model) | Vendor: \(vendor) | Protocol: \(proto) | Bus: \(bus)")
+                }
+            }
             let isHardwareCamera = (hardwareType == .sd || hardwareType == .cfexpress || hardwareType == .xqd)
 
             let isEmulatorCard = hasEmulatorStructure && hardwareType == .sd
             let isCameraCard = !isEmulatorCard && (isHardwareCamera || hasCameraStructure || (isInternal && isRemovable))
 
             var finalCardType: CardType? = isCameraCard ? hardwareType : nil
-            if isInternal && isRemovable && hardwareType == .unknown {
-                finalCardType = .sd
+            if isCameraCard && hardwareType == .unknown {
+                if isInternal && isRemovable {
+                    finalCardType = .sd
+                } else if hasCameraStructure {
+                    if let session = DASessionCreate(kCFAllocatorDefault),
+                       let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, url as CFURL),
+                       let desc = DADiskCopyDescription(disk) as? [String: Any] {
+                        let proto = (desc[kDADiskDescriptionDeviceProtocolKey as String] as? String) ?? ""
+                        if proto.lowercased().contains("pci") {
+                            finalCardType = .cfexpress
+                        }
+                    }
+                }
             }
 
             if isDebugEnabled {
@@ -983,6 +1005,8 @@ struct HelpView: View {
 
                     helpSection("Smart Sorting", icon: "sdcard") {
                         Text("Automatically detects camera folders (DCIM, GOPRO, NIKON, etc.) and card reader hardware (SD, CFexpress, XQD) to separate media cards from permanent SSDs. Especially helpful for CFexpress cards, which macOS often mistakes for standard hard drives.")
+                        Text("Note: macOS does not identify CFexpress cards directly. Easy Eject infers CFexpress by detecting camera folders on a PCI-Express/NVMe drive. In rare cases, a non-CFexpress NVMe drive with camera folders may be labeled as CFexpress.")
+                            .padding(.top, 2)
                     }
 
                     helpSection("Smart Grouping", icon: "rectangle.3.group") {
