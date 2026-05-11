@@ -145,7 +145,13 @@ struct Drive: Identifiable {
 class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     @Published var drives: [Drive] = []
     private var cancellables = Set<AnyCancellable>()
-    
+
+    private struct CachedClassification {
+        let hasCameraStructure: Bool
+        let isEmulatorCard: Bool
+    }
+    private var classificationCache: [String: CachedClassification] = [:]
+
     private var isDebugEnabled: Bool {
         UserDefaults.standard.bool(forKey: "enableDebugLogs")
     }
@@ -234,7 +240,10 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         return .unknown
     }
     
-    func fetchDrives() {
+    func fetchDrives(clearCache: Bool = false) {
+        if clearCache {
+            classificationCache.removeAll()
+        }
         let keys: [URLResourceKey] = [.volumeNameKey, .volumeIsRemovableKey, .volumeIsEjectableKey, .volumeIsInternalKey]
         
         guard let paths = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) else {
@@ -290,21 +299,31 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             var hasCameraStructure = false
             var isEmulatorCard = false
             if canBeCard {
-                let cameraFolderNames = [
-                    "DCIM", "PRIVATE", "MISC", "AVCHD", "MP_ROOT", "CONTENTS",
-                    "XDROOT", "BPAV", "NIKON", "CANONMSC", "FUJI", "GOPRO", "SONY"
-                ]
-                hasCameraStructure = cameraFolderNames.contains { folder in
-                    let folderURL = url.appendingPathComponent(folder, isDirectory: true)
-                    return FileManager.default.fileExists(atPath: folderURL.path)
-                }
+                if let cached = classificationCache[url.path] {
+                    hasCameraStructure = cached.hasCameraStructure
+                    isEmulatorCard = cached.isEmulatorCard
+                    if isDebugEnabled {
+                        LogManager.shared.log("   📦 Using cached classification")
+                    }
+                } else {
+                    let cameraFolderNames = [
+                        "DCIM", "PRIVATE", "MISC", "AVCHD", "MP_ROOT", "CONTENTS",
+                        "XDROOT", "BPAV", "NIKON", "CANONMSC", "FUJI", "GOPRO", "SONY"
+                    ]
+                    hasCameraStructure = cameraFolderNames.contains { folder in
+                        let folderURL = url.appendingPathComponent(folder, isDirectory: true)
+                        return FileManager.default.fileExists(atPath: folderURL.path)
+                    }
 
-                if hardwareType == .sd {
-                    let emulatorFolderNames = ["roms", "retroarch", "bios", ".emulationstation"]
-                    let dirContents = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
-                    let dirContentsLower = Set(dirContents.map { $0.lowercased() })
-                    let emulatorHits = emulatorFolderNames.filter { dirContentsLower.contains($0) }.count
-                    isEmulatorCard = emulatorHits >= 2
+                    if hardwareType == .sd {
+                        let emulatorFolderNames = ["roms", "retroarch", "bios", ".emulationstation"]
+                        let dirContents = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
+                        let dirContentsLower = Set(dirContents.map { $0.lowercased() })
+                        let emulatorHits = emulatorFolderNames.filter { dirContentsLower.contains($0) }.count
+                        isEmulatorCard = emulatorHits >= 2
+                    }
+
+                    classificationCache[url.path] = CachedClassification(hasCameraStructure: hasCameraStructure, isEmulatorCard: isEmulatorCard)
                 }
             }
             let isCameraCard = !isEmulatorCard && (isHardwareCamera || hasCameraStructure || (isInternal && isRemovable))
@@ -332,6 +351,9 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             foundDrives.append(Drive(name: name, url: url, isCameraCard: isCameraCard, isEmulatorCard: isEmulatorCard, cardType: finalCardType, isEjectable: isEjectable, isRemovable: isRemovable, isInternal: isInternal))
         }
         
+        let mountedPaths = Set(paths.map { $0.path })
+        classificationCache = classificationCache.filter { mountedPaths.contains($0.key) }
+
         foundDrives.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         
         DispatchQueue.main.async {
@@ -722,7 +744,7 @@ struct EjectorMenuView: View {
             Divider()
 
             Button("Refresh List") {
-                manager.fetchDrives()
+                manager.fetchDrives(clearCache: true)
             }
 
             Button("Check for Updates...") {
@@ -753,13 +775,14 @@ struct SettingsView: View {
 
     @State private var showingFullDiskAccessAlert = false
     @State private var showingNotificationAlert = false
-    
+    @State private var fullDiskAccessGranted = FileManager.default.isReadableFile(atPath: "/Library/Application Support/com.apple.TCC/TCC.db")
+    @State private var showingPermissionCheck = false
+    @State private var accessibilityGranted = GlobalHotkeyManager.shared.isTrusted(promptSystem: false)
+
     let availableKeys: [(name: String, code: Int)] = [
         ("D", 2), ("E", 14), ("F", 3), ("G", 5), ("K", 40),
         ("M", 46), ("R", 15), ("T", 17), ("X", 7)
     ]
-    
-    let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
     private func hasFullDiskAccess() -> Bool {
         FileManager.default.isReadableFile(atPath: "/Library/Application Support/com.apple.TCC/TCC.db")
@@ -791,8 +814,11 @@ struct SettingsView: View {
                     Toggle("Clean Cards Before Ejecting", isOn: $cleanCardsOnEject)
                         .toggleStyle(.switch)
                         .onChange(of: cleanCardsOnEject) { oldValue, newValue in
-                            if newValue && !hasFullDiskAccess() {
-                                showingFullDiskAccessAlert = true
+                            if newValue {
+                                fullDiskAccessGranted = hasFullDiskAccess()
+                                if !fullDiskAccessGranted {
+                                    showingFullDiskAccessAlert = true
+                                }
                             }
                         }
                     Text("Removes hidden macOS files (.DS_Store, ._ files) that cause errors on cameras and phantom entries on emulators. Applies to all camera and emulator card buttons and the keyboard shortcut.")
@@ -801,17 +827,11 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     if cleanCardsOnEject {
                         HStack(spacing: 4) {
-                            Image(systemName: hasFullDiskAccess() ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                .foregroundColor(hasFullDiskAccess() ? .green : .orange)
-                            Text(hasFullDiskAccess() ? "Full Disk Access enabled" : "Full Disk Access required")
+                            Image(systemName: fullDiskAccessGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundColor(fullDiskAccessGranted ? .green : .orange)
+                            Text(fullDiskAccessGranted ? "Full Disk Access enabled" : "Full Disk Access required")
                                 .font(.caption)
-                                .foregroundColor(hasFullDiskAccess() ? .green : .orange)
-                            if !hasFullDiskAccess() {
-                                Button("Grant Access") {
-                                    showingFullDiskAccessAlert = true
-                                }
-                                .font(.caption)
-                            }
+                                .foregroundColor(fullDiskAccessGranted ? .green : .orange)
                         }
                     }
                 }
@@ -861,7 +881,8 @@ struct SettingsView: View {
                 Toggle("Enable Global Eject Shortcut", isOn: $isShortcutEnabled)
                     .onChange(of: isShortcutEnabled) { oldValue, newValue in
                         if newValue {
-                            if GlobalHotkeyManager.shared.isTrusted(promptSystem: false) {
+                            accessibilityGranted = GlobalHotkeyManager.shared.isTrusted(promptSystem: false)
+                            if accessibilityGranted {
                                 GlobalHotkeyManager.shared.start()
                             } else {
                                 _ = GlobalHotkeyManager.shared.isTrusted(promptSystem: true)
@@ -873,19 +894,11 @@ struct SettingsView: View {
                 
                 if isShortcutEnabled {
                     HStack(spacing: 4) {
-                        Image(systemName: GlobalHotkeyManager.shared.isTrusted(promptSystem: false) ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .foregroundColor(GlobalHotkeyManager.shared.isTrusted(promptSystem: false) ? .green : .orange)
-                        Text(GlobalHotkeyManager.shared.isTrusted(promptSystem: false) ? "Accessibility enabled" : "Accessibility required")
+                        Image(systemName: accessibilityGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundColor(accessibilityGranted ? .green : .orange)
+                        Text(accessibilityGranted ? "Accessibility enabled" : "Accessibility required")
                             .font(.caption)
-                            .foregroundColor(GlobalHotkeyManager.shared.isTrusted(promptSystem: false) ? .green : .orange)
-                        if !GlobalHotkeyManager.shared.isTrusted(promptSystem: false) {
-                            Button("Grant Access") {
-                                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                                    NSWorkspace.shared.open(url)
-                                }
-                            }
-                            .font(.caption)
-                        }
+                            .foregroundColor(accessibilityGranted ? .green : .orange)
                     }
 
                     HStack {
@@ -900,18 +913,44 @@ struct SettingsView: View {
                     }
                     .padding(.leading, 18)
                     .onChange(of: shortcutKeyCode) { oldValue, newValue in
-                        if GlobalHotkeyManager.shared.isTrusted(promptSystem: false) {
+                        if accessibilityGranted {
                             GlobalHotkeyManager.shared.start()
                         }
                     }
                 }
             }
-            .onReceive(timer) { _ in
-                if isShortcutEnabled && GlobalHotkeyManager.shared.isTrusted(promptSystem: false) {
-                    GlobalHotkeyManager.shared.start()
-                }
-            }
             
+            Divider()
+
+            Text("Permissions")
+                .font(.headline)
+            VStack(alignment: .leading, spacing: 12) {
+                Button("Check Permissions") {
+                    accessibilityGranted = GlobalHotkeyManager.shared.isTrusted(promptSystem: false)
+                    fullDiskAccessGranted = hasFullDiskAccess()
+                    if accessibilityGranted && isShortcutEnabled {
+                        GlobalHotkeyManager.shared.start()
+                    }
+                    showingPermissionCheck = true
+                }
+                Text("Checks whether Accessibility and Full Disk Access are enabled for Easy Eject.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .alert("Permission Status", isPresented: $showingPermissionCheck) {
+                if !fullDiskAccessGranted || !accessibilityGranted {
+                    Button("Open Privacy Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                }
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("\(accessibilityGranted ? "✅" : "⚠️") Accessibility — \(accessibilityGranted ? "Granted" : "Not granted. Required for global keyboard shortcut.")\n\(fullDiskAccessGranted ? "✅" : "⚠️") Full Disk Access — \(fullDiskAccessGranted ? "Granted" : "Not granted. Required for Clean & Eject.")")
+            }
+
             Divider()
 
             Text("Debug")
@@ -933,7 +972,9 @@ struct SettingsView: View {
         .padding(24)
         .frame(width: 400)
         .onAppear {
-            if GlobalHotkeyManager.shared.isTrusted(promptSystem: false) && isShortcutEnabled {
+            accessibilityGranted = GlobalHotkeyManager.shared.isTrusted(promptSystem: false)
+            fullDiskAccessGranted = hasFullDiskAccess()
+            if accessibilityGranted && isShortcutEnabled {
                 GlobalHotkeyManager.shared.start()
             }
         }
@@ -1049,6 +1090,10 @@ struct HelpView: View {
                             Text("**Accessibility** — Required only for the global keyboard shortcut to work inside other apps.")
                             Text("**Full Disk Access** — Required for Clean & Eject to scan and delete hidden files. Enable in System Settings > Privacy & Security.")
                         }
+                    }
+
+                    helpSection("Refresh List", icon: "arrow.clockwise") {
+                        Text("Easy Eject remembers how it classified each drive to avoid repeatedly waking spinning disks. If a drive isn't showing up correctly, click \"Refresh List\" to clear the cache and re-scan all connected drives.")
                     }
 
                     helpSection("Debug Logging", icon: "ladybug") {
