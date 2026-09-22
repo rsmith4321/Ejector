@@ -25,7 +25,8 @@ Tested locally on September 21, 2026 (UTC logs extend into September 22), macOS 
 - After the larger-icon/count update, the user physically unplugged/reconnected the air unit. Without pressing Import now, the signed sandbox prototype displayed Checking, verified both files and ejected it. Logs record completion at 2026-09-22T03:15:53Z.
 - The user physically pressed Control-Shift-Command-J and confirmed that the prototype menu opened. A deliberately controlled other-foreground-app/conflict case was not performed.
 - The menu bar now uses an 18-point semibold `eject.fill` symbol, recognizes SD/CFexpress/XQD reader metadata and enrolled source identities, and deduplicates by physical disk. Import progress and errors override its idle count. No broader disk permission was added. Signature validation passed after the update.
-- Final retention inspection and fixture cleanup are pending the last reconnect. Login is off, test automatic importing is now off, and original deletion stayed off throughout.
+- On the final physical reconnect, both device originals and both saved copies were independently hashed again and matched the recorded initial SHA-256 values. Only the two generated files and their empty test folders were removed from the air unit and Drobo. The temporary profile was removed through the native UI; both Store and full-edition profile lists are empty. Selecting Eject Untitled in the prototype removed the physical device mount. Original deletion stayed off throughout. Login remains off.
+- The idle count implementation is built and signed, but a separate screenshot/user confirmation of the displayed count was not captured. The real-device automatic import test used this updated binary.
 - Evidence: `evidence/hardware-source.json` and `evidence/hardware-imports.log` in the local prototype artifact folder.
 
 ## Automated checks

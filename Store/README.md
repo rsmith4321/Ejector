@@ -23,8 +23,8 @@ The fixed prototype shortcut **Control-Shift-Command-J** opens the eject menu, w
 | Enrolled-folder imports, dates, collisions, SHA-256 and durability gates | Yes, selected source and destination only | Yes |
 | Retain originals by default | Yes | Yes |
 | Optional verified source deletion | Authorized source folder only, explicit warning | Yes, explicit warning |
-| Automatic import after reconnect | Observed with disposable mounted images | Existing full implementation |
-| Manual and post-import eject | Observed with single and multipartition images | Existing full implementation |
+| Automatic import after reconnect | Observed with mounted images and real air-unit storage | Existing full implementation |
+| Manual and post-import eject | Observed with single/multipartition images and real air-unit storage | Existing full implementation |
 | Device Trash recovery | Omitted | Available with required permissions |
 | Whole-volume metadata cleanup | Omitted | Available |
 | Global shortcut | Registered shortcut opens eject menu | Accessibility-dependent eject shortcut |
