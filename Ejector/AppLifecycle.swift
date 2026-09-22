@@ -31,7 +31,13 @@ import Combine
         if seen {
             DispatchQueue.main.async { NSApp.windows.first { $0.identifier?.rawValue == "importsWindow" }?.orderOut(nil) }
         }
-        #if !APP_STORE
+        #if APP_STORE
+        if !UserDefaults.standard.bool(forKey: "hasSeenCardAuthorizationGuide") {
+            UserDefaults.standard.set(true, forKey: "hasSeenCardAuthorizationGuide")
+            openWindow("helpWindow")
+            DispatchQueue.main.async { NSApp.windows.first { $0.identifier?.rawValue == "importsWindow" }?.orderOut(nil) }
+        }
+        #else
         if !UserDefaults.standard.bool(forKey: "hasAcceptedDisclaimer") { openWindow("welcomeWindow") }
         #endif
     }

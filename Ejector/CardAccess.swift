@@ -52,7 +52,7 @@ import Combine
             panel.canChooseFiles = false; panel.canChooseDirectories = true
             panel.allowsMultipleSelection = false
             panel.title = "Authorize a card or external volume"
-            panel.message = "Select the card itself to recognize camera/emulator folders and use Clean & Eject. This remembers access to this volume; it does not start an import or delete files."
+            panel.message = "Under Locations, select the card itself (for example, Untitled), not DCIM or another folder inside it. Click Authorize to remember access for folder detection and Clean & Eject. This does not start an import or enable deletion."
             panel.prompt = "Authorize"
             panel.directoryURL = expected ?? URL(fileURLWithPath: "/Volumes")
             NSApp.activate()

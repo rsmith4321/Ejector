@@ -60,8 +60,7 @@ struct SettingsView: View {
                 Divider()
                 Text("Permissions").font(.headline)
                 #if APP_STORE
-                Text("Authorize a card for camera/emulator folder detection and Clean & Eject. Import folders are authorized separately. After formatting, authorize the card again.")
-                    .font(.caption)
+                FolderAuthorizationInstructions().font(.caption)
                 Button("Authorize a Card…") { access.authorize() }
                 ForEach(access.grants) { grant in
                     HStack { Text(grant.name); Spacer(); Button("Forget") { access.forget(grant.id) } }

@@ -472,8 +472,8 @@ struct EjectorApp: App {
         Window("Welcome to Easy Eject", id: "welcomeWindow") { WelcomeView() }
             .defaultSize(width: 480, height: 420).defaultPosition(.center)
         #endif
-        Window("Help & Instructions", id: "helpWindow") { HelpView() }
-            .defaultSize(width: 500, height: 520)
+        Window("Easy Eject: Help & Instructions", id: "helpWindow") { HelpView(lifecycle: lifecycle) }
+            .defaultSize(width: 600, height: 690)
         Window("Easy Eject Debug Logs", id: "debugWindow") { DebugLogView() }
             .defaultSize(width: 550, height: 400)
         Settings { SettingsView() }
@@ -501,12 +501,24 @@ private struct ImportsWindow: View {
 
 // MARK: - 7. Help View
 struct HelpView: View {
+    let lifecycle: EjectorLifecycle
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+
+                    helpSection("Start Here: Eject Your Card", icon: "eject.fill") {
+                        Text("Click the eject icon in your Mac's menu bar, choose your card, and wait for ejection to succeed before unplugging. Import profiles are optional.")
+                        Button("Open Eject Menu") { lifecycle.showMenu() }
+                    }
+                    #if APP_STORE
+                    helpSection("Folder Authorization", icon: "folder.badge.plus") {
+                        FolderAuthorizationInstructions()
+                        Button("Authorize a Card…") { CardAccess.shared.authorize() }
+                    }
+                    #endif
 
                     helpSection("Smart Sorting", icon: "sdcard") {
                         Text("Automatically detects camera folders (DCIM, GOPRO, NIKON, etc.) and card reader hardware (SD, CFexpress, XQD) to separate media cards from permanent SSDs. Especially helpful for CFexpress cards, which macOS often mistakes for standard hard drives.")

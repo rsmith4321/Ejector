@@ -1,107 +1,36 @@
-# Easy Eject for Photographers
+# Easy Eject
 
-**Import, verify, and eject camera media from your Mac menu bar.**
+A native macOS menu bar utility for ejecting camera cards, optional hidden-file cleaning and verified media imports. The maintained distribution is the **Mac App Store app** (`EjectorStore`, `com.ryansmithphotography.EasyEject.store`). The former direct website download is retired. Historical source and release artifacts remain available for rollback; do not ship the legacy `Ejector` target as a second current edition.
 
-Version 1.5.2. Requires macOS 14 or later. Release downloads are signed with Developer ID and notarized by Apple.
+## Eject your card
 
-Easy Eject is a lightweight macOS menu bar utility that intelligently detects camera memory cards and lets you safely eject them with a single click or keyboard shortcut. It also scrubs hidden macOS metadata that causes errors on cameras, emulators, and PCs.
+Finish transfers in Lightroom or your usual photo app. Open the eject icon in the Mac menu bar and choose the card. Plain Eject needs no import profile or folder authorization. Unplug only after ejection succeeds. Ejection is not forced, and ejecting a physical disk unmounts its other partitions.
 
-## The Problem
+The menu groups Camera Cards, Emulator Cards and Other External Volumes. The count deduplicates physical card disks. Card detection uses hardware and, when authorized, familiar camera/emulator folder structures; it is a heuristic. Review the list before Eject All Cards. The optional Control-Option-Command plus selected letter shortcut starts off and needs no Accessibility permission.
 
-CFexpress cards are PCIe/NVMe solid-state drives under the hood. Because of this, macOS reports them as permanent external SSDs rather than removable camera media. Depending on the card reader and editing app, this can make the usual eject-after-import option unavailable.
+## Authorize a card
 
-On top of that, macOS silently litters every drive with invisible metadata files (`.DS_Store`, `._` AppleDouble resource forks, `__MACOSX` folders). While hidden on your Mac, these files cause real problems on other systems:
+1. Choose **Authorize a Card** in the menu or Settings.
+2. In the chooser, select the card's name under **Locations**, such as **Untitled**. Select the card itself, not DCIM or a folder inside it.
+3. Click **Authorize**. Access is remembered for that volume. After formatting the card, authorize it again. **Forget** in Settings removes saved access.
+4. If desired, enable **Clean Cards Before Ejecting**. Other volumes have a separate **Clean & Eject** action.
 
-- **Emulator consoles:** Phantom game entries from `._` files cluttering ROM libraries
-- **Windows/Linux PCs:** Visible `.DS_Store` junk in every folder
+Cleaning removes regular `._*`, `.DS_Store`, `.apdisk` files and empty `__MACOSX` folders. It preserves ordinary media, ignores symbolic links and skips protected system folders and device Trash. Permission does not start an import or enable deletion. Full Disk Access is not required or used as a sandbox bypass. Instructions appear on first launch and remain in Help and Settings.
 
-## The Solution
+## Optional imports
 
-### Smart Sorting
+Open **Air Unit & Camera Imports**, select a device and choose **Set up import**. Authorize its media folder (such as DCIM) and a destination folder on a different physical disk. These are separate grants from whole-card authorization.
 
-Instead of relying on flawed hardware flags, Easy Eject uses two detection methods:
+Copies go into dated folders. SHA-256 and durability checks verify saved files. Originals are retained by default. Automatic import, eject after verified import, original deletion and device Trash recovery are separate per-profile options and start off for new profiles. Saving a profile does not start an import; use Import now or the next connection.
 
-1. **Hardware detection** via DiskArbitration: identifies SD, CFexpress, and XQD card reader protocols
-2. **Folder structure scanning**: detects brand-specific camera directories:
-   - Canon (`CANONMSC`)
-   - Nikon (`NIKON`)
-   - Fujifilm (`FUJI`)
-   - GoPro (`GOPRO`)
-   - Sony & Panasonic Pro Video (`SONY`, `PRIVATE`, `BPAV`, `XDROOT`)
+Optional original deletion is permanent, bypasses Trash and requires a warning. Keep it off for important media. Optional device Trash recovery also needs whole-card authorization; recovered files are copied and verified before being removed from that device's Trash. Other drives are untouched. Keep independent backups.
 
-Detected camera cards are grouped under **Camera Cards**. Classification uses hardware and folder clues, so check the listed drives before bulk ejecting. Backup drives containing camera folders can also match.
+Source and destination disks are protected during imports. Multiple enrolled partitions or unavailable physical identity hold automatic eject; finish the desired imports and eject manually. Formatting requires new authorization and a new import profile. No profile or permission is migrated automatically from the retired direct app.
 
-### Clean & Eject
+## Development and release
 
-The metadata scrubber removes hidden macOS files before ejecting:
+Requires macOS 14 or later. Archive the **EjectorStore** scheme with an Apple-accepted release toolchain. Store version 1.0, build 3. `Store/README.md`, `Store/VERIFICATION.md` and `Store/RELEASE-3.md` distinguish local, uploaded, submitted and approved state. Never infer public availability from a successful build or upload.
 
-- **`._*` AppleDouble files** that can appear as phantom entries on emulator consoles
-- **`.DS_Store`**: Mac folder settings that clutter Windows and Linux
-- **Empty `__MACOSX` folders** after known metadata files are removed. Unrelated contents are preserved
+Shared app code contains historical direct-target compatibility branches, but only the Store scheme is maintained for distribution. Store permissions use App Sandbox, user-selected read/write and app-scoped bookmarks. Updates go through the App Store.
 
-The scrubber safely skips macOS-managed directories (`.Spotlight-V100`, `.Trashes`, `.fseventsd`) to prevent filesystem issues.
-
-## Air unit and camera imports
-
-Open **Air Unit & Camera Imports** from the menu. Connect a device using USB mass storage or a card reader, select its media folder (such as DCIM or VIDEO), choose a destination on a different disk, and save a profile. Each profile recognizes a volume UUID, so similarly named drives do not inherit one another's settings. Re-enroll a device after formatting it.
-
-- Automatic import is opt-in per device. **Import now** also works with automatic mode off.
-- Originals are kept by default, which is recommended for client work and important photos or videos. Enabling permanent deletion requires confirming a warning that files bypass Trash and cannot be restored from it. Use deletion only for unimportant or replaceable footage and keep independent backups. Deletion occurs only after SHA-256 verification of a durable saved copy.
-- Files are stored under the local import date (`YYYY-MM-DD`), retaining paths inside the selected media folder. Filename conflicts preserve both versions. Reimporting identical content reuses the saved copy.
-- Menu bar text shows the active phase and percentage. The import window shows file counts, a progress bar, the current filename, and the latest result.
-- **Stop import** preserves unverified originals. Completed, verified files may already have been removed if deletion was enabled.
-- Optional Trash recovery saves files from the current user's Trash on that registered device into `Recovered Device Trash` before permanently removing them. This requires Full Disk Access.
-- Optional automatic eject runs only after a successful scan/import and final device checks. Failed imports leave remaining originals in place and display a visible error.
-- Manual eject, bulk eject, and the global shortcut cannot eject an active import's source or destination disk, including other partitions of those disks.
-- Profiles wait for the chosen destination; connecting it while the source is still present retries setup. Mid-import failures require **Import now** or reconnecting the source.
-
-The importer copies every regular file in your selected media folder, including video, camera RAW, proxy, and sidecar files. It skips hidden files and folders in normal media imports, and does not follow symbolic links. This avoids silently omitting recordings with unfamiliar extensions. Compatibility depends on the unit exposing readable mounted storage. Image Capture-only/PTP/MTP devices are not supported by this version. Testing one model does not establish support for every DJI or other air unit.
-
-The native importer does not require Python, Xcode, Image Capture, a separate launch agent, or a background script on the user's Mac. Easy Eject must be running and the Mac awake. Enable Launch at Login if desired.
-
-Profiles and the import audit log are stored in `~/Library/Application Support/Easy Eject/`. Logs identify saved paths, SHA-256 values, source removal, and errors. Removing a profile does not remove imported files.
-
-## Key Features
-
-- **Smart Sorting:** Automatically identifies CFexpress, XQD, and SD cards: including those connected via Mac Studio's front card reader.
-- **One-Click Bulk Eject:** Safely unmount all camera cards simultaneously.
-- **Clean & Eject:** Scrub hidden macOS metadata before ejecting. Set as the default for camera cards, or choose per-drive for other volumes.
-- **Camera Card Eject Mode:** Toggle between "Eject" and "Clean & Eject" as the default for all camera card buttons and the keyboard shortcut.
-- **Per-Drive Options:** Non-camera drives (SSDs, thumb drives, emulator cards) show a submenu with both Eject and Clean & Eject options.
-- **Global Keyboard Shortcut:** Press **⌃⌥⌘ + letter** to instantly eject all camera cards from any app. Choose the letter in Settings and check for conflicts with shortcuts in your other apps.
-- **Safety Warnings:** Alerts before ejecting non-camera drives to prevent accidental disconnection.
-- **Launch at Login:** Optionally start with your Mac so it's always ready.
-- **Debug Window:** Built-in diagnostic log with copy-to-clipboard for troubleshooting drive detection.
-- **Native app:** SwiftUI menu bar utility with no ads or tracking. Memory use varies during imports.
-
-## Validation
-
-Run the isolated file-safety tests:
-
-```sh
-xcrun swiftc -parse-as-library Ejector/MediaImportEngine.swift Ejector/MetadataCleaner.swift Tests/ImportEngineTests.swift -o /tmp/easy-eject-tests
-/tmp/easy-eject-tests
-```
-
-`Tests/MountedVolumeImportTest.swift` is an opt-in integration test. It requires a disposable volume specifically named **Easy Eject Test**, a fixture at `DCIM/DJI_001/TEST_IMPORT.MP4`, and `~/Easy Eject Test Imports` on a different volume. It copies/verifies/removes that fixture and ejects that test volume. Never point it at real media.
-
-See `REVIEW.md` for review findings, fixes, evidence, and remaining release checks.
-
-## Installation
-
-1. Download the latest release from [Releases](https://github.com/rsmith4321/Ejector/releases/latest).
-2. Move **Easy Eject** to your Applications folder.
-3. Open the app and follow the macOS first-launch prompt. Use the signed, notarized release from this repository.
-
-## Permissions
-
-- **Accessibility** *(optional)*: Required only for the global keyboard shortcut to work inside other apps. The app walks you through enabling it in System Settings. Manual ejection from the menu works without this.
-- **Full Disk Access** *(optional)*: Needed for protected locations such as device Trash, and when macOS denies access during cleanup. Normal file imports use the source and destination folders you select. The app guides you through setup with a one-click button that opens System Settings and reveals the app in Finder for easy drag-and-drop.
-
-## Support
-
-For tutorials, troubleshooting, and contact:
-[Easy Eject setup and support](https://easyeject.com/)
-
----
-*Created by Ryan Smith for the photography and videography community.*
+[Support and authorization guide](https://easyeject.com/support/) · [Privacy](https://easyeject.com/privacy/)
