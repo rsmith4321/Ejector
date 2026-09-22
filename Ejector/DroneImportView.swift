@@ -37,12 +37,12 @@ struct DroneImportView: View {
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
             }
-            Text("Use a USB storage connection or a memory card reader. DJI O3/O4 and other air units can use a saved profile with their own media folder. Devices that only appear in Image Capture are not supported yet.")
-                .font(.callout).foregroundStyle(.secondary)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     if importer.profiles.isEmpty {
                         ContentUnavailableView("No devices enrolled", systemImage: "sdcard", description: Text("Choose a connected device below. Automatic importing and original deletion start off."))
+                            .frame(maxWidth: .infinity)
+                            .multilineTextAlignment(.center)
                     }
                     ForEach(importer.profiles) { profile in
                         GroupBox {
@@ -63,17 +63,27 @@ struct DroneImportView: View {
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(4)
                         }
                     }
-                }
+                }.frame(maxWidth: .infinity)
             }
             Divider()
-            HStack {
-                Picker("Connected device", selection: $selectedSource) {
-                    Text("Choose a device").tag("")
-                    ForEach(importer.volumes, id: \.path) { volume in
-                        Text(volume.lastPathComponent).tag(volume.path)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Add an import device").font(.headline)
+                Text("Connect your DJI air unit, camera, or memory card to this Mac. It must appear as a drive in Finder.")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text("Device")
+                    Picker("Device", selection: $selectedSource) {
+                        Text("Choose a device…").tag("")
+                        ForEach(importer.volumes, id: \.path) { volume in
+                            Text(volume.lastPathComponent).tag(volume.path)
+                        }
                     }
+                    .labelsHidden()
+                    .accessibilityLabel("Device")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("Set up import…", action: enroll).disabled(selectedSource.isEmpty || importer.busy)
                 }
-                Button("Set up import…", action: enroll).disabled(selectedSource.isEmpty || importer.busy)
             }.disabled(importer.busy)
             Text("Profiles recognize the volume, not its name. After formatting a device, enroll it again. Destination drives must be connected before importing.")
                 .font(.caption).foregroundStyle(.secondary)

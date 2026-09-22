@@ -2,7 +2,7 @@
 
 **Import, verify, and eject camera media from your Mac menu bar.**
 
-Version 1.5.0. Requires macOS 14 or later. Release downloads are signed with Developer ID and notarized by Apple.
+Version 1.5.1. Requires macOS 14 or later. Release downloads are signed with Developer ID and notarized by Apple.
 
 Easy Eject is a lightweight macOS menu bar utility that intelligently detects camera memory cards and lets you safely eject them with a single click or keyboard shortcut. It also scrubs hidden macOS metadata that causes errors on cameras, emulators, and PCs.
 
@@ -101,7 +101,7 @@ See `REVIEW.md` for review findings, fixes, evidence, and remaining release chec
 ## Support
 
 For tutorials, troubleshooting, and contact:
-[Easy Eject setup and support](https://www.ryansmithphotography.com/photography-apps/easyeject/)
+[Easy Eject setup and support](https://easyeject.com/)
 
 ---
 *Created by Ryan Smith for the photography and videography community.*

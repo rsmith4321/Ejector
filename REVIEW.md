@@ -36,6 +36,10 @@ An enabled standalone O4 helper blocks Easy Eject imports, preventing two import
 - Reconnecting the O4 triggered the installed notarized app automatically. It reverified the three saved recordings, removed each verified original, completed the enabled device Trash check, and ejected the device. The audit log and native success window confirmed completion. Nonempty Trash recovery was covered by the isolated tests.
 - Apple accepted notarization of the app and DMG. Stapling, strict signature verification, disk-image checksum verification, and Gatekeeper assessment passed for the release package.
 
+## Version 1.5.1 interface follow-up
+
+The empty-state icon and multiline text now share the full window width. The enrollment area has an "Add an import device" heading, a connection hint, and a leading Device label with a left-aligned selector. The installed native window was visually inspected after the final change. The universal build, signatures, notarization, stapling, and Gatekeeper checks passed; import behavior is unchanged.
+
 ## Still open
 
 - Other physical air units, Intel runtime, and macOS 14 runtime remain untested.
