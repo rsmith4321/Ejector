@@ -42,15 +42,17 @@ import Combine
         #endif
     }
     private func updateStatus() {
-        let symbol = importer.busy ? "arrow.down.circle" : (importer.hasError ? "exclamationmark.triangle" : "eject.fill")
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Easy Eject")
+        let symbol = importer.busy ? "arrow.down.circle" : (importer.needsAttention ? "exclamationmark.triangle" : "eject.fill")
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: importer.needsAttention ? "Easy Eject: needs attention" : "Easy Eject")
         image?.isTemplate = true; item?.button?.image = image
         item?.button?.imagePosition = .imageLeading
         item?.button?.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         let cards = manager.drives.filter { $0.isCameraCard || $0.isEmulatorCard }
         let count = Set(cards.map { ImportVolumes.physicalID($0.url) ?? $0.url.path }).count
         item?.button?.title = importer.menuTitle.isEmpty ? (count > 0 ? "\(count)" : "") : importer.menuTitle
-        item?.button?.toolTip = "Easy Eject: \(count) recognized card disks"
+        item?.button?.toolTip = importer.needsAttention
+            ? "Easy Eject: choose View Issue for details."
+            : "Easy Eject: \(count) recognized card disks"
     }
     private func heading(_ title: String, _ menu: NSMenu) {
         let row = menu.addItem(withTitle: title, action: nil, keyEquivalent: ""); row.isEnabled = false
@@ -98,7 +100,9 @@ import Combine
         }
         menu.addItem(.separator())
         if importer.busy { heading("\(importer.activeName): \(importer.menuTitle)", menu) }
-        else if importer.hasError { heading(importer.message, menu) }
+        else if importer.needsAttention {
+            add("View Issue…", #selector(imports), menu, icon: "exclamationmark.triangle")
+        }
         add("Air Unit & Camera Imports…", #selector(imports), menu)
         #if APP_STORE
         add("Authorize a Card…", #selector(authorize), menu)

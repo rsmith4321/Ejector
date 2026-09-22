@@ -26,7 +26,11 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     @Published var message = "Connect an air unit or camera card to set up automatic imports."
     @Published var activeName = ""
     @Published var lastFolder: URL?
-    @Published var hasError = false
+    @Published var hasError = false {
+        didSet { isIssueDismissed = false }
+    }
+    @Published private(set) var isIssueDismissed = false
+    var needsAttention: Bool { hasError && !isIssueDismissed }
     @Published var volumes: [URL] = []
     private var attempted = Set<String>()
     private var waiting = Set<String>()
@@ -71,7 +75,14 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
             }
             return progress.phase
         }
-        return hasError ? "Import needs attention" : ""
+        return ""
+    }
+
+    /// Acknowledging a notice never retries an import or changes its saved options.
+    /// Keep the explanation visible until the next operation replaces it.
+    func dismissIssue() {
+        guard !busy, hasError else { return }
+        isIssueDismissed = true
     }
 
     func save(_ profile: DroneProfile) {

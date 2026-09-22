@@ -17,9 +17,19 @@ struct DroneImportView: View {
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text(importer.busy ? "\(importer.activeName) · \(importer.progress.phase)" : importer.progress.phase).font(.headline)
+                        if !importer.busy && importer.hasError {
+                            Label(importer.isIssueDismissed ? "Last issue (dismissed)" : "Needs attention",
+                                  systemImage: importer.isIssueDismissed ? "info.circle" : "exclamationmark.triangle")
+                                .font(.headline)
+                        } else {
+                            Text(importer.busy ? "\(importer.activeName) · \(importer.progress.phase)" : importer.progress.phase).font(.headline)
+                        }
                         Spacer()
                         if importer.busy { Button("Stop import") { importer.cancel() }.disabled(importer.progress.phase == "Ejecting") }
+                        else if importer.needsAttention {
+                            Button("Dismiss") { importer.dismissIssue() }
+                                .help("Hide the warning icon. The explanation stays here; nothing is retried.")
+                        }
                     }
                     if importer.busy {
                         if importer.progress.total > 0 {
@@ -28,7 +38,7 @@ struct DroneImportView: View {
                                 .font(.caption).lineLimit(2)
                         } else { ProgressView().controlSize(.small) }
                     } else {
-                        Text(importer.message).foregroundStyle(importer.hasError ? .orange : .secondary)
+                        Text(importer.message).foregroundStyle(importer.needsAttention ? .orange : .secondary)
                             .id(importer.message)
                             .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                     }
