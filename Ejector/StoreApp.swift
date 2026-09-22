@@ -9,9 +9,9 @@ import DiskArbitration
     @NSApplicationDelegateAdaptor(StoreDelegate.self) private var delegate
     @StateObject private var importer = DroneImportManager.shared
     var body: some Scene {
-        Window("Easy Eject Store Prototype", id: "importsWindow") {
+        Window("Easy Eject", id: "importsWindow") {
             VStack(spacing: 0) {
-                StoreSettings()
+                StoreSettings(delegate: delegate)
                 Divider()
                 DroneImportView(importer: importer)
             }
@@ -31,6 +31,7 @@ import DiskArbitration
     private var observations = Set<AnyCancellable>()
     private let importer = DroneImportManager.shared
     private var connectedCardCount = 0
+    var openImports: (() -> Void)?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -68,6 +69,9 @@ import DiskArbitration
             DispatchQueue.main.async { NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" })?.orderOut(nil) }
         }
     }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showWindow(); return true
+    }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     private func updateStatusItem() {
@@ -81,7 +85,7 @@ import DiskArbitration
         button.imagePosition = .imageLeading
         button.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         button.title = !importer.menuTitle.isEmpty ? importer.menuTitle : (connectedCardCount > 0 ? "\(connectedCardCount)" : "")
-        button.toolTip = "Easy Eject Store Prototype: \(connectedCardCount) connected cards or enrolled air units"
+        button.toolTip = "Easy Eject: \(connectedCardCount) connected cards or enrolled air units"
     }
 
     /// Use public disk metadata and enrolled identities, without scanning unauthorized folders.
@@ -127,25 +131,25 @@ import DiskArbitration
         }
         menu.addItem(.separator())
         add("Website / Compare editions", #selector(website), to: menu)
-        add("Quit Store Prototype", #selector(quit), to: menu).isEnabled = !importer.busy
+        add("Quit Easy Eject", #selector(quit), to: menu).isEnabled = !importer.busy
     }
     @discardableResult private func add(_ title: String, _ action: Selector, to menu: NSMenu) -> NSMenuItem {
         let row = menu.addItem(withTitle: title, action: action, keyEquivalent: ""); row.target = self; return row
     }
     @objc private func showWindow() {
         NSApp.activate()
+        openImports?()
         NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" })?.makeKeyAndOrderFront(nil)
     }
-    @objc private func website() { NSWorkspace.shared.open(URL(string: "https://easyeject.com")!) }
+    @objc private func website() { NSWorkspace.shared.open(URL(string: "https://easyeject.com/editions/")!) }
     @objc private func quit() { NSApp.terminate(nil) }
     @objc private func eject(_ sender: NSMenuItem) {
         guard let volume = sender.representedObject as? URL, importer.reserveManualEject(volume) else { return }
         let key = ImportVolumes.physicalID(volume) ?? volume.path
         FileManager.default.unmountVolume(at: volume, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
             DispatchQueue.main.async {
+                self.importer.recordManualEject(volume, error: error)
                 self.importer.finishManualEject(key)
-                self.importer.hasError = error != nil
-                self.importer.message = error.map { "Could not eject \(volume.lastPathComponent): \($0.localizedDescription)" } ?? "\(volume.lastPathComponent): safe to unplug."
                 LogManager.shared.log(self.importer.message)
             }
         }
@@ -158,6 +162,8 @@ import DiskArbitration
 }
 
 private struct StoreSettings: View {
+    let delegate: StoreDelegate
+    @Environment(\.openWindow) private var openWindow
     @AppStorage("storeOnboarded") private var onboarded = false
     @ObservedObject private var preferences = StorePreferences.shared
     @Environment(\.scenePhase) private var scenePhase
@@ -167,7 +173,7 @@ private struct StoreSettings: View {
         VStack(alignment: .leading, spacing: 8) {
             if !onboarded {
                 Text("Welcome to Easy Eject").font(.title2.bold())
-                Text("Choose a media folder and a destination to save verified, dated copies. Originals stay on your device by default. This edition accesses the folders you authorize; device Trash recovery and whole-drive cleanup are available in the separate website edition.")
+                Text("Choose a media folder and a destination to save verified, dated copies. Originals stay on your device by default. Easy Eject accesses only the folders you authorize. Open the menu bar icon to eject a connected device.")
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Get started") { onboarded = true }
             }
@@ -180,7 +186,8 @@ private struct StoreSettings: View {
                     loginStatus = SMAppService.mainApp.status
                 }))
                 Spacer()
-                Link("Website / Compare editions", destination: URL(string: "https://easyeject.com")!)
+                Link("Privacy", destination: URL(string: "https://easyeject.com/privacy/")!)
+                Link("Website / Compare editions", destination: URL(string: "https://easyeject.com/editions/")!)
             }
             if loginStatus == .requiresApproval {
                 Button("Review login permission in System Settings") { SMAppService.openSystemSettingsLoginItems() }
@@ -191,6 +198,7 @@ private struct StoreSettings: View {
                 Text(preferences.shortcutStatus).font(.caption).foregroundStyle(.secondary)
             }
         }.padding(18)
+        .onAppear { delegate.openImports = { openWindow(id: "importsWindow") } }
         .onChange(of: scenePhase) { _, phase in if phase == .active { loginStatus = SMAppService.mainApp.status } }
     }
 }

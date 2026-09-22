@@ -186,7 +186,7 @@ struct DroneProfileEditor: View {
             #endif
             Toggle("Eject after successful import", isOn: $profile.autoEject)
             #if APP_STORE
-            Text("Ejecting a device also unmounts its other partitions. Turn this off if another partition still needs importing.")
+            Text("Ejecting also unmounts the other partitions. If multiple enrolled partitions share a disk, automatic eject is paused. Import each partition, then eject from the menu.")
                 .font(.caption).foregroundStyle(.secondary)
             #endif
             if let error { Text(error).foregroundStyle(.orange) }
@@ -211,7 +211,9 @@ struct DroneProfileEditor: View {
     }
     #if APP_STORE
     private func chooseSource() {
-        guard let window = NSApp.keyWindow else { return }
+        NSApp.activate()
+        guard let parent = NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" }) else { return }
+        let window = parent.attachedSheet ?? parent
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
         panel.title = "Authorize this device’s media folder"
         panel.beginSheetModal(for: window) { response in
@@ -230,7 +232,8 @@ struct DroneProfileEditor: View {
     #endif
     private func chooseDestination() {
         NSApp.activate()
-        guard let window = NSApp.keyWindow else { return }
+        guard let parent = NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" }) else { return }
+        let window = parent.attachedSheet ?? parent
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, let url = panel.url else { return }

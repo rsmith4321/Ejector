@@ -8,7 +8,7 @@
 
 /* Begin PBXFileReference section */
 		303A1AA52FAC2B2400CFBD1A /* Easy Eject.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Easy Eject.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		53541AA52FAC2B2400CFBD1A /* Easy Eject Store Prototype.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Easy Eject Store Prototype.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		53541AA52FAC2B2400CFBD1A /* Easy Eject Store.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Easy Eject Store.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		305169E02FAF864500D6218B /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -46,7 +46,7 @@
 		303A1AA62FAC2B2400CFBD1A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				53541AA52FAC2B2400CFBD1A /* Easy Eject Store Prototype.app */,
+				53541AA52FAC2B2400CFBD1A /* Easy Eject Store.app */,
 				303A1AA52FAC2B2400CFBD1A /* Easy Eject.app */,
 			);
 			name = Products;
@@ -88,7 +88,7 @@
 			);
 			name = EjectorStore;
 			productName = EjectorStore;
-			productReference = 53541AA52FAC2B2400CFBD1A /* Easy Eject Store Prototype.app */;
+			productReference = 53541AA52FAC2B2400CFBD1A /* Easy Eject Store.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -339,7 +339,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1.5.2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEPLOYMENT_POSTPROCESSING = NO;
 				DEVELOPMENT_TEAM = MCJMHBLT27;
 				ENABLE_APP_SANDBOX = YES;
@@ -352,17 +352,18 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Easy Eject Store Prototype";
+				INFOPLIST_KEY_CFBundleDisplayName = "Easy Eject";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Ryan Smith Photography, LLC";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.2;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.EasyEject.storeprototype;
-				PRODUCT_NAME = "Easy Eject Store Prototype";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.EasyEject.store;
+				PRODUCT_NAME = "Easy Eject Store";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
@@ -444,7 +445,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = 1.5.2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				DEVELOPMENT_TEAM = MCJMHBLT27;
 				ENABLE_APP_SANDBOX = YES;
@@ -457,17 +458,18 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Easy Eject Store Prototype";
+				INFOPLIST_KEY_CFBundleDisplayName = "Easy Eject";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Ryan Smith Photography, LLC";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.2;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.EasyEject.storeprototype;
-				PRODUCT_NAME = "Easy Eject Store Prototype";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.EasyEject.store;
+				PRODUCT_NAME = "Easy Eject Store";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;

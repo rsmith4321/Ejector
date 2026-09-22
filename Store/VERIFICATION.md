@@ -1,6 +1,6 @@
 # Prototype verification
 
-Tested locally on September 21, 2026 (UTC logs extend into September 22), macOS 27.0 build 26A428, Apple Silicon, Xcode 27.1 build 27A9269. No real air unit or user media was used as an import fixture.
+Tested locally on September 21, 2026 (UTC logs extend into September 22), macOS 27.0 build 26A428, Apple Silicon, Xcode 27.1 build 27A9269. Initial tests used disposable media; the real air-unit follow-up below used generated files only.
 
 ## Observed
 
@@ -75,3 +75,16 @@ Local artifact directory: `/Users/ryansmith/Easy-Eject-Review/store-prototype/`.
 ## Cleanup
 
 Disposable profiles were removed through the prototype UI. Login registration was turned off and verified disabled. Test app processes were stopped. Test images were detached, generated fixture media/destinations and the standalone test app removed. The final signed app, source, build output, logs, diff and verification documents are preserved. The Store app's isolated empty container and disabled system login record may remain as normal macOS app metadata.
+
+
+## App Store release candidate, September 22, 2026
+
+- Permanent Store identity: `com.ryansmithphotography.EasyEject.store`, version 1.0 build 1. Existing ASC app 6767951388 was reused before its first upload. Website/full identity and installation are separate.
+- Accepted toolchain located in an existing installer: Xcode 26.6 RC 2, build 17F113, macOS 26.5 SDK. Extracted separately; installed Xcode 27.1 beta remains unchanged. Apple explicitly accepts this RC 2 in its June 18, 2026 release notes. Signed universal archive succeeded.
+- All 15 Developer ID-signed sandbox engine tests passed again.
+- Production-identity UI authorized a generated HFS+ fixture and a separate APFS destination. Holding the source file open from another process caused the post-import eject to fail. UI showed the eject failure, the disk remained mounted, and independent source/destination hashes matched.
+- Replaced only the disposable profile source bookmark with invalid bytes after app quit. Relaunch/import failed closed with an actionable permission message. Native reauthorization was found to depend on the key window; fixed both editor pickers to attach to the known imports window/editor sheet. Reauthorization then succeeded and import verified/ejected.
+- Remount after completed eject displayed “Device connected again. Eject it before unplugging.”, clearing stale safe-to-unplug status. Closing imports retained the process; reopening the app restored the window.
+- Store disks with multiple enrolled source partitions now suppress automatic eject, leaving explicit manual ejection after the desired imports. Unknown/missing source disk identity also prevents automatic eject. Nine compiled coordination cases passed, including both import orders, unrelated disks, missing source, changed identity and unresolved sibling identity. This is policy-level verification, not a native two-profile disk transaction test. Shared code preserves full-edition behavior with APP_STORE guards.
+- Privacy manifest declares local preferences, user-selected/container file metadata, and free-space checks. No collected data or tracking. The app exposes privacy and neutral comparison links.
+- Actual logout/login, reboot, Intel runtime, older macOS runtime, additional hardware, newly recorded DJI clips, sustained transfers and every competing-app scenario remain untested. These limits are not claimed as verified.

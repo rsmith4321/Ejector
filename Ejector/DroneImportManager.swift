@@ -31,6 +31,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     private var attempted = Set<String>()
     private var waiting = Set<String>()
     private var mountedIDs = Set<String>()
+    private var completedEjectID: String?
     private var sourceRoot: URL?
     private var destinationRoot: URL?
     private var protectedPhysicalIDs = Set<String>()
@@ -104,6 +105,14 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
         guard !blocksEject(url), !manualOperations.contains(key) else { return false }
         manualOperations.insert(key); return true
     }
+    #if APP_STORE
+    func recordManualEject(_ volume: URL, error: Error?) {
+        hasError = error != nil
+        message = error.map { "Could not eject \(volume.lastPathComponent): \($0.localizedDescription)" } ?? "\(volume.lastPathComponent): safe to unplug."
+        // The volume may already be gone; reset success on the next mount event as well.
+        progress = ImportProgress(phase: error == nil ? "Ejected" : "Needs attention")
+    }
+    #endif
     func finishManualEject(_ key: String) { manualOperations.remove(key); refresh() }
 
     func refresh() {
@@ -112,6 +121,13 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
             return v.volumeIsInternal != true || v.volumeIsRemovable == true || v.volumeIsEjectable == true
         }
         let ids = Set(volumes.compactMap { try? ImportVolumes.identity($0) })
+        #if APP_STORE
+        if !busy, (completedEjectID.map { ids.contains($0) } ?? false) || (!ids.subtracting(mountedIDs).isEmpty && progress.phase == "Ejected") {
+            self.completedEjectID = nil
+            message = "Device connected again. Eject it before unplugging."
+            progress = ImportProgress(phase: "Ready")
+        }
+        #endif
         attempted.subtract(mountedIDs.subtracting(ids)); mountedIDs = ids
         guard !busy else { return }
         for profile in profiles where profile.enabled && !attempted.contains(profile.id) {
@@ -227,7 +243,18 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                         try audit("Completed \(result.files) files, \(result.bytes) bytes")
                         DispatchQueue.main.async {
                             self.lastFolder = result.files > 0 ? result.folder : destination
-                            if profile.autoEject {
+                            #if APP_STORE
+                            let attachments = self.volumes.compactMap { volume -> (volumeID: String, diskID: String?)? in
+                                guard let id = try? ImportVolumes.identity(volume) else { return nil }
+                                return (id, ImportVolumes.physicalID(volume))
+                            }
+                            let holdEject = !StoreEjectPolicy.allowsAutomaticEject(
+                                sourceID: profile.id, sourceDisk: ImportVolumes.physicalID(source),
+                                enrolledIDs: Set(self.profiles.map(\.id)), mounted: attachments)
+                            #else
+                            let holdEject = false
+                            #endif
+                            if profile.autoEject && !holdEject {
                                 do { try validate() }
                                 catch {
                                     releaseAccess()
@@ -238,12 +265,13 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                                 FileManager.default.unmountVolume(at: source, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
                                     DispatchQueue.main.async {
                                         releaseAccess()
+                                        if error == nil { self.completedEjectID = profile.id }
                                         self.finish(error: error, message: error == nil ? "\(profile.name): \(result.files) files imported. Safe to unplug." : "Import completed, but the device could not eject: \(error!.localizedDescription)")
                                     }
                                 }
                             } else {
                                 releaseAccess()
-                                self.finish(error: nil, message: "\(result.files) files imported and verified. Device remains connected.")
+                                self.finish(error: nil, message: holdEject ? "\(result.files) files imported and verified. Automatic eject is paused because another enrolled partition shares this disk or its disk identity could not be confirmed. Finish desired imports, then eject from the menu." : "\(result.files) files imported and verified. Device remains connected.")
                             }
                         }
                     } catch {
