@@ -8,3 +8,9 @@
 - No production profiles or real card files were changed. Full prior engine/eject parity verification remains applicable; this release only changes UI copy/type size and build number.
 
 Evidence: `release-evidence/store-readability-release/` at the canonical EasyEject workspace. `Tests/StorePrototype/VolumeIdentityProbe.swift` is the manual GUI harness; compile with `-D APP_STORE` and the three production files above, sign a standalone app with Store/Store.entitlements and a unique test bundle ID. Use generated fixtures only.
+
+## Completed release
+
+- Binary source commit `ff3c007`. Installed `/Applications/Easy Eject.app`, 1.0 (4), Store bundle, sandbox retained; local Developer ID notarization `b69dc588-bc31-402a-9c1f-9375b74f1c1d` Accepted, stapled, spctl accepted. Only installed copy running. Build 3 archived under evidence `retired-build3/`.
+- Review `fc8e6ce7-bb74-4a8b-ad21-50b13a984bff` submitted 2026-09-22T16:49:01.95Z, fresh version/review WAITING_FOR_REVIEW, AFTER_APPROVAL, correct build 4. Replaced cancelled build-3 review. Menu screenshot `5f5229b5-9cfa-4307-b2d7-597a27265035` and permission screenshot `9aafc685-c6f5-4a26-8b40-a5351def1771` COMPLETE, in that order; obsolete build-3 screenshot removed after backup. This is submission, not Apple approval or public availability.
+- Website `81a3f8a`, Cloudflare `179fcbbe-9d53-4e3c-8ef3-4a275fafb821`, live image bytes match local assets. Current menu replaces historical hero; shorter authorization instructions and same-name-device FAQ published. Desktop layout and mobile wrapping inspected.
