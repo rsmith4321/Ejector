@@ -4,17 +4,22 @@ import SwiftUI
 struct FolderAuthorizationInstructions: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Plain Eject needs no folder authorization. You can keep importing photos with Lightroom or your usual app.")
-            Text("For Clean & Eject and camera/emulator folder detection:").fontWeight(.semibold)
-            Text("1. Choose Authorize a Card from the eject menu or Settings.")
-            Text("2. In the folder chooser, select the card's name under Locations. Select the card itself, such as Untitled, not DCIM or a folder inside it.")
-            Text("3. Click Authorize. Then enable Clean Cards Before Ejecting in Settings if you want cleanup with your card's eject button.")
-            Text("Access is remembered for that volume. After formatting the card, authorize it again. Forget in Settings removes the saved authorization.")
+            Text("Eject works without folder access.").fontWeight(.semibold)
+            Text("To clean cards or detect camera folders:")
+            Text("1. Click Authorize a Card.")
+            Text("2. Under Locations, select the whole card (for example, Untitled), not DCIM. Click Authorize.")
+            Text("3. Turn on Clean Cards Before Ejecting for automatic metadata cleanup. Your photos and videos are kept.")
+            Text("Access is remembered. Authorize again after formatting; use Forget to remove access.")
                 .foregroundStyle(.secondary)
-            Text("Optional imports have separate permissions: select the media folder, such as DCIM, and a destination folder on a different disk. Device Trash recovery also needs authorization for the whole card. Granting access never starts an import or turns on deletion.")
-                .foregroundStyle(.secondary)
-            Text("You do not need Full Disk Access or Accessibility. If access is denied, reconnect the card and authorize the same card or import folders again.")
-                .foregroundStyle(.secondary)
-        }.fixedSize(horizontal: false, vertical: true)
+            DisclosureGroup("Optional imports & troubleshooting") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Import setup asks for the recording folder (such as DCIM) and a destination on another disk. Device Trash recovery also needs whole-card access.")
+                    Text("Authorizing a folder never starts imports or enables deletion. You don't need Full Disk Access or Accessibility.")
+                    Text("If access is denied, reconnect the card and authorize the card or import folders again.")
+                }.padding(.top, 6)
+            }
+        }
+        .font(.system(size: 14))
+        .fixedSize(horizontal: false, vertical: true)
     }
 }

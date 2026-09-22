@@ -36,7 +36,7 @@ struct SettingsView: View {
                 Toggle("Clean Cards Before Ejecting", isOn: Binding(get: { cleanCards }, set: {
                     if $0 { confirmCleanup = true } else { cleanCards = false }
                 }))
-                Text("Removes hidden macOS metadata such as .DS_Store and ._ files before ejecting camera and emulator cards. Original photos and recordings are kept. Applies to card buttons and the global shortcut.")
+                Text("Removes hidden macOS metadata from cards. Keeps your photos and videos.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Confirm Before Ejecting SSDs", isOn: $warnSSD)
                 Toggle("Show Eject Notifications", isOn: $notifications).onChange(of: notifications) { _, enabled in
@@ -60,7 +60,7 @@ struct SettingsView: View {
                 Divider()
                 Text("Permissions").font(.headline)
                 #if APP_STORE
-                FolderAuthorizationInstructions().font(.caption)
+                FolderAuthorizationInstructions()
                 Button("Authorize a Card…") { access.authorize() }
                 ForEach(access.grants) { grant in
                     HStack { Text(grant.name); Spacer(); Button("Forget") { access.forget(grant.id) } }

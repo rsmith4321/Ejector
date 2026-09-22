@@ -69,7 +69,7 @@ struct DroneImportView: View {
             Divider()
             VStack(alignment: .leading, spacing: 10) {
                 Text("Add an import device").font(.headline)
-                Text("Connect your DJI air unit, camera, or memory card to this Mac. It must appear as a drive in Finder.")
+                Text("Connect your DJI air unit, camera, or memory card. If several drives have the same name, connect only the device you want to set up.")
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -86,8 +86,9 @@ struct DroneImportView: View {
                     Button("Set up import…", action: enroll).disabled(selectedSource.isEmpty || importer.busy)
                 }
             }.disabled(importer.busy)
-            Text("Profiles recognize the volume, not its name. After formatting a device, enroll it again. Destination drives must be connected before importing.")
-                .font(.caption).foregroundStyle(.secondary)
+            Text("Your saved device is recognized even as Untitled 2. Its recording folder alone does not identify it. Set up again after formatting, and connect the destination before importing.")
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(22).frame(minWidth: 620, minHeight: 580)
         .onChange(of: importer.volumes) { _, volumes in
@@ -154,6 +155,8 @@ struct DroneProfileEditor: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Import profile").font(.title2.bold())
             TextField("Device name", text: $profile.name)
+            Text("Give this profile a recognizable name, such as DJI O4. The card's name in Finder can change.")
+                .font(.callout).foregroundStyle(.secondary)
             Text("Media folder: \(profile.mediaPath)").font(.callout)
             Text(profile.destinationLabel).font(.caption).textSelection(.enabled)
             Button("Change destination…", action: chooseDestination)
