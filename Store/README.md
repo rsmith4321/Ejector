@@ -12,6 +12,8 @@ Source and destination folders are explicitly selected through `NSOpenPanel`. Bo
 
 Defaults: automatic importing off, original deletion off, eject after successful import on. SHA-256, stable-source checks, storage flush, exclusive rename, collision handling, progress and cancellation remain shared with the full edition. Enabling original deletion presents the permanent-deletion warning and developer disclaimer; Return chooses Cancel. Per-file verified deletion cannot roll back earlier deletions if a later file fails. Users should retain originals and keep independent backups.
 
+The menu bar uses the full edition’s eject symbol at 18 points with semibold weight. Its idle count includes hardware-recognized SD/CFexpress/XQD cards and mounted enrolled air units, counting a multipartition physical disk once. It does not scan unauthorized folders or count all backup drives as cards. Import progress and errors take precedence over the idle count.
+
 The fixed prototype shortcut **Control-Shift-Command-J** opens the eject menu, where the user chooses a disk. It does not perform bulk ejection. This combination avoids the full edition's default shortcut. Registration failures are visible. No Accessibility event tap or Input Monitoring request is used. Eject uses `FileManager.unmountVolume` with `allPartitionsAndEjectDisk` and `withoutUI`; it does not force an unmount. Ejecting one partition also ejects its siblings. Turn automatic eject off when other partitions need separate imports.
 
 ## Comparison

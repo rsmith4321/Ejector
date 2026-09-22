@@ -3,6 +3,7 @@ import SwiftUI
 import Combine
 import Carbon
 import ServiceManagement
+import DiskArbitration
 
 @main struct StoreApp: App {
     @NSApplicationDelegateAdaptor(StoreDelegate.self) private var delegate
@@ -29,13 +30,17 @@ import ServiceManagement
     private var handler: EventHandlerRef?
     private var observations = Set<AnyCancellable>()
     private let importer = DroneImportManager.shared
+    private var connectedCardCount = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        status.button?.image = NSImage(systemSymbolName: "eject.circle", accessibilityDescription: "Easy Eject Store Prototype")
         let menu = NSMenu(); menu.autoenablesItems = false; menu.delegate = self; status.menu = menu; item = status
-        importer.$progress.combineLatest(importer.$busy).sink { [weak self] _, _ in
-            DispatchQueue.main.async { self?.item?.button?.title = self?.importer.menuTitle ?? "" }
+        importer.$progress.combineLatest(importer.$busy, importer.$hasError).sink { [weak self] _, _, _ in
+            DispatchQueue.main.async { self?.updateStatusItem() }
+        }.store(in: &observations)
+        importer.$volumes.combineLatest(importer.$profiles).sink { [weak self] volumes, profiles in
+            self?.connectedCardCount = Self.cardCount(volumes: volumes, profiles: profiles)
+            self?.updateStatusItem()
         }.store(in: &observations)
         NotificationCenter.default.publisher(for: .init("StoreOpenEjectMenu"))
             .sink { [weak self] _ in self?.item?.button?.performClick(nil) }
@@ -64,6 +69,41 @@ import ServiceManagement
         }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    private func updateStatusItem() {
+        guard let button = item?.button else { return }
+        let symbol = importer.busy ? "arrow.down.circle" : (importer.hasError ? "exclamationmark.triangle" : "eject.fill")
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Easy Eject")?
+            .withSymbolConfiguration(.init(pointSize: 18, weight: .semibold))
+        image?.size = NSSize(width: 18, height: 18)
+        image?.isTemplate = true
+        button.image = image
+        button.imagePosition = .imageLeading
+        button.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        button.title = !importer.menuTitle.isEmpty ? importer.menuTitle : (connectedCardCount > 0 ? "\(connectedCardCount)" : "")
+        button.toolTip = "Easy Eject Store Prototype: \(connectedCardCount) connected cards or enrolled air units"
+    }
+
+    /// Use public disk metadata and enrolled identities, without scanning unauthorized folders.
+    private static func cardCount(volumes: [URL], profiles: [DroneProfile]) -> Int {
+        let enrolled = Set(profiles.map(\.id))
+        var disks = Set<String>()
+        let session = DASessionCreate(nil)
+        for volume in volumes {
+            let known = (try? ImportVolumes.identity(volume)).map { enrolled.contains($0) } ?? false
+            var hardwareCard = false
+            if let session, let disk = DADiskCreateFromVolumePath(nil, session, volume as CFURL),
+               let description = DADiskCopyDescription(disk) as? [String: Any] {
+                let keys = [kDADiskDescriptionDeviceModelKey, kDADiskDescriptionDeviceVendorKey,
+                            kDADiskDescriptionDeviceProtocolKey, kDADiskDescriptionBusNameKey]
+                let text = keys.compactMap { description[$0 as String] as? String }.joined(separator: " ").lowercased()
+                hardwareCard = ["secure digital", "sdxc", "sdhc", " sd ", "cfexpress", "xqd"].contains { text.contains($0) }
+                    || (description[kDADiskDescriptionBusNameKey as String] as? String)?.lowercased() == "sd"
+            }
+            if known || hardwareCard { disks.insert(ImportVolumes.physicalID(volume) ?? volume.path) }
+        }
+        return disks.count
+    }
 
     func applicationWillTerminate(_ notification: Notification) {
         if let hotKey { UnregisterEventHotKey(hotKey) }

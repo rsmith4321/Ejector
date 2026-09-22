@@ -17,6 +17,17 @@ Tested locally on September 21, 2026 (UTC logs extend into September 22), macOS 
 - Closing the main window left the Store process running. The original full target also built successfully without signing into a separate temporary output directory.
 - Full-edition production `drone-profiles.json` was read and remained `[]`. The released `/Applications/Easy Eject.app`, original development checkout, website repository, and real media were not edited by this implementation.
 
+## Real air-unit hardware follow-up (September 21, 2026)
+
+- The user connected the same 25 GB exFAT USB volume used in the earlier O4 tests (UUID `0C2389D6-DFAF-3D80-BA05-5BECE97A785F`). Its DCIM folder was empty, so this test used two clearly named generated files in `EasyEjectSandboxTest`, totaling 48 MiB. This proves the real storage path, not import of a newly recorded DJI clip.
+- Native picker authorization granted only that source folder and `/Volumes/Drobo/Drone Videos/Easy Eject Sandbox Test`. A manual copy-only import passed; the original remained, and independently calculated destination SHA-256 matched the initial source hash.
+- After enabling automatic imports and successful-import eject with deletion still off, a full app quit/relaunch restored both folder permissions, verified both files, and ejected the physical air unit. The native window displayed safe to unplug and the mount disappeared.
+- After the larger-icon/count update, the user physically unplugged/reconnected the air unit. Without pressing Import now, the signed sandbox prototype displayed Checking, verified both files and ejected it. Logs record completion at 2026-09-22T03:15:53Z.
+- The user physically pressed Control-Shift-Command-J and confirmed that the prototype menu opened. A deliberately controlled other-foreground-app/conflict case was not performed.
+- The menu bar now uses an 18-point semibold `eject.fill` symbol, recognizes SD/CFexpress/XQD reader metadata and enrolled source identities, and deduplicates by physical disk. Import progress and errors override its idle count. No broader disk permission was added. Signature validation passed after the update.
+- Final retention inspection and fixture cleanup are pending the last reconnect. Login is off, test automatic importing is now off, and original deletion stayed off throughout.
+- Evidence: `evidence/hardware-source.json` and `evidence/hardware-imports.log` in the local prototype artifact folder.
+
 ## Automated checks
 
 The original 14 engine/metadata tests passed outside the sandbox before target-specific tests were added. The signed standalone test app then passed 15 tests with the same three release sandbox entitlements:
@@ -53,9 +64,9 @@ Local artifact directory: `/Users/ryansmith/Easy-Eject-Review/store-prototype/`.
 
 ## Remaining gates
 
-- Physical-keyboard delivery of the registered shortcut, including conflict behavior and another foreground app. Registration and menu action are verified separately.
+- A controlled shortcut conflict/other-foreground-app check. Physical-keyboard delivery has now been confirmed by the user in the hardware follow-up.
 - Actual logout/login launch; the system registration state is verified.
-- Real DJI/O4/card hardware in the sandbox, removal during transfer, long sustained transfers, filesystems beyond the HFS+ source/APFS destination fixtures, Intel runtime, and supported older macOS versions.
+- Newly recorded DJI media and additional card hardware, removal during transfer, long sustained transfers, filesystems beyond the tested HFS+/exFAT sources and HFS+/APFS destinations, Intel runtime, and supported older macOS versions. Real air-unit storage is now covered by the hardware follow-up.
 - Reboot persistence, revoked folder authorization, unresolvable stale bookmark recovery through reauthorization, busy-device/eject-denial UI, and competing apps accessing the same device. Rename-driven stale refresh and invalid bookmarks were covered; those do not establish every revocation/disconnect case.
 - Multiple enrolled partitions require automatic eject off until each desired import finishes. The prototype does not aggregate multiple profiles into one physical-disk import transaction.
 - App Store bundle provisioning/signing, final branding/version, App Store Connect metadata/privacy disclosures, minimum macOS review, App Review acceptance of eject behavior and the neutral comparison link. The prototype is not submitted, notarized, published, deployed, pushed, or presented as approved.
