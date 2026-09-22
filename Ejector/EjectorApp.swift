@@ -35,11 +35,17 @@ class GlobalHotkeyManager {
             eventsOfInterest: CGEventMask(eventMask),
             callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
                 
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                    DispatchQueue.main.async { GlobalHotkeyManager.shared.start() }
+                    return Unmanaged.passUnretained(event)
+                }
+                if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 { return Unmanaged.passUnretained(event) }
                 let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
                 let flags = event.flags
                 
-                let savedKey = UserDefaults.standard.integer(forKey: "shortcutKeyCode")
-                let targetKeyCode = savedKey == 0 ? 14 : savedKey
+                // Virtual key 0 is A, so only an absent preference uses the default E.
+                let targetKeyCode = UserDefaults.standard.object(forKey: "shortcutKeyCode") == nil
+                    ? 14 : UserDefaults.standard.integer(forKey: "shortcutKeyCode")
 
                 if flags.contains(.maskCommand) && flags.contains(.maskControl) && flags.contains(.maskAlternate) && keyCode == targetKeyCode {
                     DispatchQueue.main.async {
@@ -143,6 +149,7 @@ struct Drive: Identifiable {
 
 // MARK: - 2. Drive Manager (The Brains)
 class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
+    static let shared = DriveManager()
     @Published var drives: [Drive] = []
     private var cancellables = Set<AnyCancellable>()
 
@@ -173,7 +180,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
 
         NotificationCenter.default.publisher(for: NSNotification.Name("TriggerGlobalEject"))
             .sink { [weak self] _ in
-                self?.ejectAllCards()
+                self?.ejectAllCards(clean: UserDefaults.standard.bool(forKey: "cleanCardsOnEject"))
             }
             .store(in: &cancellables)
 
@@ -293,13 +300,14 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             }
             let isHardwareCamera = (hardwareType == .sd || hardwareType == .cfexpress || hardwareType == .xqd)
 
+            let classificationKey = (try? ImportVolumes.identity(url)) ?? url.path
             let protoLower = proto.lowercased()
             let canBeCard = isHardwareCamera || (isInternal && isRemovable) || protoLower.contains("pci") || protoLower.contains("secure digital") || isEjectable
 
             var hasCameraStructure = false
             var isEmulatorCard = false
             if canBeCard {
-                if let cached = classificationCache[url.path] {
+                if let cached = classificationCache[classificationKey] {
                     hasCameraStructure = cached.hasCameraStructure
                     isEmulatorCard = cached.isEmulatorCard
                     if isDebugEnabled {
@@ -307,12 +315,13 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                     }
                 } else {
                     let cameraFolderNames = [
-                        "DCIM", "PRIVATE", "MISC", "AVCHD", "MP_ROOT", "CONTENTS",
+                        "DCIM", "PRIVATE", "AVCHD", "MP_ROOT",
                         "XDROOT", "BPAV", "NIKON", "CANONMSC", "FUJI", "GOPRO", "SONY"
                     ]
                     hasCameraStructure = cameraFolderNames.contains { folder in
                         let folderURL = url.appendingPathComponent(folder, isDirectory: true)
-                        return FileManager.default.fileExists(atPath: folderURL.path)
+                        var isDirectory: ObjCBool = false
+                        return FileManager.default.fileExists(atPath: folderURL.path, isDirectory: &isDirectory) && isDirectory.boolValue
                     }
 
                     if hardwareType == .sd {
@@ -323,7 +332,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                         isEmulatorCard = emulatorHits >= 2
                     }
 
-                    classificationCache[url.path] = CachedClassification(hasCameraStructure: hasCameraStructure, isEmulatorCard: isEmulatorCard)
+                    classificationCache[classificationKey] = CachedClassification(hasCameraStructure: hasCameraStructure, isEmulatorCard: isEmulatorCard)
                 }
             }
             let isCameraCard = !isEmulatorCard && (isHardwareCamera || hasCameraStructure || (isInternal && isRemovable))
@@ -351,7 +360,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             foundDrives.append(Drive(name: name, url: url, isCameraCard: isCameraCard, isEmulatorCard: isEmulatorCard, cardType: finalCardType, isEjectable: isEjectable, isRemovable: isRemovable, isInternal: isInternal))
         }
         
-        let mountedPaths = Set(paths.map { $0.path })
+        let mountedPaths = Set(paths.map { (try? ImportVolumes.identity($0)) ?? $0.path })
         classificationCache = classificationCache.filter { mountedPaths.contains($0.key) }
 
         foundDrives.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -364,96 +373,48 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     
     // MARK: - 2.5 Metadata Cleanup Logic
 
-    // Uses POSIX readdir to list filenames in a directory, bypassing
-    // macOS's filtering of ._ AppleDouble files on FAT/exFAT volumes.
-    private func rawFileNames(in path: String) -> [String] {
-        guard let dir = opendir(path) else { return [] }
-        defer { closedir(dir) }
-        var names: [String] = []
-        while let entry = readdir(dir) {
-            let name = withUnsafePointer(to: entry.pointee.d_name) {
-                String(cString: UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self))
-            }
-            if name != "." && name != ".." { names.append(name) }
-        }
-        return names
-    }
-
-    @discardableResult
-    private func cleanHiddenMetadata(at volURL: URL) -> Int {
-        let fileManager = FileManager.default
-        let skipDirectories: Set<String> = [".Spotlight-V100", ".Trashes", ".fseventsd", ".TemporaryItems"]
-        var deletedCount = 0
-
-        if self.isDebugEnabled { LogManager.shared.log("🧹 Starting metadata cleanup for: \(volURL.lastPathComponent)") }
-
-        var directories: [URL] = [volURL]
-        let keys: [URLResourceKey] = [.isDirectoryKey]
-        guard let enumerator = fileManager.enumerator(at: volURL, includingPropertiesForKeys: keys, options: [.skipsPackageDescendants]) else { return 0 }
-
-        for case let fileURL as URL in enumerator {
-            let fileName = fileURL.lastPathComponent
-
-            if skipDirectories.contains(fileName) {
-                enumerator.skipDescendants()
-                continue
-            }
-
-            if let isDir = try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory, isDir {
-                directories.append(fileURL)
-            }
-
-            if fileName == ".DS_Store" || fileName == "__MACOSX" || fileName == ".apdisk" {
-                do {
-                    try fileManager.removeItem(at: fileURL)
-                    deletedCount += 1
-                    if self.isDebugEnabled { LogManager.shared.log("🗑️ Deleted: \(fileName)") }
-                } catch {
-                    if self.isDebugEnabled { LogManager.shared.log("⚠️ Could not delete \(fileName): \(error.localizedDescription)") }
-                }
-            }
-        }
-
-        for dirURL in directories {
-            for name in rawFileNames(in: dirURL.path) where name.hasPrefix("._") {
-                let fileURL = dirURL.appendingPathComponent(name)
-                do {
-                    try fileManager.removeItem(at: fileURL)
-                    deletedCount += 1
-                    if self.isDebugEnabled { LogManager.shared.log("🗑️ Deleted: \(name)") }
-                } catch {
-                    if self.isDebugEnabled { LogManager.shared.log("⚠️ Could not delete \(name): \(error.localizedDescription)") }
-                }
-            }
-        }
-
-        if self.isDebugEnabled { LogManager.shared.log("✨ Cleanup complete. Removed \(deletedCount) file\(deletedCount == 1 ? "" : "s").") }
-        return deletedCount
-    }
-    
     func eject(drive: Drive, clean: Bool = false, notify: Bool = true, completion: ((Bool, Int) -> Void)? = nil) {
+        guard DroneImportManager.shared.reserveManualEject(drive.url) else {
+            LogManager.shared.log("Eject skipped: disk is busy importing or ejecting.")
+            completion?(false, 0)
+            return
+        }
+        let operationKey = ImportVolumes.physicalID(drive.url) ?? drive.url.path
+        guard let expectedID = try? ImportVolumes.identity(drive.url) else {
+            DroneImportManager.shared.finishManualEject(operationKey)
+            sendNotification(title: "Could not eject", body: "The volume is unavailable or has no stable identity.")
+            completion?(false, 0)
+            return
+        }
         DispatchQueue.global(qos: .userInitiated).async {
             var cleanedCount = 0
-            if clean {
-                cleanedCount = self.cleanHiddenMetadata(at: drive.url)
-                if self.isDebugEnabled { LogManager.shared.log("⏳ Waiting for macOS file system to settle...") }
-                Thread.sleep(forTimeInterval: 0.5)
+            do {
+                let validate: () throws -> Void = {
+                    guard try ImportVolumes.identity(drive.url) == expectedID,
+                          try ImportVolumes.root(drive.url) == drive.url else {
+                        throw ImportFailure("The mounted drive changed. Cleanup and eject stopped.")
+                    }
+                }
+                try validate()
+                if clean { cleanedCount = try MetadataCleaner.clean(drive.url, validate: validate) }
+                try validate()
+            } catch {
+                DispatchQueue.main.async {
+                    LogManager.shared.log("Cleanup/eject failed: \(error.localizedDescription)")
+                    self.sendNotification(title: "Drive needs attention", body: error.localizedDescription)
+                    DroneImportManager.shared.finishManualEject(operationKey)
+                    completion?(false, cleanedCount)
+                }
+                return
             }
 
             FileManager.default.unmountVolume(at: drive.url, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
                 DispatchQueue.main.async {
                     var success = false
                     if let error = error {
-                        if self.isDebugEnabled { LogManager.shared.log("⚠️ FileManager eject failed for \(drive.name): \(error.localizedDescription). Trying NSWorkspace...") }
-                        do {
-                            try NSWorkspace.shared.unmountAndEjectDevice(at: drive.url)
-                            if self.isDebugEnabled { LogManager.shared.log("✅ Successfully ejected \(drive.name) via NSWorkspace") }
-                            success = true
-                        } catch let ejectError {
-                            if self.isDebugEnabled { LogManager.shared.log("❌ Failed to eject \(drive.name) via NSWorkspace: \(ejectError.localizedDescription)") }
-                        }
+                        LogManager.shared.log("Could not eject \(drive.name): \(error.localizedDescription)")
+                        if notify { self.sendNotification(title: "Could not eject \(drive.name)", body: error.localizedDescription) }
                     } else {
-                        if self.isDebugEnabled { LogManager.shared.log("✅ Successfully ejected \(drive.name)") }
                         success = true
                     }
 
@@ -471,6 +432,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                             self.sendNotification(title: "Easy Eject", body: body)
                         }
                     }
+                    DroneImportManager.shared.finishManualEject(operationKey)
                     completion?(success, cleanedCount)
                 }
             }
@@ -551,7 +513,8 @@ struct DebugLogView: View {
 
 // MARK: - 4. The Menu Bar View
 struct EjectorMenuView: View {
-    @StateObject private var manager = DriveManager()
+    @ObservedObject private var manager = DriveManager.shared
+    @ObservedObject private var importer = DroneImportManager.shared
     
     @AppStorage("warnBeforeEjectingSSD") private var warnBeforeEjectingSSD = true
     @AppStorage("cleanCardsOnEject") private var cleanCardsOnEject = false
@@ -663,7 +626,7 @@ struct EjectorMenuView: View {
             }
         } label: {
             Label(drive.name, systemImage: drive.iconName)
-        }
+        }.disabled(importer.blocksEject(drive.url))
     }
 
     var body: some View {
@@ -695,7 +658,7 @@ struct EjectorMenuView: View {
                         ForEach(cameraCards) { drive in
                             Button(action: { manager.eject(drive: drive, clean: cleanCardsOnEject) }) {
                                 Label(cleanCardsOnEject ? "Clean & Eject \(drive.displayName)" : "Eject \(drive.displayName)", systemImage: drive.iconName)
-                            }
+                            }.disabled(importer.blocksEject(drive.url))
                         }
                     }
                 }
@@ -705,7 +668,7 @@ struct EjectorMenuView: View {
                         ForEach(emulatorCards) { drive in
                             Button(action: { manager.eject(drive: drive, clean: cleanCardsOnEject) }) {
                                 Label(cleanCardsOnEject ? "Clean & Eject \(drive.displayName)" : "Eject \(drive.displayName)", systemImage: drive.iconName)
-                            }
+                            }.disabled(importer.blocksEject(drive.url))
                         }
                     }
                 }
@@ -724,6 +687,17 @@ struct EjectorMenuView: View {
             }
             
             Divider()
+
+            if importer.busy {
+                Text("\(importer.activeName): \(importer.menuTitle)")
+                Text("\(importer.progress.completed) of \(importer.progress.total) files completed")
+            } else if importer.hasError {
+                Text("Import needs attention")
+            }
+            Button("Air Unit & Camera Imports…") {
+                openWindow(id: "importsWindow")
+                NSApp.activate()
+            }
 
             Button("Help & Instructions") {
                 openWindow(id: "helpWindow")
@@ -758,7 +732,7 @@ struct EjectorMenuView: View {
 
             Button("Quit Easy Eject") {
                 NSApplication.shared.terminate(nil)
-            }
+            }.disabled(importer.busy)
         }
     }
 }
@@ -984,6 +958,8 @@ struct SettingsView: View {
 // MARK: - 6. The App Entry Point
 @main
 struct EjectorApp: App {
+    @StateObject private var importer = DroneImportManager.shared
+    @StateObject private var driveManager = DriveManager.shared
     
     @AppStorage("hasAcceptedDisclaimer") private var hasAcceptedDisclaimer = false
     @AppStorage("cameraCardCount") private var cameraCardCount = 0
@@ -1008,12 +984,25 @@ struct EjectorApp: App {
                     }
                 }
         } label: {
-            Image(systemName: "eject.fill")
-            if cameraCardCount > 0 {
+            Image(systemName: importer.busy ? "arrow.down.circle" : (importer.hasError ? "exclamationmark.triangle" : "eject.fill"))
+                .onAppear {
+                    if Bundle.main.bundleIdentifier?.hasSuffix(".preview") == true || !UserDefaults.standard.bool(forKey: "hasSeenImportSetup") {
+                        UserDefaults.standard.set(true, forKey: "hasSeenImportSetup")
+                        openWindow(id: "importsWindow")
+                    }
+                }
+            if !importer.menuTitle.isEmpty {
+                Text(importer.menuTitle).monospacedDigit()
+            } else if cameraCardCount > 0 {
                 Text("\(cameraCardCount)")
             }
         }
         
+        Window("Air Unit & Camera Imports", id: "importsWindow") {
+            DroneImportView(importer: importer)
+        }
+        .defaultSize(width: 650, height: 640)
+
         Window("Welcome to Easy Eject", id: "welcomeWindow") {
             WelcomeView()
         }
