@@ -10,6 +10,7 @@ Target `EjectorStore` shares the verified import engine with the website edition
 - Website app remains `com.ryansmithphotography.Ejector`, version 1.5.2. Do not overwrite `/Applications/Easy Eject.app`.
 - Sandbox profiles/logs live in the Store bundle's own container. No prototype or website profile is migrated automatically.
 - Listing is free with automatic release **AFTER_APPROVAL**. Upload, processing, review submission, approval, and live availability are distinct gates.
+- Submitted September 22, 2026 at 04:09:47 UTC: version 1.0 (2) is **WAITING_FOR_REVIEW**. Binary commit `6bc1fbb`; build `17a69278-1ae0-4e9d-b05d-8ac0311ec2f0`; review submission `1f29516c-55a7-4b40-bb95-9a840a0ee52a`. Approval and public Store availability remain pending.
 
 ## Permissions and safety
 
