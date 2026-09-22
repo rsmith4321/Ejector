@@ -10,6 +10,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     var destinationBookmark: Data
     var destinationVolumeID: String
     var destinationLabel: String
+    var sourceBookmark: Data? = nil
     var enabled = false
     var deleteOriginals = false
     var recoverTrash = false
@@ -132,16 +133,40 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
 
     private func start(_ profile: DroneProfile, source: URL) {
         attempted.insert(profile.id)
+        #if !APP_STORE
         let legacy = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/O4 Media Importer/enabled")
         if FileManager.default.fileExists(atPath: legacy.path) {
             message = "The standalone O4 importer is still enabled. Pause it before starting imports in Easy Eject."; hasError = true
             progress = ImportProgress(phase: "Needs attention"); return
         }
+        #endif
         do {
+            #if APP_STORE
+            guard let bookmark = profile.sourceBookmark else { throw ImportFailure("Choose the media folder again to grant access.") }
+            let sourceAccess = try ScopedFolder(bookmark)
+            let destinationAccess = try ScopedFolder(profile.destinationBookmark)
+            let media = sourceAccess.url
+            let destination = destinationAccess.url
+            guard try ImportVolumes.identity(media) == profile.id,
+                  try ImportVolumes.root(media).standardizedFileURL == source.standardizedFileURL,
+                  MediaImportEngine.isWithin(media, source), media != source else {
+                throw ImportFailure("The authorized media folder no longer belongs to this device. Choose it again.")
+            }
+            if sourceAccess.refreshedBookmark != nil || destinationAccess.refreshedBookmark != nil {
+                var updated = profile
+                updated.sourceBookmark = sourceAccess.refreshedBookmark ?? bookmark
+                updated.destinationBookmark = destinationAccess.refreshedBookmark ?? profile.destinationBookmark
+                updated.mediaPath = String(media.path.dropFirst(source.path.count + 1))
+                updated.destinationLabel = destination.path
+                save(updated)
+                guard profiles.contains(updated) else { throw ImportFailure("Cannot save refreshed folder permissions. Import stopped.") }
+            }
+            #else
             var stale = false
             let destination = try URL(resolvingBookmarkData: profile.destinationBookmark, options: [.withoutUI, .withoutMounting], bookmarkDataIsStale: &stale)
             guard !stale else { throw ImportFailure("Choose the destination folder again to refresh its permission.") }
             let accessed = destination.startAccessingSecurityScopedResource()
+            #endif
             do {
                 let destinationVolume = try ImportVolumes.root(destination)
                 guard try ImportVolumes.identity(destination) == profile.destinationVolumeID else { throw ImportFailure("The selected destination drive is unavailable or changed.") }
@@ -149,13 +174,22 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                       ImportVolumes.physicalID(source) != ImportVolumes.physicalID(destinationVolume) else {
                     throw ImportFailure("Choose a destination on a different disk from the air unit.")
                 }
+                #if !APP_STORE
                 let media = source.appendingPathComponent(profile.mediaPath).standardizedFileURL
                 guard MediaImportEngine.isWithin(media, source), media != source,
                       !profile.mediaPath.split(separator: "/").contains(".."), !profile.mediaPath.hasPrefix("/") else {
                     throw ImportFailure("Choose a media folder inside the device.")
                 }
+                #endif
                 let diskKeys = Set([ImportVolumes.physicalID(source) ?? source.path, ImportVolumes.physicalID(destinationVolume) ?? destinationVolume.path])
                 guard manualOperations.isDisjoint(with: diskKeys) else { throw ImportFailure("A disk is being ejected. Reconnect it before importing.") }
+                let releaseAccess: @Sendable () -> Void = {
+                    #if APP_STORE
+                    sourceAccess.close(); destinationAccess.close()
+                    #else
+                    if accessed { destination.stopAccessingSecurityScopedResource() }
+                    #endif
+                }
                 sourceRoot = source; destinationRoot = destinationVolume; protectedPhysicalIDs = diskKeys
                 busy = true; hasError = false; activeName = profile.name; message = "Preparing import"; progress = ImportProgress(phase: "Scanning")
                 let token = ImportCancellation(); cancellation = token
@@ -179,7 +213,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                     var lastReport = Date.distantPast
                     var lastPhase = ""
                     let engine = MediaImportEngine(source: source, mediaFolder: media, destination: destination,
-                        deleteOriginals: profile.deleteOriginals, recoverTrash: profile.recoverTrash, cancellation: token,
+                        deleteOriginals: profile.deleteOriginals, recoverTrash: Self.recoverTrash(profile), cancellation: token,
                         validate: validate, report: { value in
                             // A native UI update at most ten times per second keeps large transfers lightweight.
                             if value.phase != lastPhase || Date().timeIntervalSince(lastReport) >= 0.1 || value.completed == value.total {
@@ -196,37 +230,48 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                             if profile.autoEject {
                                 do { try validate() }
                                 catch {
-                                    if accessed { destination.stopAccessingSecurityScopedResource() }
+                                    releaseAccess()
                                     self.finish(error: error, message: error.localizedDescription)
                                     return
                                 }
                                 self.progress.phase = "Ejecting"
                                 FileManager.default.unmountVolume(at: source, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
                                     DispatchQueue.main.async {
-                                        if accessed { destination.stopAccessingSecurityScopedResource() }
+                                        releaseAccess()
                                         self.finish(error: error, message: error == nil ? "\(profile.name): \(result.files) files imported. Safe to unplug." : "Import completed, but the device could not eject: \(error!.localizedDescription)")
                                     }
                                 }
                             } else {
-                                if accessed { destination.stopAccessingSecurityScopedResource() }
+                                releaseAccess()
                                 self.finish(error: nil, message: "\(result.files) files imported and verified. Device remains connected.")
                             }
                         }
                     } catch {
                         try? audit("Stopped: \(error.localizedDescription)")
                         DispatchQueue.main.async {
-                            if accessed { destination.stopAccessingSecurityScopedResource() }
+                            releaseAccess()
                             self.finish(error: error, message: error.localizedDescription)
                         }
                     }
                 }
             } catch {
-                if accessed { destination.stopAccessingSecurityScopedResource() }; throw error
+                #if !APP_STORE
+                if accessed { destination.stopAccessingSecurityScopedResource() }
+                #endif
+                throw error
             }
         } catch {
             waiting.insert(profile.id); hasError = true; activeName = profile.name
             progress = ImportProgress(phase: "Waiting"); message = error.localizedDescription
         }
+    }
+
+    nonisolated private static func recoverTrash(_ profile: DroneProfile) -> Bool {
+        #if APP_STORE
+        return false
+        #else
+        return profile.recoverTrash
+        #endif
     }
 
     private func finish(error: Error?, message: String) {

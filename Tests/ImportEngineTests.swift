@@ -3,6 +3,9 @@ import Darwin
 
 @main struct ImportEngineTests {
     static func main() throws {
+        #if APP_STORE
+        guard CommandLine.arguments.count == 2 else { throw ImportFailure("Pass the runner-created external sentinel path.") }
+        #endif
         var passed = 0
         func test(_ name: String, _ body: (URL, URL, URL) throws -> Void) throws {
             let base = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("easy-eject-test-\(UUID().uuidString)")
@@ -94,6 +97,7 @@ import Darwin
             try fails { _ = try engine(source, media, link).run() }
             try check(FileManager.default.fileExists(atPath: file.path), "symlink kept original")
         }
+        #if !APP_STORE
         try test("trash recovered before removal") { source, media, dest in
             let trash = source.appendingPathComponent(".Trashes/\(getuid())"); try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
             let file = trash.appendingPathComponent("deleted.mp4"); try content.write(to: file)
@@ -101,6 +105,7 @@ import Darwin
             try check(try Data(contentsOf: r.folder.appendingPathComponent("Recovered Device Trash/deleted.mp4")) == content, "trash recovered")
             try check(!FileManager.default.fileExists(atPath: file.path), "trash cleared")
         }
+        #endif
         try test("new recording blocks completion") { source, media, dest in
             try content.write(to: media.appendingPathComponent("clip.mp4"))
             try fails { _ = try engine(source, media, dest, report: { if $0.phase == "Imported" { try! content.write(to: media.appendingPathComponent("new.mp4")) } }).run() }
@@ -110,6 +115,7 @@ import Darwin
             let file = media.appendingPathComponent("clip.mp4"); try content.write(to: file)
             try fails { _ = try engine(source, media, dest, delete: false, report: { if $0.phase == "Imported" { try! Data("changed".utf8).write(to: file) } }).run() }
         }
+        #if !APP_STORE
         try test("cleanup preserves trash, links, and user files inside __MACOSX") { source, media, dest in
             let mac = source.appendingPathComponent("__MACOSX"); try FileManager.default.createDirectory(at: mac, withIntermediateDirectories: true)
             try content.write(to: mac.appendingPathComponent("keep.mp4"))
@@ -125,6 +131,19 @@ import Darwin
             try check(FileManager.default.fileExists(atPath: trash.appendingPathComponent("._keep").path), "trash kept")
             try check(FileManager.default.fileExists(atPath: dest.appendingPathComponent("._outside").path), "link target kept")
         }
+        #endif
+        #if APP_STORE
+        try test("Store refuses device Trash even if profile data enables it") { source, media, dest in
+            try fails { _ = try engine(source, media, dest, trash: true).run() }
+        }
+        try test("sandbox denies unselected external fixture") { _, _, _ in
+            // The runner creates this exact disposable sentinel outside the sandbox first.
+            try fails { _ = try Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1])) }
+        }
+        try test("invalid bookmark fails closed") { _, _, _ in
+            try fails { _ = try ScopedFolder(Data("invalid".utf8)) }
+        }
+        #endif
         print("\(passed) tests passed")
     }
 }

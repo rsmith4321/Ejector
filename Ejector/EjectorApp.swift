@@ -1,3 +1,4 @@
+#if !APP_STORE
 //
 //  EjectorApp.swift
 //  Ejector
@@ -1192,3 +1193,5 @@ struct WelcomeView: View {
         .padding(30)
     }
 }
+
+#endif

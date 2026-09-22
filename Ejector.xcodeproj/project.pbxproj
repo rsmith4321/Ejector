@@ -8,6 +8,7 @@
 
 /* Begin PBXFileReference section */
 		303A1AA52FAC2B2400CFBD1A /* Easy Eject.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Easy Eject.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		53541AA52FAC2B2400CFBD1A /* Easy Eject Store Prototype.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Easy Eject Store Prototype.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		305169E02FAF864500D6218B /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -21,6 +22,11 @@
 
 /* Begin PBXFrameworksBuildPhase section */
 		303A1AA22FAC2B2400CFBD1A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		53541AA22FAC2B2400CFBD1A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
@@ -40,6 +46,7 @@
 		303A1AA62FAC2B2400CFBD1A /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				53541AA52FAC2B2400CFBD1A /* Easy Eject Store Prototype.app */,
 				303A1AA52FAC2B2400CFBD1A /* Easy Eject.app */,
 			);
 			name = Products;
@@ -64,6 +71,24 @@
 			name = Ejector;
 			productName = Ejector;
 			productReference = 303A1AA52FAC2B2400CFBD1A /* Easy Eject.app */;
+			productType = "com.apple.product-type.application";
+		};
+		53541AA42FAC2B2400CFBD1A /* Ejector */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 53541AB02FAC2B2500CFBD1A /* Build configuration list for PBXNativeTarget "Ejector" */;
+			buildPhases = (
+				53541AA12FAC2B2400CFBD1A /* Sources */,
+				53541AA22FAC2B2400CFBD1A /* Frameworks */,
+				53541AA32FAC2B2400CFBD1A /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				303A1AA72FAC2B2400CFBD1A /* Ejector */,
+			);
+			name = EjectorStore;
+			productName = EjectorStore;
+			productReference = 53541AA52FAC2B2400CFBD1A /* Easy Eject Store Prototype.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -96,6 +121,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				53541AA42FAC2B2400CFBD1A /* EjectorStore */,
 				303A1AA42FAC2B2400CFBD1A /* Ejector */,
 			);
 		};
@@ -107,10 +133,20 @@
 			files = (
 			);
 		};
+		53541AA32FAC2B2400CFBD1A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		303A1AA12FAC2B2400CFBD1A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		53541AA12FAC2B2400CFBD1A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
 			);
@@ -291,6 +327,59 @@
 			};
 			name = Debug;
 		};
+		53541AB12FAC2B2500CFBD1A /* Debug configuration for PBXNativeTarget "Ejector" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				AUTOMATION_APPLE_EVENTS = NO;
+				CODE_SIGN_ENTITLEMENTS = Store/Store.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1.5.2;
+				DEPLOYMENT_POSTPROCESSING = NO;
+				DEVELOPMENT_TEAM = MCJMHBLT27;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Easy Eject Store Prototype";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.5.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.EasyEject.storeprototype;
+				PRODUCT_NAME = "Easy Eject Store Prototype";
+				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) APP_STORE";
+			};
+			name = Debug;
+		};
 		303A1AB22FAC2B2500CFBD1A /* Release configuration for PBXNativeTarget "Ejector" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -343,6 +432,59 @@
 			};
 			name = Release;
 		};
+		53541AB22FAC2B2500CFBD1A /* Release configuration for PBXNativeTarget "Ejector" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				AUTOMATION_APPLE_EVENTS = NO;
+				CODE_SIGN_ENTITLEMENTS = Store/Store.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = YES;
+				CURRENT_PROJECT_VERSION = 1.5.2;
+				DEPLOYMENT_POSTPROCESSING = YES;
+				DEVELOPMENT_TEAM = MCJMHBLT27;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Easy Eject Store Prototype";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.5.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.EasyEject.storeprototype;
+				PRODUCT_NAME = "Easy Eject Store Prototype";
+				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) APP_STORE";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -359,6 +501,14 @@
 			buildConfigurations = (
 				303A1AB12FAC2B2500CFBD1A /* Debug configuration for PBXNativeTarget "Ejector" */,
 				303A1AB22FAC2B2500CFBD1A /* Release configuration for PBXNativeTarget "Ejector" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		53541AB02FAC2B2500CFBD1A /* Build configuration list for PBXNativeTarget "Ejector" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				53541AB12FAC2B2500CFBD1A /* Debug configuration for PBXNativeTarget "Ejector" */,
+				53541AB22FAC2B2500CFBD1A /* Release configuration for PBXNativeTarget "Ejector" */,
 			);
 			defaultConfigurationName = Release;
 		};

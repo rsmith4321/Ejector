@@ -1,3 +1,4 @@
+#if !APP_STORE
 import Foundation
 import Darwin
 
@@ -46,3 +47,5 @@ nonisolated enum MetadataCleaner {
         return count
     }
 }
+
+#endif

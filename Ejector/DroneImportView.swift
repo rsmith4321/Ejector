@@ -89,6 +89,9 @@ struct DroneImportView: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(22).frame(minWidth: 620, minHeight: 580)
+        .onChange(of: importer.volumes) { _, volumes in
+            if !volumes.contains(where: { $0.path == selectedSource }) { selectedSource = "" }
+        }
         .sheet(item: $editing) { profile in
             DroneProfileEditor(profile: profile) { importer.save($0); editing = nil }
         }
@@ -127,7 +130,8 @@ struct DroneImportView: View {
                                 let bookmark = try target.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
                                 editing = DroneProfile(id: id, name: source.lastPathComponent,
                                     mediaPath: String(folder.path.dropFirst(source.path.count + 1)), destinationBookmark: bookmark,
-                                    destinationVolumeID: destinationID, destinationLabel: target.path)
+                                    destinationVolumeID: destinationID, destinationLabel: target.path,
+                                    sourceBookmark: try folder.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil))
                             } catch { setupError = error.localizedDescription }
                         }
                     }
@@ -151,6 +155,9 @@ struct DroneProfileEditor: View {
             Text("Media folder: \(profile.mediaPath)").font(.callout)
             Text(profile.destinationLabel).font(.caption).textSelection(.enabled)
             Button("Change destination…", action: chooseDestination)
+            #if APP_STORE
+            Button("Authorize media folder again…", action: chooseSource)
+            #endif
             Divider()
             Toggle("Import automatically when connected", isOn: $profile.enabled)
             Toggle("Permanently delete originals after import", isOn: Binding(
@@ -172,10 +179,16 @@ struct DroneProfileEditor: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            #if !APP_STORE
             Toggle("Recover and clear this device’s Trash", isOn: $profile.recoverTrash)
             Text("Saves files from your Trash on this device into Recovered Device Trash before removing them. Requires Full Disk Access. Other drives’ Trash is untouched.")
                 .font(.caption).foregroundStyle(.secondary)
+            #endif
             Toggle("Eject after successful import", isOn: $profile.autoEject)
+            #if APP_STORE
+            Text("Ejecting a device also unmounts its other partitions. Turn this off if another partition still needs importing.")
+                .font(.caption).foregroundStyle(.secondary)
+            #endif
             if let error { Text(error).foregroundStyle(.orange) }
             HStack {
                 Button("Cancel") { dismiss() }
@@ -196,6 +209,25 @@ struct DroneProfileEditor: View {
             Text("After saved copies pass verification, Easy Eject removes the originals directly from the device. This skips Trash and cannot be undone.\n\nUse this only for unimportant or replaceable FPV footage. Keep originals for client work and other important photos or videos, and keep independent backups.\n\nThe developer is not responsible for lost files.")
         }
     }
+    #if APP_STORE
+    private func chooseSource() {
+        guard let window = NSApp.keyWindow else { return }
+        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
+        panel.title = "Authorize this device’s media folder"
+        panel.beginSheetModal(for: window) { response in
+            guard response == .OK, let folder = panel.url else { return }
+            do {
+                try MediaImportEngine.checkPath(folder)
+                let volume = try ImportVolumes.root(folder)
+                guard try ImportVolumes.identity(folder) == profile.id, folder != volume else {
+                    throw ImportFailure("Choose a media folder inside the original device. Enroll formatted devices again.")
+                }
+                profile.sourceBookmark = try folder.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
+                profile.mediaPath = String(folder.path.dropFirst(volume.path.count + 1)); error = nil
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+    #endif
     private func chooseDestination() {
         NSApp.activate()
         guard let window = NSApp.keyWindow else { return }
