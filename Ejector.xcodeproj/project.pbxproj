@@ -283,11 +283,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = "";
+				INFOPLIST_KEY_NSRemovableVolumesUsageDescription = "Easy Eject reads camera folders to recognize cards and removes hidden macOS metadata when you choose Clean & Eject. Optional imports copy recordings to your selected destination.";
+				INFOPLIST_KEY_NSNetworkVolumesUsageDescription = "Easy Eject accesses network storage only when you select it for optional media imports.";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1.5.2;
+				CURRENT_PROJECT_VERSION = 1.5.3;
 				DEPLOYMENT_POSTPROCESSING = NO;
 				DEVELOPMENT_TEAM = MCJMHBLT27;
 				ENABLE_APP_SANDBOX = NO;
@@ -308,7 +310,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.2;
+				MARKETING_VERSION = 1.5.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.Ejector;
 				PRODUCT_NAME = "Easy Eject";
 				REGISTER_APP_GROUPS = YES;
@@ -389,11 +391,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = "";
+				INFOPLIST_KEY_NSRemovableVolumesUsageDescription = "Easy Eject reads camera folders to recognize cards and removes hidden macOS metadata when you choose Clean & Eject. Optional imports copy recordings to your selected destination.";
+				INFOPLIST_KEY_NSNetworkVolumesUsageDescription = "Easy Eject accesses network storage only when you select it for optional media imports.";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = 1.5.2;
+				CURRENT_PROJECT_VERSION = 1.5.3;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				DEVELOPMENT_TEAM = MCJMHBLT27;
 				ENABLE_APP_SANDBOX = NO;
@@ -414,7 +418,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.2;
+				MARKETING_VERSION = 1.5.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.Ejector;
 				PRODUCT_NAME = "Easy Eject";
 				REGISTER_APP_GROUPS = YES;

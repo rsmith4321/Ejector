@@ -67,7 +67,8 @@ struct SettingsView: View {
                 }
                 if let error = access.error { Text(error).font(.caption).foregroundStyle(.orange) }
                 #else
-                Text("If macOS denies file access, review Easy Eject's permissions in System Settings. The shortcut does not need Accessibility permission.").font(.caption)
+                Text("The website version does not need Authorize a Card for detection or cleaning, including after camera formatting. macOS may still ask to access removable or network drives. If access is denied, check Privacy & Security → Files and Folders in System Settings.")
+                    .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
                 Button("Open Privacy Settings") {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy")!)
                 }

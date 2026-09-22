@@ -566,7 +566,7 @@ struct HelpView: View {
                             #if APP_STORE
                             Text("Choose Authorize a Card to grant access for folder detection and Clean & Eject. Permission is remembered for this volume; formatting it requires authorization again. Imported media folders have separate permissions.")
                             #else
-                            Text("Full Disk Access may be needed when macOS denies access to files. Enable it in System Settings > Privacy & Security if required.")
+                            Text("The website version inspects camera folders and cleans cards without Easy Eject's per-card authorization. macOS may still request access to removable or network drives. Review Privacy & Security > Files and Folders if access is denied. Formatting can change a card's identity, so optional import profiles may need setup again.")
                             #endif
                         }
                     }
