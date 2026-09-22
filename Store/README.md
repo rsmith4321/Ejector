@@ -6,7 +6,7 @@ Target `EjectorStore` shares the verified import engine with the website edition
 
 - App Store Connect app: **6767951388**, Easy Eject. Reuses the existing empty listing; no duplicate app record.
 - Permanent bundle: `com.ryansmithphotography.EasyEject.store`, registered ID `XX33FPA5TF`, team `MCJMHBLT27`.
-- Initial Store version **1.0**, build **1**. Product file `Easy Eject Store.app`, visible window/title Easy Eject.
+- Initial Store version **1.0**, build **2**. Product file `Easy Eject Store.app`, visible window/title Easy Eject.
 - Website app remains `com.ryansmithphotography.Ejector`, version 1.5.2. Do not overwrite `/Applications/Easy Eject.app`.
 - Sandbox profiles/logs live in the Store bundle's own container. No prototype or website profile is migrated automatically.
 - Listing is free with automatic release **AFTER_APPROVAL**. Upload, processing, review submission, approval, and live availability are distinct gates.
@@ -19,7 +19,7 @@ Automatic importing and original deletion start off. Originals are retained by d
 
 Eject uses non-forced `FileManager.unmountVolume` with all partitions and no implicit UI. Busy-device failure is visible. Source and destination disks are protected while importing. Automatic eject pauses if another enrolled partition shares the physical disk, or coordination identity is unavailable. Manual eject remains explicit. Reconnecting clears prior safe-to-unplug status.
 
-The menu bar uses an 18-point semibold eject symbol. Recognized SD/CFexpress/XQD hardware and enrolled air units are counted once per physical disk; progress/errors override the idle count. Control-Shift-Command-J opens the eject menu using a registered Carbon hotkey. Registration failures are visible. Launch at login is opt-in through SMAppService. Reopening the app restores its imports window.
+The menu bar uses the original shipping eject.fill glyph at the native unstyled symbol size and regular weight. Recognized SD/CFexpress/XQD hardware and enrolled air units are counted once per physical disk; progress/errors override the idle count. Control-Shift-Command-J opens the eject menu using a registered Carbon hotkey. Registration failures are visible. Launch at login is opt-in through SMAppService. Reopening the app restores its imports window.
 
 Release entitlements:
 

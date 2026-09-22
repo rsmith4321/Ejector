@@ -77,9 +77,8 @@ import DiskArbitration
     private func updateStatusItem() {
         guard let button = item?.button else { return }
         let symbol = importer.busy ? "arrow.down.circle" : (importer.hasError ? "exclamationmark.triangle" : "eject.fill")
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Easy Eject")?
-            .withSymbolConfiguration(.init(pointSize: 18, weight: .semibold))
-        image?.size = NSSize(width: 18, height: 18)
+        // Match the shipping app's unstyled eject.fill at the native menu-bar scale.
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Easy Eject")
         image?.isTemplate = true
         button.image = image
         button.imagePosition = .imageLeading
