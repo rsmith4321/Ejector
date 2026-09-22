@@ -2,17 +2,17 @@
 
 Both targets now compile the same native menu, classifier, settings, cleaner, import engine and eject operations. Narrow build conditions provide sandbox folder grants, the App Store update channel and omission of the direct edition launch license screen. No separate reduced Store UI remains. Metadata cleaning and verified device Trash recovery are available after explicit card authorization.
 
-The Store target and website target are maintained from shared code. Store **1.0 (5)** was submitted; see RELEASE-5.md and fresh App Store Connect state. Website **1.5.3** restores direct distribution to avoid per-card sandbox authorization for folder detection and cleaning. This supersedes earlier Store-only notes.
+The Store target and website target are maintained from shared code. Store **1.0 (6)** adds an in-app explanation and comparison link; see RELEASE-6.md and fresh App Store Connect state. Website **1.5.3** restores direct distribution to avoid per-card sandbox authorization for folder detection and cleaning. This supersedes earlier Store-only notes.
 
 ## Identity and distribution
 
 - App Store Connect app: **6767951388**, Easy Eject. Reuses the existing empty listing; no duplicate app record.
 - Permanent bundle: `com.ryansmithphotography.EasyEject.store`, registered ID `XX33FPA5TF`, team `MCJMHBLT27`.
-- Initial Store version **1.0**, build **2**. Product file `Easy Eject Store.app`, visible window/title Easy Eject.
-- Direct identity: `com.ryansmithphotography.Ejector`, version 1.5.3. At Ryan's earlier request, `/Applications/Easy Eject.app` now contains the notarized local Store build. The old executable is retained in release evidence for rollback.
+- Current Store version **1.0**, build **6**. Product file and visible title: Easy Eject.
+- Direct identity: `com.ryansmithphotography.Ejector`, version 1.5.3. `/Applications/Easy Eject.app` now contains this signed, notarized website edition at Ryan's request. Store build 5 is retained in release evidence for rollback.
 - Sandbox profiles/logs live in the Store bundle's own container. No prototype or website profile is migrated automatically.
 - Listing is free with automatic release **AFTER_APPROVAL**. Upload, processing, review submission, approval, and live availability are distinct gates.
-- Submitted September 22, 2026 at 04:09:47 UTC: version 1.0 (2) is **WAITING_FOR_REVIEW**. Binary commit `6bc1fbb`; build `17a69278-1ae0-4e9d-b05d-8ac0311ec2f0`; review submission `1f29516c-55a7-4b40-bb95-9a840a0ee52a`. Approval and public Store availability remain pending.
+- Historical first submission, superseded: September 22, 2026 at 04:09:47 UTC: version 1.0 (2) is **WAITING_FOR_REVIEW**. Binary commit `6bc1fbb`; build `17a69278-1ae0-4e9d-b05d-8ac0311ec2f0`; review submission `1f29516c-55a7-4b40-bb95-9a840a0ee52a`. Approval and public Store availability remain pending.
 
 ## Permissions and safety
 

@@ -18,6 +18,14 @@ struct FolderAuthorizationInstructions: View {
                     Text("If access is denied, reconnect the card and authorize the card or import folders again.")
                 }.padding(.top, 6)
             }
+            DisclosureGroup("App Store & website versions") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Both versions have the same features. The App Store version needs permission for each card. Formatting can remove that access.")
+                    Text("The website version uses macOS drive-access permissions instead, so it does not need Authorize a Card after formatting. macOS remembers your choice, but may ask again if permissions change.")
+                    Text("In either version, set up optional imports again after formatting. Plain eject needs no folder access.")
+                    Link("Compare versions and permissions", destination: URL(string: "https://easyeject.com/editions/")!)
+                }.padding(.top, 6)
+            }
         }
         .font(.system(size: 14))
         .fixedSize(horizontal: false, vertical: true)
