@@ -1,4 +1,3 @@
-#if !APP_STORE
 import Foundation
 import Darwin
 
@@ -14,7 +13,7 @@ nonisolated enum MetadataCleaner {
             var s = stat()
             guard lstat(folder.path, &s) == 0, s.st_dev == rootStat.st_dev,
                   (s.st_mode & S_IFMT) == S_IFDIR else { throw ImportFailure("Drive changed during cleanup. Ejection stopped.") }
-            guard let dir = opendir(folder.path) else { throw ImportFailure("Cannot scan \(folder.path). Check Full Disk Access.") }
+            guard let dir = opendir(folder.path) else { throw ImportFailure("Cannot scan \(folder.path). Authorize this card or check its file permissions.") }
             var names: [String] = []
             while true {
                 errno = 0
@@ -47,5 +46,3 @@ nonisolated enum MetadataCleaner {
         return count
     }
 }
-
-#endif

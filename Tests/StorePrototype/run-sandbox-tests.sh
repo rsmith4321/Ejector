@@ -7,7 +7,7 @@ app="$output/Sandbox Engine Tests.app"
 cat > "$app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.ryansmithphotography.EasyEject.sandboxtests</string><key>CFBundleExecutable</key><string>SandboxEngineTests</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>
 PLIST
-xcrun swiftc -D APP_STORE Ejector/MediaImportEngine.swift Ejector/ScopedFolder.swift Tests/ImportEngineTests.swift -o "$app/Contents/MacOS/SandboxEngineTests"
+xcrun swiftc -D APP_STORE Ejector/MediaImportEngine.swift Ejector/ScopedFolder.swift Ejector/MetadataCleaner.swift Tests/ImportEngineTests.swift -o "$app/Contents/MacOS/SandboxEngineTests"
 codesign --force --sign 'Developer ID Application: Ryan Smith Photography, LLC (MCJMHBLT27)' --options runtime --entitlements Store/Store.entitlements "$app"
 printf 'Disposable sandbox denial sentinel\n' > "$output/not-authorized.txt"
 cat "$output/not-authorized.txt" > /dev/null

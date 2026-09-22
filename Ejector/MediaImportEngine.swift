@@ -124,9 +124,6 @@ nonisolated struct MediaImportEngine {
     }
 
     func run() throws -> Result {
-        #if APP_STORE
-        guard !recoverTrash else { throw ImportFailure("Device Trash recovery is unavailable in this edition.") }
-        #endif
         try validate(); try cancellation.check()
         try Self.checkPath(source); try Self.checkPath(mediaFolder); try Self.checkPath(destination)
         guard Self.isWithin(mediaFolder, source), !Self.isWithin(destination, source),

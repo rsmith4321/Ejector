@@ -29,6 +29,7 @@ struct DroneImportView: View {
                         } else { ProgressView().controlSize(.small) }
                     } else {
                         Text(importer.message).foregroundStyle(importer.hasError ? .orange : .secondary)
+                            .id(importer.message)
                             .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                     }
                     HStack {
@@ -148,6 +149,7 @@ struct DroneProfileEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var error: String?
     @State private var showingPermanentDeletionConfirmation = false
+    @State private var showingTrashConfirmation = false
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Import profile").font(.title2.bold())
@@ -179,16 +181,20 @@ struct DroneProfileEditor: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            #if !APP_STORE
-            Toggle("Recover and clear this device’s Trash", isOn: $profile.recoverTrash)
-            Text("Saves files from your Trash on this device into Recovered Device Trash before removing them. Requires Full Disk Access. Other drives’ Trash is untouched.")
+            Toggle("Recover and clear this device’s Trash", isOn: Binding(get: { profile.recoverTrash }, set: {
+                if $0 { showingTrashConfirmation = true } else { profile.recoverTrash = false }
+            }))
+            Text("Saves files from your Trash on this device into Recovered Device Trash, verifies the copies, then removes the recovered files from this device's Trash. Other drives' Trash is untouched.")
+                .font(.caption).foregroundStyle(.secondary)
+            #if APP_STORE
+            Text("Requires authorization for this card, in addition to the media folder. If permission is unavailable, import stops without claiming completion.")
                 .font(.caption).foregroundStyle(.secondary)
             #endif
-            Toggle("Eject after successful import", isOn: $profile.autoEject)
-            #if APP_STORE
+            Toggle("Eject after verified import", isOn: $profile.autoEject)
+            Text("Optional. Ejects this device only after an import finishes successfully. Leave off to eject from the menu yourself.")
+                .font(.caption).foregroundStyle(.secondary)
             Text("Ejecting also unmounts the other partitions. If multiple enrolled partitions share a disk, automatic eject is paused. Import each partition, then eject from the menu.")
                 .font(.caption).foregroundStyle(.secondary)
-            #endif
             if let error { Text(error).foregroundStyle(.orange) }
             HStack {
                 Button("Cancel") { dismiss() }
@@ -199,6 +205,25 @@ struct DroneProfileEditor: View {
             Text("Saving applies to the next connection. Use Import now to start with the connected device.")
                 .font(.caption).foregroundStyle(.secondary)
         }.padding(24).frame(width: 480)
+        .alert("Recover and clear device Trash?", isPresented: $showingTrashConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Enable Verified Trash Recovery", role: .destructive) {
+                #if APP_STORE
+                do {
+                    guard let volume = ImportVolumes.mounted().first(where: { (try? ImportVolumes.identity($0)) == profile.id }) else {
+                        throw ImportFailure("Connect the original card before authorizing Trash recovery.")
+                    }
+                    let permission = try CardAccess.shared.require(volume)
+                    permission.close()
+                    profile.recoverTrash = true
+                } catch { self.error = error.localizedDescription }
+                #else
+                profile.recoverTrash = true
+                #endif
+            }
+        } message: {
+            Text("On each import, files in your Trash on this device are copied to the destination and verified before being permanently removed from the device's Trash. Keep independent backups. No recovery runs until you save this profile and start an import.")
+        }
         .alert("Enable permanent deletion?", isPresented: $showingPermanentDeletionConfirmation) {
             Button("Cancel", role: .cancel) { }
                 .keyboardShortcut(.defaultAction)

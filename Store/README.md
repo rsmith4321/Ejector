@@ -1,6 +1,8 @@
 # Easy Eject App Store edition
 
-Target `EjectorStore` shares the verified import engine with the website edition. The Store app is a useful standalone sandboxed Mac utility. It has no updater, donation UI, license gate, broad metadata cleanup, downloaded helper, or device Trash recovery.
+Both targets now compile the same native menu, classifier, settings, cleaner, import engine and eject operations. Narrow build conditions provide sandbox folder grants, the App Store update channel and omission of the direct edition launch license screen. No separate reduced Store UI remains. Metadata cleaning and verified device Trash recovery are available after explicit card authorization.
+
+This checkout contains local candidate **1.0 (3)**. It has not been uploaded or submitted. The existing build 2 submission is unchanged.
 
 ## Identity and distribution
 
@@ -16,11 +18,11 @@ Target `EjectorStore` shares the verified import engine with the website edition
 
 `NSOpenPanel` grants only selected source and destination folders. `ScopedFolder` resolves app-scoped bookmarks, refreshes stale data, owns one access claim, and releases it after the worker and eject callback complete. Invalid permissions fail closed and can be renewed in Edit. Source volume UUID, destination identity, and physical disk separation are rechecked.
 
-Automatic importing and original deletion start off. Originals are retained by default. Enabling deletion requires a permanent-deletion warning with Cancel as the default. Per-file saved-copy verification precedes deletion; earlier deletions cannot be rolled back if a later file fails. Keep independent backups.
+Automatic importing, original deletion, Trash recovery and eject-after-import start off for new profiles. Existing saved choices are preserved. Originals are retained by default. Enabling deletion requires a permanent-deletion warning with Cancel as the default. Per-file saved-copy verification precedes deletion; earlier deletions cannot be rolled back if a later file fails. Keep independent backups.
 
 Eject uses non-forced `FileManager.unmountVolume` with all partitions and no implicit UI. Busy-device failure is visible. Source and destination disks are protected while importing. Automatic eject pauses if another enrolled partition shares the physical disk, or coordination identity is unavailable. Manual eject remains explicit. Reconnecting clears prior safe-to-unplug status.
 
-The menu bar uses the original shipping eject.fill glyph at the native unstyled symbol size and regular weight. Recognized SD/CFexpress/XQD hardware and enrolled air units are counted once per physical disk; progress/errors override the idle count. Control-Shift-Command-J opens the eject menu using a registered Carbon hotkey. Registration failures are visible. Launch at login is opt-in through SMAppService. Reopening the app restores its imports window.
+The menu bar uses the original shipping eject.fill glyph at the native unstyled symbol size and regular weight. Recognized SD/CFexpress/XQD hardware and authorized camera/emulator folder structures are counted once per physical disk; progress/errors override the idle count. The optional Control-Option-Command plus configurable letter shortcut ejects recognized cards. It is off by default and uses Carbon registration without Accessibility. Registration failures are visible. Launch at login is opt-in through SMAppService. Reopening the app restores its imports window.
 
 Release entitlements:
 
@@ -44,7 +46,7 @@ Public resources: [support](https://easyeject.com/support/), [privacy](https://e
 
 See [VERIFICATION.md](VERIFICATION.md). Earlier prototype hardware evidence belongs to the historical `storeprototype` identity and must not be presented as final Store validation.
 
-- `Tests/StorePrototype/run-sandbox-tests.sh /absolute/output/path`: 15 signed sandbox engine tests.
+- `Tests/StorePrototype/run-sandbox-tests.sh /absolute/output/path`: 16 signed sandbox engine tests.
 - Compile `Ejector/StoreEjectPolicy.swift` and `Tests/StoreEjectPolicyTests.swift` with `swiftc -D APP_STORE`: 9 physical-disk coordination cases.
 
-Local release evidence: `/Users/ryansmith/Easy-Eject-Review/app-store-release/`. Final submission status is recorded there after checking the provider. A successful build alone does not establish App Review acceptance or live availability.
+Local release evidence: `/Volumes/Recent Pictures SSD/Xcode/Development/EasyEject/release-evidence/app-store-release/`. Shared-code candidate evidence is under `release-evidence/store-parity-audit/` in the same workspace. Final submission status is recorded there after checking the provider. A successful build alone does not establish App Review acceptance or live availability.

@@ -14,7 +14,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     var enabled = false
     var deleteOriginals = false
     var recoverTrash = false
-    var autoEject = true
+    var autoEject = false
 }
 
 
@@ -105,14 +105,18 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
         guard !blocksEject(url), !manualOperations.contains(key) else { return false }
         manualOperations.insert(key); return true
     }
-    #if APP_STORE
+    func recordOperationFailure(_ error: Error) {
+        guard !busy else { LogManager.shared.log(error.localizedDescription); return }
+        hasError = true; message = error.localizedDescription
+        progress = ImportProgress(phase: "Needs attention")
+    }
     func recordManualEject(_ volume: URL, error: Error?) {
+        guard !busy else { return }
         hasError = error != nil
         message = error.map { "Could not eject \(volume.lastPathComponent): \($0.localizedDescription)" } ?? "\(volume.lastPathComponent): safe to unplug."
         // The volume may already be gone; reset success on the next mount event as well.
         progress = ImportProgress(phase: error == nil ? "Ejected" : "Needs attention")
     }
-    #endif
     func finishManualEject(_ key: String) { manualOperations.remove(key); refresh() }
 
     func refresh() {
@@ -121,13 +125,11 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
             return v.volumeIsInternal != true || v.volumeIsRemovable == true || v.volumeIsEjectable == true
         }
         let ids = Set(volumes.compactMap { try? ImportVolumes.identity($0) })
-        #if APP_STORE
         if !busy, (completedEjectID.map { ids.contains($0) } ?? false) || (!ids.subtracting(mountedIDs).isEmpty && progress.phase == "Ejected") {
             self.completedEjectID = nil
             message = "Device connected again. Eject it before unplugging."
             progress = ImportProgress(phase: "Ready")
         }
-        #endif
         attempted.subtract(mountedIDs.subtracting(ids)); mountedIDs = ids
         guard !busy else { return }
         for profile in profiles where profile.enabled && !attempted.contains(profile.id) {
@@ -159,6 +161,8 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
         do {
             #if APP_STORE
             guard let bookmark = profile.sourceBookmark else { throw ImportFailure("Choose the media folder again to grant access.") }
+            // Trash is outside the selected media folder. Never broaden access silently.
+            let trashAccess = profile.recoverTrash ? try CardAccess.shared.open(source) : nil
             let sourceAccess = try ScopedFolder(bookmark)
             let destinationAccess = try ScopedFolder(profile.destinationBookmark)
             let media = sourceAccess.url
@@ -201,7 +205,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                 guard manualOperations.isDisjoint(with: diskKeys) else { throw ImportFailure("A disk is being ejected. Reconnect it before importing.") }
                 let releaseAccess: @Sendable () -> Void = {
                     #if APP_STORE
-                    sourceAccess.close(); destinationAccess.close()
+                    sourceAccess.close(); destinationAccess.close(); trashAccess?.close()
                     #else
                     if accessed { destination.stopAccessingSecurityScopedResource() }
                     #endif
@@ -229,7 +233,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                     var lastReport = Date.distantPast
                     var lastPhase = ""
                     let engine = MediaImportEngine(source: source, mediaFolder: media, destination: destination,
-                        deleteOriginals: profile.deleteOriginals, recoverTrash: Self.recoverTrash(profile), cancellation: token,
+                        deleteOriginals: profile.deleteOriginals, recoverTrash: profile.recoverTrash, cancellation: token,
                         validate: validate, report: { value in
                             // A native UI update at most ten times per second keeps large transfers lightweight.
                             if value.phase != lastPhase || Date().timeIntervalSince(lastReport) >= 0.1 || value.completed == value.total {
@@ -243,7 +247,6 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                         try audit("Completed \(result.files) files, \(result.bytes) bytes")
                         DispatchQueue.main.async {
                             self.lastFolder = result.files > 0 ? result.folder : destination
-                            #if APP_STORE
                             let attachments = self.volumes.compactMap { volume -> (volumeID: String, diskID: String?)? in
                                 guard let id = try? ImportVolumes.identity(volume) else { return nil }
                                 return (id, ImportVolumes.physicalID(volume))
@@ -251,9 +254,6 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                             let holdEject = !StoreEjectPolicy.allowsAutomaticEject(
                                 sourceID: profile.id, sourceDisk: ImportVolumes.physicalID(source),
                                 enrolledIDs: Set(self.profiles.map(\.id)), mounted: attachments)
-                            #else
-                            let holdEject = false
-                            #endif
                             if profile.autoEject && !holdEject {
                                 do { try validate() }
                                 catch {
@@ -271,7 +271,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                                 }
                             } else {
                                 releaseAccess()
-                                self.finish(error: nil, message: holdEject ? "\(result.files) files imported and verified. Automatic eject is paused because another enrolled partition shares this disk or its disk identity could not be confirmed. Finish desired imports, then eject from the menu." : "\(result.files) files imported and verified. Device remains connected.")
+                                self.finish(error: nil, message: profile.autoEject && holdEject ? "\(result.files) files imported and verified. Automatic eject is paused because another enrolled partition shares this disk or its disk identity could not be confirmed. Finish desired imports, then eject from the menu." : "\(result.files) files imported and verified. Device remains connected.")
                             }
                         }
                     } catch {
@@ -292,14 +292,6 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
             waiting.insert(profile.id); hasError = true; activeName = profile.name
             progress = ImportProgress(phase: "Waiting"); message = error.localizedDescription
         }
-    }
-
-    nonisolated private static func recoverTrash(_ profile: DroneProfile) -> Bool {
-        #if APP_STORE
-        return false
-        #else
-        return profile.recoverTrash
-        #endif
     }
 
     private func finish(error: Error?, message: String) {

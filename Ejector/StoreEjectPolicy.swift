@@ -1,4 +1,3 @@
-#if APP_STORE
 import Foundation
 
 /// A physical eject affects every partition, including profiles not yet imported.
@@ -14,4 +13,3 @@ nonisolated enum StoreEjectPolicy {
         }
     }
 }
-#endif

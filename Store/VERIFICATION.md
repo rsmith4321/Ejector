@@ -1,3 +1,7 @@
+# Shared-code candidate verification
+
+See the current implementation evidence in [SHARED-CODE-VERIFICATION.md](SHARED-CODE-VERIFICATION.md). Candidate build 3 is local only. The dated sections below are historical prototype/build 2 evidence. Statements about excluded cleanup/Trash recovery and the old menu-opening hotkey are superseded for this candidate.
+
 # Prototype verification
 
 Tested locally on September 21, 2026 (UTC logs extend into September 22), macOS 27.0 build 26A428, Apple Silicon, Xcode 27.1 build 27A9269. Initial tests used disposable media; the real air-unit follow-up below used generated files only.

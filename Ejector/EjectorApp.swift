@@ -1,4 +1,3 @@
-#if !APP_STORE
 //
 //  EjectorApp.swift
 //  Ejector
@@ -10,73 +9,6 @@ import Combine
 import DiskArbitration
 import ServiceManagement
 import UserNotifications
-
-// MARK: - 0. Global Hotkey Manager
-class GlobalHotkeyManager {
-    static let shared = GlobalHotkeyManager()
-    
-    private var eventTap: CFMachPort?
-    private var runLoopSource: CFRunLoopSource?
-    
-    func isTrusted(promptSystem: Bool) -> Bool {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: promptSystem] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
-    }
-    
-    func start() {
-        guard isTrusted(promptSystem: false) else { return }
-        
-        if eventTap != nil { stop() }
-        
-        let eventMask = (1 << CGEventType.keyDown.rawValue)
-        guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: CGEventMask(eventMask),
-            callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
-                
-                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-                    DispatchQueue.main.async { GlobalHotkeyManager.shared.start() }
-                    return Unmanaged.passUnretained(event)
-                }
-                if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 { return Unmanaged.passUnretained(event) }
-                let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-                let flags = event.flags
-                
-                // Virtual key 0 is A, so only an absent preference uses the default E.
-                let targetKeyCode = UserDefaults.standard.object(forKey: "shortcutKeyCode") == nil
-                    ? 14 : UserDefaults.standard.integer(forKey: "shortcutKeyCode")
-
-                if flags.contains(.maskCommand) && flags.contains(.maskControl) && flags.contains(.maskAlternate) && keyCode == targetKeyCode {
-                    DispatchQueue.main.async {
-                        NotificationCenter.default.post(name: NSNotification.Name("TriggerGlobalEject"), object: nil)
-                    }
-                    return nil
-                }
-                return Unmanaged.passUnretained(event)
-            }, userInfo: nil) else { return }
-        
-        self.eventTap = tap
-        self.runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        
-        if let runLoopSource = self.runLoopSource {
-            CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
-            CGEvent.tapEnable(tap: tap, enable: true)
-            LogManager.shared.log("✅ Global shortcut activated.")
-        }
-    }
-    
-    func stop() {
-        if let tap = eventTap, let source = runLoopSource {
-            CGEvent.tapEnable(tap: tap, enable: false)
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
-            LogManager.shared.log("ℹ️ Global shortcut disabled.")
-        }
-        eventTap = nil
-        runLoopSource = nil
-    }
-}
 
 // MARK: - 0.5 Log Manager
 class LogManager: ObservableObject {
@@ -110,48 +42,13 @@ class LogManager: ObservableObject {
     }
 }
 
-// MARK: - Card Type Classification
-enum CardType: String {
-    case sd = "SD"
-    case cfexpress = "CFexpress"
-    case xqd = "XQD"
-    case unknown = "Unknown"
-}
-
-// MARK: - 1. Drive Model
-struct Drive: Identifiable {
-    var id: String { url.path }
-    let name: String
-    let url: URL
-    let isCameraCard: Bool
-    let isEmulatorCard: Bool
-    let cardType: CardType?
-    let isEjectable: Bool
-    let isRemovable: Bool
-    let isInternal: Bool
-
-    var displayName: String {
-        if let cardType = cardType, cardType != .unknown {
-            return "\(name) (\(cardType.rawValue))"
-        }
-        return name
-    }
-
-    var iconName: String {
-        if isCameraCard {
-            return "sdcard"
-        } else if isEmulatorCard {
-            return "gamecontroller"
-        } else {
-            return "externaldrive"
-        }
-    }
-}
-
 // MARK: - 2. Drive Manager (The Brains)
 class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     static let shared = DriveManager()
     @Published var drives: [Drive] = []
+    @Published private(set) var ejectOperations = 0
+    @Published private(set) var bulkEjecting = false
+    var isEjecting: Bool { ejectOperations > 0 || bulkEjecting }
     private var cancellables = Set<AnyCancellable>()
 
     private struct CachedClassification {
@@ -175,7 +72,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             .merge(with: center.publisher(for: NSWorkspace.didRenameVolumeNotification))
             .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
             .sink { [weak self] _ in
-                self?.fetchDrives()
+                self?.fetchDrives(clearCache: true)
             }
             .store(in: &cancellables)
 
@@ -184,6 +81,12 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                 self?.ejectAllCards(clean: UserDefaults.standard.bool(forKey: "cleanCardsOnEject"))
             }
             .store(in: &cancellables)
+
+        DroneImportManager.shared.$profiles.dropFirst().sink { [weak self] _ in
+            self?.fetchDrives(clearCache: true)
+        }.store(in: &cancellables)
+        NotificationCenter.default.publisher(for: .init("CardAccessChanged"))
+            .sink { [weak self] _ in self?.fetchDrives(clearCache: true) }.store(in: &cancellables)
 
         if UserDefaults.standard.bool(forKey: "isShortcutEnabled") {
             GlobalHotkeyManager.shared.start()
@@ -297,7 +200,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                 let model = (desc?[kDADiskDescriptionDeviceModelKey as String] as? String) ?? "(none)"
                 let vendor = (desc?[kDADiskDescriptionDeviceVendorKey as String] as? String) ?? "(none)"
                 let bus = (desc?[kDADiskDescriptionBusNameKey as String] as? String) ?? "(none)"
-                LogManager.shared.log("   Hardware — Model: \(model) | Vendor: \(vendor) | Protocol: \(proto.isEmpty ? "(none)" : proto) | Bus: \(bus)")
+                LogManager.shared.log("   Hardware: Model: \(model) | Vendor: \(vendor) | Protocol: \(proto.isEmpty ? "(none)" : proto) | Bus: \(bus)")
             }
             let isHardwareCamera = (hardwareType == .sd || hardwareType == .cfexpress || hardwareType == .xqd)
 
@@ -307,7 +210,14 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
 
             var hasCameraStructure = false
             var isEmulatorCard = false
-            if canBeCard {
+            #if APP_STORE
+            let readAccess = try? CardAccess.shared.open(url)
+            defer { readAccess?.close() }
+            let mayInspectFolders = readAccess != nil
+            #else
+            let mayInspectFolders = true
+            #endif
+            if canBeCard && mayInspectFolders {
                 if let cached = classificationCache[classificationKey] {
                     hasCameraStructure = cached.hasCameraStructure
                     isEmulatorCard = cached.isEmulatorCard
@@ -368,112 +278,149 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         
         DispatchQueue.main.async {
             self.drives = foundDrives
-            UserDefaults.standard.set(foundDrives.filter { $0.isCameraCard || $0.isEmulatorCard }.count, forKey: "cameraCardCount")
+            let cards = foundDrives.filter { $0.isCameraCard || $0.isEmulatorCard }
+            UserDefaults.standard.set(Set(cards.map { ImportVolumes.physicalID($0.url) ?? $0.url.path }).count, forKey: "cameraCardCount")
         }
     }
     
     // MARK: - 2.5 Metadata Cleanup Logic
 
-    func eject(drive: Drive, clean: Bool = false, notify: Bool = true, completion: ((Bool, Int) -> Void)? = nil) {
+    func eject(drive: Drive, clean: Bool = false, notify: Bool = true,
+               cleanupCards: [Drive]? = nil, completion: ((Bool, Int) -> Void)? = nil) {
+        let roots = cleanupCards ?? [drive]
+        // Obtain all permissions before reserving the disk or deleting anything.
+        #if APP_STORE
+        let accesses: [ScopedFolder]
+        do { accesses = clean ? try roots.map { try CardAccess.shared.require($0.url) } : [] }
+        catch { operationFailed(error); completion?(false, 0); return }
+        #endif
         guard DroneImportManager.shared.reserveManualEject(drive.url) else {
-            LogManager.shared.log("Eject skipped: disk is busy importing or ejecting.")
-            completion?(false, 0)
-            return
+            #if APP_STORE
+            accesses.forEach { $0.close() }
+            #endif
+            operationFailed(ImportFailure("Disk is busy importing or ejecting.")); completion?(false, 0); return
         }
         let operationKey = ImportVolumes.physicalID(drive.url) ?? drive.url.path
-        guard let expectedID = try? ImportVolumes.identity(drive.url) else {
+        let identities: [(URL, String)]
+        do { identities = try roots.map { ($0.url, try ImportVolumes.identity($0.url)) } }
+        catch {
+            #if APP_STORE
+            accesses.forEach { $0.close() }
+            #endif
             DroneImportManager.shared.finishManualEject(operationKey)
-            sendNotification(title: "Could not eject", body: "The volume is unavailable or has no stable identity.")
-            completion?(false, 0)
-            return
+            operationFailed(error); completion?(false, 0); return
         }
+        ejectOperations += 1
         DispatchQueue.global(qos: .userInitiated).async {
             var cleanedCount = 0
+            let releaseAccess: () -> Void = {
+                #if APP_STORE
+                accesses.forEach { $0.close() }
+                #endif
+            }
             do {
                 let validate: () throws -> Void = {
-                    guard try ImportVolumes.identity(drive.url) == expectedID,
-                          try ImportVolumes.root(drive.url) == drive.url else {
-                        throw ImportFailure("The mounted drive changed. Cleanup and eject stopped.")
+                    for (root, expected) in identities {
+                        guard try ImportVolumes.identity(root) == expected,
+                              try ImportVolumes.root(root).standardizedFileURL == root.standardizedFileURL,
+                              (ImportVolumes.physicalID(root) ?? root.path) == operationKey else {
+                            throw ImportFailure("The mounted disk changed. Cleanup and eject stopped.")
+                        }
                     }
                 }
                 try validate()
-                if clean { cleanedCount = try MetadataCleaner.clean(drive.url, validate: validate) }
+                if clean {
+                    for (root, _) in identities { cleanedCount += try MetadataCleaner.clean(root, validate: validate) }
+                }
                 try validate()
             } catch {
+                releaseAccess()
                 DispatchQueue.main.async {
-                    LogManager.shared.log("Cleanup/eject failed: \(error.localizedDescription)")
-                    self.sendNotification(title: "Drive needs attention", body: error.localizedDescription)
+                    self.operationFailed(error)
                     DroneImportManager.shared.finishManualEject(operationKey)
+                    self.ejectOperations -= 1
                     completion?(false, cleanedCount)
                 }
                 return
             }
-
             FileManager.default.unmountVolume(at: drive.url, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
+                releaseAccess()
                 DispatchQueue.main.async {
-                    var success = false
-                    if let error = error {
+                    DroneImportManager.shared.recordManualEject(drive.url, error: error)
+                    if let error {
                         LogManager.shared.log("Could not eject \(drive.name): \(error.localizedDescription)")
                         if notify { self.sendNotification(title: "Could not eject \(drive.name)", body: error.localizedDescription) }
                     } else {
-                        success = true
-                    }
-
-                    if success {
-                        self.fetchDrives()
-                        if notify {
-                            let body: String
-                            if clean && cleanedCount > 0 {
-                                body = "Removed \(cleanedCount) hidden file\(cleanedCount == 1 ? "" : "s") and ejected \(drive.name)"
-                            } else if clean {
-                                body = "No hidden files found — ejected \(drive.name)"
-                            } else {
-                                body = "Ejected \(drive.name)"
-                            }
-                            self.sendNotification(title: "Easy Eject", body: body)
-                        }
+                        self.fetchDrives(clearCache: true)
+                        let body = clean ? "Removed \(cleanedCount) metadata files and ejected \(drive.name)." : "Ejected \(drive.name)."
+                        LogManager.shared.log(body)
+                        if notify { self.sendNotification(title: "Easy Eject", body: body) }
                     }
                     DroneImportManager.shared.finishManualEject(operationKey)
-                    completion?(success, cleanedCount)
+                    self.ejectOperations -= 1
+                    completion?(error == nil, cleanedCount)
                 }
             }
         }
+    }
+
+    private func operationFailed(_ error: Error) {
+        LogManager.shared.log(error.localizedDescription)
+        DroneImportManager.shared.recordOperationFailure(error)
+        sendNotification(title: "Drive needs attention", body: error.localizedDescription)
     }
 
     func ejectAllCards(clean: Bool = false) {
-        let cards = drives.filter { $0.isCameraCard || $0.isEmulatorCard }
-        guard !cards.isEmpty else { return }
-        if cards.count == 1 {
-            eject(drive: cards[0], clean: clean)
-            return
-        }
-
-        let totalCards = cards.count
-        var ejectedCount = 0
-        var totalCleaned = 0
-        var completed = 0
-
-        for drive in cards {
-            eject(drive: drive, clean: clean, notify: false) { success, cleanedCount in
-                if success { ejectedCount += 1 }
-                totalCleaned += cleanedCount
-                completed += 1
-
-                if completed == totalCards {
-                    let noun = ejectedCount == 1 ? "card" : "cards"
-                    let body: String
-                    if clean && totalCleaned > 0 {
-                        body = "Removed \(totalCleaned) hidden file\(totalCleaned == 1 ? "" : "s") and ejected \(ejectedCount) \(noun)"
-                    } else if clean {
-                        body = "No hidden files found — ejected \(ejectedCount) \(noun)"
-                    } else {
-                        body = "Ejected \(ejectedCount) \(noun)"
-                    }
-                    self.sendNotification(title: "Easy Eject", body: body)
+        guard !isEjecting else { return }
+        let groups: [[Drive]]
+        #if APP_STORE
+        let preflightAccess: [ScopedFolder]
+        #endif
+        do {
+            let plan = try BulkEjectPolicy.plan(drives.map { drive in
+                .init(id: drive.id, disk: ImportVolumes.physicalID(drive.url),
+                      isCard: drive.isCameraCard || drive.isEmulatorCard,
+                      blocked: DroneImportManager.shared.blocksEject(drive.url))
+            })
+            groups = plan.map { ids in drives.filter { ids.contains($0.id) } }
+            #if APP_STORE
+            preflightAccess = clean ? try groups.flatMap { $0 }.map { try CardAccess.shared.require($0.url) } : []
+            #endif
+        } catch { operationFailed(error); return }
+        guard !groups.isEmpty else { return }
+        bulkEjecting = true
+        var ejected = 0
+        var cleaned = 0
+        func next(_ index: Int) {
+            guard index < groups.count else {
+                #if APP_STORE
+                preflightAccess.forEach { $0.close() }
+                #endif
+                bulkEjecting = false
+                let summary = "Ejected \(ejected) of \(groups.count) card disks. Removed \(cleaned) metadata files."
+                LogManager.shared.log(summary)
+                sendNotification(title: "Easy Eject", body: summary)
+                return
+            }
+            let group = groups[index]
+            eject(drive: group[0], clean: clean, notify: false, cleanupCards: group) { success, count in
+                if success { ejected += 1 }
+                cleaned += count
+                // Stop a batch on failure; never hide partial success.
+                if !success {
+                    #if APP_STORE
+                    preflightAccess.forEach { $0.close() }
+                    #endif
+                    self.bulkEjecting = false
+                    self.sendNotification(title: "Eject all stopped", body: "Ejected \(ejected) of \(groups.count) disks before an error. Review the import window or log.")
+                    return
                 }
+                next(index + 1)
             }
         }
+        next(0)
     }
+
 }
 
 // MARK: - 3. The Debug Window View
@@ -512,516 +459,42 @@ struct DebugLogView: View {
     }
 }
 
-// MARK: - 4. The Menu Bar View
-struct EjectorMenuView: View {
-    @ObservedObject private var manager = DriveManager.shared
-    @ObservedObject private var importer = DroneImportManager.shared
-    
-    @AppStorage("warnBeforeEjectingSSD") private var warnBeforeEjectingSSD = true
-    @AppStorage("cleanCardsOnEject") private var cleanCardsOnEject = false
-    @AppStorage("enableDebugLogs") private var enableDebugLogs = false
-    @AppStorage("shortcutKeyCode") private var shortcutKeyCode = 14
-    
-    let availableKeys: [(name: String, code: Int)] = [
-        ("D", 2), ("E", 14), ("F", 3), ("G", 5), ("K", 40),
-        ("M", 46), ("R", 15), ("T", 17), ("X", 7)
-    ]
-    
-    @Environment(\.openWindow) private var openWindow
-    
-    var cameraCards: [Drive] { manager.drives.filter { $0.isCameraCard } }
-    var emulatorCards: [Drive] { manager.drives.filter { $0.isEmulatorCard } }
-    var otherExternalVolumes: [Drive] { manager.drives.filter { !$0.isCameraCard && !$0.isEmulatorCard } }
-    
-    var currentShortcutLetter: KeyEquivalent {
-        let matchedKey = availableKeys.first(where: { $0.code == shortcutKeyCode })?.name ?? "E"
-        return KeyEquivalent(Character(matchedKey.lowercased()))
-    }
-    
-    func checkForUpdates() {
-        guard let url = URL(string: "https://api.github.com/repos/rsmith4321/Ejector/releases/latest") else { return }
-        URLSession.shared.dataTask(with: url) { data, _, error in
-            guard let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let tagName = json["tag_name"] as? String else {
-                DispatchQueue.main.async {
-                    let alert = NSAlert()
-                    alert.messageText = "Unable to Check for Updates"
-                    alert.informativeText = "Could not connect to GitHub. Check your internet connection and try again."
-                    alert.alertStyle = .warning
-                    alert.addButton(withTitle: "OK")
-                    NSApp.activate()
-                    alert.runModal()
-                }
-                return
-            }
-
-            let remoteVersion = tagName.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
-            let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
-
-            DispatchQueue.main.async {
-                if remoteVersion.compare(currentVersion, options: .numeric) == .orderedDescending {
-                    let alert = NSAlert()
-                    alert.messageText = "Update Available"
-                    alert.informativeText = "Easy Eject v\(remoteVersion) is available. You're currently running v\(currentVersion)."
-                    alert.alertStyle = .informational
-                    alert.addButton(withTitle: "Download")
-                    alert.addButton(withTitle: "Later")
-                    NSApp.activate()
-                    if alert.runModal() == .alertFirstButtonReturn {
-                        if let downloadURL = URL(string: "https://github.com/rsmith4321/Ejector/releases/latest") {
-                            NSWorkspace.shared.open(downloadURL)
-                        }
-                    }
-                } else {
-                    let alert = NSAlert()
-                    alert.messageText = "You're Up to Date"
-                    alert.informativeText = "Easy Eject v\(currentVersion) is the latest version."
-                    alert.alertStyle = .informational
-                    alert.addButton(withTitle: "OK")
-                    NSApp.activate()
-                    alert.runModal()
-                }
-            }
-        }.resume()
-    }
-
-    func confirmAndEject(drive: Drive, clean: Bool = false) {
-        let alert = NSAlert()
-        alert.messageText = "Confirm Ejection"
-        alert.informativeText = "Are you sure you want to \(clean ? "clean & eject" : "eject") '\(drive.name)'? It is not recognized as a camera card."
-        alert.alertStyle = .warning
-
-        alert.addButton(withTitle: clean ? "Clean & Eject" : "Eject")
-        alert.addButton(withTitle: "Cancel")
-
-        NSApp.activate()
-
-        let response = alert.runModal()
-
-        if response == .alertFirstButtonReturn {
-            manager.eject(drive: drive, clean: clean)
-        }
-    }
-    
-    @ViewBuilder
-    private func driveMenu(for drive: Drive, isCameraCard: Bool) -> some View {
-        Menu {
-            Button(action: {
-                if !isCameraCard && warnBeforeEjectingSSD {
-                    confirmAndEject(drive: drive)
-                } else {
-                    manager.eject(drive: drive)
-                }
-            }) {
-                Label("Eject", systemImage: "eject")
-            }
-            Button(action: {
-                if !isCameraCard && warnBeforeEjectingSSD {
-                    confirmAndEject(drive: drive, clean: true)
-                } else {
-                    manager.eject(drive: drive, clean: true)
-                }
-            }) {
-                Label("Clean & Eject", systemImage: "sparkles")
-            }
-        } label: {
-            Label(drive.name, systemImage: drive.iconName)
-        }.disabled(importer.blocksEject(drive.url))
-    }
-
-    var body: some View {
-        VStack(alignment: .leading) {
-
-            Text("Easy Eject")
-                .font(.headline)
-                .fontWeight(.bold)
-                .padding(.horizontal)
-                .padding(.top, 4)
-                .padding(.bottom, 2)
-            
-            Divider()
-            
-            if manager.drives.isEmpty {
-                Text("No external drives found")
-                    .foregroundColor(.secondary)
-            } else {
-
-                if !cameraCards.isEmpty || !emulatorCards.isEmpty {
-                    Button(action: { manager.ejectAllCards(clean: cleanCardsOnEject) }) {
-                        Label(cleanCardsOnEject ? "Clean & Eject All Cards" : "Eject All Cards", systemImage: cleanCardsOnEject ? "sparkles" : "eject.fill")
-                    }
-                    .keyboardShortcut(currentShortcutLetter, modifiers: [.control, .option, .command])
-                }
-
-                if !cameraCards.isEmpty {
-                    Section("Camera Cards") {
-                        ForEach(cameraCards) { drive in
-                            Button(action: { manager.eject(drive: drive, clean: cleanCardsOnEject) }) {
-                                Label(cleanCardsOnEject ? "Clean & Eject \(drive.displayName)" : "Eject \(drive.displayName)", systemImage: drive.iconName)
-                            }.disabled(importer.blocksEject(drive.url))
-                        }
-                    }
-                }
-
-                if !emulatorCards.isEmpty {
-                    Section("Emulator Cards") {
-                        ForEach(emulatorCards) { drive in
-                            Button(action: { manager.eject(drive: drive, clean: cleanCardsOnEject) }) {
-                                Label(cleanCardsOnEject ? "Clean & Eject \(drive.displayName)" : "Eject \(drive.displayName)", systemImage: drive.iconName)
-                            }.disabled(importer.blocksEject(drive.url))
-                        }
-                    }
-                }
-
-                if (!cameraCards.isEmpty || !emulatorCards.isEmpty) && !otherExternalVolumes.isEmpty {
-                    Divider()
-                }
-
-                if !otherExternalVolumes.isEmpty {
-                    Section("Other External Volumes") {
-                        ForEach(otherExternalVolumes) { drive in
-                            driveMenu(for: drive, isCameraCard: false)
-                        }
-                    }
-                }
-            }
-            
-            Divider()
-
-            if importer.busy {
-                Text("\(importer.activeName): \(importer.menuTitle)")
-                Text("\(importer.progress.completed) of \(importer.progress.total) files completed")
-            } else if importer.hasError {
-                Text("Import needs attention")
-            }
-            Button("Air Unit & Camera Imports…") {
-                openWindow(id: "importsWindow")
-                NSApp.activate()
-            }
-
-            Button("Help & Instructions") {
-                openWindow(id: "helpWindow")
-                NSApp.activate()
-            }
-
-            SettingsLink {
-                Text("Settings...")
-            }
-
-            if enableDebugLogs {
-                Button("Show Debug Window") {
-                    openWindow(id: "debugWindow")
-                    NSApp.activate()
-                }
-            }
-
-            Divider()
-
-            Button("Refresh List") {
-                manager.fetchDrives(clearCache: true)
-            }
-
-            Button("Check for Updates...") {
-                checkForUpdates()
-            }
-
-            Button("About Easy Eject") {
-                NSApp.activate()
-                NSApp.orderFrontStandardAboutPanel()
-            }
-
-            Button("Quit Easy Eject") {
-                NSApplication.shared.terminate(nil)
-            }.disabled(importer.busy)
-        }
-    }
-}
-
-// MARK: - 5. The Settings Window
-struct SettingsView: View {
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
-    @AppStorage("cleanCardsOnEject") private var cleanCardsOnEject = false
-    @AppStorage("warnBeforeEjectingSSD") private var warnBeforeEjectingSSD = true
-    @AppStorage("isShortcutEnabled") private var isShortcutEnabled = false
-    @AppStorage("shortcutKeyCode") private var shortcutKeyCode = 14
-    @AppStorage("enableDebugLogs") private var enableDebugLogs = false
-    @AppStorage("showEjectNotifications") private var showEjectNotifications = true
-
-    @State private var showingFullDiskAccessAlert = false
-    @State private var showingNotificationAlert = false
-    @State private var fullDiskAccessGranted = FileManager.default.isReadableFile(atPath: "/Library/Application Support/com.apple.TCC/TCC.db")
-    @State private var showingPermissionCheck = false
-    @State private var accessibilityGranted = GlobalHotkeyManager.shared.isTrusted(promptSystem: false)
-
-    let availableKeys: [(name: String, code: Int)] = [
-        ("D", 2), ("E", 14), ("F", 3), ("G", 5), ("K", 40),
-        ("M", 46), ("R", 15), ("T", 17), ("X", 7)
-    ]
-
-    private func hasFullDiskAccess() -> Bool {
-        FileManager.default.isReadableFile(atPath: "/Library/Application Support/com.apple.TCC/TCC.db")
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-
-            Text("General")
-                .font(.headline)
-            VStack(alignment: .leading, spacing: 12) {
-                Toggle("Launch at Login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { oldValue, newValue in
-                        do {
-                            if newValue {
-                                try SMAppService.mainApp.register()
-                                LogManager.shared.log("✅ Launch at Login enabled")
-                            } else {
-                                try SMAppService.mainApp.unregister()
-                                LogManager.shared.log("✅ Launch at Login disabled")
-                            }
-                        } catch {
-                            LogManager.shared.log("❌ Failed to toggle login item: \(error.localizedDescription)")
-                            launchAtLogin = (SMAppService.mainApp.status == .enabled)
-                        }
-                    }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Toggle("Clean Cards Before Ejecting", isOn: $cleanCardsOnEject)
-                        .toggleStyle(.switch)
-                        .onChange(of: cleanCardsOnEject) { oldValue, newValue in
-                            if newValue {
-                                fullDiskAccessGranted = hasFullDiskAccess()
-                                if !fullDiskAccessGranted {
-                                    showingFullDiskAccessAlert = true
-                                }
-                            }
-                        }
-                    Text("Removes hidden macOS files (.DS_Store, ._ files) that cause errors on cameras and phantom entries on emulators. Applies to all camera and emulator card buttons and the keyboard shortcut.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if cleanCardsOnEject {
-                        HStack(spacing: 4) {
-                            Image(systemName: fullDiskAccessGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                .foregroundColor(fullDiskAccessGranted ? .green : .orange)
-                            Text(fullDiskAccessGranted ? "Full Disk Access enabled" : "Full Disk Access required")
-                                .font(.caption)
-                                .foregroundColor(fullDiskAccessGranted ? .green : .orange)
-                        }
-                    }
-                }
-                .alert("Full Disk Access Recommended", isPresented: $showingFullDiskAccessAlert) {
-                    Button("Open Settings & Show App") {
-                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
-                            NSWorkspace.shared.open(url)
-                        }
-                        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
-                    }
-                    Button("Later", role: .cancel) { }
-                } message: {
-                    Text("To clean hidden files from your drives, Easy Eject needs Full Disk Access.\n\n1. Click 'Open Settings & Show App' below.\n2. Drag Easy Eject from the Finder window into the Full Disk Access list.\n3. Toggle the switch next to Easy Eject to turn it on.\n4. macOS will ask you to quit and reopen the app for it to take effect.")
-                }
-
-                Toggle("Confirm Before Ejecting SSDs", isOn: $warnBeforeEjectingSSD)
-
-                Toggle("Show Eject Notifications", isOn: $showEjectNotifications)
-                    .onChange(of: showEjectNotifications) { oldValue, newValue in
-                        if newValue {
-                            UNUserNotificationCenter.current().getNotificationSettings { settings in
-                                DispatchQueue.main.async {
-                                    if settings.authorizationStatus == .denied {
-                                        showingNotificationAlert = true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .alert("Notifications Not Allowed", isPresented: $showingNotificationAlert) {
-                        Button("Open Notification Settings") {
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }
-                        Button("Later", role: .cancel) { }
-                    } message: {
-                        Text("macOS has notifications turned off for Easy Eject. To receive eject confirmations, open Notification Settings and enable notifications for this app.")
-                    }
-            }
-
-            Divider()
-
-            Text("Keyboard Shortcut")
-                .font(.headline)
-            VStack(alignment: .leading, spacing: 12) {
-                Toggle("Enable Global Eject Shortcut", isOn: $isShortcutEnabled)
-                    .onChange(of: isShortcutEnabled) { oldValue, newValue in
-                        if newValue {
-                            accessibilityGranted = GlobalHotkeyManager.shared.isTrusted(promptSystem: false)
-                            if accessibilityGranted {
-                                GlobalHotkeyManager.shared.start()
-                            } else {
-                                _ = GlobalHotkeyManager.shared.isTrusted(promptSystem: true)
-                            }
-                        } else {
-                            GlobalHotkeyManager.shared.stop()
-                        }
-                    }
-                
-                if isShortcutEnabled {
-                    HStack(spacing: 4) {
-                        Image(systemName: accessibilityGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .foregroundColor(accessibilityGranted ? .green : .orange)
-                        Text(accessibilityGranted ? "Accessibility enabled" : "Accessibility required")
-                            .font(.caption)
-                            .foregroundColor(accessibilityGranted ? .green : .orange)
-                    }
-
-                    HStack {
-                        Text("Shortcut Letter (⌃⌥⌘ +)")
-                        Picker("", selection: $shortcutKeyCode) {
-                            ForEach(availableKeys, id: \.code) { key in
-                                Text(key.name).tag(key.code)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 80)
-                    }
-                    .padding(.leading, 18)
-                    .onChange(of: shortcutKeyCode) { oldValue, newValue in
-                        if accessibilityGranted {
-                            GlobalHotkeyManager.shared.start()
-                        }
-                    }
-                }
-            }
-            
-            Divider()
-
-            Text("Permissions")
-                .font(.headline)
-            VStack(alignment: .leading, spacing: 12) {
-                Button("Check Permissions") {
-                    accessibilityGranted = GlobalHotkeyManager.shared.isTrusted(promptSystem: false)
-                    fullDiskAccessGranted = hasFullDiskAccess()
-                    if accessibilityGranted && isShortcutEnabled {
-                        GlobalHotkeyManager.shared.start()
-                    }
-                    showingPermissionCheck = true
-                }
-                Text("Checks whether Accessibility and Full Disk Access are enabled for Easy Eject.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .alert("Permission Status", isPresented: $showingPermissionCheck) {
-                if !fullDiskAccessGranted || !accessibilityGranted {
-                    Button("Open Privacy Settings") {
-                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy") {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }
-                }
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("\(accessibilityGranted ? "✅" : "⚠️") Accessibility — \(accessibilityGranted ? "Granted" : "Not granted. Required for global keyboard shortcut.")\n\(fullDiskAccessGranted ? "✅" : "⚠️") Full Disk Access — \(fullDiskAccessGranted ? "Granted" : "Not granted. Required for Clean & Eject.")")
-            }
-
-            Divider()
-
-            Text("Debug")
-                .font(.headline)
-            VStack(alignment: .leading, spacing: 12) {
-                Toggle("Enable Debug Logging", isOn: $enableDebugLogs)
-            }
-
-            Divider()
-
-            HStack {
-                Spacer()
-                Button("Done") {
-                    NSApp.keyWindow?.close()
-                }
-                .keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(24)
-        .frame(width: 400)
-        .onAppear {
-            accessibilityGranted = GlobalHotkeyManager.shared.isTrusted(promptSystem: false)
-            fullDiskAccessGranted = hasFullDiskAccess()
-            if accessibilityGranted && isShortcutEnabled {
-                GlobalHotkeyManager.shared.start()
-            }
-        }
-    }
-}
-
 // MARK: - 6. The App Entry Point
 @main
 struct EjectorApp: App {
+    @NSApplicationDelegateAdaptor(EjectorLifecycle.self) private var lifecycle
     @StateObject private var importer = DroneImportManager.shared
-    @StateObject private var driveManager = DriveManager.shared
-    
-    @AppStorage("hasAcceptedDisclaimer") private var hasAcceptedDisclaimer = false
-    @AppStorage("cameraCardCount") private var cameraCardCount = 0
-    @Environment(\.openWindow) private var openWindow
-    
-    init() {
-        if let bundleID = Bundle.main.bundleIdentifier {
-            let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
-            if runningApps.count > 1 {
-                NSApplication.shared.terminate(nil)
-            }
-        }
-    }
-    
     var body: some Scene {
-        MenuBarExtra {
-            EjectorMenuView()
-                .onAppear {
-                    if !hasAcceptedDisclaimer {
-                        openWindow(id: "welcomeWindow")
-                        NSApp.activate()
-                    }
-                }
-        } label: {
-            Image(systemName: importer.busy ? "arrow.down.circle" : (importer.hasError ? "exclamationmark.triangle" : "eject.fill"))
-                .onAppear {
-                    if Bundle.main.bundleIdentifier?.hasSuffix(".preview") == true || !UserDefaults.standard.bool(forKey: "hasSeenImportSetup") {
-                        UserDefaults.standard.set(true, forKey: "hasSeenImportSetup")
-                        openWindow(id: "importsWindow")
-                    }
-                }
-            if !importer.menuTitle.isEmpty {
-                Text(importer.menuTitle).monospacedDigit()
-            } else if cameraCardCount > 0 {
-                Text("\(cameraCardCount)")
-            }
-        }
-        
         Window("Air Unit & Camera Imports", id: "importsWindow") {
+            ImportsWindow(lifecycle: lifecycle, importer: importer)
+        }.defaultSize(width: 650, height: 690)
+        #if !APP_STORE
+        Window("Welcome to Easy Eject", id: "welcomeWindow") { WelcomeView() }
+            .defaultSize(width: 480, height: 420).defaultPosition(.center)
+        #endif
+        Window("Help & Instructions", id: "helpWindow") { HelpView() }
+            .defaultSize(width: 500, height: 520)
+        Window("Easy Eject Debug Logs", id: "debugWindow") { DebugLogView() }
+            .defaultSize(width: 550, height: 400)
+        Settings { SettingsView() }
+    }
+}
+
+private struct ImportsWindow: View {
+    let lifecycle: EjectorLifecycle
+    @ObservedObject var importer: DroneImportManager
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button("Eject menu") { lifecycle.showMenu() }
+                SettingsLink { Text("Settings…") }
+                Spacer()
+            }.padding([.horizontal, .top], 16)
             DroneImportView(importer: importer)
-        }
-        .defaultSize(width: 650, height: 640)
-
-        Window("Welcome to Easy Eject", id: "welcomeWindow") {
-            WelcomeView()
-        }
-        .defaultSize(width: 480, height: 420)
-        .defaultPosition(.center)
-
-        Window("Help & Instructions", id: "helpWindow") {
-            HelpView()
-        }
-        .defaultSize(width: 500, height: 520)
-
-        WindowGroup("Easy Eject Debug Logs", id: "debugWindow") {
-            DebugLogView()
-        }
-        .defaultSize(width: 550, height: 400)
-        
-        Settings {
-            SettingsView()
+        }.onAppear {
+            lifecycle.configure(openWindow: { id in openWindow(id: id) }, openSettings: { openSettings() })
         }
     }
 }
@@ -1042,7 +515,7 @@ struct HelpView: View {
                     }
 
                     helpSection("Smart Grouping", icon: "rectangle.3.group") {
-                        Text("Many cameras label all cards as \"Untitled.\" Easy Eject displays the card type next to the name — e.g., \"Untitled (CFexpress)\" and \"Untitled (SD)\" — so you always know which card you're ejecting.")
+                        Text("Many cameras label all cards as \"Untitled.\" Easy Eject displays the card type next to the name: e.g., \"Untitled (CFexpress)\" and \"Untitled (SD)\": so you always know which card you're ejecting.")
                     }
 
                     helpSection("Camera Cards", icon: "eject") {
@@ -1056,7 +529,7 @@ struct HelpView: View {
                     helpSection("Clean & Eject", icon: "sparkles") {
                         Text("Removes invisible macOS files that cause problems on other systems:")
                             .padding(.bottom, 2)
-                        Text("• .**_ AppleDouble files** — the #1 cause of ghost games on retro consoles\n• **.DS_Store** — Mac folder settings that clutter Windows and Linux\n• **__MACOSX folders** — junk created when extracting zip files\n• **.apdisk** — Apple disk identification files created for network sharing")
+                        Text("• .**_ AppleDouble files**: the #1 cause of ghost games on retro consoles\n• **.DS_Store**: Mac folder settings that clutter Windows and Linux\n• **Empty __MACOSX folders**: removes the folder only when empty; keeps user files\n• **.apdisk**: Apple disk identification files created for network sharing")
                         Text("Non-camera drives (SSDs, thumb drives) show a submenu with both Eject and Clean & Eject options.")
                             .padding(.top, 2)
                         Text("If your card has thousands of metadata files, cleaning may take several seconds. You'll receive a notification when it's done.")
@@ -1072,13 +545,17 @@ struct HelpView: View {
                     }
 
                     helpSection("Menu Bar Badge", icon: "number.circle") {
-                        Text("When camera or emulator cards are connected, a count appears next to the menu bar icon showing how many cards are mounted.")
+                        Text("When recognized camera or emulator cards are connected, the menu bar counts each physical disk once. Progress and errors take priority.")
                     }
 
                     helpSection("Permissions", icon: "lock.shield") {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("**Accessibility** — Required only for the global keyboard shortcut to work inside other apps.")
-                            Text("**Full Disk Access** — Required for Clean & Eject to scan and delete hidden files. Enable in System Settings > Privacy & Security.")
+                            Text("The keyboard shortcut uses a registered key combination and does not require Accessibility access.")
+                            #if APP_STORE
+                            Text("Choose Authorize a Card to grant access for folder detection and Clean & Eject. Permission is remembered for this volume; formatting it requires authorization again. Imported media folders have separate permissions.")
+                            #else
+                            Text("Full Disk Access may be needed when macOS denies access to files. Enable it in System Settings > Privacy & Security if required.")
+                            #endif
                         }
                     }
 
@@ -1097,7 +574,7 @@ struct HelpView: View {
 
             HStack {
                 Button("Visit Website") {
-                    if let url = URL(string: "https://www.ryansmithphotography.com/easyejector") {
+                    if let url = URL(string: "https://easyeject.com/") {
                         NSWorkspace.shared.open(url)
                     }
                 }
@@ -1123,6 +600,7 @@ struct HelpView: View {
     }
 }
 
+#if !APP_STORE
 // MARK: - 8. Welcome & Disclaimer View
 struct WelcomeView: View {
     @AppStorage("hasAcceptedDisclaimer") private var hasAcceptedDisclaimer = false
@@ -1158,7 +636,7 @@ struct WelcomeView: View {
                     **Important Disclaimer:**
                     This software is provided "as is", without warranty of any kind, express or implied. In no event shall the developer be liable for any claim, damages, or other liability, including but not limited to data loss or hardware issues, arising from the use of this software.
 
-                    The "Clean & Eject" feature involves the automated deletion of hidden macOS metadata files. Please ensure you have backups of your critical data before using this utility. If your card contains thousands of metadata files, cleaning may take several seconds — you'll receive a notification when it's done.
+                    The "Clean & Eject" feature involves the automated deletion of hidden macOS metadata files. Please ensure you have backups of your critical data before using this utility. If your card contains thousands of metadata files, cleaning may take several seconds: you'll receive a notification when it's done.
                     """)
                     .font(.subheadline)
                     .multilineTextAlignment(.leading)
@@ -1193,5 +671,4 @@ struct WelcomeView: View {
         .padding(30)
     }
 }
-
 #endif
