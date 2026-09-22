@@ -143,6 +143,7 @@ struct DroneProfileEditor: View {
     let save: (DroneProfile) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var error: String?
+    @State private var showingPermanentDeletionConfirmation = false
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Import profile").font(.title2.bold())
@@ -152,9 +153,25 @@ struct DroneProfileEditor: View {
             Button("Change destination…", action: chooseDestination)
             Divider()
             Toggle("Import automatically when connected", isOn: $profile.enabled)
-            Toggle("Delete originals after verifying saved copies", isOn: $profile.deleteOriginals)
-            Text("All regular files in the selected media folder are imported. Hidden items are skipped. Deletion is permanent and happens only after each saved copy passes a SHA-256 check.")
-                .font(.caption).foregroundStyle(.secondary)
+            Toggle("Permanently delete originals after import", isOn: Binding(
+                get: { profile.deleteOriginals },
+                set: { enabled in
+                    if enabled && !profile.deleteOriginals {
+                        showingPermanentDeletionConfirmation = true
+                    } else if !enabled {
+                        profile.deleteOriginals = false
+                    }
+                }
+            ))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(profile.deleteOriginals ? "Permanent deletion is on" : "Keep originals is on (recommended)")
+                    .font(.caption.weight(.semibold))
+                Text(profile.deleteOriginals
+                    ? "Originals are removed directly after saved-copy verification. They skip Trash and cannot be restored from it. Use only for unimportant or replaceable footage."
+                    : "Easy Eject saves verified copies and leaves the files on your device. Keep this setting for client work and important photos or videos.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Toggle("Recover and clear this device’s Trash", isOn: $profile.recoverTrash)
             Text("Saves files from your Trash on this device into Recovered Device Trash before removing them. Requires Full Disk Access. Other drives’ Trash is untouched.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -169,6 +186,15 @@ struct DroneProfileEditor: View {
             Text("Saving applies to the next connection. Use Import now to start with the connected device.")
                 .font(.caption).foregroundStyle(.secondary)
         }.padding(24).frame(width: 480)
+        .alert("Enable permanent deletion?", isPresented: $showingPermanentDeletionConfirmation) {
+            Button("Cancel", role: .cancel) { }
+                .keyboardShortcut(.defaultAction)
+            Button("Enable permanent deletion", role: .destructive) {
+                profile.deleteOriginals = true
+            }
+        } message: {
+            Text("After saved copies pass verification, Easy Eject removes the originals directly from the device. This skips Trash and cannot be undone.\n\nUse this only for unimportant or replaceable FPV footage. Keep originals for client work and other important photos or videos, and keep independent backups.\n\nThe developer is not responsible for lost files.")
+        }
     }
     private func chooseDestination() {
         NSApp.activate()

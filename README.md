@@ -2,7 +2,7 @@
 
 **Import, verify, and eject camera media from your Mac menu bar.**
 
-Version 1.5.1. Requires macOS 14 or later. Release downloads are signed with Developer ID and notarized by Apple.
+Version 1.5.2. Requires macOS 14 or later. Release downloads are signed with Developer ID and notarized by Apple.
 
 Easy Eject is a lightweight macOS menu bar utility that intelligently detects camera memory cards and lets you safely eject them with a single click or keyboard shortcut. It also scrubs hidden macOS metadata that causes errors on cameras, emulators, and PCs.
 
@@ -46,7 +46,7 @@ The scrubber safely skips macOS-managed directories (`.Spotlight-V100`, `.Trashe
 Open **Air Unit & Camera Imports** from the menu. Connect a device using USB mass storage or a card reader, select its media folder (such as DCIM or VIDEO), choose a destination on a different disk, and save a profile. Each profile recognizes a volume UUID, so similarly named drives do not inherit one another's settings. Re-enroll a device after formatting it.
 
 - Automatic import is opt-in per device. **Import now** also works with automatic mode off.
-- Originals are kept by default. Optional deletion occurs only after SHA-256 verification of a durable saved copy.
+- Originals are kept by default, which is recommended for client work and important photos or videos. Enabling permanent deletion requires confirming a warning that files bypass Trash and cannot be restored from it. Use deletion only for unimportant or replaceable footage and keep independent backups. Deletion occurs only after SHA-256 verification of a durable saved copy.
 - Files are stored under the local import date (`YYYY-MM-DD`), retaining paths inside the selected media folder. Filename conflicts preserve both versions. Reimporting identical content reuses the saved copy.
 - Menu bar text shows the active phase and percentage. The import window shows file counts, a progress bar, the current filename, and the latest result.
 - **Stop import** preserves unverified originals. Completed, verified files may already have been removed if deletion was enabled.
