@@ -48,11 +48,11 @@ import Combine
     @discardableResult func authorize(_ expected: URL? = nil) -> Bool {
         do {
             let expectedID = try expected.map { try ImportVolumes.identity($0) }
-            let panel = NSOpenPanel()
+            let panel = FolderSelectionPanel.make()
             panel.canChooseFiles = false; panel.canChooseDirectories = true
             panel.allowsMultipleSelection = false
             panel.title = "Authorize a card or external volume"
-            panel.message = "Under Locations, select the card itself (for example, Untitled), not DCIM or another folder inside it. Click Authorize to remember access for folder detection and Clean & Eject. This does not start an import or enable deletion."
+            panel.message = "Under Locations, select the card itself (for example, Untitled),\nnot DCIM or another folder inside it.\nAuthorize remembers access for folder detection and Clean & Eject.\nThis does not start an import or enable deletion."
             panel.prompt = "Authorize"
             panel.directoryURL = expected ?? URL(fileURLWithPath: "/Volumes")
             NSApp.activate()

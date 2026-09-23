@@ -122,7 +122,7 @@ struct DroneImportView: View {
             let id = try ImportVolumes.identity(source)
             if let existing = importer.profiles.first(where: { $0.id == id }) { editing = existing; return }
             guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" }) else { return }
-            let media = NSOpenPanel()
+            let media = FolderSelectionPanel.make()
             media.title = "Step 1 of 2: Choose recordings"
             media.message = "Step 1 of 2: Choose the recording folder on \(source.lastPathComponent).\nSelect DCIM or VIDEO. Next, choose where to save copies."
             media.prompt = "Use recording folder"
@@ -255,7 +255,7 @@ struct DroneProfileEditor: View {
         NSApp.activate()
         guard let parent = NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" }) else { return }
         let window = parent.attachedSheet ?? parent
-        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
+        let panel = FolderSelectionPanel.make(); panel.canChooseDirectories = true; panel.canChooseFiles = false
         panel.title = "Authorize this device’s media folder"
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, let folder = panel.url else { return }
@@ -293,7 +293,7 @@ struct DroneProfileEditor: View {
 
 @MainActor private enum ImportFolderPanels {
     static func destination(message: String, currentFolder: URL? = nil) -> NSOpenPanel {
-        let panel = NSOpenPanel()
+        let panel = FolderSelectionPanel.make()
         panel.title = "Choose where to save copies"
         // Sheet titles are not always visible, so instructions must be in the message.
         panel.message = message

@@ -5,7 +5,7 @@ A native macOS menu bar utility for ejecting camera cards, optional hidden-file 
 | | Website download | Mac App Store |
 | --- | --- | --- |
 | Target / bundle | `Ejector` / `com.ryansmithphotography.Ejector` | `EjectorStore` / `com.ryansmithphotography.EasyEject.store` |
-| Current version | 1.5.4 | 1.0 (6); see Store/RELEASE-6.md and current Apple status |
+| Current version | 1.5.5 | 1.0 (6); see Store/RELEASE-6.md and current Apple status |
 | Distribution | Developer ID signed and notarized | App Sandbox and App Store review |
 | Folder detection and cleaning | No Easy Eject per-card authorization; macOS Files and Folders permissions still apply | Select the whole card with Authorize a Card; repeat if formatting invalidates access |
 | Updates | GitHub release checker | App Store |
@@ -40,6 +40,6 @@ Source/destination disks are protected during imports. Multiple enrolled partiti
 
 Requires macOS 14+. Universal arm64/x86_64 builds; Intel and older macOS runtime coverage is limited. Quit the other edition before switching, and do not run two automatic importers for the same device. Each bundle keeps its own preferences/profiles; they are not migrated automatically. A returning website installation retains its existing settings.
 
-Archive `Ejector` or `EjectorStore` with the preserved release toolchain. Direct releases require Developer ID signing, notarization, stapling, signature/Gatekeeper verification and a tested download. Store releases require current App Store Connect checks and one reviewed submission. Build/upload/submission are not approval or live availability. See `Store/RELEASE-5.md`, `Store/README.md` and `RELEASE-1.5.4.md` for evidence and limits.
+Archive `Ejector` or `EjectorStore` with the preserved release toolchain. Direct releases require Developer ID signing, notarization, stapling, signature/Gatekeeper verification and a tested download. Store releases require current App Store Connect checks and one reviewed submission. Build/upload/submission are not approval or live availability. See `Store/RELEASE-5.md`, `Store/README.md` and `RELEASE-1.5.5.md` for evidence and limits.
 
 [Download and comparison](https://easyeject.com/editions/) · [Support](https://easyeject.com/support/) · [Privacy](https://easyeject.com/privacy/)

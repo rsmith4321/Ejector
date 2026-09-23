@@ -289,7 +289,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1.5.4;
+				CURRENT_PROJECT_VERSION = 1.5.5;
 				DEPLOYMENT_POSTPROCESSING = NO;
 				DEVELOPMENT_TEAM = MCJMHBLT27;
 				ENABLE_APP_SANDBOX = NO;
@@ -310,7 +310,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.4;
+				MARKETING_VERSION = 1.5.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.Ejector;
 				PRODUCT_NAME = "Easy Eject";
 				REGISTER_APP_GROUPS = YES;
@@ -397,7 +397,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = 1.5.4;
+				CURRENT_PROJECT_VERSION = 1.5.5;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				DEVELOPMENT_TEAM = MCJMHBLT27;
 				ENABLE_APP_SANDBOX = NO;
@@ -418,7 +418,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.4;
+				MARKETING_VERSION = 1.5.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.Ejector;
 				PRODUCT_NAME = "Easy Eject";
 				REGISTER_APP_GROUPS = YES;
