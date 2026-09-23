@@ -95,6 +95,9 @@ struct DroneImportView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Button("Set up import…", action: enroll).disabled(selectedSource.isEmpty || importer.busy)
                 }
+                Text("First choose the device’s recording folder, then where to save copies. Review the settings before saving; setup does not start an import.")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }.disabled(importer.busy)
             Text("Your saved device is recognized even as Untitled 2. Its recording folder alone does not identify it. Set up again after formatting, and connect the destination before importing.")
                 .font(.callout).foregroundStyle(.secondary)
@@ -120,8 +123,9 @@ struct DroneImportView: View {
             if let existing = importer.profiles.first(where: { $0.id == id }) { editing = existing; return }
             guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" }) else { return }
             let media = NSOpenPanel()
-            media.title = "Choose the media folder on \(source.lastPathComponent)"
-            media.message = "Select DCIM, VIDEO, or the folder where this device stores recordings. All regular files inside are imported; hidden items are skipped."
+            media.title = "Step 1 of 2: Choose recordings"
+            media.message = "Step 1 of 2: Choose the recording folder on \(source.lastPathComponent).\nSelect DCIM or VIDEO. Next, choose where to save copies."
+            media.prompt = "Use recording folder"
             media.canChooseDirectories = true; media.canChooseFiles = false
             media.directoryURL = source
             media.beginSheetModal(for: window) { response in
@@ -130,9 +134,8 @@ struct DroneImportView: View {
                     try MediaImportEngine.checkPath(folder)
                     guard MediaImportEngine.isWithin(folder, source), folder != source else { throw ImportFailure("Select a media folder inside the chosen device.") }
                     DispatchQueue.main.async {
-                        let destination = NSOpenPanel()
-                        destination.title = "Choose where imports will be saved"
-                        destination.canChooseDirectories = true; destination.canChooseFiles = false; destination.canCreateDirectories = true
+                        let destination = ImportFolderPanels.destination(
+                            message: "Step 2 of 2: Choose where to save copies of \(folder.lastPathComponent).\nUse your Mac or another drive. Copies go into dated subfolders.")
                         destination.beginSheetModal(for: window) { response in
                             guard response == .OK, let target = destination.url else { return }
                             do {
@@ -168,7 +171,7 @@ struct DroneProfileEditor: View {
             Text("Give this profile a recognizable name, such as DJI O4. The card's name in Finder can change.")
                 .font(.callout).foregroundStyle(.secondary)
             Text("Media folder: \(profile.mediaPath)").font(.callout)
-            Text(profile.destinationLabel).font(.caption).textSelection(.enabled)
+            Text("Save copies to: \(profile.destinationLabel)/YYYY-MM-DD").font(.caption).textSelection(.enabled)
             Button("Change destination…", action: chooseDestination)
             #if APP_STORE
             Button("Authorize media folder again…", action: chooseSource)
@@ -272,7 +275,9 @@ struct DroneProfileEditor: View {
         NSApp.activate()
         guard let parent = NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" }) else { return }
         let window = parent.attachedSheet ?? parent
-        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true
+        let panel = ImportFolderPanels.destination(
+            message: "Choose where to save copies from \(profile.name).\nUse your Mac or another drive. Copies go into dated subfolders.",
+            currentFolder: URL(fileURLWithPath: profile.destinationLabel))
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, let url = panel.url else { return }
             do {
@@ -283,5 +288,25 @@ struct DroneProfileEditor: View {
                 profile.destinationVolumeID = id; profile.destinationLabel = url.path; error = nil
             } catch { self.error = error.localizedDescription }
         }
+    }
+}
+
+@MainActor private enum ImportFolderPanels {
+    static func destination(message: String, currentFolder: URL? = nil) -> NSOpenPanel {
+        let panel = NSOpenPanel()
+        panel.title = "Choose where to save copies"
+        // Sheet titles are not always visible, so instructions must be in the message.
+        panel.message = message
+        panel.prompt = "Save copies here"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        // A fresh panel otherwise inherits the previous source chooser's DCIM folder.
+        if let currentFolder, FileManager.default.fileExists(atPath: currentFolder.path) {
+            panel.directoryURL = currentFolder
+        } else {
+            panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+        }
+        return panel
     }
 }
