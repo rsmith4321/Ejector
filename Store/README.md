@@ -2,13 +2,13 @@
 
 Both targets now compile the same native menu, classifier, settings, cleaner, import engine and eject operations. Narrow build conditions provide sandbox folder grants, the App Store update channel and omission of the direct edition launch license screen. No separate reduced Store UI remains. Metadata cleaning and verified device Trash recovery are available after explicit card authorization.
 
-The Store target and website target are maintained from shared code. Store **1.0 (6)** adds an in-app explanation and comparison link; see RELEASE-6.md and fresh App Store Connect state. Website **1.5.3** restores direct distribution to avoid per-card sandbox authorization for folder detection and cleaning. This supersedes earlier Store-only notes.
+The Store target and website target are maintained from shared code. Store **1.0 (8)** includes the latest import-setup fixes and red glass icon; see RELEASE-8.md and fresh App Store Connect state. Website **1.5.6** uses the same icon and shared implementation, with ordinary macOS filesystem permissions. This supersedes earlier Store-only notes.
 
 ## Identity and distribution
 
 - App Store Connect app: **6767951388**, Easy Eject. Reuses the existing empty listing; no duplicate app record.
 - Permanent bundle: `com.ryansmithphotography.EasyEject.store`, registered ID `XX33FPA5TF`, team `MCJMHBLT27`.
-- Current Store version **1.0**, build **6**. Product file and visible title: Easy Eject.
+- Current Store version **1.0**, build **8**. Product file and visible title: Easy Eject.
 - Direct identity: `com.ryansmithphotography.Ejector`, version 1.5.3. `/Applications/Easy Eject.app` now contains this signed, notarized website edition at Ryan's request. Store build 5 is retained in release evidence for rollback.
 - Sandbox profiles/logs live in the Store bundle's own container. No prototype or website profile is migrated automatically.
 - Listing is free with automatic release **AFTER_APPROVAL**. Upload, processing, review submission, approval, and live availability are distinct gates.
