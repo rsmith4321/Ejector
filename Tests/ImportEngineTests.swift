@@ -41,8 +41,8 @@ import Darwin
             let file = media.appendingPathComponent("clip.mp4"); try content.write(to: file)
             let first = try engine(source, media, dest, delete: false).run()
             let r = try engine(source, media, dest, delete: false).run()
-            try check(first.shouldAutoEject, "first new media copy may finish with automatic eject")
-            try check(!r.shouldAutoEject, "reconnected no-op copy-only device stays available to Lightroom")
+            try check(first.hasSelectedMedia, "new media is an import-complete result")
+            try check(r.hasSelectedMedia, "verified existing copies are import-complete, not an empty card")
             try check(try Data(contentsOf: file) == content, "original retained")
             try check(try MediaImportEngine.files(r.folder, includeHidden: true).count == 1, "no duplicate")
         }
@@ -52,16 +52,36 @@ import Darwin
             _ = try engine(source, media, dest, delete: false).run()
             let result = try engine(source, media, dest).run()
             try check(!FileManager.default.fileExists(atPath: file.path), "reused verified copy permits explicitly enabled source removal")
-            try check(result.shouldAutoEject, "verified source deletion is meaningful work even when no new copy was needed")
+            try check(result.hasSelectedMedia, "verified source deletion is an import-complete result")
         }
         try test("device-index-only import stays connected for the next photo workflow") { source, media, dest in
             let index = media.appendingPathComponent("fileinfo_list.list")
             try content.write(to: index)
             let first = try engine(source, media, dest, videosOnly: true, cleanLayout: true).run()
             let repeated = try engine(source, media, dest, videosOnly: true, cleanLayout: true).run()
-            try check(!first.shouldAutoEject && !repeated.shouldAutoEject, "index backup alone never triggers automatic eject")
+            try check(!first.hasSelectedMedia && !repeated.hasSelectedMedia, "index backup alone is no-media, not an imported recording")
             try check(try Data(contentsOf: index) == content, "device index remains on source")
             try check(try MediaImportEngine.files(dest, includeHidden: true).count == 1, "repeated index backup reuses saved metadata")
+        }
+        try test("empty recording folder reports no media") { source, media, dest in
+            let result = try engine(source, media, dest).run()
+            try check(!result.hasSelectedMedia && result.files == 0, "empty folder is a no-media result")
+        }
+        try test("empty card with absent recording folder reports no media") { source, media, dest in
+            try FileManager.default.removeItem(at: media)
+            let result = try engine(source, media, dest).run()
+            try check(!result.hasSelectedMedia && result.files == 0, "readable empty card can offer eject")
+        }
+        try test("missing folder on nonempty card is not called empty") { source, media, dest in
+            try FileManager.default.removeItem(at: media)
+            try content.write(to: source.appendingPathComponent("elsewhere.mp4"))
+            try fails { _ = try engine(source, media, dest).run() }
+        }
+        try test("photos-only video selection reports no media and retains photos") { source, media, dest in
+            let photo = media.appendingPathComponent("photo.dng"); try content.write(to: photo)
+            let result = try engine(source, media, dest, videosOnly: true).run()
+            try check(!result.hasSelectedMedia && result.files == 0, "no selected videos")
+            try check(try Data(contentsOf: photo) == content, "photos retained")
         }
         try test("name collision never overwrites") { source, media, dest in
             let file = media.appendingPathComponent("clip.mp4"); try content.write(to: file)
@@ -368,7 +388,7 @@ import Darwin
             }
             let first = try engine(source, media, dest, videosOnly: true, cleanLayout: true, includePreviews: false).run()
             let second = try engine(source, media, dest, videosOnly: true, cleanLayout: true, includePreviews: false).run()
-            try check(!first.shouldAutoEject && !second.shouldAutoEject, "remaining skipped previews do not turn metadata-only reconnect into an automatic eject")
+            try check(!first.hasSelectedMedia && !second.hasSelectedMedia, "remaining skipped previews report no selected media")
             let saved = try MediaImportEngine.files(dest, includeHidden: true)
             try check(saved.count == 1 && saved[0].lastPathComponent == "fileinfo_list.list", "only device metadata is backed up")
             for path in paths { try check(try Data(contentsOf: media.appendingPathComponent(path)) == Data(path.utf8), "skipped previews and device index retained") }

@@ -14,6 +14,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     var enabled = false
     var deleteOriginals = false
     var recoverTrash = false
+    // Legacy persisted key; true now asks for confirmation and never ejects automatically.
     var autoEject = false
     var videosOnly: Bool? = nil
     var cleanLayout: Bool? = nil
@@ -215,7 +216,8 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                     throw ImportFailure("Choose a media folder inside the device.")
                 }
                 #endif
-                let diskKeys = Set([ImportVolumes.physicalID(source) ?? source.path, ImportVolumes.physicalID(destinationVolume) ?? destinationVolume.path])
+                let originalSourceDisk = ImportVolumes.physicalID(source)
+                let diskKeys = Set([originalSourceDisk ?? source.path, ImportVolumes.physicalID(destinationVolume) ?? destinationVolume.path])
                 guard manualOperations.isDisjoint(with: diskKeys) else { throw ImportFailure("A disk is being ejected. Reconnect it before importing.") }
                 let releaseAccess: @Sendable () -> Void = {
                     #if APP_STORE
@@ -262,31 +264,53 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                         DispatchQueue.main.async {
                             self.lastFolder = result.files > 0 ? result.folder : destination
                             let importNote = result.note.isEmpty ? "" : " " + result.note
-                            let attachments = self.volumes.compactMap { volume -> (volumeID: String, diskID: String?)? in
-                                guard let id = try? ImportVolumes.identity(volume) else { return nil }
-                                return (id, ImportVolumes.physicalID(volume))
-                            }
-                            let holdEject = !StoreEjectPolicy.allowsAutomaticEject(
-                                sourceID: profile.id, sourceDisk: ImportVolumes.physicalID(source),
-                                enrolledIDs: Set(self.profiles.map(\.id)), mounted: attachments)
-                            if profile.autoEject && result.shouldAutoEject && !holdEject {
-                                do { try validate() }
-                                catch {
-                                    releaseAccess()
-                                    self.finish(error: error, message: error.localizedDescription)
-                                    return
-                                }
-                                self.progress.phase = "Ejecting"
-                                FileManager.default.unmountVolume(at: source, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
-                                    DispatchQueue.main.async {
-                                        releaseAccess()
-                                        if error == nil { self.completedEjectID = profile.id }
-                                        self.finish(error: error, message: error == nil ? "\(profile.name): \(result.files) files imported. Safe to unplug." + importNote : "Import completed, but the device could not eject: \(error!.localizedDescription)")
-                                    }
-                                }
-                            } else {
+                            let completion = result.hasSelectedMedia
+                                ? "\(profile.name): \(result.files) files imported and verified."
+                                : "\(profile.name): no media found matching your import options."
+                            guard profile.autoEject else {
                                 releaseAccess()
-                                self.finish(error: nil, message: profile.autoEject && !result.shouldAutoEject ? "No new selected media to import or remove. Device remains connected." + importNote : profile.autoEject && holdEject ? "\(result.files) files imported and verified. Automatic eject is paused because another enrolled partition shares this disk or its disk identity could not be confirmed. Finish desired imports, then eject from the menu." + importNote : "\(result.files) files imported and verified. Device remains connected." + importNote)
+                                self.finish(error: nil, message: completion + " Device remains connected." + importNote)
+                                return
+                            }
+                            do { try validate() }
+                            catch {
+                                releaseAccess()
+                                self.finish(error: error, message: error.localizedDescription)
+                                return
+                            }
+                            self.progress.phase = "Awaiting eject choice"
+                            self.message = completion + " Choose whether to eject or keep the device connected."
+                            let alert = ImportEjectPrompt.make(hasMedia: result.hasSelectedMedia, deviceName: profile.name)
+                            NSApp.activate()
+                            let response = alert.runModal()
+                            guard response == .alertSecondButtonReturn else {
+                                let connected = (try? ImportVolumes.identity(source)) == profile.id
+                                releaseAccess()
+                                self.finish(error: nil, message: completion + (connected ? " Device remains connected." : " Device is no longer connected.") + importNote)
+                                return
+                            }
+                            do {
+                                // The user may leave the prompt open while changing connected disks.
+                                // Recheck after the choice; never eject a replacement at the old path.
+                                try validate()
+                                guard let originalSourceDisk,
+                                      ImportVolumes.physicalID(source) == originalSourceDisk else {
+                                    throw ImportFailure("The device's disk identity changed or could not be confirmed. Eject it from the menu after checking the connected device.")
+                                }
+                            } catch {
+                                releaseAccess()
+                                self.finish(error: error, message: error.localizedDescription)
+                                return
+                            }
+                            self.progress.phase = "Ejecting"
+                            FileManager.default.unmountVolume(at: source, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
+                                DispatchQueue.main.async {
+                                    releaseAccess()
+                                    if error == nil { self.completedEjectID = profile.id }
+                                    self.finish(error: error, message: error == nil
+                                        ? completion + " Safe to unplug." + importNote
+                                        : completion + " The device could not eject: \(error!.localizedDescription)")
+                                }
                             }
                         }
                     } catch {

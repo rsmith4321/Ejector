@@ -38,13 +38,13 @@ Website 1.6.0 adds **Videos only**, **Include camera previews**, and **Clean fol
 
 Ordinary media can be saved directly in the dated folder with unchanged names. Conflicting groups go in Additional media; known structured or unfamiliar media retains its tree under Camera originals. Complete Sony/P2/RED and other recognized packages include supporting audio/metadata; partial CLIP/STREAM selections stop with guidance. This is a verified file copier, not a codec converter, stitching engine, clip joiner, camera database editor or universal device certification. Same-name still/movie pairs are conservatively kept for photo workflows; renamed Live Photo pairs and unfamiliar video sequences need manual review.
 
-For Lightroom: select Videos only, optionally exclude previews, and choose whether to keep or permanently delete verified imported videos. Leave auto-eject off to continue directly in Lightroom, or keep it on and unplug/reconnect for the photo import. No-op imports with no new selected copies or removals leave the device connected. Whole-batch copy, source manifest, source identity and saved dependency checks precede removal. Deletion remains optional for Sony; the confirmation warns that computer-side deletion may leave camera databases inconsistent and require in-camera recovery. Manufacturer-specific deletion guidance still applies.
+For Lightroom: select Videos only, optionally exclude previews, and choose whether to keep or permanently delete verified imported videos. Enable Ask to eject after import for “Import complete. Eject now?” or “No media found. Eject now?” prompts. Keep Connected is the default for continuing in Lightroom; Eject Now is an explicit choice. Previously enabled auto-eject profiles now prompt, including empty selections and already-imported media. Whole-batch copy, source manifest, source identity and saved dependency checks precede removal. Deletion remains optional for Sony; the confirmation warns that computer-side deletion may leave camera databases inconsistent and require in-camera recovery. Manufacturer-specific deletion guidance still applies.
 
 [Import and Lightroom guide](https://easyeject.com/help/video-imports-with-lightroom) · [Camera compatibility and official sources](https://easyeject.com/help/camera-media-compatibility)
 
 The pending Store build 1.0 (8) has the earlier importer. Shared source compiles for both targets; compiling this change does not submit or publish an App Store update.
 
-Source/destination disks are protected during imports. Multiple enrolled partitions or unknown disk identity hold automatic eject; finish imports and eject manually. Keep independent backups. Devices must appear as mounted storage in Finder; PTP/MTP-only devices are unsupported.
+Source/destination disks are protected during imports. The eject prompt explains that all partitions will unmount. Source, destination and original disk identity are rechecked after the choice; a changed or unknown disk is not ejected. Keep independent backups. Devices must appear as mounted storage in Finder; PTP/MTP-only devices are unsupported.
 
 ## Install and develop
 

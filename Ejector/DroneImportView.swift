@@ -223,10 +223,10 @@ struct DroneProfileEditor: View {
             Text("Requires authorization for this card, in addition to the media folder. If permission is unavailable, import stops without claiming completion.")
                 .font(.caption).foregroundStyle(.secondary)
             #endif
-            Toggle("Eject after verified import", isOn: $profile.autoEject)
-            Text("Optional. Leave off to import photos in Lightroom next, or keep on and unplug/reconnect the device before the Lightroom import. Ejects only after a successful import.")
+            Toggle("Ask to eject after import", isOn: $profile.autoEject)
+            Text("After a successful import or when no media matches your options, ask “Eject now?” Choose Keep Connected to use Lightroom next. The device never ejects without your choice.")
                 .font(.caption).foregroundStyle(.secondary)
-            Text("Ejecting also unmounts the other partitions. If multiple enrolled partitions share a disk, automatic eject is paused. Import each partition, then eject from the menu.")
+            Text("Choosing Eject Now also unmounts the other partitions on that disk. Keep it connected until you have finished all desired imports.")
                 .font(.caption).foregroundStyle(.secondary)
             if let error { Text(error).foregroundStyle(.orange) }
             HStack {

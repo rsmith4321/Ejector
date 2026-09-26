@@ -41,7 +41,7 @@ nonisolated struct MediaImportEngine {
     var sourceIdentifier = ""
     var includePreviews = true
 
-    struct Result { let files: Int; let bytes: Int64; let folder: URL; var note: String = ""; var shouldAutoEject = true }
+    struct Result { let files: Int; let bytes: Int64; let folder: URL; var note: String = ""; var hasSelectedMedia = false }
     struct Stamp: Equatable {
         let device: dev_t
         let inode: ino_t
@@ -305,6 +305,18 @@ nonisolated struct MediaImportEngine {
         guard fsync(parent) == 0 else { throw ImportFailure("Could not flush the destination directory. Original kept.") }
     }
 
+    private func mediaFiles() throws -> [URL] {
+        try Self.checkPath(mediaFolder)
+        var info = stat()
+        if lstat(mediaFolder.path, &info) != 0 && errno == ENOENT {
+            // Do not mislabel an unavailable folder or unreadable card as empty.
+            // Full-card access may be unavailable in the Store edition; that remains an error.
+            let cardFiles = try Self.files(source, includeHidden: false)
+            if cardFiles.allSatisfy(Self.isDeviceIndex) { return [] }
+        }
+        return try Self.files(mediaFolder, includeHidden: false)
+    }
+
     func run() throws -> Result {
         try validate(); try cancellation.check()
         try Self.checkPath(source); try Self.checkPath(mediaFolder); try Self.checkPath(destination)
@@ -318,7 +330,7 @@ nonisolated struct MediaImportEngine {
         let dated = destination.appendingPathComponent(formatter.string(from: Date()), isDirectory: true)
         let trash = source.appendingPathComponent(".Trashes/\(getuid())", isDirectory: true)
         report(ImportProgress(phase: "Scanning"))
-        let scanned = try Self.files(mediaFolder, includeHidden: false)
+        let scanned = try mediaFiles()
         let structured = needsCameraStructure(includePreviews ? scanned : scanned.filter { !Self.isOptionalPreview($0, root: mediaFolder) })
         if structured && (!completePackageSelected(scanned) || (videosOnly && !supportsVideoPackages(scanned, root: mediaFolder))) {
             throw ImportFailure("This selection is part of a camera recording package. Select the complete camera folder or whole card so audio, metadata and clips stay together. For unrecognized or multi-camera packages, use All media and sidecars. No files were removed.")
@@ -362,7 +374,6 @@ nonisolated struct MediaImportEngine {
         var completedBytes: Int64 = 0
         var retainedStamps: [URL: Stamp] = [:]
         var savedStamps: [URL: Stamp] = [:]
-        var newSelectedCopy = false
         let initialStamps = try Dictionary(uniqueKeysWithValues: (media + trashFiles).map { ($0, try Self.stamp($0)) })
         var removals: [(source: URL, saved: URL, before: Stamp, savedBefore: Stamp)] = []
         for (index, file) in items.enumerated() {
@@ -387,7 +398,6 @@ nonisolated struct MediaImportEngine {
             guard try Self.stamp(file) == before else { throw ImportFailure("Source changed while reading. Original kept: \(file.lastPathComponent)") }
             let copy = try save(file, to: target, sha: sha, before: before, progress: progress)
             let saved = copy.url
-            if !copy.reused && deletable.contains(file) { newSelectedCopy = true }
             try validate(); try Self.checkPath(file); try Self.checkPath(saved)
             let savedBefore = try Self.stamp(saved)
             let savedHash = try Self.hash(saved, cancellation: cancellation) { progress("Verifying", $0) }
@@ -409,7 +419,7 @@ nonisolated struct MediaImportEngine {
         // Recheck the selected manifest before deletion as well as before eject.
         // In video-only mode, unrelated photos and their edits do not block completion.
         func checkManifest(_ root: URL, expected: [URL], hidden: Bool) throws {
-            let current = selectedMedia(try Self.files(root, includeHidden: hidden), root: root)
+            let current = selectedMedia(try root == mediaFolder && !hidden ? mediaFiles() : Self.files(root, includeHidden: hidden), root: root)
             guard Set(current) == Set(expected) else { throw ImportFailure("Device contents changed. Import again before deleting or ejecting; originals kept.") }
             for file in expected {
                 guard try Self.stamp(file) == initialStamps[file] else { throw ImportFailure("A recording changed during import. Originals kept.") }
@@ -442,7 +452,7 @@ nonisolated struct MediaImportEngine {
             try audit("Removed verified source | \(entry.source.path)")
         }
         let removed = Set(removals.map(\.source))
-        let remaining = selectedMedia(try Self.files(mediaFolder, includeHidden: false), root: mediaFolder)
+        let remaining = selectedMedia(try mediaFiles(), root: mediaFolder)
         guard Set(remaining) == Set(media).subtracting(removed) else { throw ImportFailure("Device contents changed. Import again before ejecting.") }
         for (file, stamp) in retainedStamps where !removed.contains(file) {
             guard try Self.stamp(file) == stamp else { throw ImportFailure("A recording changed after copying. Import again before ejecting.") }
@@ -458,7 +468,7 @@ nonisolated struct MediaImportEngine {
         if !includePreviews { notes.append("Optional previews left on device; required package files preserved.") }
         if videosOnly { notes.append("Photos and unrecognized files left on device.") }
         else if deleteOriginals && media.contains(where: { !deletable.contains($0) }) { notes.append("Unrecognized files kept on device.") }
-        return Result(files: items.count, bytes: totalBytes, folder: dated, note: notes.joined(separator: " "), shouldAutoEject: newSelectedCopy || !removals.isEmpty)
+        return Result(files: items.count, bytes: totalBytes, folder: dated, note: notes.joined(separator: " "), hasSelectedMedia: !media.isEmpty || !trashFiles.isEmpty)
     }
 
     private struct SavedCopy { let url: URL; let reused: Bool }
