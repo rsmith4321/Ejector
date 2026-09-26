@@ -95,6 +95,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         self.fetchDrives()
 
         let notificationCenter = UNUserNotificationCenter.current()
+        notificationCenter.setNotificationCategories([ImportCompletionNotification.makeCategory()])
         notificationCenter.delegate = self
         notificationCenter.requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error = error {
@@ -106,7 +107,21 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner])
+        completionHandler([.banner, .list])
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        let request = response.notification.request
+        guard request.content.categoryIdentifier == ImportCompletionNotification.category else {
+            completionHandler(); return
+        }
+        let id = request.identifier
+        let action = response.actionIdentifier
+        DispatchQueue.main.async {
+            DroneImportManager.shared.handleImportNotification(id: id, action: action)
+            completionHandler()
+        }
     }
 
     private func sendNotification(title: String, body: String) {
@@ -553,7 +568,7 @@ struct HelpView: View {
                     }
 
                     helpSection("Notifications", icon: "bell") {
-                        Text("A macOS notification confirms each eject and shows how many hidden files were cleaned. Useful when ejecting via the keyboard shortcut from inside another app. Toggle in Settings.")
+                        Text("Notifications confirm ejection. With Ask to eject after import enabled, the completion notification offers Eject Now and Open Import Folder (macOS may place these under Options). Ignore it to keep the device connected for Lightroom. If notifications are disabled, a popup asks instead. Focus may silence an allowed notification; eject remains available in the menu and import window. Toggle notifications in Settings.")
                     }
 
                     helpSection("Menu Bar Badge", icon: "number.circle") {

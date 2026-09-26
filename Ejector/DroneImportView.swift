@@ -46,6 +46,11 @@ struct DroneImportView: View {
                         Button("Open import folder") { importer.openFolder() }.disabled(importer.lastFolder == nil)
                         Button("Show import log") { importer.openLog() }
                     }
+                    ForEach(importer.pendingEjects) { completion in
+                        Button("Eject Now · \(completion.deviceName)") { importer.ejectCompletedImport(completion.id) }
+                            .disabled(importer.busy)
+                            .help("Eject this device and all its partitions. Leave connected to import photos in Lightroom.")
+                    }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
             }
             ScrollView {
@@ -224,7 +229,7 @@ struct DroneProfileEditor: View {
                 .font(.caption).foregroundStyle(.secondary)
             #endif
             Toggle("Ask to eject after import", isOn: $profile.autoEject)
-            Text("After a successful import or when no media matches your options, ask “Eject now?” Choose Keep Connected to use Lightroom next. The device never ejects without your choice.")
+            Text("After import or when no media matches your options, the notification offers Eject Now and Open Import Folder. Ignore it to keep connected for Lightroom. If notifications are disabled, a popup asks instead; Keep Connected is the default. Eject is always available in the menu.")
                 .font(.caption).foregroundStyle(.secondary)
             Text("Choosing Eject Now also unmounts the other partitions on that disk. Keep it connected until you have finished all desired imports.")
                 .font(.caption).foregroundStyle(.secondary)

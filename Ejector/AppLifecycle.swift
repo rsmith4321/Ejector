@@ -21,6 +21,8 @@ import Combine
         manager.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async { self?.updateStatus() }
         }.store(in: &observations)
+        NotificationCenter.default.publisher(for: ImportCompletionNotification.showImports)
+            .sink { [weak self] _ in self?.imports() }.store(in: &observations)
         updateStatus()
     }
     func configure(openWindow: @escaping (String) -> Void, openSettings: @escaping () -> Void) {

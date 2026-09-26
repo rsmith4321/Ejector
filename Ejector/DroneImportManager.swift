@@ -36,6 +36,9 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     @Published private(set) var isIssueDismissed = false
     var needsAttention: Bool { hasError && !isIssueDismissed }
     @Published var volumes: [URL] = []
+    @Published private(set) var pendingEjects: [ImportCompletion] = []
+    private var completions = ImportCompletionRegistry()
+    private var connections: [URL: UUID] = [:]
     private var attempted = Set<String>()
     private var waiting = Set<String>()
     private var mountedIDs = Set<String>()
@@ -49,9 +52,9 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     private let queue = DispatchQueue(label: "com.ryansmithphotography.Ejector.import", qos: .utility)
     private let support: URL
 
-    init() {
+    init(supportDirectory: URL? = nil) {
         let supportName = Bundle.main.bundleIdentifier?.hasSuffix(".preview") == true ? "Easy Eject Preview" : "Easy Eject"
-        support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent(supportName)
+        support = supportDirectory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent(supportName)
         do {
             try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
             let file = support.appendingPathComponent("drone-profiles.json")
@@ -60,6 +63,16 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
             }
         } catch { message = "Could not load import profiles: \(error.localizedDescription)"; hasError = true }
         let center = NSWorkspace.shared.notificationCenter
+        // Invalidate synchronously, before the debounced device-list refresh. BSD names and UUIDs
+        // can both be reused when the same card is reconnected.
+        center.publisher(for: NSWorkspace.didUnmountNotification)
+            .merge(with: center.publisher(for: NSWorkspace.didMountNotification))
+            .merge(with: center.publisher(for: NSWorkspace.didRenameVolumeNotification))
+            .sink { [weak self] event in
+                guard let self, let url = event.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL else { return }
+                self.connections[url] = UUID()
+                self.clearCompletions(for: url)
+            }.store(in: &observations)
         center.publisher(for: NSWorkspace.didMountNotification)
             .merge(with: center.publisher(for: NSWorkspace.didUnmountNotification))
             .merge(with: center.publisher(for: NSWorkspace.didRenameVolumeNotification))
@@ -165,6 +178,9 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     }
 
     private func start(_ profile: DroneProfile, source: URL) {
+        clearCompletions(for: source)
+        let connection = connections[source] ?? UUID()
+        connections[source] = connection
         attempted.insert(profile.id)
         #if !APP_STORE
         let legacy = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/O4 Media Importer/enabled")
@@ -267,51 +283,23 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                             let completion = result.hasSelectedMedia
                                 ? "\(profile.name): \(result.files) files imported and verified."
                                 : "\(profile.name): no media found matching your import options."
-                            guard profile.autoEject else {
-                                releaseAccess()
+                            let completionID = UUID().uuidString
+                            let entry = ImportCompletion(id: completionID, source: source, volumeID: profile.id,
+                                physicalID: originalSourceDisk, connection: connection, deviceName: profile.name,
+                                hasMedia: result.hasSelectedMedia, folder: self.lastFolder!,
+                                destinationBookmark: profile.destinationBookmark, destinationVolumeID: profile.destinationVolumeID)
+                            releaseAccess()
+                            guard profile.autoEject, self.connections[source] == connection else {
                                 self.finish(error: nil, message: completion + " Device remains connected." + importNote)
                                 return
                             }
-                            do { try validate() }
-                            catch {
-                                releaseAccess()
-                                self.finish(error: error, message: error.localizedDescription)
-                                return
-                            }
-                            self.progress.phase = "Awaiting eject choice"
-                            self.message = completion + " Choose whether to eject or keep the device connected."
-                            let alert = ImportEjectPrompt.make(hasMedia: result.hasSelectedMedia, deviceName: profile.name)
-                            NSApp.activate()
-                            let response = alert.runModal()
-                            guard response == .alertSecondButtonReturn else {
-                                let connected = (try? ImportVolumes.identity(source)) == profile.id
-                                releaseAccess()
-                                self.finish(error: nil, message: completion + (connected ? " Device remains connected." : " Device is no longer connected.") + importNote)
-                                return
-                            }
-                            do {
-                                // The user may leave the prompt open while changing connected disks.
-                                // Recheck after the choice; never eject a replacement at the old path.
-                                try validate()
-                                guard let originalSourceDisk,
-                                      ImportVolumes.physicalID(source) == originalSourceDisk else {
-                                    throw ImportFailure("The device's disk identity changed or could not be confirmed. Eject it from the menu after checking the connected device.")
-                                }
-                            } catch {
-                                releaseAccess()
-                                self.finish(error: error, message: error.localizedDescription)
-                                return
-                            }
-                            self.progress.phase = "Ejecting"
-                            FileManager.default.unmountVolume(at: source, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
-                                DispatchQueue.main.async {
-                                    releaseAccess()
-                                    if error == nil { self.completedEjectID = profile.id }
-                                    self.finish(error: error, message: error == nil
-                                        ? completion + " Safe to unplug." + importNote
-                                        : completion + " The device could not eject: \(error!.localizedDescription)")
-                                }
-                            }
+                            self.removeNotifications(self.completions.insert(entry))
+                            self.updatePendingEjects()
+                            // Release import reservations before waiting for any notification response.
+                            self.finish(error: nil, message: completion + " Device remains connected." + importNote,
+                                        notify: false, refreshDevices: false)
+                            self.offerEject(entry, message: completion + importNote)
+
                         }
                     } catch {
                         try? audit("Stopped: \(error.localizedDescription)")
@@ -333,15 +321,123 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
-    private func finish(error: Error?, message: String) {
+    private func updatePendingEjects() {
+        pendingEjects = completions.entries.values.sorted { $0.deviceName.localizedStandardCompare($1.deviceName) == .orderedAscending }
+    }
+
+    private func removeNotifications(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+        center.removeDeliveredNotifications(withIdentifiers: ids)
+    }
+
+    private func clearCompletions(for source: URL) {
+        removeNotifications(completions.invalidate(source: source))
+        updatePendingEjects()
+    }
+
+    private func offerEject(_ entry: ImportCompletion, message: String) {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            let available = ImportCompletionNotification.canShowActions(
+                enabled: UserDefaults.standard.bool(forKey: "showEjectNotifications"),
+                authorization: settings.authorizationStatus, alerts: settings.alertSetting, style: settings.alertStyle)
+            DispatchQueue.main.async {
+                guard self.completions.entries[entry.id] != nil else { self.refresh(); return }
+                guard available else { self.showEjectFallback(entry); self.refresh(); return }
+                let request = UNNotificationRequest(identifier: entry.id,
+                    content: ImportCompletionNotification.content(hasMedia: entry.hasMedia, message: message), trigger: nil)
+                UNUserNotificationCenter.current().add(request) { error in
+                    DispatchQueue.main.async {
+                        guard self.completions.entries[entry.id] != nil else {
+                            self.removeNotifications([entry.id]); return
+                        }
+                        if error != nil { self.showEjectFallback(entry) }
+                        self.refresh()
+                    }
+                }
+            }
+        }
+    }
+
+    private func showEjectFallback(_ entry: ImportCompletion) {
+        guard completions.entries[entry.id] != nil else { return }
+        let alert = ImportEjectPrompt.make(hasMedia: entry.hasMedia, deviceName: entry.deviceName)
+        NSApp.activate()
+        if alert.runModal() == .alertSecondButtonReturn { ejectCompletedImport(entry.id) }
+    }
+
+    func handleImportNotification(id: String, action: String) {
+        if action == UNNotificationDismissActionIdentifier { return }
+        guard let entry = completions.entries[id] else {
+            recordOperationFailure(ImportFailure("This import notification has expired. Check the connected device in the eject menu."))
+            NotificationCenter.default.post(name: ImportCompletionNotification.showImports, object: nil)
+            return
+        }
+        switch action {
+        case ImportCompletionNotification.eject: ejectCompletedImport(id)
+        case ImportCompletionNotification.openFolder:
+            do {
+                #if APP_STORE
+                let access = try ScopedFolder(entry.destinationBookmark)
+                defer { access.close() }
+                #endif
+                guard try ImportVolumes.identity(entry.folder) == entry.destinationVolumeID else {
+                    throw ImportFailure("The import destination is disconnected or changed.")
+                }
+                NSWorkspace.shared.open(entry.folder)
+            } catch {
+                recordOperationFailure(error)
+                NotificationCenter.default.post(name: ImportCompletionNotification.showImports, object: nil)
+            }
+        case UNNotificationDefaultActionIdentifier:
+            NotificationCenter.default.post(name: ImportCompletionNotification.showImports, object: nil)
+        default: break
+        }
+    }
+
+    func ejectCompletedImport(_ id: String) {
+        guard let entry = completions.entries[id] else { return }
+        // No stored payload path is trusted. All state comes from the completed import in this process.
+        guard completions.matches(id, volumeID: try? ImportVolumes.identity(entry.source),
+                physicalID: ImportVolumes.physicalID(entry.source), connection: connections[entry.source] ?? UUID(),
+                root: try? ImportVolumes.root(entry.source)) else {
+            clearCompletions(for: entry.source)
+            recordOperationFailure(ImportFailure("The device disconnected or changed. Check it in the eject menu."))
+            NotificationCenter.default.post(name: ImportCompletionNotification.showImports, object: nil)
+            return
+        }
+        guard !busy, reserveManualEject(entry.source) else {
+            LogManager.shared.log("Eject postponed: a disk is busy importing or ejecting. Use Eject Now after it finishes.")
+            NotificationCenter.default.post(name: ImportCompletionNotification.showImports, object: nil)
+            return
+        }
+        let operationKey = entry.physicalID!
+        // Consume the action once, before unmounting. Repeat clicks cannot request another eject.
+        completions.remove(id); updatePendingEjects(); removeNotifications([id])
+        busy = true; activeName = entry.deviceName; sourceRoot = entry.source
+        protectedPhysicalIDs = [operationKey]; progress.phase = "Ejecting"
+        FileManager.default.unmountVolume(at: entry.source, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
+            DispatchQueue.main.async {
+                if error == nil { self.completedEjectID = entry.volumeID }
+                self.manualOperations.remove(operationKey)
+                self.finish(error: error, message: error.map { "Could not eject \(entry.deviceName): \($0.localizedDescription)" }
+                    ?? "\(entry.deviceName): safe to unplug.", notificationTitle: "Easy Eject")
+            }
+        }
+    }
+
+    private func finish(error: Error?, message: String, notify: Bool = true, refreshDevices: Bool = true,
+                        notificationTitle: String? = nil) {
         busy = false; cancellation = nil; sourceRoot = nil; destinationRoot = nil; protectedPhysicalIDs.removeAll()
         hasError = error != nil; self.message = message; progress.phase = error == nil ? "Complete" : "Needs attention"
         LogManager.shared.log(message)
-        if UserDefaults.standard.bool(forKey: "showEjectNotifications") {
-            let content = UNMutableNotificationContent(); content.title = error == nil ? "Easy Eject import complete" : "Easy Eject import needs attention"
+        if notify && UserDefaults.standard.bool(forKey: "showEjectNotifications") {
+            let content = UNMutableNotificationContent(); content.title = notificationTitle ?? (error == nil ? "Easy Eject import complete" : "Easy Eject import needs attention")
             content.body = message
             UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
         }
-        refresh()
+        if refreshDevices { refresh() }
     }
 }
