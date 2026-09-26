@@ -103,7 +103,7 @@ import Combine
         else if importer.needsAttention {
             add("View Issue…", #selector(imports), menu, icon: "exclamationmark.triangle")
         }
-        add("Air Unit & Camera Imports…", #selector(imports), menu)
+        add("Device Media Imports…", #selector(imports), menu)
         #if APP_STORE
         add("Authorize a Card…", #selector(authorize), menu)
         #endif

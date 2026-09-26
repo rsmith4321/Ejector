@@ -9,7 +9,7 @@ struct DroneImportView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Label("Air unit & camera imports", systemImage: "arrow.down.doc")
+                Label("Device media imports", systemImage: "arrow.down.doc")
                     .font(.title2.bold())
                 Spacer()
                 Button("Refresh") { importer.refresh() }.disabled(importer.busy)
@@ -22,7 +22,7 @@ struct DroneImportView: View {
                                   systemImage: importer.isIssueDismissed ? "info.circle" : "exclamationmark.triangle")
                                 .font(.headline)
                         } else {
-                            Text(importer.busy ? "\(importer.activeName) · \(importer.progress.phase)" : importer.progress.phase).font(.headline)
+                            Text(importer.busy ? "\(importer.activeName) · \(importer.progress.phase == "Checking" ? "Importing" : importer.progress.phase)" : importer.progress.phase).font(.headline)
                         }
                         Spacer()
                         if importer.busy { Button("Stop import") { importer.cancel() }.disabled(importer.progress.phase == "Ejecting") }
@@ -64,7 +64,7 @@ struct DroneImportView: View {
                                     Text(profile.enabled ? "Automatic" : "Manual").font(.caption).foregroundStyle(.secondary)
                                 }
                                 Text("\(profile.mediaPath) → \(profile.destinationLabel)/YYYY-MM-DD").font(.caption).lineLimit(2)
-                                Text(profile.deleteOriginals ? "Delete originals after verification" : "Keep originals on device").font(.caption)
+                                Text((profile.videosOnly == true ? "Videos only · " : "All media · ") + (profile.deleteOriginals ? "Delete imported originals after verification" : "Keep originals on device")).font(.caption)
                                 HStack {
                                     Button("Import now") { importer.importNow(profile) }
                                     Button("Edit") { editing = profile }
@@ -79,7 +79,7 @@ struct DroneImportView: View {
             Divider()
             VStack(alignment: .leading, spacing: 10) {
                 Text("Add an import device").font(.headline)
-                Text("Connect your DJI air unit, camera, or memory card. If several drives have the same name, connect only the device you want to set up.")
+                Text("Connect a camera, memory card, or FPV device. If several drives have the same name, connect only the device you want to set up.")
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -124,7 +124,7 @@ struct DroneImportView: View {
             guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" }) else { return }
             let media = FolderSelectionPanel.make()
             media.title = "Step 1 of 2: Choose recordings"
-            media.message = "Step 1 of 2: Choose the recording folder on \(source.lastPathComponent).\nSelect DCIM or VIDEO. Next, choose where to save copies."
+            media.message = "Step 1 of 2: Choose the recording folder on \(source.lastPathComponent).\nSelect DCIM or VIDEO for ordinary clips; choose the whole card for structured cinema formats. Next, choose where to save copies."
             media.prompt = "Use recording folder"
             media.canChooseDirectories = true; media.canChooseFiles = false
             media.directoryURL = source
@@ -132,7 +132,7 @@ struct DroneImportView: View {
                 guard response == .OK, let folder = media.url else { return }
                 do {
                     try MediaImportEngine.checkPath(folder)
-                    guard MediaImportEngine.isWithin(folder, source), folder != source else { throw ImportFailure("Select a media folder inside the chosen device.") }
+                    guard MediaImportEngine.isWithin(folder, source) else { throw ImportFailure("Select a media folder or the whole chosen device.") }
                     DispatchQueue.main.async {
                         let destination = ImportFolderPanels.destination(
                             message: "Step 2 of 2: Choose where to save copies of \(folder.lastPathComponent).\nUse your Mac or another drive. Copies go into dated subfolders.")
@@ -146,7 +146,7 @@ struct DroneImportView: View {
                                 editing = DroneProfile(id: id, name: source.lastPathComponent,
                                     mediaPath: String(folder.path.dropFirst(source.path.count + 1)), destinationBookmark: bookmark,
                                     destinationVolumeID: destinationID, destinationLabel: target.path,
-                                    sourceBookmark: try folder.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil))
+                                    sourceBookmark: try folder.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil), cleanLayout: true)
                             } catch { setupError = error.localizedDescription }
                         }
                     }
@@ -165,20 +165,37 @@ struct DroneProfileEditor: View {
     @State private var showingPermanentDeletionConfirmation = false
     @State private var showingTrashConfirmation = false
     var body: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 16) {
             Text("Import profile").font(.title2.bold())
             TextField("Device name", text: $profile.name)
-            Text("Give this profile a recognizable name, such as DJI O4. The card's name in Finder can change.")
+            Text("Give this profile a recognizable name, such as Insta360, Sony, or DJI O4. The card's name in Finder can change.")
                 .font(.callout).foregroundStyle(.secondary)
-            Text("Media folder: \(profile.mediaPath)").font(.callout)
+            Text("Media folder: \(profile.mediaPath.isEmpty ? "Whole device" : profile.mediaPath)").font(.callout)
             Text("Save copies to: \(profile.destinationLabel)/YYYY-MM-DD").font(.caption).textSelection(.enabled)
             Button("Change destination…", action: chooseDestination)
-            #if APP_STORE
-            Button("Authorize media folder again…", action: chooseSource)
-            #endif
+            Button("Change media folder…", action: chooseSource)
             Divider()
+            Picker("Import", selection: Binding(get: { profile.videosOnly ?? false }, set: { value in
+                // Broadening a video-only profile must not silently enable photo deletion.
+                if !value && profile.videosOnly == true { profile.deleteOriginals = false; profile.recoverTrash = false }
+                profile.videosOnly = value
+            })) {
+                Text("All media and sidecars").tag(false)
+                Text("Videos only").tag(true)
+            }
+            Text(profile.videosOnly == true
+                ? "Using Lightroom for photos? Import videos and their recognized companions here. Photos, photo sidecars, and unrecognized files stay on the device, even with deletion or Trash recovery enabled. Recognized camera packages include their support files; ambiguous packages require All media."
+                : "Copies media and sidecars. Unfamiliar formats keep their camera folders and remain on the device. The Insta360 device index is backed up separately and retained.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Toggle("Include camera previews", isOn: Binding(get: { profile.includePreviews ?? true }, set: { profile.includePreviews = $0 }))
+            Text("Includes LRV, LRF, THM and recognized proxy folders. Turn off for full-quality recordings without optional previews. Skipped previews stay on the device. Required camera-package files are always kept; some editor/playback features need previews.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Toggle("Clean folder layout", isOn: Binding(get: { profile.cleanLayout ?? false }, set: { profile.cleanLayout = $0 }))
+            Text("Ordinary media goes directly in the dated folder with original names and companions. Conflicts use Additional media; structured or unfamiliar formats keep Camera originals folders. Turn off to preserve ordinary camera folders too.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Toggle("Import automatically when connected", isOn: $profile.enabled)
-            Toggle("Permanently delete originals after import", isOn: Binding(
+            Toggle(profile.videosOnly == true ? "Permanently delete imported videos" : "Permanently delete imported originals", isOn: Binding(
                 get: { profile.deleteOriginals },
                 set: { enabled in
                     if enabled && !profile.deleteOriginals {
@@ -192,7 +209,7 @@ struct DroneProfileEditor: View {
                 Text(profile.deleteOriginals ? "Permanent deletion is on" : "Keep originals is on (recommended)")
                     .font(.caption.weight(.semibold))
                 Text(profile.deleteOriginals
-                    ? "Originals are removed directly after saved-copy verification. They skip Trash and cannot be restored from it. Use only for unimportant or replaceable footage."
+                    ? "Only recognized imported media and companions are removed after the selected batch passes saved-copy verification. They skip Trash and cannot be restored from it. Use only for unimportant or replaceable footage."
                     : "Easy Eject saves verified copies and leaves the files on your device. Keep this setting for client work and important photos or videos.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -200,14 +217,14 @@ struct DroneProfileEditor: View {
             Toggle("Recover and clear this device’s Trash", isOn: Binding(get: { profile.recoverTrash }, set: {
                 if $0 { showingTrashConfirmation = true } else { profile.recoverTrash = false }
             }))
-            Text("Saves files from your Trash on this device into Recovered Device Trash, verifies the copies, then removes the recovered files from this device's Trash. Other drives' Trash is untouched.")
+            Text("Recovers and verifies files matching your import choice before removing them from this device’s Trash. Videos only leaves photos and unrecognized files in Trash.")
                 .font(.caption).foregroundStyle(.secondary)
             #if APP_STORE
             Text("Requires authorization for this card, in addition to the media folder. If permission is unavailable, import stops without claiming completion.")
                 .font(.caption).foregroundStyle(.secondary)
             #endif
             Toggle("Eject after verified import", isOn: $profile.autoEject)
-            Text("Optional. Ejects this device only after an import finishes successfully. Leave off to eject from the menu yourself.")
+            Text("Optional. Leave off to import photos in Lightroom next, or keep on and unplug/reconnect the device before the Lightroom import. Ejects only after a successful import.")
                 .font(.caption).foregroundStyle(.secondary)
             Text("Ejecting also unmounts the other partitions. If multiple enrolled partitions share a disk, automatic eject is paused. Import each partition, then eject from the menu.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -220,7 +237,8 @@ struct DroneProfileEditor: View {
             }
             Text("Saving applies to the next connection. Use Import now to start with the connected device.")
                 .font(.caption).foregroundStyle(.secondary)
-        }.padding(24).frame(width: 480)
+        }.padding(24)
+        }.frame(width: 520, height: 700)
         .alert("Recover and clear device Trash?", isPresented: $showingTrashConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Enable Verified Trash Recovery", role: .destructive) {
@@ -238,7 +256,7 @@ struct DroneProfileEditor: View {
                 #endif
             }
         } message: {
-            Text("On each import, files in your Trash on this device are copied to the destination and verified before being permanently removed from the device's Trash. Keep independent backups. No recovery runs until you save this profile and start an import.")
+            Text("On each import, files matching your import choice in your Trash on this device are copied to the destination and verified before being permanently removed from the device's Trash. Keep independent backups. No recovery runs until you save this profile and start an import.")
         }
         .alert("Enable permanent deletion?", isPresented: $showingPermanentDeletionConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -247,30 +265,29 @@ struct DroneProfileEditor: View {
                 profile.deleteOriginals = true
             }
         } message: {
-            Text("After saved copies pass verification, Easy Eject removes the originals directly from the device. This skips Trash and cannot be undone.\n\nUse this only for unimportant or replaceable FPV footage. Keep originals for client work and other important photos or videos, and keep independent backups.\n\nThe developer is not responsible for lost files.")
+            Text("After the selected batch passes saved-copy verification, Easy Eject removes only imported originals directly from the device. Videos only leaves photos and unrecognized files untouched. This skips Trash and cannot be undone. Skipped preview files remain on the device; use the camera to clear any leftover previews.\n\nUse this only for unimportant or replaceable media. Keep originals for client work and other important photos or videos, and keep independent backups.\n\nSony and some other cameras maintain a media database. Deleting outside the camera may leave that database inconsistent and require its recovery function. Keep originals if unsure; use the camera to erase or format after backup.\n\nThe developer is not responsible for lost files.")
         }
     }
-    #if APP_STORE
     private func chooseSource() {
         NSApp.activate()
         guard let parent = NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" }) else { return }
         let window = parent.attachedSheet ?? parent
         let panel = FolderSelectionPanel.make(); panel.canChooseDirectories = true; panel.canChooseFiles = false
-        panel.title = "Authorize this device’s media folder"
+        panel.title = "Choose this device’s media folder"
+        panel.message = "Choose DCIM or VIDEO for ordinary clips. For structured recordings, choose the complete camera folder or whole card."
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, let folder = panel.url else { return }
             do {
                 try MediaImportEngine.checkPath(folder)
                 let volume = try ImportVolumes.root(folder)
-                guard try ImportVolumes.identity(folder) == profile.id, folder != volume else {
-                    throw ImportFailure("Choose a media folder inside the original device. Enroll formatted devices again.")
+                guard try ImportVolumes.identity(folder) == profile.id else {
+                    throw ImportFailure("Choose a media folder or the whole original device. Enroll formatted devices again.")
                 }
                 profile.sourceBookmark = try folder.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
                 profile.mediaPath = String(folder.path.dropFirst(volume.path.count + 1)); error = nil
             } catch { self.error = error.localizedDescription }
         }
     }
-    #endif
     private func chooseDestination() {
         NSApp.activate()
         guard let parent = NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" }) else { return }

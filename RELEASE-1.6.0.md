@@ -1,0 +1,11 @@
+# Website 1.6.0: camera and device media imports
+
+Device Media Imports adds independent Videos only, Include camera previews and Clean folder layout choices. New profiles use clean layout; existing profiles preserve their layout. Original retention and automatic import/eject remain separate opt-ins. The Sony database warning leaves deletion available, and the Lightroom guide supports either auto-eject choice.
+
+Ordinary media retains exact filenames/bytes with companions grouped on collisions. Optional previews can be omitted without removing their sources. Required camera packages retain supporting files and hierarchy. Unfamiliar files are preserved under Camera originals and retained on source. Insta360 fileinfo_list.list is backed up under hidden .easy-eject-metadata and retained on source. No transcode, metadata stripping, clip stitching or multi-card completeness guarantee is implied.
+
+Safety: verify complete selected batch and every saved dependency before deletion, recheck selected source manifests and ctime-aware stamps, keep ambiguous still/movie pairs, preserve unknown/index files, and hold auto-eject for no-op metadata/reused-copy imports. Generated tests cover both normal and sandbox builds; physical-device and all-mode camera certification remain separate.
+
+Validation: 42 standard regressions and 44 signed sandbox regressions passed; Website and Store targets compiled. Copy-only probe replayed Ryan's existing Luna import into isolated evidence: original MP4/LRV SHA-256 values match prior import log, photos untouched, index hidden backup. Research covers 27 official vendor sources, recorded in release-evidence/device-import-2026-09-26/camera-research.md. Website/help tests and responsive checks documented separately.
+
+Universal Website 1.6.0 app and DMG are Developer ID signed, notarized, stapled, and Gatekeeper accepted. App notarization: 35241a68-1eb0-482d-a3aa-9789d59baf37. DMG notarization: 2dcfdb06-e1e9-4b66-b32d-71cb54bc0884. DMG SHA-256: edd1eb40b6a3d7c9482ba0167bdc03e54f56088fcf566c0ced6bcd96078b93fc. Release and public verification receipts are in release-evidence/device-import-2026-09-26. Store build 8 submission is unchanged; no new Apple review submission is made here.

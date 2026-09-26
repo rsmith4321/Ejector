@@ -15,6 +15,9 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     var deleteOriginals = false
     var recoverTrash = false
     var autoEject = false
+    var videosOnly: Bool? = nil
+    var cleanLayout: Bool? = nil
+    var includePreviews: Bool? = nil
 }
 
 
@@ -23,7 +26,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     @Published var profiles: [DroneProfile] = []
     @Published var progress = ImportProgress(phase: "Ready")
     @Published var busy = false
-    @Published var message = "Connect an air unit or camera card to set up automatic imports."
+    @Published var message = "Connect a camera, memory card, or FPV device to set up automatic imports."
     @Published var activeName = ""
     @Published var lastFolder: URL?
     @Published var hasError = false {
@@ -71,7 +74,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     var menuTitle: String {
         if busy {
             if ["Importing", "Checking", "Verifying copy", "Verifying", "Imported"].contains(progress.phase) {
-                return "\(progress.phase) \(Int(progress.fraction * 100))%"
+                return "Importing \(Int(progress.fraction * 100))%"
             }
             return progress.phase
         }
@@ -180,7 +183,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
             let destination = destinationAccess.url
             guard try ImportVolumes.identity(media) == profile.id,
                   try ImportVolumes.root(media).standardizedFileURL == source.standardizedFileURL,
-                  MediaImportEngine.isWithin(media, source), media != source else {
+                  MediaImportEngine.isWithin(media, source) else {
                 throw ImportFailure("The authorized media folder no longer belongs to this device. Choose it again.")
             }
             if sourceAccess.refreshedBookmark != nil || destinationAccess.refreshedBookmark != nil {
@@ -203,11 +206,11 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                 guard try ImportVolumes.identity(destination) == profile.destinationVolumeID else { throw ImportFailure("The selected destination drive is unavailable or changed.") }
                 guard try ImportVolumes.identity(source) != profile.destinationVolumeID,
                       ImportVolumes.physicalID(source) != ImportVolumes.physicalID(destinationVolume) else {
-                    throw ImportFailure("Choose a destination on a different disk from the air unit.")
+                    throw ImportFailure("Choose a destination on a different disk from the device.")
                 }
                 #if !APP_STORE
                 let media = source.appendingPathComponent(profile.mediaPath).standardizedFileURL
-                guard MediaImportEngine.isWithin(media, source), media != source,
+                guard MediaImportEngine.isWithin(media, source),
                       !profile.mediaPath.split(separator: "/").contains(".."), !profile.mediaPath.hasPrefix("/") else {
                     throw ImportFailure("Choose a media folder inside the device.")
                 }
@@ -251,13 +254,14 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                                 lastReport = Date(); lastPhase = value.phase
                                 DispatchQueue.main.async { self.progress = value }
                             }
-                        }, audit: audit)
+                        }, audit: audit, videosOnly: profile.videosOnly ?? false, cleanLayout: profile.cleanLayout ?? false, sourceIdentifier: profile.id, includePreviews: profile.includePreviews ?? true)
                     do {
                         let result = try engine.run()
                         try validate()
                         try audit("Completed \(result.files) files, \(result.bytes) bytes")
                         DispatchQueue.main.async {
                             self.lastFolder = result.files > 0 ? result.folder : destination
+                            let importNote = result.note.isEmpty ? "" : " " + result.note
                             let attachments = self.volumes.compactMap { volume -> (volumeID: String, diskID: String?)? in
                                 guard let id = try? ImportVolumes.identity(volume) else { return nil }
                                 return (id, ImportVolumes.physicalID(volume))
@@ -265,7 +269,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                             let holdEject = !StoreEjectPolicy.allowsAutomaticEject(
                                 sourceID: profile.id, sourceDisk: ImportVolumes.physicalID(source),
                                 enrolledIDs: Set(self.profiles.map(\.id)), mounted: attachments)
-                            if profile.autoEject && !holdEject {
+                            if profile.autoEject && result.shouldAutoEject && !holdEject {
                                 do { try validate() }
                                 catch {
                                     releaseAccess()
@@ -277,12 +281,12 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                                     DispatchQueue.main.async {
                                         releaseAccess()
                                         if error == nil { self.completedEjectID = profile.id }
-                                        self.finish(error: error, message: error == nil ? "\(profile.name): \(result.files) files imported. Safe to unplug." : "Import completed, but the device could not eject: \(error!.localizedDescription)")
+                                        self.finish(error: error, message: error == nil ? "\(profile.name): \(result.files) files imported. Safe to unplug." + importNote : "Import completed, but the device could not eject: \(error!.localizedDescription)")
                                     }
                                 }
                             } else {
                                 releaseAccess()
-                                self.finish(error: nil, message: profile.autoEject && holdEject ? "\(result.files) files imported and verified. Automatic eject is paused because another enrolled partition shares this disk or its disk identity could not be confirmed. Finish desired imports, then eject from the menu." : "\(result.files) files imported and verified. Device remains connected.")
+                                self.finish(error: nil, message: profile.autoEject && !result.shouldAutoEject ? "No new selected media to import or remove. Device remains connected." + importNote : profile.autoEject && holdEject ? "\(result.files) files imported and verified. Automatic eject is paused because another enrolled partition shares this disk or its disk identity could not be confirmed. Finish desired imports, then eject from the menu." + importNote : "\(result.files) files imported and verified. Device remains connected." + importNote)
                             }
                         }
                     } catch {

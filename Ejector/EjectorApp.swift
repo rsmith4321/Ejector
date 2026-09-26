@@ -465,7 +465,7 @@ struct EjectorApp: App {
     @NSApplicationDelegateAdaptor(EjectorLifecycle.self) private var lifecycle
     @StateObject private var importer = DroneImportManager.shared
     var body: some Scene {
-        Window("Air Unit & Camera Imports", id: "importsWindow") {
+        Window("Device Media Imports", id: "importsWindow") {
             ImportsWindow(lifecycle: lifecycle, importer: importer)
         }.defaultSize(width: 650, height: 690)
         #if !APP_STORE
