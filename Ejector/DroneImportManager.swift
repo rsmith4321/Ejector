@@ -124,6 +124,8 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     func blocksEject(_ url: URL) -> Bool {
         if busy {
             if url == sourceRoot || url == destinationRoot { return true }
+            if let device = ImportVolumes.usbDeviceID(url),
+               [sourceRoot, destinationRoot].compactMap({ $0 }).contains(where: { ImportVolumes.usbDeviceID($0) == device }) { return true }
             if let key = ImportVolumes.physicalID(url), protectedPhysicalIDs.contains(key) { return true }
         }
         return false
@@ -293,12 +295,17 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                                 self.finish(error: nil, message: completion + " Device remains connected." + importNote)
                                 return
                             }
+                            if let warning = ImportVolumes.multiSourceEjectWarning(source) {
+                                self.finish(error: nil, message: completion + " " + warning + importNote)
+                                return
+                            }
                             self.removeNotifications(self.completions.insert(entry))
                             self.updatePendingEjects()
-                            // Release import reservations before waiting for any notification response.
+                            // Release import reservations before presenting the eject choice.
                             self.finish(error: nil, message: completion + " Device remains connected." + importNote,
                                         notify: false, refreshDevices: false)
-                            self.offerEject(entry, message: completion + importNote)
+                            self.showEjectPrompt(entry)
+                            self.refresh()
 
                         }
                     } catch {
@@ -337,31 +344,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
         updatePendingEjects()
     }
 
-    private func offerEject(_ entry: ImportCompletion, message: String) {
-        let center = UNUserNotificationCenter.current()
-        center.getNotificationSettings { settings in
-            let available = ImportCompletionNotification.canShowActions(
-                enabled: UserDefaults.standard.bool(forKey: "showEjectNotifications"),
-                authorization: settings.authorizationStatus, alerts: settings.alertSetting, style: settings.alertStyle)
-            DispatchQueue.main.async {
-                guard self.completions.entries[entry.id] != nil else { self.refresh(); return }
-                guard available else { self.showEjectFallback(entry); self.refresh(); return }
-                let request = UNNotificationRequest(identifier: entry.id,
-                    content: ImportCompletionNotification.content(hasMedia: entry.hasMedia, message: message), trigger: nil)
-                UNUserNotificationCenter.current().add(request) { error in
-                    DispatchQueue.main.async {
-                        guard self.completions.entries[entry.id] != nil else {
-                            self.removeNotifications([entry.id]); return
-                        }
-                        if error != nil { self.showEjectFallback(entry) }
-                        self.refresh()
-                    }
-                }
-            }
-        }
-    }
-
-    private func showEjectFallback(_ entry: ImportCompletion) {
+    private func showEjectPrompt(_ entry: ImportCompletion) {
         guard completions.entries[entry.id] != nil else { return }
         let alert = ImportEjectPrompt.make(hasMedia: entry.hasMedia, deviceName: entry.deviceName)
         NSApp.activate()
@@ -376,7 +359,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
             return
         }
         switch action {
-        case ImportCompletionNotification.eject: ejectCompletedImport(id)
+        case ImportCompletionNotification.eject: showEjectPrompt(entry)
         case ImportCompletionNotification.openFolder:
             do {
                 #if APP_STORE
@@ -397,6 +380,22 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
+    private func logEjectEvent(_ message: String) {
+        let logURL = support.appendingPathComponent("imports.log")
+        let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
+        queue.async {
+            do {
+                let handle = try FileHandle(forWritingTo: logURL)
+                defer { try? handle.close() }
+                try handle.seekToEnd()
+                try handle.write(contentsOf: Data(line.utf8))
+                try handle.synchronize()
+            } catch {
+                DispatchQueue.main.async { LogManager.shared.log("Could not record eject event: \(error.localizedDescription)") }
+            }
+        }
+    }
+
     func ejectCompletedImport(_ id: String) {
         guard let entry = completions.entries[id] else { return }
         // No stored payload path is trusted. All state comes from the completed import in this process.
@@ -406,6 +405,11 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
             clearCompletions(for: entry.source)
             recordOperationFailure(ImportFailure("The device disconnected or changed. Check it in the eject menu."))
             NotificationCenter.default.post(name: ImportCompletionNotification.showImports, object: nil)
+            return
+        }
+        if let warning = ImportVolumes.multiSourceEjectWarning(entry.source) {
+            clearCompletions(for: entry.source)
+            recordOperationFailure(ImportFailure(warning))
             return
         }
         guard !busy, reserveManualEject(entry.source) else {
@@ -418,8 +422,11 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
         completions.remove(id); updatePendingEjects(); removeNotifications([id])
         busy = true; activeName = entry.deviceName; sourceRoot = entry.source
         protectedPhysicalIDs = [operationKey]; progress.phase = "Ejecting"
+        logEjectEvent("User requested post-import eject | \(entry.deviceName) | \(entry.source.path)")
         FileManager.default.unmountVolume(at: entry.source, options: [.allPartitionsAndEjectDisk, .withoutUI]) { error in
             DispatchQueue.main.async {
+                self.logEjectEvent(error.map { "Post-import eject failed | \(entry.deviceName) | \($0.localizedDescription)" }
+                    ?? "Post-import eject succeeded | \(entry.deviceName)")
                 if error == nil { self.completedEjectID = entry.volumeID }
                 self.manualOperations.remove(operationKey)
                 self.finish(error: error, message: error.map { "Could not eject \(entry.deviceName): \($0.localizedDescription)" }

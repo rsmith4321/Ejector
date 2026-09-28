@@ -1,0 +1,11 @@
+# Local 1.6.3: restore the eject dialog and protect multi-source USB devices
+
+Successful single-source imports and empty selections use the native Keep Connected / Eject Now dialog. Notification categories no longer expose eject actions, and a legacy notification action must pass through the dialog. Existing connection identity, busy-disk and one-shot checks remain.
+
+Device Media Imports uses one outer scroll view for status, profiles and setup instructions. The small nested profile-list scroller is removed.
+
+A camera can expose internal storage and an SD card as separate whole disks. The new read-only IOKit check identifies their nearest USB device rather than confusing them with independent devices or grouping a whole hub. While another whole disk on that USB device remains mounted, post-import eject is deferred and manual single-disk eject is refused before cleanup and again before eject. The user is directed to finish all imports and eject the device's volumes together in Finder. Coordinated multi-source eject inside Easy Eject is not implemented by this patch. Active source/destination USB siblings are also protected from eject. Post-import eject requests and outcomes are appended to the import audit log.
+
+Verified: Website archive/export and Store Release build; signed disposable-volume integration for native dialog/default retention, enabled-notification empty scan, legacy-action confirmation, old-token rejection and explicit fixture eject. Read-only actual-camera checks identified Internal and SD Card on one USB device and excluded unrelated storage. Installed UI shows the new guard and one outer scroll area, with both actual storage volumes still mounted.
+
+Installed locally as Developer ID signed 1.6.3; prior 1.6.2 bundle/profiles backed up. Not newly notarized, published to GitHub, deployed to the website, or submitted to Apple. Existing Insta360 profile alone changed to Videos only at Ryan's request; other profile options are preserved, including its existing deletion option. SD Card remains unenrolled for Ryan to configure separately. Physical-camera ejection was deliberately not exercised; the exact cause of the earlier improper-eject warning remains unproven.

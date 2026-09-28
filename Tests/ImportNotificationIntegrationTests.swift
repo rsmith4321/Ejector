@@ -29,10 +29,11 @@ final class LogManager {
             autoEject: true, cleanLayout: true)
         manager.profiles = [profile] // Never persist a profile; production support is never opened.
         var alertSeen = false
+        var chooseEject = false
         let timer = Timer(timeInterval: 0.05, repeats: true) { _ in
             MainActor.assumeIsolated {
                 func visit(_ view: NSView) {
-                    if let button = view as? NSButton, button.title == "Keep Connected" {
+                    if let button = view as? NSButton, button.title == (chooseEject ? "Eject Now" : "Keep Connected") {
                         alertSeen = true; button.performClick(nil); return
                     }
                     for child in view.subviews { visit(child) }
@@ -57,10 +58,11 @@ final class LogManager {
             let first = manager.pendingEjects[0]
             precondition(FileManager.default.fileExists(atPath: video.path))
             precondition(try! Data(contentsOf: first.folder.appendingPathComponent("TEST001.MP4")) == Data(repeating: 7, count: 1024))
-            print("PASS actual importer + disabled-notification popup defaults Keep Connected; copies verified; source retained; busy released")
+            print("PASS actual importer + dialog defaults Keep Connected; copies verified; source retained; busy released")
             manager.handleImportNotification(id: first.id, action: UNNotificationDismissActionIdentifier)
             precondition(manager.pendingEjects.count == 1 && FileManager.default.fileExists(atPath: video.path))
             print("PASS dismiss does not eject or consume pending menu action")
+            UserDefaults.standard.set(true, forKey: "showEjectNotifications")
             alertSeen = false
             manager.volumes = [source]
             manager.importNow(profile)
@@ -69,12 +71,26 @@ final class LogManager {
             manager.ejectCompletedImport(first.id)
             precondition(!manager.busy && FileManager.default.fileExists(atPath: video.path))
             print("PASS superseded completion cannot eject; already-verified import gets new choice")
-            let second = manager.pendingEjects[0]
-            manager.handleImportNotification(id: second.id, action: ImportCompletionNotification.eject)
-            manager.ejectCompletedImport(second.id)
+            // Empty/filtered selections must also show the dialog, even with notifications enabled.
+            try! FileManager.default.removeItem(at: video) // Generated fixture only.
+            alertSeen = false
+            manager.volumes = [source]
+            manager.importNow(profile)
+            await waitUntil { alertSeen && !manager.busy && manager.pendingEjects.count == 1 }
+            let empty = manager.pendingEjects[0]
+            precondition(!empty.hasMedia && FileManager.default.fileExists(atPath: source.path))
+            print("PASS no-media dialog with notifications enabled; Keep Connected leaves fixture mounted")
+            // Even a legacy notification eject action requires a fresh dialog choice.
+            alertSeen = false
+            manager.handleImportNotification(id: empty.id, action: ImportCompletionNotification.eject)
+            precondition(alertSeen && !manager.busy && FileManager.default.fileExists(atPath: source.path))
+            print("PASS legacy notification cannot eject without dialog confirmation")
+            chooseEject = true
+            manager.handleImportNotification(id: empty.id, action: ImportCompletionNotification.eject)
+            manager.ejectCompletedImport(empty.id)
             await waitUntil { !manager.busy }
             precondition(!manager.hasError && !FileManager.default.fileExists(atPath: source.path))
-            print("PASS explicit notification-handler Eject Now unmounts only disposable fixture; duplicate click ignored")
+            print("PASS explicit dialog Eject Now unmounts only disposable fixture; duplicate click ignored")
             timer.invalidate()
             fflush(stdout)
             exit(0)

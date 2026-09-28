@@ -7,108 +7,109 @@ struct DroneImportView: View {
     @State private var setupError: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Label("Device media imports", systemImage: "arrow.down.doc")
-                    .font(.title2.bold())
-                Spacer()
-                Button("Refresh") { importer.refresh() }.disabled(importer.busy)
-            }
-            GroupBox {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        if !importer.busy && importer.hasError {
-                            Label(importer.isIssueDismissed ? "Last issue (dismissed)" : "Needs attention",
-                                  systemImage: importer.isIssueDismissed ? "info.circle" : "exclamationmark.triangle")
-                                .font(.headline)
-                        } else {
-                            Text(importer.busy ? "\(importer.activeName) · \(importer.progress.phase == "Checking" ? "Importing" : importer.progress.phase)" : importer.progress.phase).font(.headline)
-                        }
-                        Spacer()
-                        if importer.busy { Button("Stop import") { importer.cancel() }.disabled(importer.progress.phase == "Ejecting") }
-                        else if importer.needsAttention {
-                            Button("Dismiss") { importer.dismissIssue() }
-                                .help("Hide the warning icon. The explanation stays here; nothing is retried.")
-                        }
-                    }
-                    if importer.busy {
-                        if importer.progress.total > 0 {
-                            ProgressView(value: importer.progress.fraction)
-                            Text("\(importer.progress.completed) of \(importer.progress.total) files completed · \(importer.progress.file)")
-                                .font(.caption).lineLimit(2)
-                        } else { ProgressView().controlSize(.small) }
-                    } else {
-                        Text(importer.message).foregroundStyle(importer.needsAttention ? .orange : .secondary)
-                            .id(importer.message)
-                            .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                    }
-                    HStack {
-                        Button("Open import folder") { importer.openFolder() }.disabled(importer.lastFolder == nil)
-                        Button("Show import log") { importer.openLog() }
-                    }
-                    ForEach(importer.pendingEjects) { completion in
-                        Button("Eject Now · \(completion.deviceName)") { importer.ejectCompletedImport(completion.id) }
-                            .disabled(importer.busy)
-                            .help("Eject this device and all its partitions. Leave connected to import photos in Lightroom.")
-                    }
-                }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
-            }
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    if importer.profiles.isEmpty {
-                        ContentUnavailableView("No devices enrolled", systemImage: "sdcard", description: Text("Choose a connected device below. Automatic importing and original deletion start off."))
-                            .frame(maxWidth: .infinity)
-                            .multilineTextAlignment(.center)
-                    }
-                    ForEach(importer.profiles) { profile in
-                        GroupBox {
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Text(profile.name).font(.headline)
-                                    Spacer()
-                                    Text(profile.enabled ? "Automatic" : "Manual").font(.caption).foregroundStyle(.secondary)
-                                }
-                                Text("\(profile.mediaPath) → \(profile.destinationLabel)/YYYY-MM-DD").font(.caption).lineLimit(2)
-                                Text((profile.videosOnly == true ? "Videos only · " : "All media · ") + (profile.deleteOriginals ? "Delete imported originals after verification" : "Keep originals on device")).font(.caption)
-                                HStack {
-                                    Button("Import now") { importer.importNow(profile) }
-                                    Button("Edit") { editing = profile }
-                                    Spacer()
-                                    Button("Remove profile") { importer.remove(profile.id) }
-                                }.disabled(importer.busy)
-                            }.frame(maxWidth: .infinity, alignment: .leading).padding(4)
-                        }
-                    }
-                }.frame(maxWidth: .infinity)
-            }
-            Divider()
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Add an import device").font(.headline)
-                Text("Connect a camera, memory card, or FPV device. If several drives have the same name, connect only the device you want to set up.")
-                    .font(.callout).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text("Device")
-                    Picker("Device", selection: $selectedSource) {
-                        Text("Choose a device…").tag("")
-                        ForEach(importer.volumes, id: \.path) { volume in
-                            Text(volume.lastPathComponent).tag(volume.path)
-                        }
-                    }
-                    .labelsHidden()
-                    .accessibilityLabel("Device")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Button("Set up import…", action: enroll).disabled(selectedSource.isEmpty || importer.busy)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Label("Device media imports", systemImage: "arrow.down.doc")
+                        .font(.title2.bold())
+                    Spacer()
+                    Button("Refresh") { importer.refresh() }.disabled(importer.busy)
                 }
-                Text("First choose the device’s recording folder, then where to save copies. Review the settings before saving; setup does not start an import.")
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            if !importer.busy && importer.hasError {
+                                Label(importer.isIssueDismissed ? "Last issue (dismissed)" : "Needs attention",
+                                      systemImage: importer.isIssueDismissed ? "info.circle" : "exclamationmark.triangle")
+                                    .font(.headline)
+                            } else {
+                                Text(importer.busy ? "\(importer.activeName) · \(importer.progress.phase == "Checking" ? "Importing" : importer.progress.phase)" : importer.progress.phase).font(.headline)
+                            }
+                            Spacer()
+                            if importer.busy { Button("Stop import") { importer.cancel() }.disabled(importer.progress.phase == "Ejecting") }
+                            else if importer.needsAttention {
+                                Button("Dismiss") { importer.dismissIssue() }
+                                    .help("Hide the warning icon. The explanation stays here; nothing is retried.")
+                            }
+                        }
+                        if importer.busy {
+                            if importer.progress.total > 0 {
+                                ProgressView(value: importer.progress.fraction)
+                                Text("\(importer.progress.completed) of \(importer.progress.total) files completed · \(importer.progress.file)")
+                                    .font(.caption).lineLimit(2)
+                            } else { ProgressView().controlSize(.small) }
+                        } else {
+                            Text(importer.message).foregroundStyle(importer.needsAttention ? .orange : .secondary)
+                                .id(importer.message)
+                                .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                        }
+                        HStack {
+                            Button("Open import folder") { importer.openFolder() }.disabled(importer.lastFolder == nil)
+                            Button("Show import log") { importer.openLog() }
+                        }
+                        ForEach(importer.pendingEjects) { completion in
+                            Button("Eject Now · \(completion.deviceName)") { importer.ejectCompletedImport(completion.id) }
+                                .disabled(importer.busy)
+                                .help("Eject this device and all its partitions. Leave connected to import photos in Lightroom.")
+                        }
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                        if importer.profiles.isEmpty {
+                            ContentUnavailableView("No devices enrolled", systemImage: "sdcard", description: Text("Choose a connected device below. Automatic importing and original deletion start off."))
+                                .frame(maxWidth: .infinity)
+                                .multilineTextAlignment(.center)
+                        }
+                        ForEach(importer.profiles) { profile in
+                            GroupBox {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        Text(profile.name).font(.headline)
+                                        Spacer()
+                                        Text(profile.enabled ? "Automatic" : "Manual").font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Text("\(profile.mediaPath) → \(profile.destinationLabel)/YYYY-MM-DD").font(.caption).lineLimit(2)
+                                    Text((profile.videosOnly == true ? "Videos only · " : "All media · ") + (profile.deleteOriginals ? "Delete imported originals after verification" : "Keep originals on device")).font(.caption)
+                                    HStack {
+                                        Button("Import now") { importer.importNow(profile) }
+                                        Button("Edit") { editing = profile }
+                                        Spacer()
+                                        Button("Remove profile") { importer.remove(profile.id) }
+                                    }.disabled(importer.busy)
+                                }.frame(maxWidth: .infinity, alignment: .leading).padding(4)
+                            }
+                        }
+                }.frame(maxWidth: .infinity)
+                Divider()
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Add an import device").font(.headline)
+                    Text("Connect a camera, memory card, or FPV device. If several drives have the same name, connect only the device you want to set up.")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text("Device")
+                        Picker("Device", selection: $selectedSource) {
+                            Text("Choose a device…").tag("")
+                            ForEach(importer.volumes, id: \.path) { volume in
+                                Text(volume.lastPathComponent).tag(volume.path)
+                            }
+                        }
+                        .labelsHidden()
+                        .accessibilityLabel("Device")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Button("Set up import…", action: enroll).disabled(selectedSource.isEmpty || importer.busy)
+                    }
+                    Text("First choose the device’s recording folder, then where to save copies. Review the settings before saving; setup does not start an import.")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }.disabled(importer.busy)
+                Text("Your saved device is recognized even as Untitled 2. Its recording folder alone does not identify it. Set up again after formatting, and connect the destination before importing.")
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-            }.disabled(importer.busy)
-            Text("Your saved device is recognized even as Untitled 2. Its recording folder alone does not identify it. Set up again after formatting, and connect the destination before importing.")
-                .font(.callout).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(22)
         }
-        .padding(22).frame(minWidth: 620, minHeight: 580)
+        .frame(minWidth: 620, minHeight: 580)
         .onChange(of: importer.volumes) { _, volumes in
             if !volumes.contains(where: { $0.path == selectedSource }) { selectedSource = "" }
         }
@@ -229,7 +230,7 @@ struct DroneProfileEditor: View {
                 .font(.caption).foregroundStyle(.secondary)
             #endif
             Toggle("Ask to eject after import", isOn: $profile.autoEject)
-            Text("After import or when no media matches your options, the notification offers Eject Now and Open Import Folder. Ignore it to keep connected for Lightroom. If notifications are disabled, a popup asks instead; Keep Connected is the default. Eject is always available in the menu.")
+            Text("After import or when no media matches your options, a dialog asks whether to eject. Keep Connected is the default so you can finish importing in Lightroom. Choose Eject Now and wait for confirmation that the device is safe to unplug. Eject is also available in the menu.")
                 .font(.caption).foregroundStyle(.secondary)
             Text("Choosing Eject Now also unmounts the other partitions on that disk. Keep it connected until you have finished all desired imports.")
                 .font(.caption).foregroundStyle(.secondary)

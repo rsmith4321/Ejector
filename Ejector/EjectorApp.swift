@@ -95,7 +95,8 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
         self.fetchDrives()
 
         let notificationCenter = UNUserNotificationCenter.current()
-        notificationCenter.setNotificationCategories([ImportCompletionNotification.makeCategory()])
+        // Eject choices use the native dialog; retire the previous notification actions.
+        notificationCenter.setNotificationCategories([])
         notificationCenter.delegate = self
         notificationCenter.requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error = error {
@@ -302,6 +303,9 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
 
     func eject(drive: Drive, clean: Bool = false, notify: Bool = true,
                cleanupCards: [Drive]? = nil, completion: ((Bool, Int) -> Void)? = nil) {
+        if let warning = ImportVolumes.multiSourceEjectWarning(drive.url) {
+            operationFailed(ImportFailure(warning)); completion?(false, 0); return
+        }
         let roots = cleanupCards ?? [drive]
         // Obtain all permissions before reserving the disk or deleting anything.
         #if APP_STORE
@@ -348,6 +352,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                     for (root, _) in identities { cleanedCount += try MetadataCleaner.clean(root, validate: validate) }
                 }
                 try validate()
+                if let warning = ImportVolumes.multiSourceEjectWarning(drive.url) { throw ImportFailure(warning) }
             } catch {
                 releaseAccess()
                 DispatchQueue.main.async {
@@ -568,7 +573,7 @@ struct HelpView: View {
                     }
 
                     helpSection("Notifications", icon: "bell") {
-                        Text("Notifications confirm ejection. With Ask to eject after import enabled, the completion notification offers Eject Now and Open Import Folder (macOS may place these under Options). Ignore it to keep the device connected for Lightroom. If notifications are disabled, a popup asks instead. Focus may silence an allowed notification; eject remains available in the menu and import window. Toggle notifications in Settings.")
+                        Text("Notifications confirm ejection. With Ask to eject after import enabled, a dialog offers Keep Connected and Eject Now after import or when no media matches your options. Keep Connected is the default. Wait for confirmation that the device is safe to unplug. Eject also remains available in the menu and import window. Toggle notifications in Settings.")
                     }
 
                     helpSection("Menu Bar Badge", icon: "number.circle") {
