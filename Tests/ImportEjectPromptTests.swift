@@ -12,6 +12,11 @@ import AppKit
             precondition(alert.informativeText.contains("Test camera") && alert.informativeText.contains("all its partitions"))
             if !hasMedia { precondition(alert.informativeText.contains("Photos, skipped previews")) }
         }
+        let grouped = ImportEjectPrompt.make(hasMedia: false, deviceName: "Insta360 (Internal)", storageSources: ["Internal", "SD Card"])
+        precondition(grouped.buttons.map(\.title) == ["Keep Connected", "Eject All Camera Storage"])
+        precondition(grouped.buttons[0].keyEquivalent == "\r" && grouped.buttons[1].keyEquivalent.isEmpty)
+        precondition(grouped.informativeText.contains("only Insta360 (Internal)"))
+        precondition(grouped.informativeText.contains("SD Card") && grouped.informativeText.contains("has not been imported"))
         for button in [0, 1] {
             let alert = ImportEjectPrompt.make(hasMedia: button == 0, deviceName: "Test camera")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {

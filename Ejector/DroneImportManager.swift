@@ -295,10 +295,6 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                                 self.finish(error: nil, message: completion + " Device remains connected." + importNote)
                                 return
                             }
-                            if let warning = ImportVolumes.multiSourceEjectWarning(source) {
-                                self.finish(error: nil, message: completion + " " + warning + importNote)
-                                return
-                            }
                             self.removeNotifications(self.completions.insert(entry))
                             self.updatePendingEjects()
                             // Release import reservations before presenting the eject choice.
@@ -346,9 +342,61 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
 
     private func showEjectPrompt(_ entry: ImportCompletion) {
         guard completions.entries[entry.id] != nil else { return }
+        if !ImportVolumes.otherStorageSources(entry.source).isEmpty {
+            do {
+                let plan = try USBStorageUnmountPlan(source: entry.source)
+                var expectedConnections: [URL: UUID] = [:]
+                for member in plan.members {
+                    let token = connections[member.url] ?? UUID()
+                    connections[member.url] = token
+                    expectedConnections[member.url] = token
+                }
+                let alert = ImportEjectPrompt.make(hasMedia: entry.hasMedia,
+                    deviceName: "\(entry.deviceName) (\(entry.source.lastPathComponent))",
+                    storageSources: plan.members.map { $0.url.lastPathComponent })
+                NSApp.activate()
+                if alert.runModal() == .alertSecondButtonReturn {
+                    ejectCameraStorage(entry, plan: plan, expectedConnections: expectedConnections)
+                }
+            } catch { recordOperationFailure(error) }
+            return
+        }
         let alert = ImportEjectPrompt.make(hasMedia: entry.hasMedia, deviceName: entry.deviceName)
         NSApp.activate()
         if alert.runModal() == .alertSecondButtonReturn { ejectCompletedImport(entry.id) }
+    }
+
+    private func ejectCameraStorage(_ entry: ImportCompletion, plan: USBStorageUnmountPlan,
+                                    expectedConnections: [URL: UUID]) {
+        let urls = plan.members.map(\.url)
+        let keys = Set(plan.members.map(\.diskID))
+        guard completions.matches(entry.id, volumeID: try? ImportVolumes.identity(entry.source),
+                  physicalID: ImportVolumes.physicalID(entry.source),
+                  connection: connections[entry.source] ?? UUID(), root: try? ImportVolumes.root(entry.source)),
+              !busy, manualOperations.isDisjoint(with: keys) else {
+            recordOperationFailure(ImportFailure("The camera is busy or the import choice expired. Try again after it finishes."))
+            return
+        }
+        let validate: ([URL]) throws -> Void = { remaining in
+            try plan.validate(remaining: remaining)
+            guard remaining.allSatisfy({ self.connections[$0] == expectedConnections[$0] }) else {
+                throw ImportFailure("A camera source reconnected. Ejection stopped; check all sources before unplugging.")
+            }
+        }
+        do { try validate(urls) }
+        catch { recordOperationFailure(error); return }
+        for url in urls { clearCompletions(for: url) }
+        manualOperations.formUnion(keys)
+        busy = true; activeName = entry.deviceName; sourceRoot = entry.source
+        protectedPhysicalIDs = keys; progress.phase = "Ejecting"
+        logEjectEvent("User confirmed unmount of all camera storage | \(urls.map(\.lastPathComponent).joined(separator: ", "))")
+        SequentialVolumeUnmount.run(volumes: urls, validate: validate) { error in
+            self.manualOperations.subtract(keys)
+            let result = error.map { "Camera eject stopped: \($0.localizedDescription) Some sources may already be unmounted. Check all camera storage before unplugging." }
+                ?? "\(entry.deviceName): all camera storage unmounted. Safe to unplug."
+            self.logEjectEvent(result)
+            self.finish(error: error, message: result, notificationTitle: "Easy Eject")
+        }
     }
 
     func handleImportNotification(id: String, action: String) {
@@ -407,9 +455,8 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
             NotificationCenter.default.post(name: ImportCompletionNotification.showImports, object: nil)
             return
         }
-        if let warning = ImportVolumes.multiSourceEjectWarning(entry.source) {
-            clearCompletions(for: entry.source)
-            recordOperationFailure(ImportFailure(warning))
+        if !ImportVolumes.otherStorageSources(entry.source).isEmpty {
+            showEjectPrompt(entry)
             return
         }
         guard !busy, reserveManualEject(entry.source) else {
