@@ -8,7 +8,7 @@ The Store target and website target are maintained from shared code. Store **1.0
 
 - App Store Connect app: **6767951388**, Easy Eject. Reuses the existing empty listing; no duplicate app record.
 - Permanent bundle: `com.ryansmithphotography.EasyEject.store`, registered ID `XX33FPA5TF`, team `MCJMHBLT27`.
-- Update candidate: Store version **1.1**, build **9**; currently live: **1.0 (8)**. Product file and visible title: Easy Eject.
+- Submitted update: Store version **1.1**, build **9**, WAITING_FOR_REVIEW with AFTER_APPROVAL; currently live: **1.0 (8)**. Product file and visible title: Easy Eject.
 - Direct identity: `com.ryansmithphotography.Ejector`, version 1.5.3. `/Applications/Easy Eject.app` now contains this signed, notarized website edition at Ryan's request. Store build 5 is retained in release evidence for rollback.
 - Sandbox profiles/logs live in the Store bundle's own container. No prototype or website profile is migrated automatically.
 - Listing is free with automatic release **AFTER_APPROVAL**. Upload, processing, review submission, approval, and live availability are distinct gates.
