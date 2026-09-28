@@ -352,7 +352,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
                     expectedConnections[member.url] = token
                 }
                 let alert = ImportEjectPrompt.make(hasMedia: entry.hasMedia,
-                    deviceName: "\(entry.deviceName) (\(entry.source.lastPathComponent))",
+                    deviceName: entry.deviceName, sourceName: entry.source.lastPathComponent,
                     storageSources: plan.members.map { $0.url.lastPathComponent })
                 NSApp.activate()
                 if alert.runModal() == .alertSecondButtonReturn {
