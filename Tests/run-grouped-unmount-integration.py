@@ -1,9 +1,15 @@
 from pathlib import Path
-import subprocess,uuid,sys
+import subprocess,uuid,sys,plistlib
 repo=Path(__file__).resolve().parents[1]
 evidence=Path(sys.argv[1]).resolve();evidence.mkdir(parents=True,exist_ok=True)
-exe=evidence/'grouped-integration'
+sandbox = '--sandbox' in sys.argv[2:]
+app = evidence/'Grouped Unmount Tests.app'
+exe = app/'Contents/MacOS/GroupedUnmountTests' if sandbox else evidence/'grouped-integration'
+exe.parent.mkdir(parents=True, exist_ok=True)
 subprocess.run(['xcrun','swiftc',str(repo/'Ejector/ImportVolumes.swift'),str(repo/'Tests/GroupedUnmountIntegrationTests.swift'),'-o',str(exe)],check=True)
+if sandbox:
+ (app/'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'com.ryansmithphotography.EasyEject.groupedunmounttests','CFBundleExecutable':'GroupedUnmountTests','CFBundlePackageType':'APPL','LSUIElement':True}))
+ subprocess.run(['codesign','--force','--sign','Developer ID Application: Ryan Smith Photography, LLC (MCJMHBLT27)','--options','runtime','--entitlements',str(repo/'Store/Store.entitlements'),str(app)],check=True)
 images=[];mounts=[]
 try:
  for n in range(2):
