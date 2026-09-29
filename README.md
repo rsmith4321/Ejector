@@ -5,7 +5,7 @@ A native macOS menu bar utility for ejecting camera cards, optional hidden-file 
 | | Website download | Mac App Store |
 | --- | --- | --- |
 | Target / bundle | `Ejector` / `com.ryansmithphotography.Ejector` | `EjectorStore` / `com.ryansmithphotography.EasyEject.store` |
-| Current source | Website 1.7.6 (local candidate) | Store 1.1 (9) submitted; public Store 1.0 (8) |
+| Current source | Website 1.7.6 | Store 1.1 (10) submitted; public Store 1.0 (8) |
 | Distribution | Developer ID signed and notarized | App Sandbox and App Store review |
 | Folder detection and cleaning | No Easy Eject per-card authorization; macOS Files and Folders permissions still apply | Select the whole card with Authorize a Card; repeat if formatting invalidates access |
 | Updates | Sparkle automatic checks; signed GitHub updates installed with approval | App Store |
@@ -42,7 +42,7 @@ For Lightroom: select Videos only, optionally exclude previews, and choose wheth
 
 [Import and Lightroom guide](https://easyeject.com/help/video-imports-with-lightroom) · [Camera compatibility and official sources](https://easyeject.com/help/camera-media-compatibility)
 
-Public Store 1.0 (8) has the earlier importer. Store 1.1 (9) was submitted before import defaults were added. Shared source compiles for both targets; compiling this change does not submit or publish an App Store update.
+Public Store 1.0 (8) has the earlier importer. Store 1.1 (10) includes shared import defaults and the latest dialog improvements. Check Store/RELEASE-10.md for upload and review status; public Store 1.0 does not include them.
 
 Source/destination disks are protected during imports. Completion dialogs explain what will be unmounted. Import reservations are released before waiting for the eject choice. Eject actions check the source volume, original physical disk and connection; a changed or unknown disk is not ejected. Disconnect/reconnect, a new import on the device, and app restart invalidate old actions. Keep independent backups. Devices must appear as mounted storage in Finder; PTP/MTP-only devices are unsupported.
 
