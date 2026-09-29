@@ -10,7 +10,7 @@ struct ImportDefaultsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Import defaults").font(.headline)
-            Text("Cards using defaults follow these settings on their next import. Choose Customize for this device in a card’s profile to give it different settings.")
+            Text("Cards using defaults follow these settings on their next import. Choose Use custom settings in a card’s profile to give it different settings.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Picker("Import", selection: $videosOnly) {
                 Text("All media and sidecars").tag(false)

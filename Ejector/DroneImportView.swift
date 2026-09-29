@@ -177,7 +177,6 @@ struct DroneProfileEditor: View {
     @State private var error: String?
     @State private var showingPermanentDeletionConfirmation = false
     @State private var showingTrashConfirmation = false
-    @State private var showingDefaults = false
     @StoredImportDefaults private var defaults
     var body: some View {
         ScrollView {
@@ -193,21 +192,18 @@ struct DroneProfileEditor: View {
             Divider()
             GroupBox {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Label(profile.followsImportDefaults ? "Using import defaults" : "Custom import settings",
-                              systemImage: profile.followsImportDefaults ? "slider.horizontal.3" : "pencil")
-                            .font(.headline)
-                        Spacer()
-                        Button("Edit defaults…") { showingDefaults = true }
-                    }
-                    Toggle("Customize for this device", isOn: Binding(
+                    Picker("Import settings", selection: Binding(
                         get: { !profile.followsImportDefaults },
                         set: { profile.setCustomImportSettings($0, defaults: defaults) }
-                    ))
+                    )) {
+                        Text("Use defaults").tag(false)
+                        Text("Use custom settings").tag(true)
+                    }
+                    .pickerStyle(.segmented)
                     Text(profile.followsImportDefaults
-                        ? "These settings follow your import defaults. Turn on customization to change them for this device."
-                        : "These settings are saved only for this device. Turn off customization to use the current defaults and keep originals.")
-                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        ? "Follows your import defaults."
+                        : "Applies only to this device.")
+                        .font(.caption).foregroundStyle(.secondary)
                     Divider()
                     VStack(alignment: .leading, spacing: 12) {
                         Picker("Import", selection: Binding(get: { profile.videosOnly ?? false }, set: { value in
@@ -241,7 +237,7 @@ struct DroneProfileEditor: View {
             }
             Text("Originals on this device").font(.headline)
             if profile.followsImportDefaults {
-                Text("Defaults keep originals. Customize this device to enable deletion or Trash recovery.")
+                Text("Defaults keep originals. Choose Use custom settings to enable deletion or Trash recovery.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Group {
@@ -287,7 +283,6 @@ struct DroneProfileEditor: View {
         }.frame(width: 520, height: 700)
         .onAppear { profile = profile.resolved(using: defaults) }
         .onChange(of: defaults) { _, value in profile = profile.resolved(using: value) }
-        .sheet(isPresented: $showingDefaults) { ImportDefaultsSheet() }
         .alert("Recover and clear device Trash?", isPresented: $showingTrashConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Enable Verified Trash Recovery", role: .destructive) {
