@@ -5,7 +5,7 @@ A native macOS menu bar utility for ejecting camera cards, optional hidden-file 
 | | Website download | Mac App Store |
 | --- | --- | --- |
 | Target / bundle | `Ejector` / `com.ryansmithphotography.Ejector` | `EjectorStore` / `com.ryansmithphotography.EasyEject.store` |
-| Current source | Website 1.7.2 (local candidate) | Store 1.1 (9) submitted; public Store 1.0 (8) |
+| Current source | Website 1.7.3 (local candidate) | Store 1.1 (9) submitted; public Store 1.0 (8) |
 | Distribution | Developer ID signed and notarized | App Sandbox and App Store review |
 | Folder detection and cleaning | No Easy Eject per-card authorization; macOS Files and Folders permissions still apply | Select the whole card with Authorize a Card; repeat if formatting invalidates access |
 | Updates | Sparkle automatic checks; signed GitHub updates installed with approval | App Store |
@@ -57,6 +57,6 @@ Archive `Ejector` or `EjectorStore` with the preserved release toolchain. Direct
 
 ## New-device defaults and website updates
 
-Settings and Device Media Imports → Import defaults let users choose media selection, camera previews, clean layout, automatic import and the post-import eject prompt. New cards visibly use defaults, with their option controls disabled until Use custom settings is selected. A Use defaults / Use custom settings selector sits above the card’s options. Edit shared defaults from Settings or the main Device Media Imports window. Cards using defaults follow changes on their next import; each running import freezes its options. Older profiles retain saved settings as custom profiles. Returning to defaults disables original deletion and device Trash recovery; these options require custom settings and their per-device confirmations.
+Settings and Device Media Imports → Import defaults let users choose media selection, camera previews, clean layout, automatic import and the post-import eject prompt. New cards visibly use defaults, with their option controls disabled until Use custom settings is selected. A native Use defaults / Use custom settings radio group sits above the card’s options. Edit shared defaults from Settings or the main Device Media Imports window. Cards using defaults follow changes on their next import; each running import freezes its options. Older profiles retain saved settings as custom profiles. Returning to defaults disables original deletion and device Trash recovery; these options require custom settings and their per-device confirmations.
 
 Website 1.7.0 uses Sparkle 2.10.0, linked only into the Ejector target. Checks are automatic by default and can be disabled in Settings. Users approve installation. Silent downloading/installing and system-profile reporting are disabled. Both the appcast and update archive require Ed25519 signatures; the app and DMG also use Developer ID signing and notarization. Updates wait for imports, ejection and open dialogs. Final termination refuses to interrupt active work. See [update publishing](Updates/README.md).

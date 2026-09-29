@@ -199,7 +199,7 @@ struct DroneProfileEditor: View {
                         Text("Use defaults").tag(false)
                         Text("Use custom settings").tag(true)
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.radioGroup)
                     Text(profile.followsImportDefaults
                         ? "Follows your import defaults."
                         : "Applies only to this device.")
