@@ -6,7 +6,7 @@ evidence=Path(sys.argv[1]).resolve()
 evidence.mkdir(parents=True, exist_ok=True)
 work=evidence/('ee-notification-integration-'+str(uuid.uuid4()));work.mkdir()
 app=work/'Notification Integration Tests.app'; mac=app/'Contents/MacOS';mac.mkdir(parents=True)
-subprocess.run(['xcrun','swiftc',*['Ejector/'+x+'.swift' for x in ['DroneImportManager','MediaImportEngine','MetadataCleaner','ImportVolumes','ImportEjectPrompt','ImportCompletionNotification']],'Tests/ImportNotificationIntegrationTests.swift','-o',str(mac/'NotificationIntegrationTests')],check=True)
+subprocess.run(['xcrun','swiftc',*['Ejector/'+x+'.swift' for x in ['DroneProfile','DroneImportManager','MediaImportEngine','MetadataCleaner','ImportVolumes','ImportEjectPrompt','ImportCompletionNotification']],'Tests/ImportNotificationIntegrationTests.swift','-o',str(mac/'NotificationIntegrationTests')],check=True)
 (app/'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'com.ryansmithphotography.EasyEject.notificationtests','CFBundleExecutable':'NotificationIntegrationTests','CFBundlePackageType':'APPL','LSUIElement':True}))
 subprocess.run(['codesign','--force','--sign','Developer ID Application: Ryan Smith Photography, LLC (MCJMHBLT27)','--options','runtime',str(app)],check=True)
 name='EE-Notification-Test-'+str(uuid.uuid4())[:8]

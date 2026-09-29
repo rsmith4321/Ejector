@@ -5,10 +5,10 @@ A native macOS menu bar utility for ejecting camera cards, optional hidden-file 
 | | Website download | Mac App Store |
 | --- | --- | --- |
 | Target / bundle | `Ejector` / `com.ryansmithphotography.Ejector` | `EjectorStore` / `com.ryansmithphotography.EasyEject.store` |
-| Current version | 1.6.0 | 1.0 (8); see Store/RELEASE-8.md and current Apple status |
+| Current source | Website 1.7.0 | Store 1.1 (9) submitted; public Store 1.0 (8) |
 | Distribution | Developer ID signed and notarized | App Sandbox and App Store review |
 | Folder detection and cleaning | No Easy Eject per-card authorization; macOS Files and Folders permissions still apply | Select the whole card with Authorize a Card; repeat if formatting invalidates access |
-| Updates | GitHub release checker | App Store |
+| Updates | Sparkle automatic checks; signed GitHub updates installed with approval | App Store |
 
 Both use the same native menu, classifier, settings, metadata cleaner, import engine, shortcuts and eject policies. Keep differences limited to permissions, distribution and the direct build's welcome screen. The September 22 decision to restore the website build supersedes earlier Store-only retirement notes.
 
@@ -32,19 +32,19 @@ For the website build, there is no Authorize a Card step. macOS can still reques
 
 In Device Media Imports, select the device, its media folder (such as DCIM, or a complete camera package/whole card) and a destination on another physical disk. The Store build saves scoped source/destination permissions. Profiles match the volume UUID, not its name or DJI folder alone. Formatting can change the UUID and require setup again **in either build**.
 
-Copies go into dated folders and are verified with SHA-256 and durability checks. Originals are kept by default. Automatic import, eject after verified import, original deletion and device Trash recovery are separate options, off for new profiles. Saving does not start an import. Permanent original deletion requires explicit confirmation and saved-copy verification; keep it off for important media. Device Trash recovery verifies recovered copies before removal, and in Store also needs whole-card access.
+Copies go into dated folders and are verified with SHA-256 and durability checks. Originals are kept by default. Automatic import and the post-import eject prompt start off unless changed in import defaults. Original deletion and device Trash recovery always start off for each new profile. Saving does not start an import. Permanent original deletion requires explicit confirmation and saved-copy verification; keep it off for important media. Device Trash recovery verifies recovered copies before removal, and in Store also needs whole-card access.
 
-Website 1.6.0 adds **Videos only**, **Include camera previews**, and **Clean folder layout**. Media selection and preview selection are independent. New profiles use clean layout; existing profiles keep their original layout until changed. Previews remain included unless disabled. Skipped previews, unknown files and device indexes are never deleted by the importer. Required camera-package files remain included even when optional previews are off.
+Website 1.6.0 adds **Videos only**, **Include camera previews**, and **Clean folder layout**. Media selection and preview selection are independent. New profiles start from the user’s import defaults; existing profiles keep their saved options until edited. Previews remain included unless disabled. Skipped previews, unknown files and device indexes are never deleted by the importer. Required camera-package files remain included even when optional previews are off.
 
 Ordinary media can be saved directly in the dated folder with unchanged names. Conflicting groups go in Additional media; known structured or unfamiliar media retains its tree under Camera originals. Complete Sony/P2/RED and other recognized packages include supporting audio/metadata; partial CLIP/STREAM selections stop with guidance. This is a verified file copier, not a codec converter, stitching engine, clip joiner, camera database editor or universal device certification. Same-name still/movie pairs are conservatively kept for photo workflows; renamed Live Photo pairs and unfamiliar video sequences need manual review.
 
-For Lightroom: select Videos only, optionally exclude previews, and choose whether to keep or permanently delete verified imported videos. Enable Ask to eject after import for a completion notification with Eject Now and Open Import Folder (sometimes under macOS Options). Ignore it to keep connected for Lightroom. Disabled notifications use a popup with Keep Connected as the default. Focus may hide an allowed notification; eject remains available in the menu and import window. Previously enabled auto-eject profiles now ask, including empty selections and already-imported media. Whole-batch copy, source manifest, source identity and saved dependency checks precede removal. Deletion remains optional for Sony; the confirmation warns that computer-side deletion may leave camera databases inconsistent and require in-camera recovery. Manufacturer-specific deletion guidance still applies.
+For Lightroom: select Videos only, optionally exclude previews, and choose whether to keep or permanently delete verified imported videos. Enable Ask to eject after import for a native dialog with Keep Connected as the default. A camera exposing multiple mounted storage sources gets one explicit grouped confirmation. Eject actions validate the exact source topology and identities before sequential unmounts. No matching media describes the configured selection, not the whole camera. Source media is kept unless permanent deletion was explicitly enabled for that device.
 
 [Import and Lightroom guide](https://easyeject.com/help/video-imports-with-lightroom) · [Camera compatibility and official sources](https://easyeject.com/help/camera-media-compatibility)
 
-The pending Store build 1.0 (8) has the earlier importer. Shared source compiles for both targets; compiling this change does not submit or publish an App Store update.
+Public Store 1.0 (8) has the earlier importer. Store 1.1 (9) was submitted before import defaults were added. Shared source compiles for both targets; compiling this change does not submit or publish an App Store update.
 
-Source/destination disks are protected during imports. Completion notifications and the fallback popup explain that all partitions will unmount. Import reservations are released without waiting for a notification response. Eject actions check the source volume, original physical disk and connection; a changed or unknown disk is not ejected. Disconnect/reconnect, a new import on the device, and app restart invalidate old actions. Keep independent backups. Devices must appear as mounted storage in Finder; PTP/MTP-only devices are unsupported.
+Source/destination disks are protected during imports. Completion dialogs explain what will be unmounted. Import reservations are released before waiting for the eject choice. Eject actions check the source volume, original physical disk and connection; a changed or unknown disk is not ejected. Disconnect/reconnect, a new import on the device, and app restart invalidate old actions. Keep independent backups. Devices must appear as mounted storage in Finder; PTP/MTP-only devices are unsupported.
 
 ## Install and develop
 
@@ -53,3 +53,10 @@ Requires macOS 14+. Universal arm64/x86_64 builds; Intel and older macOS runtime
 Archive `Ejector` or `EjectorStore` with the preserved release toolchain. Direct releases require Developer ID signing, notarization, stapling, signature/Gatekeeper verification and a tested download. Store releases require current App Store Connect checks and one reviewed submission. Build/upload/submission are not approval or live availability. See `Store/RELEASE-8.md`, `Store/README.md` and `RELEASE-1.6.0.md` for evidence and limits.
 
 [Download and comparison](https://easyeject.com/editions/) · [Support](https://easyeject.com/support/) · [Privacy](https://easyeject.com/privacy/)
+
+
+## New-device defaults and website updates
+
+Settings and Device Media Imports → Import defaults let users choose media selection, camera previews, clean layout, automatic import and the post-import eject prompt. New enrollment snapshots those values; changing defaults never migrates existing profiles. Original deletion and device Trash recovery always start off and retain their per-device confirmations.
+
+Website 1.7.0 uses Sparkle 2.10.0, linked only into the Ejector target. Checks are automatic by default and can be disabled in Settings. Users approve installation. Silent downloading/installing and system-profile reporting are disabled. Both the appcast and update archive require Ed25519 signatures; the app and DMG also use Developer ID signing and notarization. Updates wait for imports, ejection and open dialogs. Final termination refuses to interrupt active work. See [update publishing](Updates/README.md).

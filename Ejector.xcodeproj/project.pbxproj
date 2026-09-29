@@ -6,7 +6,13 @@
 	objectVersion = 100;
 	objects = {
 
+/* Begin PBXBuildFile section */
+        EE1700010000000000000004 /* Sparkle license in Resources */ = {isa = PBXBuildFile; fileRef = EE1700010000000000000005; };
+        EE1700010000000000000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = EE1700010000000000000002 /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+        EE1700010000000000000005 /* Sparkle-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Updates/Sparkle-LICENSE.txt"; sourceTree = SOURCE_ROOT; };
 		303A1AA52FAC2B2400CFBD1A /* Easy Eject.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Easy Eject.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		53541AA52FAC2B2400CFBD1A /* Easy Eject Store.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Easy Eject Store.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		305169E02FAF864500D6218B /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -24,6 +30,7 @@
 		303A1AA22FAC2B2400CFBD1A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+                EE1700010000000000000001 /* Sparkle in Frameworks */,
 			);
 		};
 		53541AA22FAC2B2400CFBD1A /* Frameworks */ = {
@@ -38,6 +45,7 @@
 			isa = PBXGroup;
 			children = (
 				305169E02FAF864500D6218B /* README.md */,
+                EE1700010000000000000005 /* Sparkle-LICENSE.txt */,
 				303A1AA72FAC2B2400CFBD1A /* Ejector */,
 				303A1AA62FAC2B2400CFBD1A /* Products */,
 			);
@@ -68,6 +76,7 @@
 			fileSystemSynchronizedGroups = (
 				303A1AA72FAC2B2400CFBD1A /* Ejector */,
 			);
+			packageProductDependencies = (EE1700010000000000000002 /* Sparkle */);
 			name = Ejector;
 			productName = Ejector;
 			productReference = 303A1AA52FAC2B2400CFBD1A /* Easy Eject.app */;
@@ -118,6 +127,7 @@
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 100;
 			productRefGroup = 303A1AA62FAC2B2400CFBD1A /* Products */;
+			packageReferences = (EE1700010000000000000003 /* Sparkle */);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -131,6 +141,7 @@
 		303A1AA32FAC2B2400CFBD1A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+                EE1700010000000000000004 /* Sparkle license in Resources */,
 			);
 		};
 		53541AA32FAC2B2400CFBD1A /* Resources */ = {
@@ -283,13 +294,14 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = "";
+                INFOPLIST_FILE = "Updates/Website-Info.plist";
 				INFOPLIST_KEY_NSRemovableVolumesUsageDescription = "Easy Eject reads camera folders to recognize cards and removes hidden macOS metadata when you choose Clean & Eject. Optional imports copy recordings to your selected destination.";
 				INFOPLIST_KEY_NSNetworkVolumesUsageDescription = "Easy Eject accesses network storage only when you select it for optional media imports.";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1.6.5;
+				CURRENT_PROJECT_VERSION = 1.7.0;
 				DEPLOYMENT_POSTPROCESSING = NO;
 				DEVELOPMENT_TEAM = MCJMHBLT27;
 				ENABLE_APP_SANDBOX = NO;
@@ -310,7 +322,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.5;
+				MARKETING_VERSION = 1.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.Ejector;
 				PRODUCT_NAME = "Easy Eject";
 				REGISTER_APP_GROUPS = YES;
@@ -391,13 +403,14 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = "";
+                INFOPLIST_FILE = "Updates/Website-Info.plist";
 				INFOPLIST_KEY_NSRemovableVolumesUsageDescription = "Easy Eject reads camera folders to recognize cards and removes hidden macOS metadata when you choose Clean & Eject. Optional imports copy recordings to your selected destination.";
 				INFOPLIST_KEY_NSNetworkVolumesUsageDescription = "Easy Eject accesses network storage only when you select it for optional media imports.";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = 1.6.5;
+				CURRENT_PROJECT_VERSION = 1.7.0;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				DEVELOPMENT_TEAM = MCJMHBLT27;
 				ENABLE_APP_SANDBOX = NO;
@@ -418,7 +431,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.5;
+				MARKETING_VERSION = 1.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ryansmithphotography.Ejector;
 				PRODUCT_NAME = "Easy Eject";
 				REGISTER_APP_GROUPS = YES;
@@ -492,6 +505,21 @@
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+        EE1700010000000000000003 /* Sparkle */ = {
+            isa = XCRemoteSwiftPackageReference;
+            repositoryURL = "https://github.com/sparkle-project/Sparkle";
+            requirement = {kind = exactVersion; version = 2.10.0; };
+        };
+/* End XCRemoteSwiftPackageReference section */
+/* Begin XCSwiftPackageProductDependency section */
+        EE1700010000000000000002 /* Sparkle */ = {
+            isa = XCSwiftPackageProductDependency;
+            package = EE1700010000000000000003 /* Sparkle */;
+            productName = Sparkle;
+        };
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */
 		303A1AA02FAC2B2400CFBD1A /* Build configuration list for PBXProject "Ejector" */ = {

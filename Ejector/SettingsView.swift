@@ -48,6 +48,8 @@ struct SettingsView: View {
                 }
                 if !notificationStatus.isEmpty { Text(notificationStatus).font(.caption) }
                 Divider()
+                ImportDefaultsView()
+                Divider()
                 Text("Keyboard Shortcut").font(.headline)
                 Toggle("Enable Global Eject Shortcut", isOn: $shortcutEnabled).onChange(of: shortcutEnabled) { _, _ in shortcut.start() }
                 HStack {
@@ -74,6 +76,10 @@ struct SettingsView: View {
                 }
                 #endif
                 Divider()
+                #if !APP_STORE
+                UpdateSettingsView()
+                Divider()
+                #endif
                 Toggle("Enable Debug Logging", isOn: $debug)
                 HStack {
                     Link("Privacy", destination: URL(string: "https://easyeject.com/privacy/")!)

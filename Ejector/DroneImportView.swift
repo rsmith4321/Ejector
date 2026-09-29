@@ -5,6 +5,7 @@ struct DroneImportView: View {
     @State private var editing: DroneProfile?
     @State private var selectedSource = ""
     @State private var setupError: String?
+    @State private var showingDefaults = false
 
     var body: some View {
         ScrollView {
@@ -13,6 +14,7 @@ struct DroneImportView: View {
                     Label("Device media imports", systemImage: "arrow.down.doc")
                         .font(.title2.bold())
                     Spacer()
+                    Button("Import defaults…") { showingDefaults = true }
                     Button("Refresh") { importer.refresh() }.disabled(importer.busy)
                 }
                 GroupBox {
@@ -56,7 +58,7 @@ struct DroneImportView: View {
                 }
                 VStack(alignment: .leading, spacing: 12) {
                         if importer.profiles.isEmpty {
-                            ContentUnavailableView("No devices enrolled", systemImage: "sdcard", description: Text("Choose a connected device below. Automatic importing and original deletion start off."))
+                            ContentUnavailableView("No devices enrolled", systemImage: "sdcard", description: Text("Choose a connected device below. New profiles use your import defaults and keep originals."))
                                 .frame(maxWidth: .infinity)
                                 .multilineTextAlignment(.center)
                         }
@@ -113,6 +115,12 @@ struct DroneImportView: View {
         .onChange(of: importer.volumes) { _, volumes in
             if !volumes.contains(where: { $0.path == selectedSource }) { selectedSource = "" }
         }
+        .sheet(isPresented: $showingDefaults) {
+            VStack(alignment: .leading, spacing: 20) {
+                ImportDefaultsView()
+                HStack { Spacer(); Button("Done") { showingDefaults = false }.keyboardShortcut(.defaultAction) }
+            }.padding(24).frame(width: 470)
+        }
         .sheet(item: $editing) { profile in
             DroneProfileEditor(profile: profile) { importer.save($0); editing = nil }
         }
@@ -149,10 +157,10 @@ struct DroneImportView: View {
                                 let destinationID = try ImportVolumes.identity(target)
                                 guard destinationID != id else { throw ImportFailure("Choose a destination on a different disk.") }
                                 let bookmark = try target.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
-                                editing = DroneProfile(id: id, name: source.lastPathComponent,
+                                editing = ImportDefaults().newProfile(id: id, name: source.lastPathComponent,
                                     mediaPath: String(folder.path.dropFirst(source.path.count + 1)), destinationBookmark: bookmark,
                                     destinationVolumeID: destinationID, destinationLabel: target.path,
-                                    sourceBookmark: try folder.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil), cleanLayout: true)
+                                    sourceBookmark: try folder.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil))
                             } catch { setupError = error.localizedDescription }
                         }
                     }

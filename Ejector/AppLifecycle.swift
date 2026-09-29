@@ -24,6 +24,7 @@ import Combine
         NotificationCenter.default.publisher(for: ImportCompletionNotification.showImports)
             .sink { [weak self] _ in self?.imports() }.store(in: &observations)
         updateStatus()
+        UpdateChannel.start()
     }
     func configure(openWindow: @escaping (String) -> Void, openSettings: @escaping () -> Void) {
         self.openWindow = openWindow; self.openSettings = openSettings
@@ -161,8 +162,11 @@ import Combine
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { imports(); return true }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        if importer.busy { importer.cancel(); imports(); return .terminateCancel }
+        if importer.busy { imports(); return .terminateCancel }
         if manager.isEjecting { return .terminateCancel }
+        if NSApp.windows.contains(where: { $0.identifier?.rawValue == "importsWindow" && !$0.sheets.isEmpty }) {
+            imports(); return .terminateCancel
+        }
         return .terminateNow
     }
     func applicationWillTerminate(_ notification: Notification) { GlobalHotkeyManager.shared.stop() }
