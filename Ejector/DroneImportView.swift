@@ -137,7 +137,8 @@ struct DroneImportView: View {
             guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" }) else { return }
             let media = FolderSelectionPanel.make()
             media.title = "Step 1 of 2: Choose recordings"
-            media.message = "Step 1 of 2: Choose the recording folder on \(source.lastPathComponent).\nSelect DCIM or VIDEO for ordinary clips; choose the whole card for structured cinema formats. Next, choose where to save copies."
+            // Long message lines squeeze the native picker's sidebar, even in a wide panel.
+            media.message = "Step 1 of 2: Choose the recording folder.\nSelect DCIM or VIDEO for ordinary clips.\nFor structured cinema formats, choose the whole card.\nNext, choose where to save copies."
             media.prompt = "Use recording folder"
             media.canChooseDirectories = true; media.canChooseFiles = false
             media.directoryURL = source
@@ -148,7 +149,7 @@ struct DroneImportView: View {
                     guard MediaImportEngine.isWithin(folder, source) else { throw ImportFailure("Select a media folder or the whole chosen device.") }
                     DispatchQueue.main.async {
                         let destination = ImportFolderPanels.destination(
-                            message: "Step 2 of 2: Choose where to save copies of \(folder.lastPathComponent).\nUse your Mac or another drive. Copies go into dated subfolders.")
+                            message: "Step 2 of 2: Choose where to save copies.\nUse your Mac or another drive.\nCopies go into dated subfolders.")
                         destination.beginSheetModal(for: window) { response in
                             guard response == .OK, let target = destination.url else { return }
                             do {
@@ -324,7 +325,7 @@ struct DroneProfileEditor: View {
         let window = parent.attachedSheet ?? parent
         let panel = FolderSelectionPanel.make(); panel.canChooseDirectories = true; panel.canChooseFiles = false
         panel.title = "Choose this device’s media folder"
-        panel.message = "Choose DCIM or VIDEO for ordinary clips. For structured recordings, choose the complete camera folder or whole card."
+        panel.message = "Choose this device’s recording folder.\nSelect DCIM or VIDEO for ordinary clips.\nFor structured recordings, choose the full camera folder\nor the whole card."
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, let folder = panel.url else { return }
             do {
@@ -343,7 +344,7 @@ struct DroneProfileEditor: View {
         guard let parent = NSApp.windows.first(where: { $0.identifier?.rawValue == "importsWindow" }) else { return }
         let window = parent.attachedSheet ?? parent
         let panel = ImportFolderPanels.destination(
-            message: "Choose where to save copies from \(profile.name).\nUse your Mac or another drive. Copies go into dated subfolders.",
+            message: "Choose where to save copies.\nUse your Mac or another drive.\nCopies go into dated subfolders.",
             currentFolder: URL(fileURLWithPath: profile.destinationLabel))
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, let url = panel.url else { return }

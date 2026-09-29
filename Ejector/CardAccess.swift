@@ -52,7 +52,7 @@ import Combine
             panel.canChooseFiles = false; panel.canChooseDirectories = true
             panel.allowsMultipleSelection = false
             panel.title = "Authorize a card or external volume"
-            panel.message = "Under Locations, select the card itself (for example, Untitled),\nnot DCIM or another folder inside it.\nAuthorize remembers access for folder detection and Clean & Eject.\nThis does not start an import or enable deletion."
+            panel.message = "Under Locations, select the card itself, such as Untitled.\nDo not select DCIM or another folder inside it.\nThis remembers access for folder detection and cleanup.\nIt does not start an import or enable deletion."
             panel.prompt = "Authorize"
             panel.directoryURL = expected ?? URL(fileURLWithPath: "/Volumes")
             NSApp.activate()
