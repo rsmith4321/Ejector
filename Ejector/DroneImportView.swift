@@ -59,7 +59,7 @@ struct DroneImportView: View {
                 }
                 VStack(alignment: .leading, spacing: 12) {
                         if importer.profiles.isEmpty {
-                            ContentUnavailableView("No devices enrolled", systemImage: "sdcard", description: Text("Choose a connected device below. New profiles use your import defaults and keep originals."))
+                            ContentUnavailableView("No devices enrolled", systemImage: "sdcard", description: Text("Choose a connected device below. New profiles follow your import defaults."))
                                 .frame(maxWidth: .infinity)
                                 .multilineTextAlignment(.center)
                         }
@@ -237,7 +237,7 @@ struct DroneProfileEditor: View {
             }
             Text("Originals on this device").font(.headline)
             if profile.followsImportDefaults {
-                Text("Defaults keep originals. Choose Use custom settings to enable deletion or Trash recovery.")
+                Text("These choices also follow your import defaults. Choose Use custom settings to change them for this device.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Group {

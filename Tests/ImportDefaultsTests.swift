@@ -11,7 +11,7 @@ import Foundation
                                 destinationLabel: "/test", sourceBookmark: Data())
         }
         let initial = profile(ImportDefaults(store: store))
-        precondition(initial.cleanLayout == true && initial.includePreviews == true && initial.videosOnly == false)
+        precondition(initial.cleanLayout == true && initial.includePreviews == true && initial.videosOnly == true)
         precondition(!initial.enabled && !initial.autoEject && !initial.deleteOriginals && !initial.recoverTrash)
         store.set(true, forKey: ImportDefaults.videosOnlyKey)
         store.set(false, forKey: ImportDefaults.cleanLayoutKey)
@@ -21,11 +21,11 @@ import Foundation
         let customized = profile(ImportDefaults(store: UserDefaults(suiteName: name)!))
         precondition(customized.videosOnly == true && customized.cleanLayout == false && customized.includePreviews == false)
         precondition(customized.enabled && customized.autoEject && !customized.deleteOriginals && !customized.recoverTrash)
-        precondition(initial.cleanLayout == true && initial.videosOnly == false) // Saved seed values are unchanged.
+        precondition(initial.cleanLayout == true && initial.videosOnly == true) // Saved seed values are unchanged.
         let changedDefaults = ImportDefaults(store: store)
         let inherited = initial.resolved(using: changedDefaults)
         precondition(inherited.videosOnly == true && inherited.cleanLayout == false && inherited.enabled && inherited.autoEject)
-        precondition(initial.videosOnly == false && !initial.enabled) // Resolution does not mutate stored data.
+        precondition(initial.videosOnly == true && !initial.enabled) // Resolution does not mutate stored data.
         var override = customized
         override.setCustomImportSettings(true, defaults: changedDefaults)
         override.cleanLayout = true
@@ -58,6 +58,33 @@ import Foundation
         precondition(decoded == legacy && decoded.cleanLayout == nil && decoded.deleteOriginals)
         precondition(!decoded.followsImportDefaults && decoded.resolved(using: nextDefaults) == legacy)
         precondition(!profile(ImportDefaults(store: store)).deleteOriginals)
-        print("PASS: factory defaults, saved preferences, per-card overrides, live inheritance, frozen operations, custom isolation, legacy profiles and original retention")
+        store.set(true, forKey: ImportDefaults.deleteOriginalsKey)
+        store.set(true, forKey: ImportDefaults.recoverTrashKey)
+        let removalDefaults = ImportDefaults(store: UserDefaults(suiteName: name)!)
+        precondition(removalDefaults.deleteOriginals && removalDefaults.recoverTrash)
+        let newCard = profile(removalDefaults)
+        precondition(newCard.deleteOriginals && newCard.recoverTrash)
+        let existingDefaultCard = initial.resolved(using: removalDefaults)
+        precondition(existingDefaultCard.deleteOriginals && existingDefaultCard.recoverTrash)
+        precondition(customSnapshot.resolved(using: removalDefaults) == customSnapshot)
+        precondition(decoded.resolved(using: removalDefaults) == decoded)
+        var switcher = customSnapshot
+        switcher.setCustomImportSettings(false, defaults: removalDefaults)
+        precondition(switcher.deleteOriginals && switcher.recoverTrash)
+        switcher.setCustomImportSettings(true, defaults: removalDefaults)
+        precondition(switcher.deleteOriginals && switcher.recoverTrash && !switcher.followsImportDefaults)
+        ImportDefaults.setVideosOnly(true, store: store)
+        precondition(ImportDefaults(store: store).deleteOriginals && ImportDefaults(store: store).recoverTrash)
+        ImportDefaults.setVideosOnly(false, store: store)
+        let broadened = ImportDefaults(store: store)
+        precondition(!broadened.videosOnly && !broadened.deleteOriginals && !broadened.recoverTrash)
+        precondition(existingDefaultCard.deleteOriginals && existingDefaultCard.recoverTrash) // Running import frozen.
+        store.removeObject(forKey: ImportDefaults.videosOnlyKey)
+        store.set(true, forKey: ImportDefaults.deleteOriginalsKey)
+        store.set(true, forKey: ImportDefaults.recoverTrashKey)
+        precondition(ImportDefaults(store: store).videosOnly) // Factory Videos only also needs reset on broadening.
+        ImportDefaults.setVideosOnly(false, store: store)
+        precondition(!ImportDefaults(store: store).deleteOriginals && !ImportDefaults(store: store).recoverTrash)
+        print("PASS: factory defaults, saved preferences, per-card overrides, live inheritance, frozen operations, custom isolation, legacy profiles, Videos only factory default, removal-default inheritance and photo-broadening reset")
     }
 }
