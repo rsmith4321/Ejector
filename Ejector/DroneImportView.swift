@@ -6,6 +6,7 @@ struct DroneImportView: View {
     @State private var selectedSource = ""
     @State private var setupError: String?
     @State private var showingDefaults = false
+    @StoredImportDefaults private var defaults
 
     var body: some View {
         ScrollView {
@@ -62,19 +63,20 @@ struct DroneImportView: View {
                                 .frame(maxWidth: .infinity)
                                 .multilineTextAlignment(.center)
                         }
-                        ForEach(importer.profiles) { profile in
+                        ForEach(importer.profiles) { storedProfile in
+                            let profile = storedProfile.resolved(using: defaults)
                             GroupBox {
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack {
                                         Text(profile.name).font(.headline)
                                         Spacer()
-                                        Text(profile.enabled ? "Automatic" : "Manual").font(.caption).foregroundStyle(.secondary)
+                                        Text((profile.followsImportDefaults ? "Uses defaults · " : "Custom · ") + (profile.enabled ? "Automatic" : "Manual")).font(.caption).foregroundStyle(.secondary)
                                     }
                                     Text("\(profile.mediaPath) → \(profile.destinationLabel)/YYYY-MM-DD").font(.caption).lineLimit(2)
                                     Text((profile.videosOnly == true ? "Videos only · " : "All media · ") + (profile.deleteOriginals ? "Delete imported originals after verification" : "Keep originals on device")).font(.caption)
                                     HStack {
-                                        Button("Import now") { importer.importNow(profile) }
-                                        Button("Edit") { editing = profile }
+                                        Button("Import now") { importer.importNow(storedProfile) }
+                                        Button("Edit") { editing = storedProfile }
                                         Spacer()
                                         Button("Remove profile") { importer.remove(profile.id) }
                                     }.disabled(importer.busy)
@@ -116,10 +118,7 @@ struct DroneImportView: View {
             if !volumes.contains(where: { $0.path == selectedSource }) { selectedSource = "" }
         }
         .sheet(isPresented: $showingDefaults) {
-            VStack(alignment: .leading, spacing: 20) {
-                ImportDefaultsView()
-                HStack { Spacer(); Button("Done") { showingDefaults = false }.keyboardShortcut(.defaultAction) }
-            }.padding(24).frame(width: 470)
+            ImportDefaultsSheet()
         }
         .sheet(item: $editing) { profile in
             DroneProfileEditor(profile: profile) { importer.save($0); editing = nil }
@@ -178,6 +177,8 @@ struct DroneProfileEditor: View {
     @State private var error: String?
     @State private var showingPermanentDeletionConfirmation = false
     @State private var showingTrashConfirmation = false
+    @State private var showingDefaults = false
+    @StoredImportDefaults private var defaults
     var body: some View {
         ScrollView {
         VStack(alignment: .leading, spacing: 16) {
@@ -190,58 +191,89 @@ struct DroneProfileEditor: View {
             Button("Change destination…", action: chooseDestination)
             Button("Change media folder…", action: chooseSource)
             Divider()
-            Picker("Import", selection: Binding(get: { profile.videosOnly ?? false }, set: { value in
-                // Broadening a video-only profile must not silently enable photo deletion.
-                if !value && profile.videosOnly == true { profile.deleteOriginals = false; profile.recoverTrash = false }
-                profile.videosOnly = value
-            })) {
-                Text("All media and sidecars").tag(false)
-                Text("Videos only").tag(true)
-            }
-            Text(profile.videosOnly == true
-                ? "Using Lightroom for photos? Import videos and their recognized companions here. Photos, photo sidecars, and unrecognized files stay on the device, even with deletion or Trash recovery enabled. Recognized camera packages include their support files; ambiguous packages require All media."
-                : "Copies media and sidecars. Unfamiliar formats keep their camera folders and remain on the device. The Insta360 device index is backed up separately and retained.")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Toggle("Include camera previews", isOn: Binding(get: { profile.includePreviews ?? true }, set: { profile.includePreviews = $0 }))
-            Text("Includes LRV, LRF, THM and recognized proxy folders. Turn off for full-quality recordings without optional previews. Skipped previews stay on the device. Required camera-package files are always kept; some editor/playback features need previews.")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Toggle("Clean folder layout", isOn: Binding(get: { profile.cleanLayout ?? false }, set: { profile.cleanLayout = $0 }))
-            Text("Ordinary media goes directly in the dated folder with original names and companions. Conflicts use Additional media; structured or unfamiliar formats keep Camera originals folders. Turn off to preserve ordinary camera folders too.")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Toggle("Import automatically when connected", isOn: $profile.enabled)
-            Toggle(profile.videosOnly == true ? "Permanently delete imported videos" : "Permanently delete imported originals", isOn: Binding(
-                get: { profile.deleteOriginals },
-                set: { enabled in
-                    if enabled && !profile.deleteOriginals {
-                        showingPermanentDeletionConfirmation = true
-                    } else if !enabled {
-                        profile.deleteOriginals = false
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Label(profile.followsImportDefaults ? "Using import defaults" : "Custom import settings",
+                              systemImage: profile.followsImportDefaults ? "slider.horizontal.3" : "pencil")
+                            .font(.headline)
+                        Spacer()
+                        Button("Edit defaults…") { showingDefaults = true }
                     }
-                }
-            ))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(profile.deleteOriginals ? "Permanent deletion is on" : "Keep originals is on (recommended)")
-                    .font(.caption.weight(.semibold))
-                Text(profile.deleteOriginals
-                    ? "Only recognized imported media and companions are removed after the selected batch passes saved-copy verification. They skip Trash and cannot be restored from it. Use only for unimportant or replaceable footage."
-                    : "Easy Eject saves verified copies and leaves the files on your device. Keep this setting for client work and important photos or videos.")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    Toggle("Customize for this device", isOn: Binding(
+                        get: { !profile.followsImportDefaults },
+                        set: { profile.setCustomImportSettings($0, defaults: defaults) }
+                    ))
+                    Text(profile.followsImportDefaults
+                        ? "These settings follow your import defaults. Turn on customization to change them for this device."
+                        : "These settings are saved only for this device. Turn off customization to use the current defaults and keep originals.")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Divider()
+                    VStack(alignment: .leading, spacing: 12) {
+                        Picker("Import", selection: Binding(get: { profile.videosOnly ?? false }, set: { value in
+                            // Broadening a video-only profile must not silently enable photo deletion.
+                            if !value && profile.videosOnly == true { profile.deleteOriginals = false; profile.recoverTrash = false }
+                            profile.videosOnly = value
+                        })) {
+                            Text("All media and sidecars").tag(false)
+                            Text("Videos only").tag(true)
+                        }
+                        Text(profile.videosOnly == true
+                            ? "Using Lightroom for photos? Import videos and their recognized companions here. Photos, photo sidecars, and unrecognized files stay on the device, even with deletion or Trash recovery enabled. Recognized camera packages include their support files; ambiguous packages require All media."
+                            : "Copies media and sidecars. Unfamiliar formats keep their camera folders and remain on the device. The Insta360 device index is backed up separately and retained.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        Toggle("Include camera previews", isOn: Binding(get: { profile.includePreviews ?? true }, set: { profile.includePreviews = $0 }))
+                        Text("Includes LRV, LRF, THM and recognized proxy folders. Turn off for full-quality recordings without optional previews. Skipped previews stay on the device. Required camera-package files are always kept; some editor/playback features need previews.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        Toggle("Clean folder layout", isOn: Binding(get: { profile.cleanLayout ?? false }, set: { profile.cleanLayout = $0 }))
+                        Text("Ordinary media goes directly in the dated folder with original names and companions. Conflicts use Additional media; structured or unfamiliar formats keep Camera originals folders. Turn off to preserve ordinary camera folders too.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        Toggle("Import automatically when connected", isOn: $profile.enabled)
+                        Toggle("Ask to eject after import", isOn: $profile.autoEject)
+                        Text("After import or when no media matches your options, a dialog asks whether to eject. Keep Connected is the default so you can finish importing in Lightroom. Choose Eject Now and wait for confirmation that the device is safe to unplug. Eject is also available in the menu.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text("Choosing Eject Now also unmounts the other partitions on that disk. Keep it connected until you have finished all desired imports.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .disabled(profile.followsImportDefaults)
+                    .foregroundStyle(profile.followsImportDefaults ? .secondary : .primary)
+                }.padding(6)
             }
-            Toggle("Recover and clear this device’s Trash", isOn: Binding(get: { profile.recoverTrash }, set: {
-                if $0 { showingTrashConfirmation = true } else { profile.recoverTrash = false }
-            }))
-            Text("Recovers and verifies files matching your import choice before removing them from this device’s Trash. Videos only leaves photos and unrecognized files in Trash.")
-                .font(.caption).foregroundStyle(.secondary)
-            #if APP_STORE
-            Text("Requires authorization for this card, in addition to the media folder. If permission is unavailable, import stops without claiming completion.")
-                .font(.caption).foregroundStyle(.secondary)
-            #endif
-            Toggle("Ask to eject after import", isOn: $profile.autoEject)
-            Text("After import or when no media matches your options, a dialog asks whether to eject. Keep Connected is the default so you can finish importing in Lightroom. Choose Eject Now and wait for confirmation that the device is safe to unplug. Eject is also available in the menu.")
-                .font(.caption).foregroundStyle(.secondary)
-            Text("Choosing Eject Now also unmounts the other partitions on that disk. Keep it connected until you have finished all desired imports.")
-                .font(.caption).foregroundStyle(.secondary)
+            Text("Originals on this device").font(.headline)
+            if profile.followsImportDefaults {
+                Text("Defaults keep originals. Customize this device to enable deletion or Trash recovery.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Group {
+                Toggle(profile.videosOnly == true ? "Permanently delete imported videos" : "Permanently delete imported originals", isOn: Binding(
+                    get: { profile.deleteOriginals },
+                    set: { enabled in
+                        if enabled && !profile.deleteOriginals {
+                            showingPermanentDeletionConfirmation = true
+                        } else if !enabled {
+                            profile.deleteOriginals = false
+                        }
+                    }
+                ))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(profile.deleteOriginals ? "Permanent deletion is on" : "Keep originals is on (recommended)")
+                        .font(.caption.weight(.semibold))
+                    Text(profile.deleteOriginals
+                        ? "Only recognized imported media and companions are removed after the selected batch passes saved-copy verification. They skip Trash and cannot be restored from it. Use only for unimportant or replaceable footage."
+                        : "Easy Eject saves verified copies and leaves the files on your device. Keep this setting for client work and important photos or videos.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Toggle("Recover and clear this device’s Trash", isOn: Binding(get: { profile.recoverTrash }, set: {
+                    if $0 { showingTrashConfirmation = true } else { profile.recoverTrash = false }
+                }))
+                Text("Recovers and verifies files matching your import choice before removing them from this device’s Trash. Videos only leaves photos and unrecognized files in Trash.")
+                    .font(.caption).foregroundStyle(.secondary)
+                #if APP_STORE
+                Text("Requires authorization for this card, in addition to the media folder. If permission is unavailable, import stops without claiming completion.")
+                    .font(.caption).foregroundStyle(.secondary)
+                #endif
+            }.disabled(profile.followsImportDefaults)
             if let error { Text(error).foregroundStyle(.orange) }
             HStack {
                 Button("Cancel") { dismiss() }
@@ -253,6 +285,9 @@ struct DroneProfileEditor: View {
                 .font(.caption).foregroundStyle(.secondary)
         }.padding(24)
         }.frame(width: 520, height: 700)
+        .onAppear { profile = profile.resolved(using: defaults) }
+        .onChange(of: defaults) { _, value in profile = profile.resolved(using: value) }
+        .sheet(isPresented: $showingDefaults) { ImportDefaultsSheet() }
         .alert("Recover and clear device Trash?", isPresented: $showingTrashConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Enable Verified Trash Recovery", role: .destructive) {

@@ -143,7 +143,7 @@ import UserNotifications
         }
         attempted.subtract(mountedIDs.subtracting(ids)); mountedIDs = ids
         guard !busy else { return }
-        for profile in profiles where profile.enabled && !attempted.contains(profile.id) {
+        for profile in profiles where profile.resolved(using: ImportDefaults()).enabled && !attempted.contains(profile.id) {
             if let source = volumes.first(where: { (try? ImportVolumes.identity($0)) == profile.id }) {
                 start(profile, source: source)
                 if busy { break }
@@ -160,7 +160,9 @@ import UserNotifications
         start(profile, source: source)
     }
 
-    private func start(_ profile: DroneProfile, source: URL) {
+    private func start(_ storedProfile: DroneProfile, source: URL) {
+        // Freeze defaults for the whole operation, including its final eject choice.
+        let profile = storedProfile.resolved(using: ImportDefaults())
         clearCompletions(for: source)
         let connection = connections[source] ?? UUID()
         connections[source] = connection
@@ -187,7 +189,7 @@ import UserNotifications
                 throw ImportFailure("The authorized media folder no longer belongs to this device. Choose it again.")
             }
             if sourceAccess.refreshedBookmark != nil || destinationAccess.refreshedBookmark != nil {
-                var updated = profile
+                var updated = storedProfile
                 updated.sourceBookmark = sourceAccess.refreshedBookmark ?? bookmark
                 updated.destinationBookmark = destinationAccess.refreshedBookmark ?? profile.destinationBookmark
                 updated.mediaPath = String(media.path.dropFirst(source.path.count + 1))

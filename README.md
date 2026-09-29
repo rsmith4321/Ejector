@@ -5,7 +5,7 @@ A native macOS menu bar utility for ejecting camera cards, optional hidden-file 
 | | Website download | Mac App Store |
 | --- | --- | --- |
 | Target / bundle | `Ejector` / `com.ryansmithphotography.Ejector` | `EjectorStore` / `com.ryansmithphotography.EasyEject.store` |
-| Current source | Website 1.7.0 | Store 1.1 (9) submitted; public Store 1.0 (8) |
+| Current source | Website 1.7.1 (local candidate) | Store 1.1 (9) submitted; public Store 1.0 (8) |
 | Distribution | Developer ID signed and notarized | App Sandbox and App Store review |
 | Folder detection and cleaning | No Easy Eject per-card authorization; macOS Files and Folders permissions still apply | Select the whole card with Authorize a Card; repeat if formatting invalidates access |
 | Updates | Sparkle automatic checks; signed GitHub updates installed with approval | App Store |
@@ -34,7 +34,7 @@ In Device Media Imports, select the device, its media folder (such as DCIM, or a
 
 Copies go into dated folders and are verified with SHA-256 and durability checks. Originals are kept by default. Automatic import and the post-import eject prompt start off unless changed in import defaults. Original deletion and device Trash recovery always start off for each new profile. Saving does not start an import. Permanent original deletion requires explicit confirmation and saved-copy verification; keep it off for important media. Device Trash recovery verifies recovered copies before removal, and in Store also needs whole-card access.
 
-Website 1.6.0 adds **Videos only**, **Include camera previews**, and **Clean folder layout**. Media selection and preview selection are independent. New profiles start from the user’s import defaults; existing profiles keep their saved options until edited. Previews remain included unless disabled. Skipped previews, unknown files and device indexes are never deleted by the importer. Required camera-package files remain included even when optional previews are off.
+Website 1.6.0 adds **Videos only**, **Include camera previews**, and **Clean folder layout**. Media selection and preview selection are independent. New profiles follow the user’s import defaults unless Customize for this device is enabled; older profiles retain their saved choices as custom settings. Previews remain included unless disabled. Skipped previews, unknown files and device indexes are never deleted by the importer. Required camera-package files remain included even when optional previews are off.
 
 Ordinary media can be saved directly in the dated folder with unchanged names. Conflicting groups go in Additional media; known structured or unfamiliar media retains its tree under Camera originals. Complete Sony/P2/RED and other recognized packages include supporting audio/metadata; partial CLIP/STREAM selections stop with guidance. This is a verified file copier, not a codec converter, stitching engine, clip joiner, camera database editor or universal device certification. Same-name still/movie pairs are conservatively kept for photo workflows; renamed Live Photo pairs and unfamiliar video sequences need manual review.
 
@@ -57,6 +57,6 @@ Archive `Ejector` or `EjectorStore` with the preserved release toolchain. Direct
 
 ## New-device defaults and website updates
 
-Settings and Device Media Imports → Import defaults let users choose media selection, camera previews, clean layout, automatic import and the post-import eject prompt. New enrollment snapshots those values; changing defaults never migrates existing profiles. Original deletion and device Trash recovery always start off and retain their per-device confirmations.
+Settings and Device Media Imports → Import defaults let users choose media selection, camera previews, clean layout, automatic import and the post-import eject prompt. New cards visibly use defaults, with their option controls disabled until Customize for this device is selected. Edit defaults is available directly in the profile editor. Cards using defaults follow changes on their next import; each running import freezes its options. Older profiles retain saved settings as custom profiles. Returning to defaults disables original deletion and device Trash recovery; these options require custom settings and their per-device confirmations.
 
 Website 1.7.0 uses Sparkle 2.10.0, linked only into the Ejector target. Checks are automatic by default and can be disabled in Settings. Users approve installation. Silent downloading/installing and system-profile reporting are disabled. Both the appcast and update archive require Ed25519 signatures; the app and DMG also use Developer ID signing and notarization. Updates wait for imports, ejection and open dialogs. Final termination refuses to interrupt active work. See [update publishing](Updates/README.md).

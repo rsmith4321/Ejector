@@ -23,10 +23,16 @@ final class LogManager {
         let video = source.appendingPathComponent("DCIM/TEST001.MP4")
         try! FileManager.default.createDirectory(at: video.deletingLastPathComponent(), withIntermediateDirectories: true)
         try! Data(repeating: 7, count: 1024).write(to: video)
+        let photo = source.appendingPathComponent("DCIM/PHOTO001.JPG")
+        try! Data(repeating: 3, count: 128).write(to: photo)
+        UserDefaults.standard.set(true, forKey: ImportDefaults.videosOnlyKey)
+        UserDefaults.standard.set(true, forKey: ImportDefaults.cleanLayoutKey)
+        UserDefaults.standard.set(true, forKey: ImportDefaults.askToEjectKey)
         let profile = DroneProfile(id: try! ImportVolumes.identity(source), name: "Disposable notification test",
             mediaPath: "DCIM", destinationBookmark: try! destination.bookmarkData(),
             destinationVolumeID: try! ImportVolumes.identity(destination), destinationLabel: destination.path,
-            autoEject: true, cleanLayout: true)
+            deleteOriginals: true, recoverTrash: true, autoEject: false,
+            videosOnly: false, cleanLayout: false, usesImportDefaults: true)
         manager.profiles = [profile] // Never persist a profile; production support is never opened.
         var alertSeen = false
         var chooseEject = false
@@ -58,7 +64,9 @@ final class LogManager {
             let first = manager.pendingEjects[0]
             precondition(FileManager.default.fileExists(atPath: video.path))
             precondition(try! Data(contentsOf: first.folder.appendingPathComponent("TEST001.MP4")) == Data(repeating: 7, count: 1024))
-            print("PASS actual importer + dialog defaults Keep Connected; copies verified; source retained; busy released")
+            precondition(FileManager.default.fileExists(atPath: photo.path))
+            precondition(!FileManager.default.fileExists(atPath: first.folder.appendingPathComponent("PHOTO001.JPG").path))
+            print("PASS actual importer resolves shared video/layout/eject defaults; destructive flags ignored; photo not imported; originals retained")
             manager.handleImportNotification(id: first.id, action: UNNotificationDismissActionIdentifier)
             precondition(manager.pendingEjects.count == 1 && FileManager.default.fileExists(atPath: video.path))
             print("PASS dismiss does not eject or consume pending menu action")
