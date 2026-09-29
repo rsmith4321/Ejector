@@ -5,7 +5,7 @@ A native macOS menu bar utility for ejecting camera cards, optional hidden-file 
 | | Website download | Mac App Store |
 | --- | --- | --- |
 | Target / bundle | `Ejector` / `com.ryansmithphotography.Ejector` | `EjectorStore` / `com.ryansmithphotography.EasyEject.store` |
-| Current source | Website 1.7.4 (local candidate) | Store 1.1 (9) submitted; public Store 1.0 (8) |
+| Current source | Website 1.7.5 (local candidate) | Store 1.1 (9) submitted; public Store 1.0 (8) |
 | Distribution | Developer ID signed and notarized | App Sandbox and App Store review |
 | Folder detection and cleaning | No Easy Eject per-card authorization; macOS Files and Folders permissions still apply | Select the whole card with Authorize a Card; repeat if formatting invalidates access |
 | Updates | Sparkle automatic checks; signed GitHub updates installed with approval | App Store |
@@ -60,3 +60,5 @@ Archive `Ejector` or `EjectorStore` with the preserved release toolchain. Direct
 Settings and Device Media Imports → Import defaults include media selection, camera previews, clean layout, automatic import, the post-import eject prompt, permanent original deletion and device Trash recovery. New cards visibly use defaults, with their option controls disabled until Use custom settings is selected. A native Use defaults / Use custom settings radio group sits above the card’s options. Edit shared defaults from Settings or the main Device Media Imports window. Cards using defaults follow changes on their next import; each running import freezes its options. Older profiles retain saved settings as custom profiles. Removal options start off and require explicit confirmation before enabling in shared defaults or a custom profile. Shared-default confirmation covers all cards using defaults, including future cards; changing Videos only to All media resets both removal options for review. Switching a card to defaults inherits all current choices. Store Trash recovery still requires whole-card authorization for each device.
 
 Website 1.7.0 uses Sparkle 2.10.0, linked only into the Ejector target. Checks are automatic by default and can be disabled in Settings. Users approve installation. Silent downloading/installing and system-profile reporting are disabled. Both the appcast and update archive require Ed25519 signatures; the app and DMG also use Developer ID signing and notarization. Updates wait for imports, ejection and open dialogs. Final termination refuses to interrupt active work. See [update publishing](Updates/README.md).
+
+Settings and import-default sheets keep Done visible below their scrolling content. Profile editors keep Cancel and Save profile visible, with Escape to cancel and Return to save. Folder selectors start at 960 × 680 points where the screen permits, with a usable minimum size and native resizing.

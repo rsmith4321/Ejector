@@ -91,11 +91,15 @@ struct ImportDefaultsView: View {
 struct ImportDefaultsSheet: View {
     @Environment(\.dismiss) private var dismiss
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                ImportDefaultsView()
-                HStack { Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
-            }.padding(24)
+        VStack(spacing: 0) {
+            ScrollView { ImportDefaultsView().padding(24) }
+            Divider()
+            HStack {
+                Text("Changes save automatically.").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+            }.padding(.horizontal, 24).padding(.vertical, 16)
         }.frame(width: 520, height: 680)
+        .onExitCommand { dismiss() }
     }
 }
