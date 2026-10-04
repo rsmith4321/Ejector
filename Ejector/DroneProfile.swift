@@ -18,8 +18,10 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     var includePreviews: Bool? = nil
     // Missing in older profiles: preserve their saved choices as custom settings.
     var usesImportDefaults: Bool? = nil
+    // Explicitly per-device; older profiles and new cards start with sharing copies off.
+    var sharingPreset: EasySharePreset? = nil
+    var sharingColor: EasyShareColor? = nil
 
     var followsImportDefaults: Bool { usesImportDefaults == true }
 }
-
 

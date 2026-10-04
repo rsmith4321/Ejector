@@ -237,6 +237,9 @@ struct DroneProfileEditor: View {
                             .foregroundStyle(profile.followsImportDefaults ? .secondary : .primary)
                         }.padding(6)
                     }
+                    #if !APP_STORE
+                    EasyShareProfileOptions(profile: $profile)
+                    #endif
                     Text("Originals on this device").font(.headline)
                     if profile.followsImportDefaults {
                         Text("These choices also follow your import defaults. Choose Use custom settings to change them for this device.")

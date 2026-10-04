@@ -68,6 +68,7 @@ import UserNotifications
 
     var menuTitle: String {
         if busy {
+            if progress.phase == "Creating sharing copies" { return "Sharing \(Int(progress.fraction * 100))%" }
             if ["Importing", "Checking", "Verifying copy", "Verifying", "Imported"].contains(progress.phase) {
                 return "Importing \(Int(progress.fraction * 100))%"
             }
@@ -262,9 +263,33 @@ import UserNotifications
                         let result = try engine.run()
                         try validate()
                         try audit("Completed \(result.files) files, \(result.bytes) bytes")
+                        var shareNote = ""
+                        #if !APP_STORE
+                        if let preset = profile.sharingPreset {
+                            do {
+                                let share = EasyShareEngine(tools: try EasyShareTools.installed(), preset: preset,
+                                    color: profile.sharingColor ?? .lunaILog, cancellation: token, validate: validate,
+                                    report: { value in DispatchQueue.main.async { self.progress = value } }, audit: audit)
+                                let copies = try share.run(originals: result.verifiedMedia, folder: result.folder)
+                                shareNote = " \(copies.created + copies.reused) \(preset.rawValue) sharing copies ready in Sharing Copies."
+                                if copies.created + copies.reused == 0 { shareNote = " No supported Luna master videos found for Easy Share." }
+                                if copies.skipped > 0 { shareNote += " \(copies.skipped) other MP4 files skipped." }
+                            } catch {
+                                try? audit("Original import verified; Easy Share stopped: \(error.localizedDescription)")
+                                let shareFailure = "\(profile.name): originals imported and verified. Easy Share stopped: \(error.localizedDescription)"
+                                DispatchQueue.main.async {
+                                    self.lastFolder = result.folder
+                                    releaseAccess()
+                                    self.finish(error: error, message: shareFailure)
+                                }
+                                return
+                            }
+                        }
+                        #endif
+                        let completedShareNote = shareNote
                         DispatchQueue.main.async {
                             self.lastFolder = result.files > 0 ? result.folder : destination
-                            let importNote = result.note.isEmpty ? "" : " " + result.note
+                            let importNote = (result.note.isEmpty ? "" : " " + result.note) + completedShareNote
                             let completion = result.hasSelectedMedia
                                 ? "\(profile.name): \(result.files) files imported and verified."
                                 : "\(profile.name): no media found matching your import options."

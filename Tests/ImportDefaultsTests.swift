@@ -49,6 +49,13 @@ import Foundation
         precondition(roundTrip == override && roundTrip.usesImportDefaults == false)
         let inheritedRoundTrip = try JSONDecoder().decode(DroneProfile.self, from: JSONEncoder().encode(initial))
         precondition(inheritedRoundTrip.followsImportDefaults)
+        precondition(inheritedRoundTrip.sharingPreset == nil && inheritedRoundTrip.sharingColor == nil)
+        var sharing = initial
+        sharing.sharingPreset = .uhd; sharing.sharingColor = .standard
+        let sharingResolved = sharing.resolved(using: changedDefaults)
+        precondition(sharingResolved.sharingPreset == .uhd && sharingResolved.sharingColor == .standard)
+        let sharingRoundTrip = try JSONDecoder().decode(DroneProfile.self, from: JSONEncoder().encode(sharing))
+        precondition(sharingRoundTrip == sharing)
         var legacy = initial
         legacy.usesImportDefaults = nil
         legacy.videosOnly = nil; legacy.cleanLayout = nil; legacy.includePreviews = nil

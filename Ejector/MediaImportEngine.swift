@@ -41,7 +41,8 @@ nonisolated struct MediaImportEngine {
     var sourceIdentifier = ""
     var includePreviews = true
 
-    struct Result { let files: Int; let bytes: Int64; let folder: URL; var note: String = ""; var hasSelectedMedia = false }
+    struct VerifiedMedia: Sendable { let url: URL; let sha256: String }
+    struct Result { let files: Int; let bytes: Int64; let folder: URL; var note: String = ""; var hasSelectedMedia = false; var verifiedMedia: [VerifiedMedia] = [] }
     struct Stamp: Equatable {
         let device: dev_t
         let inode: ino_t
@@ -376,6 +377,7 @@ nonisolated struct MediaImportEngine {
         var savedStamps: [URL: Stamp] = [:]
         let initialStamps = try Dictionary(uniqueKeysWithValues: (media + trashFiles).map { ($0, try Self.stamp($0)) })
         var removals: [(source: URL, saved: URL, before: Stamp, savedBefore: Stamp)] = []
+        var verifiedMedia: [VerifiedMedia] = []
         for (index, file) in items.enumerated() {
             try cancellation.check(); try validate()
             let fromTrash = index >= media.count && index < media.count + trashFiles.count
@@ -406,6 +408,7 @@ nonisolated struct MediaImportEngine {
             try Self.flushSavedCopy(saved)
             savedStamps[saved] = savedBefore
             try audit("Verified SHA256 \(sha) | \(file.path) -> \(saved.path)")
+            if !indexSet.contains(file) { verifiedMedia.append(VerifiedMedia(url: saved, sha256: sha)) }
             try cancellation.check(); try validate()
             if (deleteOriginals || fromTrash) && deletable.contains(file) && !indexSet.contains(file) {
                 guard try Self.stamp(file) == before, try Self.stamp(saved) == savedBefore else { throw ImportFailure("A file changed before deletion. Original kept.") }
@@ -468,7 +471,7 @@ nonisolated struct MediaImportEngine {
         if !includePreviews { notes.append("Optional previews left on device; required package files preserved.") }
         if videosOnly { notes.append("Photos and unrecognized files left on device.") }
         else if deleteOriginals && media.contains(where: { !deletable.contains($0) }) { notes.append("Unrecognized files kept on device.") }
-        return Result(files: items.count, bytes: totalBytes, folder: dated, note: notes.joined(separator: " "), hasSelectedMedia: !media.isEmpty || !trashFiles.isEmpty)
+        return Result(files: items.count, bytes: totalBytes, folder: dated, note: notes.joined(separator: " "), hasSelectedMedia: !media.isEmpty || !trashFiles.isEmpty, verifiedMedia: verifiedMedia)
     }
 
     private struct SavedCopy { let url: URL; let reused: Bool }
