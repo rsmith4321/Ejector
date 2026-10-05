@@ -18,6 +18,16 @@ import UserNotifications
     var needsAttention: Bool { hasError && !isIssueDismissed }
     @Published var volumes: [URL] = []
     @Published private(set) var pendingEjects: [ImportCompletion] = []
+    #if !APP_STORE
+    @Published private(set) var completedImports: [QuickShareImport] = []
+    var quickShareImports: [QuickShareImport] {
+        completedImports.filter { quickShareProfile(for: $0.id) != nil }
+    }
+    func quickShareProfile(for id: String) -> DroneProfile? {
+        guard let batch = completedImports.first(where: { $0.id == id }) else { return nil }
+        return profiles.first { $0.id == batch.profileID && $0.sharingPreset != nil }
+    }
+    #endif
     private var completions = ImportCompletionRegistry()
     private var connections: [URL: UUID] = [:]
     private var attempted = Set<String>()
@@ -43,6 +53,10 @@ import UserNotifications
                 profiles = try JSONDecoder().decode([DroneProfile].self, from: Data(contentsOf: file))
             }
         } catch { message = "Could not load import profiles: \(error.localizedDescription)"; hasError = true }
+        #if !APP_STORE
+        do { completedImports = try QuickShareImport.load(from: support.appendingPathComponent("completed-imports.json")) }
+        catch { message = "Could not load completed imports: \(error.localizedDescription)"; hasError = true }
+        #endif
         let center = NSWorkspace.shared.notificationCenter
         // Invalidate synchronously, before the debounced device-list refresh. BSD names and UUIDs
         // can both be reused when the same card is reconnected.
@@ -263,33 +277,9 @@ import UserNotifications
                         let result = try engine.run()
                         try validate()
                         try audit("Completed \(result.files) files, \(result.bytes) bytes")
-                        var shareNote = ""
-                        #if !APP_STORE
-                        if let preset = profile.sharingPreset {
-                            do {
-                                let share = EasyShareEngine(tools: try EasyShareTools.installed(), preset: preset,
-                                    color: profile.sharingColor ?? .lunaILog, cancellation: token, validate: validate,
-                                    report: { value in DispatchQueue.main.async { self.progress = value } }, audit: audit)
-                                let copies = try share.run(originals: result.verifiedMedia, folder: result.folder)
-                                shareNote = " \(copies.created + copies.reused) \(preset.rawValue) sharing copies ready in Sharing Copies."
-                                if copies.created + copies.reused == 0 { shareNote = " No supported Luna master videos found for Easy Share." }
-                                if copies.skipped > 0 { shareNote += " \(copies.skipped) other MP4 files skipped." }
-                            } catch {
-                                try? audit("Original import verified; Easy Share stopped: \(error.localizedDescription)")
-                                let shareFailure = "\(profile.name): originals imported and verified. Easy Share stopped: \(error.localizedDescription)"
-                                DispatchQueue.main.async {
-                                    self.lastFolder = result.folder
-                                    releaseAccess()
-                                    self.finish(error: error, message: shareFailure)
-                                }
-                                return
-                            }
-                        }
-                        #endif
-                        let completedShareNote = shareNote
                         DispatchQueue.main.async {
                             self.lastFolder = result.files > 0 ? result.folder : destination
-                            let importNote = (result.note.isEmpty ? "" : " " + result.note) + completedShareNote
+                            let importNote = (result.note.isEmpty ? "" : " " + result.note)
                             let completion = result.hasSelectedMedia
                                 ? "\(profile.name): \(result.files) files imported and verified."
                                 : "\(profile.name): no media found matching your import options."
@@ -298,6 +288,17 @@ import UserNotifications
                                 physicalID: originalSourceDisk, connection: connection, deviceName: profile.name,
                                 hasMedia: result.hasSelectedMedia, folder: self.lastFolder!,
                                 destinationBookmark: profile.destinationBookmark, destinationVolumeID: profile.destinationVolumeID)
+                            #if !APP_STORE
+                            if !result.verifiedMedia.isEmpty {
+                                let batch = QuickShareImport(id: completionID, profileID: profile.id, deviceName: profile.name,
+                                    date: Date(), folder: result.folder, destinationBookmark: profile.destinationBookmark,
+                                    destinationVolumeID: profile.destinationVolumeID, originals: result.verifiedMedia)
+                                self.completedImports.insert(batch, at: 0)
+                                self.completedImports = Array(self.completedImports.prefix(20))
+                                do { try QuickShareImport.save(self.completedImports, to: self.support.appendingPathComponent("completed-imports.json")) }
+                                catch { self.logEjectEvent("Import verified; could not save Quick Share history: \(error.localizedDescription)") }
+                            }
+                            #endif
                             releaseAccess()
                             guard profile.autoEject, self.connections[source] == connection else {
                                 self.finish(error: nil, message: completion + " Device remains connected." + importNote)
@@ -350,6 +351,11 @@ import UserNotifications
 
     private func showEjectPrompt(_ entry: ImportCompletion) {
         guard completions.entries[entry.id] != nil else { return }
+        #if !APP_STORE
+        let offersQuickShare = quickShareProfile(for: entry.id) != nil
+        #else
+        let offersQuickShare = false
+        #endif
         if !ImportVolumes.otherStorageSources(entry.source).isEmpty {
             do {
                 let plan = try USBStorageUnmountPlan(source: entry.source)
@@ -361,18 +367,111 @@ import UserNotifications
                 }
                 let alert = ImportEjectPrompt.make(hasMedia: entry.hasMedia,
                     deviceName: entry.deviceName, sourceName: entry.source.lastPathComponent,
-                    storageSources: plan.members.map { $0.url.lastPathComponent })
+                    storageSources: plan.members.map { $0.url.lastPathComponent }, quickShare: offersQuickShare)
                 NSApp.activate()
-                if alert.runModal() == .alertSecondButtonReturn {
+                let choice = alert.runModal()
+                if choice == .alertSecondButtonReturn {
                     ejectCameraStorage(entry, plan: plan, expectedConnections: expectedConnections)
                 }
+                #if !APP_STORE
+                if choice == .alertThirdButtonReturn { quickShareCompletedImport(entry.id, returnToEject: true) }
+                #endif
             } catch { recordOperationFailure(error) }
             return
         }
-        let alert = ImportEjectPrompt.make(hasMedia: entry.hasMedia, deviceName: entry.deviceName)
+        let alert = ImportEjectPrompt.make(hasMedia: entry.hasMedia, deviceName: entry.deviceName, quickShare: offersQuickShare)
         NSApp.activate()
-        if alert.runModal() == .alertSecondButtonReturn { ejectCompletedImport(entry.id) }
+        let choice = alert.runModal()
+        if choice == .alertSecondButtonReturn { ejectCompletedImport(entry.id) }
+        #if !APP_STORE
+        if choice == .alertThirdButtonReturn { quickShareCompletedImport(entry.id, returnToEject: true) }
+        #endif
     }
+
+    #if !APP_STORE
+    func quickShareCompletedImport(_ id: String, returnToEject: Bool = false) {
+        guard !busy, let batch = completedImports.first(where: { $0.id == id }),
+              let profile = quickShareProfile(for: id) else { return }
+        NSApp.activate()
+        guard let choice = QuickSharePrompt.choose(deviceName: batch.deviceName,
+            preset: profile.sharingPreset ?? .hd, color: profile.sharingColor ?? .lunaILog) else { return }
+        createQuickShare(batch, preset: choice.preset, color: choice.color, returnToEject: returnToEject)
+    }
+
+    /// Called only after a manual Quick Share choice. Never invoked by start/refresh/importNow.
+    func createQuickShare(_ batch: QuickShareImport, preset: EasySharePreset, color: EasyShareColor,
+                          returnToEject: Bool = false) {
+        guard !busy, completedImports.contains(batch), quickShareProfile(for: batch.id) != nil else { return }
+        do {
+            var stale = false
+            let destination = try URL(resolvingBookmarkData: batch.destinationBookmark,
+                options: [.withoutUI, .withoutMounting], bookmarkDataIsStale: &stale)
+            guard !stale else { throw ImportFailure("The saved import permission expired. Choose the destination again and reimport to restore Quick Share access.") }
+            let accessed = destination.startAccessingSecurityScopedResource()
+            do {
+                try MediaImportEngine.checkPath(batch.folder)
+                let volume = try ImportVolumes.root(destination)
+                let physical = ImportVolumes.physicalID(volume)
+                let key = physical ?? volume.path
+                guard MediaImportEngine.isWithin(batch.folder, destination),
+                      try ImportVolumes.identity(destination) == batch.destinationVolumeID,
+                      try ImportVolumes.identity(batch.folder) == batch.destinationVolumeID else {
+                    throw ImportFailure("The saved import destination is disconnected or changed.")
+                }
+                guard !manualOperations.contains(key) else { throw ImportFailure("The import destination is being ejected. Reconnect it before making Quick Share copies.") }
+                let tools = try EasyShareTools.installed()
+                let token = ImportCancellation()
+                busy = true; hasError = false; activeName = batch.deviceName; cancellation = token
+                destinationRoot = volume; sourceRoot = nil; protectedPhysicalIDs = [key]
+                lastFolder = batch.folder
+                message = "Creating Quick Share copies from saved originals."
+                progress = ImportProgress(phase: "Creating sharing copies")
+                let logURL = support.appendingPathComponent("imports.log")
+                queue.async {
+                    let validate: () throws -> Void = {
+                        guard try ImportVolumes.identity(destination) == batch.destinationVolumeID,
+                              try ImportVolumes.identity(batch.folder) == batch.destinationVolumeID,
+                              try ImportVolumes.root(destination).standardizedFileURL == volume.standardizedFileURL,
+                              ImportVolumes.physicalID(volume) == physical else {
+                            throw ImportFailure("The import destination disconnected or changed. Quick Share stopped.")
+                        }
+                    }
+                    let audit: (String) throws -> Void = { line in
+                        if !FileManager.default.fileExists(atPath: logURL.path) { FileManager.default.createFile(atPath: logURL.path, contents: nil) }
+                        let handle = try FileHandle(forWritingTo: logURL); defer { try? handle.close() }
+                        try handle.seekToEnd()
+                        try handle.write(contentsOf: Data("\(ISO8601DateFormatter().string(from: Date())) \(line)\n".utf8))
+                        try handle.synchronize()
+                    }
+                    do {
+                        try audit("User requested Quick Share | \(batch.deviceName) | \(preset.rawValue) | \(color.rawValue)")
+                        let engine = EasyShareEngine(tools: tools, preset: preset, color: color, cancellation: token,
+                            validate: validate, report: { value in DispatchQueue.main.async { self.progress = value } }, audit: audit)
+                        let result = try engine.run(originals: batch.originals, folder: batch.folder)
+                        let total = result.created + result.reused
+                        let note = total > 0 ? "\(batch.deviceName): \(total) \(preset.rawValue) Quick Share copies ready in Sharing Copies. Imported originals are unchanged."
+                            : "\(batch.deviceName): no supported Luna master videos in this completed import."
+                        DispatchQueue.main.async {
+                            if accessed { destination.stopAccessingSecurityScopedResource() }
+                            self.finish(error: nil, message: note, refreshDevices: false)
+                            if returnToEject, let entry = self.completions.entries[batch.id] { self.showEjectPrompt(entry) }
+                            self.refresh()
+                        }
+                    } catch {
+                        try? audit("Quick Share stopped; imported originals kept: \(error.localizedDescription)")
+                        DispatchQueue.main.async {
+                            if accessed { destination.stopAccessingSecurityScopedResource() }
+                            self.finish(error: error, message: "Quick Share stopped: \(error.localizedDescription) Imported originals are unchanged.")
+                        }
+                    }
+                }
+            } catch {
+                if accessed { destination.stopAccessingSecurityScopedResource() }
+                throw error
+            }
+        } catch { recordOperationFailure(error) }
+    }
+    #endif
 
     private func ejectCameraStorage(_ entry: ImportCompletion, plan: USBStorageUnmountPlan,
                                     expectedConnections: [URL: UUID]) {

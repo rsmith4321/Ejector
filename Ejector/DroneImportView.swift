@@ -29,7 +29,7 @@ struct DroneImportView: View {
                                 Text(importer.busy ? "\(importer.activeName) · \(importer.progress.phase == "Checking" ? "Importing" : importer.progress.phase)" : importer.progress.phase).font(.headline)
                             }
                             Spacer()
-                            if importer.busy { Button("Stop import") { importer.cancel() }.disabled(importer.progress.phase == "Ejecting") }
+                            if importer.busy { Button(importer.progress.phase == "Creating sharing copies" ? "Stop Quick Share" : "Stop import") { importer.cancel() }.disabled(importer.progress.phase == "Ejecting") }
                             else if importer.needsAttention {
                                 Button("Dismiss") { importer.dismissIssue() }
                                     .help("Hide the warning icon. The explanation stays here; nothing is retried.")
@@ -57,6 +57,9 @@ struct DroneImportView: View {
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
                 }
+                #if !APP_STORE
+                QuickShareCompletedImports(importer: importer)
+                #endif
                 VStack(alignment: .leading, spacing: 12) {
                         if importer.profiles.isEmpty {
                             ContentUnavailableView("No devices enrolled", systemImage: "sdcard", description: Text("Choose a connected device below. New profiles follow your import defaults."))

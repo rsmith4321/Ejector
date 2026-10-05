@@ -41,7 +41,7 @@ nonisolated struct MediaImportEngine {
     var sourceIdentifier = ""
     var includePreviews = true
 
-    struct VerifiedMedia: Sendable { let url: URL; let sha256: String }
+    struct VerifiedMedia: Codable, Equatable, Sendable { let url: URL; let sha256: String }
     struct Result { let files: Int; let bytes: Int64; let folder: URL; var note: String = ""; var hasSelectedMedia = false; var verifiedMedia: [VerifiedMedia] = [] }
     struct Stamp: Equatable {
         let device: dev_t
