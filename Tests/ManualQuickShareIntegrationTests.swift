@@ -31,6 +31,7 @@ final class LogManager {
         var shareDialogSeen = false
         var makeCopies = false
         var choose4K = false
+        var keptConnectedAfterShare = false
         let timer = Timer(timeInterval: 0.05, repeats: true) { _ in
             MainActor.assumeIsolated {
                 var buttons: [NSButton] = []
@@ -57,7 +58,10 @@ final class LogManager {
                     importDialogSeen = true
                     precondition(button.keyEquivalent.isEmpty)
                     print("Keep Connected key at presentation:", buttons.first(where: { $0.title == "Keep Connected" })!.keyEquivalent.debugDescription)
-                    button.performClick(nil)
+                    if makeCopies {
+                        keptConnectedAfterShare = true
+                        buttons.first(where: { $0.title == "Keep Connected" })!.performClick(nil)
+                    } else { button.performClick(nil) }
                 }
             }
         }
@@ -86,6 +90,11 @@ final class LogManager {
             profile.sharingPreset = .hd; manager.save(profile)
             precondition(manager.quickShareImports.count == 1)
             print("PASS enabling LUT after completion makes the exact completed batch available; disabling hides the action")
+            makeCopies = true
+            manager.quickShareCompletedImport(batch.id, returnToEject: true)
+            await waitUntil { !manager.busy && keptConnectedAfterShare }
+            precondition(!manager.hasError && FileManager.default.fileExists(atPath: source.path) && manager.pendingEjects.count == 1)
+            print("PASS successful Quick Share returns to a fresh eject choice without ejecting automatically")
             manager.ejectCompletedImport(batch.id)
             await waitUntil { !manager.busy && !FileManager.default.fileExists(atPath: source.path) }
             precondition(manager.completedImports == [batch] && manager.pendingEjects.isEmpty)
