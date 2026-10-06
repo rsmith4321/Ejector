@@ -89,6 +89,7 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--share-directories") { DirectoryLeaseTests(); QuickShareEngineTests(); QuickShareProcessTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable directories, fake exports and contained synthetic child processes only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--configuration-writer") { ConfigurationWriterTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable native configuration files only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--manual-installation") { ManualInstallationTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable directories, fake folder viewers and hidden native controls only."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--windows-signatures") { WindowsAuthenticodeTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake positive trust and disposable native unsigned refusals only; no execution or trusted release proof."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--ui-render") {
                 string output = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectWindowsPreview", "run-" + Guid.NewGuid().ToString("N").Substring(0, 16));
                 Directory.CreateDirectory(output); var state = State(); var defaults = new ImportDefaults(); var profile = defaults.NewProfile(state.Volumes[0], state.Disks[0]); profile.RelativeSource = "DCIM"; profile.Destination = @"D:\Travel backups";
@@ -702,7 +703,7 @@ namespace EasyEject {
             StartupTests();
             QuickShareRecipeTests();
             QuickShareProcessTests();
-            ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
+            WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
             QuickShareDialogTests();
             QuickShareConfigurationTests();
             ManualQuickShareTests();
