@@ -32,7 +32,7 @@ namespace EasyEject {
     internal sealed class WindowsUpdateCoordinator : IDisposable {
         readonly object sync = new object(); readonly bool configured;
         readonly Func<WindowsUpdateCheckScope, Task<WindowsChannelOffer>> check; readonly Func<DateTime> clock; readonly TimeSpan interval;
-        bool enabled, started, idle, disposed; long id, activityEpoch, preferenceEpoch;
+        bool enabled, started, idle, disposed, reviewOpen; long id, activityEpoch, preferenceEpoch;
         DateTime nextAutomatic = new DateTime(0, DateTimeKind.Utc); WindowsUpdateCheckScope active;
         internal WindowsUpdateCoordinator(bool configured, Func<WindowsUpdateCheckScope, Task<WindowsChannelOffer>> check, Func<DateTime> clock, TimeSpan interval, bool automatic) {
             if (configured && check == null || clock == null || interval < TimeSpan.FromMinutes(1) || interval > TimeSpan.FromDays(7)) throw new ArgumentException("Windows release checks require an owned callback, UTC clock and bounded cadence.");
@@ -51,6 +51,14 @@ namespace EasyEject {
             } }
         }
         internal void Start() { lock (sync) { if (!disposed) started = true; } }
+        internal void SetReviewOpen(bool value) {
+            WindowsUpdateCheckScope revoked = null;
+            lock (sync) {
+                if (disposed || reviewOpen == value) return; reviewOpen = value; activityEpoch++;
+                if (active != null) { revoked = active; revoked.Invalidate(); }
+            }
+            if (revoked != null) revoked.Cancel();
+        }
         internal void PublishIdle(bool value) {
             WindowsUpdateCheckScope revoked = null;
             lock (sync) { if (disposed || idle == value) return; idle = value; activityEpoch++; if (!value && active != null) { revoked = active; revoked.Invalidate(); } }
@@ -71,7 +79,7 @@ namespace EasyEject {
                 if (disposed) throw new ObjectDisposedException("WindowsUpdateCoordinator"); caller.ThrowIfCancellationRequested();
                 if (!configured) { if (origin == WindowsUpdateCheckOrigin.Automatic) return null; throw new SafetyException(WindowsUpdateSafety.ChannelStatus); }
                 if (!idle || active != null) { if (origin == WindowsUpdateCheckOrigin.Automatic) return null; throw new SafetyException(active != null ? "A Windows release check is already in progress." : "Finish the active import, eject, scan or dialog before checking Windows releases."); }
-                if (origin == WindowsUpdateCheckOrigin.Automatic && (!started || !enabled)) return null;
+                if (origin == WindowsUpdateCheckOrigin.Automatic && (!started || !enabled || reviewOpen)) return null;
                 var now = Now(); if (origin == WindowsUpdateCheckOrigin.Automatic && now < nextAutomatic) return null;
                 // Consume an admitted attempt, including cancellation/failure. An idle
                 // timer must not silently retry every second after a stopped request.

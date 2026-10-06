@@ -34,8 +34,8 @@ namespace EasyEject {
         public void Dispose() { disposed = true; Settings.Dispose(); Application.Dispose(); }
     }
     internal static class ManualInstallation {
-        internal static string Instructions(string version, InstallationFolders folders) {
-            return "Easy Eject for Windows\r\nCurrent version: " + version + "\r\n\r\n" + WindowsUpdateSafety.ChannelStatus + "\r\n\r\n" +
+        internal static string Instructions(string version, InstallationFolders folders, string channelStatus = null) {
+            return "Easy Eject for Windows\r\nCurrent version: " + version + "\r\n\r\n" + (channelStatus ?? WindowsUpdateSafety.ChannelStatus) + "\r\n\r\n" +
                 "Application folder\r\n" + folders.Application.Path + FolderIssue(folders.Application) + "\r\n\r\n" +
                 "Separate settings folder\r\n" + folders.Settings.Path + FolderIssue(folders.Settings) + "\r\nProfiles, import defaults, exact batch history, tool selections, the supplied LUT and diagnostics stay here when you switch app folders.\r\n\r\n" +
                 "First installation\r\nOnce an approved Windows download is available, use its Windows x64 ZIP and published verification instructions. Check the archive SHA-256 and the executable's trusted Windows signature against the approved publisher. The current Mac DMG, PKG, app and Sparkle feed are not Windows updates. Extract the complete Windows folder into a versioned folder you own, then start EasyEject.Windows.exe. Keep the accompanying .exe.config file. No administrator or startup installation is needed.\r\n\r\n" +

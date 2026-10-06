@@ -33,6 +33,7 @@ namespace EasyEject {
         readonly ToolStripMenuItem releaseStatusMenu = new ToolStripMenuItem { Enabled = false };
         readonly WindowsUpdateCoordinator releaseChecks;
         readonly System.Windows.Forms.Timer releaseTimer = new System.Windows.Forms.Timer(); string releaseStatus;
+        WindowsReleaseReviewDialog releaseReview;
         readonly TrayActivity trayActivity = new TrayActivity(); readonly TrayBusyIcons trayBusyIcons = new TrayBusyIcons();
         ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu, helpMenu, aboutMenu, installationMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
@@ -147,7 +148,9 @@ namespace EasyEject {
         static string GroupLabel(StorageGroup group) { switch (group) { case StorageGroup.Camera: return "Camera cards (candidates)"; case StorageGroup.Emulator: return "Emulator cards (candidates)"; case StorageGroup.External: return "Other external volumes"; case StorageGroup.Internal: return "Internal storage"; case StorageGroup.Protected: return "Windows storage (protected)"; default: return "Unknown mapping"; } }
         void UpdateActions() {
             if (IsDisposed || Disposing) return;
-            if (releaseChecks != null) releaseChecks.PublishIdle(!readOnly && CanReviewInstallation);
+            bool releaseIdle = !readOnly && (CanReviewInstallation || ReleaseReviewOwnsIdle);
+            if (releaseChecks != null) releaseChecks.PublishIdle(releaseIdle);
+            if (releaseReview != null) releaseReview.PublishAvailable(releaseIdle);
             releaseStatusMenu.Text = releaseChecks == null || !releaseChecks.Configured ? "Windows releases: channel unavailable" : releaseChecks.Checking ? "Windows releases: checking metadata…" : releaseStatus == null ? "Windows releases: ready for check" : "Windows releases: review check result";
             var v = Selected; bool ready = v != null && inventory != null && !scanning && !concurrentStorage.Busy && inventory.Epoch == discovery.Epoch;
             eject.Enabled = cleanEject.Enabled = false; import.Enabled = false; profile.Enabled = false; defaults.Enabled = !Busy; history.Enabled = !Busy && !scanning; refresh.Enabled = !Busy && !scanning;
@@ -515,6 +518,10 @@ namespace EasyEject {
             finally { FinishOperation(); }
         }
         bool CanReviewInstallation { get { return WindowsUpdateSafety.CanReview(Busy, scanning, !Enabled || OwnedForms.Any(form => form.Visible && form.Modal)); } }
+        // working belongs exclusively to this modal review. It still blocks storage,
+        // hotkeys and automatic imports. Only the exact live review can admit metadata;
+        // scans, independent storage and any other/nested dialog revoke that scope.
+        bool ReleaseReviewOwnsIdle { get { return releaseReview != null && working && !scanning && !concurrentStorage.Busy && !releaseReview.IsDisposed && releaseReview.Visible && releaseReview.Modal && releaseReview.Enabled && !releaseReview.NestedReview && !OwnedForms.Any(form => form != releaseReview && form.Visible && form.Modal); } }
         async Task PulseReleaseChecks() {
             if (IsDisposed || Disposing || !monitoringStarted || readOnly) return;
             try {
@@ -528,12 +535,15 @@ namespace EasyEject {
         }
         void ViewInstallation() {
             if (!CanReviewInstallation) return;
-            working = true; UpdateActions();
+            working = true; releaseChecks.SetReviewOpen(true); UpdateActions();
             try {
                 using (var folders = new InstallationFolders(System.IO.Path.GetDirectoryName(Application.ExecutablePath), Profiles.Root))
-                using (var dialog = new ManualInstallationDialog(ApplicationInformation.Version, folders)) dialog.ShowDialog(this);
+                using (var session = new WindowsReleaseReviewSession(releaseChecks, readOnly ? null : WindowsReleaseChecks.ProductionChannel))
+                using (var dialog = new WindowsReleaseReviewDialog(ApplicationInformation.Version, session, folders, UpdateActions)) {
+                    releaseReview = dialog; dialog.ShowDialog(this);
+                }
             } catch (Exception ex) { ShowError(ex); }
-            finally { FinishOperation(); }
+            finally { releaseReview = null; releaseChecks.SetReviewOpen(false); FinishOperation(); }
         }
         void EditSettings() {
             if (Busy || scanning) return;
@@ -770,6 +780,6 @@ namespace EasyEject {
             }
         }
         void ShowError(Exception ex) { RecordIssue(ex.Message); Notify("Easy Eject needs attention", ex.Message, ToolTipIcon.Warning); if (ForegroundWindow) ShowMessage(ex.Message, "Easy Eject", MessageBoxIcon.Warning); }
-        protected override void Dispose(bool disposing) { if (disposing) { releaseTimer.Dispose(); if (releaseChecks != null) releaseChecks.Dispose(); hotkey.Dispose(); discovery.Instances.Dispose(); tray.Dispose(); trayBusyIcons.Dispose(); debounce.Dispose(); } base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { releaseTimer.Dispose(); if (releaseReview != null) releaseReview.Dispose(); if (releaseChecks != null) releaseChecks.Dispose(); hotkey.Dispose(); discovery.Instances.Dispose(); tray.Dispose(); trayBusyIcons.Dispose(); debounce.Dispose(); } base.Dispose(disposing); }
     }
 }

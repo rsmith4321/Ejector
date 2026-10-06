@@ -92,6 +92,7 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--windows-signatures") { WindowsAuthenticodeTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake positive trust and disposable native unsigned refusals only; no execution or trusted release proof."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-manifests") { WindowsManifestTrustTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Ephemeral fixture keys, fake positive chain trust and real native untrusted refusals only; no trust-store import or release signing."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-update-coordinator") { WindowsUpdateCoordinatorTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned fake checks, disposable settings/replay and hidden native controls only; no production channel request."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--windows-release-review") { WindowsReleaseReviewTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Read-only disposable ZIP/package review and fake positive native trust only; no real download, extraction, execution or installation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-replay") { WindowsChannelReplayTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable replay files, native CurrentUser protection and fake positive publisher trust only; no real network or cached installation authority."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-discovery") { WindowsChannelDiscoveryTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake HTTP operations, owned disposable signed records and fake positive native trust only; no real network request."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-channels") { WindowsChannelTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable signed channel fixtures and fake positive native trust only; no endpoint network request or production channel configured."); return failed == 0 ? 0 : 1; }
@@ -106,6 +107,15 @@ namespace EasyEject {
                     dialog.Complete("Windows refused removal (fixture veto: OutstandingOpen). Finish the other program's transfer, then review this device again.\r\n\r\nRemoved 3 metadata files. Photos, recordings and device Trash are kept.\r\n\r\nThe other import retains its own progress and cancellation controls. No automatic retry."); Render(dialog, Path.Combine(output, "manual-storage-result.png"));
                 }
                 var shareProfile = profile.Copy(); shareProfile.Name = "Fixture Luna travel card"; shareProfile.SharingPreset = QuickShareProfile.Uhd; shareProfile.SharingColor = QuickShareProfile.Standard;
+                using (var check = new WindowsUpdateCoordinator(false, null, () => DateTime.UtcNow, TimeSpan.FromDays(1), true))
+                using (var session = new WindowsReleaseReviewSession(check, null)) using (var folders = new InstallationFolders(output, output, _ => {}))
+                using (var dialog = new WindowsReleaseReviewDialog(ApplicationInformation.Version, session, folders, () => {})) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "windows-release-unavailable.png")); }
+                using (var review = new ReleaseReviewFixture()) using (var folders = new InstallationFolders(output, output, _ => {}))
+                using (var dialog = new WindowsReleaseReviewDialog(ApplicationInformation.Version, review.Review, folders, () => {})) {
+                    dialog.Size = dialog.MinimumSize; PumpShareSetup(dialog.RunAction(() => review.Review.CheckAsync(CancellationToken.None))); Render(dialog, Path.Combine(output, "windows-release-metadata.png"));
+                    PumpShareSetup(dialog.RunAction(() => review.Review.ArchiveAsync(review.Update.Channel.Archive.Path, CancellationToken.None)));
+                    PumpShareSetup(dialog.RunAction(() => review.Review.ExtractedAsync(review.Update.Channel.Archive.Package.Root, CancellationToken.None))); Render(dialog, Path.Combine(output, "windows-release-package.png"));
+                }
                 using (var folders = new InstallationFolders(output, output, _ => {})) using (var dialog = new ManualInstallationDialog(ApplicationInformation.Version, folders)) {
                     dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "manual-installation-top.png"));
                     string complete = dialog.Content.Text; dialog.Content.Text = complete.Substring(complete.IndexOf("Manual rollback", StringComparison.Ordinal));
@@ -711,7 +721,7 @@ namespace EasyEject {
             StartupTests();
             QuickShareRecipeTests();
             QuickShareProcessTests();
-            WindowsUpdateCoordinatorTests(); WindowsChannelReplayTests(); WindowsChannelDiscoveryTests(); WindowsChannelTests(); WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
+            WindowsReleaseReviewTests(); WindowsUpdateCoordinatorTests(); WindowsChannelReplayTests(); WindowsChannelDiscoveryTests(); WindowsChannelTests(); WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
             QuickShareDialogTests();
             QuickShareConfigurationTests();
             ManualQuickShareTests();
