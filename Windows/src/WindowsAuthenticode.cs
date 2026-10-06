@@ -35,11 +35,13 @@ namespace EasyEject {
     internal sealed class WindowsSignedFileReview : IDisposable {
         const long MaximumExecutableBytes = 1024L * 1024 * 1024;
         readonly SafePaths.DirectoryLease directories; readonly FileStream held; readonly Native.FileInfo identity;
+        readonly ApprovedWindowsPublisher approved; readonly IWindowsExecutableTrust trust;
         internal readonly string Path, Hash; internal readonly WindowsSignerEvidence Signer;
         bool disposed;
         internal WindowsSignedFileReview(string input, ApprovedWindowsPublisher approved, IWindowsExecutableTrust trust, CancellationToken cancel) {
             if (approved == null) throw new SafetyException("No approved Windows publisher is configured. Signature review cannot approve a release.");
             if (trust == null) throw new ArgumentNullException("trust");
+            this.approved = approved; this.trust = trust;
             cancel.ThrowIfCancellationRequested(); Path = SafePaths.Normalize(input);
             try {
                 directories = SafePaths.HoldDirectories(System.IO.Path.GetDirectoryName(Path));
@@ -57,6 +59,23 @@ namespace EasyEject {
             directories.Validate(); var current = Native.Info(held.SafeFileHandle);
             if (!VerifiedImporter.SameStamp(identity, current) || current.Links != 1 || (current.Attributes & 0x1010) != 0 || !Native.FinalPath(held.SafeFileHandle).Equals(Path, StringComparison.OrdinalIgnoreCase))
                 throw new SafetyException("The reviewed Windows candidate is aliased, offline, moved or changed. It is not approved.");
+        }
+        internal void Inspect(Action<FileStream> inspect) {
+            Validate(); long position = held.Position;
+            try { inspect(held); Validate(); } finally { if (held.CanSeek) held.Position = position; }
+        }
+        internal void Revalidate(CancellationToken cancel, bool refreshTrust) {
+            Validate(); cancel.ThrowIfCancellationRequested(); long position = held.Position;
+            try {
+                held.Position = 0; if (VerifiedImporter.Hash(held, cancel) != Hash) throw new SafetyException("The reviewed Windows executable's complete hash changed.");
+                Validate();
+                if (refreshTrust) {
+                    var fresh = trust.Verify(Path, held); cancel.ThrowIfCancellationRequested(); approved.Require(fresh);
+                    if (fresh.CertificateHash != Signer.CertificateHash || fresh.DigestOid != Signer.DigestOid) throw new SafetyException("The reviewed Windows executable's verified signature changed.");
+                    held.Position = 0; if (VerifiedImporter.Hash(held, cancel) != Hash) throw new SafetyException("The Windows executable changed during fresh signature verification.");
+                }
+                cancel.ThrowIfCancellationRequested(); Validate();
+            } finally { if (held.CanSeek) held.Position = position; }
         }
         public void Dispose() { if (disposed) return; disposed = true; if (held != null) held.Dispose(); if (directories != null) directories.Dispose(); }
     }
