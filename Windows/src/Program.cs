@@ -29,7 +29,7 @@ namespace EasyEject {
         AppSettings appSettings = new AppSettings(); AppIssue appIssue = new AppIssue(); ImportCompletionDialog activeCompletion;
         ManualQuickShareService manualSharing;
         readonly ToolStripMenuItem storageMenu = new ToolStripMenuItem("Connected storage");
-        ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu;
+        ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu, helpMenu, aboutMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
         int cardCount;
         readonly Button resume = new Button();
@@ -84,6 +84,8 @@ namespace EasyEject {
             savedProfilesMenu = new ToolStripMenuItem("Saved profiles…", null, delegate { EditSavedProfiles(); }); menu.Items.Add(savedProfilesMenu);
             issueMenu = new ToolStripMenuItem("View issue…", null, delegate { ViewIssue(); }); menu.Items.Add(issueMenu);
             debugMenu = new ToolStripMenuItem("View debug log…", null, delegate { ViewDebugLog(); }); menu.Items.Add(debugMenu);
+            helpMenu = new ToolStripMenuItem("Help && Instructions…", null, delegate { ViewInformation(false); }); menu.Items.Add(helpMenu);
+            aboutMenu = new ToolStripMenuItem("About Easy Eject…", null, delegate { ViewInformation(true); }); menu.Items.Add(aboutMenu);
             menu.Items.Add("Quit", null, delegate { if (working) { MessageBox.Show(this, "Wait for the operation to finish or cancel the import before quitting."); return; } quit = true; Close(); });
             tray = new NotifyIcon { Icon = SystemIcons.Information, Text = "Easy Eject Windows prototype", Visible = true, ContextMenuStrip = menu };
             tray.DoubleClick += delegate { Show(); WindowState = FormWindowState.Normal; Activate(); };
@@ -136,7 +138,8 @@ namespace EasyEject {
             savedProfiles.Enabled = savedProfilesMenu.Enabled = !working && !scanning && !readOnly;
             settings.Enabled = pending.Enabled = issue.Enabled = !working && !scanning;
             pending.Enabled &= completions.Entries.Length > 0; issue.Enabled &= appIssue.HasIssue;
-            pendingMenu.Enabled = pending.Enabled; issueMenu.Enabled = issue.Enabled; settingsMenu.Enabled = settings.Enabled; debugMenu.Visible = appSettings.DebugEnabled; debugMenu.Enabled = !working;
+            pendingMenu.Enabled = pending.Enabled; issueMenu.Enabled = issue.Enabled; settingsMenu.Enabled = settings.Enabled; debugMenu.Visible = appSettings.DebugEnabled; debugMenu.Enabled = !working && !scanning;
+            helpMenu.Enabled = aboutMenu.Enabled = !working && !scanning;
             tray.Icon = appIssue.NeedsAttention ? SystemIcons.Warning : SystemIcons.Information;
             tray.Text = appIssue.NeedsAttention ? "Easy Eject: needs attention. Choose View issue." : "Easy Eject: " + cardCount + " candidate card disks";
             bulk.Enabled = !readOnly && !working && !scanning && inventory != null && inventory.Epoch == discovery.Epoch && inventory.Volumes.Any(x => x.IsCard);
@@ -392,10 +395,19 @@ namespace EasyEject {
             finally { FinishOperation(); }
         }
         void ViewDebugLog() {
-            if (working || !appSettings.DebugEnabled) return;
+            if (working || scanning || !appSettings.DebugEnabled) return;
             working = true; UpdateActions();
-            try { using (var dialog = new DiagnosticsDialog(DebugLog.Read(Profiles.Root))) dialog.ShowDialog(this); }
+            try {
+                string root = Profiles.Root;
+                using (var dialog = new DiagnosticsDialog(DebugLog.Load(root), () => DebugLog.Load(root), readOnly ? (Action<DebugLogSnapshot>)null : snapshot => DebugLog.Clear(snapshot, root), readOnly ? (Action<string>)null : content => { if (content.Length == 0) Clipboard.Clear(); else Clipboard.SetText(content); })) dialog.ShowDialog(this);
+            }
             catch (Exception ex) { ShowError(ex); }
+            finally { FinishOperation(); }
+        }
+        void ViewInformation(bool about) {
+            if (working || scanning) return;
+            working = true; UpdateActions();
+            try { using (var dialog = new InformationDialog(about)) dialog.ShowDialog(this); }
             finally { FinishOperation(); }
         }
         void EditSettings() {

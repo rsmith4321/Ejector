@@ -102,10 +102,43 @@ namespace EasyEject {
         }
     }
     internal sealed class DiagnosticsDialog : Form {
-        internal DiagnosticsDialog(string content) {
+        readonly TextBox text;
+        readonly Label outcome;
+        readonly Button clear, copy, refresh;
+        readonly Func<DebugLogSnapshot> load;
+        readonly Action<DebugLogSnapshot> clearLog;
+        readonly Action<string> copyText;
+        DebugLogSnapshot snapshot;
+        internal string DisplayedText { get { return text.Text; } }
+        internal string ActionStatus { get { return outcome.Text; } }
+        internal DiagnosticsDialog(string content) : this(null, null, null, null) { text.Text = content; }
+        internal DiagnosticsDialog(DebugLogSnapshot initial, Func<DebugLogSnapshot> load, Action<DebugLogSnapshot> clearLog, Action<string> copyText) {
+            snapshot = initial; this.load = load; this.clearLog = clearLog; this.copyText = copyText;
             Text = "Easy Eject debug log"; Font = new Font("Segoe UI", 10); Size = new Size(850, 580); MinimumSize = new Size(650, 420); StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
-            var text = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Text = content };
-            var close = new Button { Text = "Close", AutoSize = true, DialogResult = DialogResult.Cancel, Dock = DockStyle.Bottom, Height = 36 }; Controls.Add(text); Controls.Add(close); CancelButton = close;
+            text = new TextBox { Name = "logText", Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Text = initial == null ? "" : initial.Text };
+            outcome = new Label { Dock = DockStyle.Bottom, Height = 64, Padding = new Padding(12, 4, 12, 4) };
+            var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(12), FlowDirection = FlowDirection.RightToLeft };
+            var close = new Button { Name = "close", Text = "Close", AutoSize = true, MinimumSize = new Size(95, 36), DialogResult = DialogResult.Cancel };
+            copy = new Button { Name = "copy", Text = "Copy to Clipboard", AutoSize = true, MinimumSize = new Size(150, 36) };
+            refresh = new Button { Name = "refresh", Text = "Refresh", AutoSize = true, MinimumSize = new Size(95, 36) };
+            clear = new Button { Name = "clear", Text = "Clear log", AutoSize = true, MinimumSize = new Size(95, 36) };
+            footer.Controls.AddRange(new Control[] { close, copy, refresh, clear }); Controls.Add(text); Controls.Add(outcome); Controls.Add(footer);
+            copy.Click += delegate { RequestCopy(); }; refresh.Click += delegate { RequestRefresh(); }; clear.Click += delegate { RequestClear(); };
+            AcceptButton = close; CancelButton = close; UpdateChoices();
+        }
+        void UpdateChoices() { copy.Enabled = copyText != null && snapshot != null && snapshot.Exists; refresh.Enabled = load != null; clear.Enabled = load != null && clearLog != null && snapshot != null && snapshot.Exists; }
+        void Reload() { var current = load(); if (current == null) throw new SafetyException("Debug log could not be refreshed."); snapshot = current; text.Text = current.Text; UpdateChoices(); }
+        internal void RequestRefresh() {
+            if (!refresh.Enabled) return;
+            try { Reload(); outcome.Text = "Current debug log displayed."; } catch (Exception ex) { outcome.Text = ex.Message; }
+        }
+        internal void RequestCopy() {
+            if (!copy.Enabled) return;
+            try { copyText(snapshot.Exists ? snapshot.Text : ""); outcome.Text = "Displayed debug log copied to Clipboard."; } catch (Exception ex) { outcome.Text = "Clipboard copy failed: " + ex.Message; }
+        }
+        internal void RequestClear() {
+            if (!clear.Enabled) return;
+            try { clearLog(snapshot); Reload(); outcome.Text = "Debug log cleared."; } catch (Exception ex) { outcome.Text = ex.Message; }
         }
     }
 }

@@ -135,6 +135,10 @@ namespace EasyEject {
                     using (var dialog = new AppSettingsDialog(new AppSettings(), "Shortcut off", new StartupSnapshot(new StartupValue(true, Microsoft.Win32.RegistryValueKind.String, "Unrecognized fixture command"), startupCommand), () => {})) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "startup-conflict.png")); }
                     var issue = new AppIssue(); issue.Record("Fixture open-file veto. Finish transfers and close programs using the device, then review a fresh safe-removal choice.");
                     using (var dialog = new IssueDialog(issue)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "issue.png")); }
+                    DebugLog.Append(fixture.Destination, "Synthetic private log. No real device operation.");
+                    using (var dialog = new DiagnosticsDialog(DebugLog.Load(fixture.Destination), () => DebugLog.Load(fixture.Destination), snapshot => DebugLog.Clear(snapshot, fixture.Destination), text => {})) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "debug-log-actions.png")); }
+                    using (var dialog = new InformationDialog(false)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "help.png")); }
+                    using (var dialog = new InformationDialog(true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "about.png")); }
                 }
                 var cleanupState = CardState(); var cleanupBulk = BulkEjectPolicy.Plan(cleanupState);
                 using (var dialog = new BulkEjectDialog(cleanupBulk)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "bulk-eject.png")); }
@@ -673,6 +677,7 @@ namespace EasyEject {
             ManualQuickShareTests();
             TrayStorageMenuTests();
             StatusLayoutTests();
+            InformationDiagnosticsTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {

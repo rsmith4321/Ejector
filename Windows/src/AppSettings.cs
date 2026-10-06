@@ -53,25 +53,6 @@ namespace EasyEject {
         internal static void Save(AppIssue issue) { Save(issue, Profiles.Root); }
         internal static void Save(AppIssue issue, string root) { Profiles.WriteJson(issue, typeof(AppIssue), root, "issue-state.json"); }
     }
-    internal static class DebugLog {
-        const long MaximumBytes = 1048576;
-        internal static void Append(string root, string message) {
-            using (SafePaths.LockDirectories(root)) {
-                string path = Path.Combine(root, "debug.log");
-                using (var stream = File.Exists(path) ? SafePaths.ExistingCopy(path) : SafePaths.NewFile(path)) {
-                    byte[] line = Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("o") + " " + message.Replace("\r", " ").Replace("\n", " ") + Environment.NewLine);
-                    if (stream.Length + line.Length > MaximumBytes) throw new SafetyException("Debug log reached 1 MiB. Existing diagnostics were kept.");
-                    stream.Position = stream.Length; stream.Write(line, 0, line.Length); stream.Flush(true);
-                }
-            }
-        }
-        internal static string Read(string root) {
-            using (SafePaths.LockDirectories(root)) {
-                string path = Path.Combine(root, "debug.log"); if (!File.Exists(path)) return "No debug events have been recorded.";
-                using (var stream = SafePaths.ReadFile(path)) { if (stream.Length > MaximumBytes) throw new SafetyException("Debug log is too large to display."); using (var reader = new StreamReader(stream, Encoding.UTF8)) return reader.ReadToEnd(); }
-            }
-        }
-    }
     internal static class CompletionPresentation {
         internal static bool ShowChoice(bool askToEject, bool foreground, bool notifications) { return askToEject && (foreground || !notifications); }
         internal static string Notification(bool hasMedia, int removed = 0, int clearedTrash = 0) {
