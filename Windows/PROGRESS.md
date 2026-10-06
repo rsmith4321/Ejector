@@ -2,6 +2,18 @@
 
 ## Full-port scope and latest software milestone
 
+### Device Trash ownership and original-path catalog · recovery implementation in progress
+
+Implementation commit: `04bd63557a9d2f1ee1af3caff2d221d29ade11aa`.
+
+After reading the Mac Trash recovery/selection/removal fixtures, added a read-only Windows-native source catalog for the next recovery integration. It selects only the current Windows user's SID under this device's `$RECYCLE.BIN`; `.Trashes/<UID>` is traversed only with an explicit numeric Mac-owner selection, never inferred from a Windows account. It never traverses other owners. Recycle Bin metadata maps randomized payloads back to original names and folder ancestry, preserving lens/sidecar and structured-package selection. Selected records retain captured metadata SHA-256/stamps and payload file identities. Unknown/unassociated payloads and device indexes never qualify for clearing; Windows folder records remain while their directories or retained contents remain. Windows and Mac names have separate recovery namespaces.
+
+The bounded version-1/version-2 parser is based on [Joachim Metz's primary format research](https://github.com/libyal/dtformats/blob/main/documentation/Windows%20Recycle.Bin%20file%20formats.asciidoc), not a promised Microsoft storage-format contract. [WindowsIdentity.User](https://learn.microsoft.com/en-us/dotnet/api/system.security.principal.windowsidentity.user?view=netframework-4.8.1) supplies the runtime owner. Future/invalid versions, malformed Unicode/length/time/size, unsupported original paths, duplicate case/Unicode-equivalent names, missing/orphan pairs, redirected/offline payloads and incorrect location types fail with a reviewable error. Throwing enumeration distinguishes absence from access failures. No Shell restore/empty operation or data removal is called.
+
+Validation: `./Windows/build.ps1 -Test` **192 passed; zero failed**, warnings as errors; `git diff --check` passes. Nineteen new semantic fixture cases cover current/explicit versus unselected owners, absent/wrong-type locations, original names/old drive letters, still/movie and ambiguous companion rules, lens previews, deleted package folders/support, all-media unknowns/indexes, hidden Mac Trash, duplicate names, links, malformed metadata/pairs/paths, captured evidence, immutable collections and cancellation/device-guard failure. All catalog inputs are isolated disposable fixtures; no actual user or camera Trash was enumerated or modified. Existing UI behavior is unchanged, so no new UI acceptance is claimed for this stage.
+
+**Recovery is not yet available in the app.** Next integrate this catalog into the same complete-batch copy/reuse/verification/audit/removal transaction as ordinary media, protect record dependencies until publication, remove a Windows file's record only after its verified payload, revalidate selected Trash manifests through partial removal, distinguish ordinary-original versus Trash/record counts, and add acknowledged shared/custom recovery and explicit per-device Mac-owner UI. Recovery must remain independent of original deletion and preserve unknown/skipped/index/other-owner data. Then continue the remaining full-port checklist; no completion claim or scope reduction is made.
+
 ### Verified optional original removal and explicit review · goal continuation
 
 Implementation commit: `cd1ebaf7e90897af7a458bb97ae0ef87a19b084c`.
