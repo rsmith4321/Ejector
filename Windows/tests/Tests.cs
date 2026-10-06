@@ -605,6 +605,7 @@ namespace EasyEject {
             BulkTests();
             CleanupTests();
             RemovalTests();
+            TrashCatalogTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {
