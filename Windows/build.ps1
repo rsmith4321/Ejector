@@ -8,7 +8,8 @@ $sources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Filter 
 $references = @('/r:System.dll', '/r:System.Core.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Runtime.Serialization.dll')
 & $compiler /nologo /warn:4 /warnaserror+ /optimize+ /platform:x64 /target:winexe "/win32manifest:$PSScriptRoot/app.manifest" "/out:$output/EasyEject.Windows.exe" @references @sources
 if ($LASTEXITCODE -ne 0) { throw 'App compilation failed.' }
-& $compiler /nologo /warn:4 /warnaserror+ /optimize+ /platform:x64 /target:exe /main:EasyEject.Tests "/out:$output/EasyEject.Tests.exe" @references @sources (Join-Path $PSScriptRoot 'tests/Tests.cs')
+$testSources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'tests') -Filter '*.cs' | ForEach-Object FullName)
+& $compiler /nologo /warn:4 /warnaserror+ /optimize+ /platform:x64 /target:exe /main:EasyEject.Tests "/out:$output/EasyEject.Tests.exe" @references @sources @testSources
 if ($LASTEXITCODE -ne 0) { throw 'Test compilation failed.' }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'app.config') -Destination (Join-Path $output 'EasyEject.Windows.exe.config')
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'app.config') -Destination (Join-Path $output 'EasyEject.Tests.exe.config')

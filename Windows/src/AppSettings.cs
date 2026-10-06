@@ -7,12 +7,17 @@ using System.Text;
 namespace EasyEject {
     [DataContract] internal sealed class AppSettings {
         [DataMember] internal bool? ShowNotifications, DebugLogging;
+        [DataMember] internal bool? EnableShortcut;
+        [DataMember] internal string ShortcutLetter;
         internal bool NotificationsEnabled { get { return ShowNotifications ?? true; } }
         internal bool DebugEnabled { get { return DebugLogging ?? false; } }
+        internal bool ShortcutEnabled { get { return EnableShortcut ?? false; } }
+        internal string ShortcutKey { get { return ShortcutLetter ?? "E"; } }
         internal static AppSettings Load() { return Load(Profiles.Root); }
-        internal static AppSettings Load(string root) { return Configuration.Read<AppSettings>(root, "app-settings.json") ?? new AppSettings(); }
+        internal static AppSettings Load(string root) { var value = Configuration.Read<AppSettings>(root, "app-settings.json") ?? new AppSettings(); value.Validate(); return value; }
         internal static void Save(AppSettings settings) { Save(settings, Profiles.Root); }
-        internal static void Save(AppSettings settings, string root) { if (settings == null) throw new ArgumentNullException("settings"); Profiles.WriteJson(settings, typeof(AppSettings), root, "app-settings.json"); }
+        internal static void Save(AppSettings settings, string root) { if (settings == null) throw new ArgumentNullException("settings"); settings.Validate(); Profiles.WriteJson(settings, typeof(AppSettings), root, "app-settings.json"); }
+        internal void Validate() { if (!GlobalHotkey.Supported(ShortcutKey)) throw new SafetyException("Saved shortcut letter is unsupported. Choose a supported letter in Settings."); }
     }
     internal static class Configuration {
         internal static T Read<T>(string root, string name) where T : class {

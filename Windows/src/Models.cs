@@ -15,6 +15,8 @@ namespace EasyEject {
         public string Id = "", Label = "", Serial = "", Error = "", Extents = "";
         public List<string> Mounts = new List<string>(); public List<int> Disks = new List<int>();
         public bool System; public string Classification = "Unknown";
+        public StorageGroup Group = StorageGroup.Unknown;
+        public bool IsCard { get { return Group == StorageGroup.Camera || Group == StorageGroup.Emulator; } }
         public string Fingerprint { get { return Id + "|" + Serial + "|" + Extents + "|" + System + "|" + Error + "|" + String.Join(";", Mounts.OrderBy(x => x)); } }
         public string Display { get { return (String.IsNullOrEmpty(Label) ? "Unnamed volume" : Label) + " [" + String.Join(", ", Mounts) + "]"; } }
     }
@@ -22,6 +24,8 @@ namespace EasyEject {
         public long Epoch; public bool Complete = true;
         public List<Disk> Disks = new List<Disk>(); public List<Volume> Volumes = new List<Volume>();
         public List<string> Errors = new List<string>();
+        public Dictionary<string, string> GroupConnections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public string ConnectionStamp(string target) { string value; return GroupConnections.TryGetValue(target, out value) ? value : ""; }
         public string GroupFingerprint(string target) {
             var disks = Disks.Where(d => d.Ancestors.Contains(target) || d.InstanceId == target).ToList();
             var numbers = new HashSet<int>(disks.Select(d => d.Number));
@@ -63,7 +67,7 @@ namespace EasyEject {
             var siblings = inventory.Volumes.Where(v => v.Disks.Any(numbers.Contains)).ToArray();
             if (group.Any(d => d.Error != "") || siblings.Any(v => v.System || v.Error != "" || v.Disks.Count != 1)) throw new SafetyException("Removal would affect protected, unknown, or spanning storage. Nothing was ejected.");
             return new EjectPlan { TargetId = disk.TargetId, TargetDevInst = disk.TargetDevInst, Epoch = inventory.Epoch,
-                Fingerprint = inventory.GroupFingerprint(disk.TargetId), Disks = numbers.ToArray(), Affected = siblings.Select(v => v.Display).ToArray() };
+                Fingerprint = inventory.GroupFingerprint(disk.TargetId), Disks = numbers.ToArray(), Affected = siblings.Select(v => v.Display).Concat(group.Where(d => !siblings.Any(v => v.Disks.Contains(d.Number))).Select(d => "Disk " + d.Number + " (" + d.Model + "): no mounted volume")).ToArray() };
         }
         public EjectResult Execute(EjectPlan plan) {
             return Execute(plan, state => {});
@@ -79,13 +83,26 @@ namespace EasyEject {
         }
     }
     public static class Classifier {
+        internal static bool External(Disk disk) { return disk != null && (disk.Removable || disk.Hotplug || disk.TargetId != ""); }
+        internal static bool Sd(Disk disk) {
+            string text = (disk.Model + " " + disk.InstanceId).ToUpperInvariant();
+            return disk.Bus == 12 || disk.Bus == 13 || text.Contains("SECURE DIGITAL") || text.Contains("SDHC") || text.Contains("SDXC") || System.Text.RegularExpressions.Regex.IsMatch(text, @"(^|[^A-Z0-9])SD([^A-Z0-9]|$)");
+        }
+        internal static void Apply(Volume volume, Disk disk, bool cameraFolders, int emulatorHits) {
+            volume.Classification = Classify(disk, cameraFolders);
+            if (volume.System) { volume.Group = StorageGroup.Protected; volume.Classification = "Windows system storage: protected"; }
+            else if (disk == null) volume.Group = StorageGroup.Unknown;
+            else if (!External(disk)) volume.Group = StorageGroup.Internal;
+            else if (Sd(disk) && emulatorHits >= 2) { volume.Group = StorageGroup.Emulator; volume.Classification = "Emulator card candidate (SD hardware + folder evidence)"; }
+            else volume.Group = volume.Classification.IndexOf("candidate", StringComparison.OrdinalIgnoreCase) >= 0 ? StorageGroup.Camera : StorageGroup.External;
+        }
         public static string Classify(Disk disk, bool cameraFolders) {
             if (disk == null) return "Unknown mapping";
             if (!(disk.Removable || disk.Hotplug || disk.TargetId != "")) return "Internal / fixed storage";
             string text = (disk.Model + " " + disk.InstanceId).ToUpperInvariant();
             if (text.Contains("CFEXPRESS")) return "Camera card candidate (CFexpress hardware)";
             if (text.Contains("XQD")) return "Camera card candidate (XQD hardware)";
-            if (disk.Bus == 12 || disk.Bus == 13) return "Removable SD / MMC candidate";
+            if (Sd(disk)) return "Removable SD / MMC candidate";
             if (cameraFolders) return "Camera media candidate (folder evidence; card type unconfirmed)";
             return "Other external storage (card type unconfirmed)";
         }

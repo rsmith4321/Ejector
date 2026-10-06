@@ -22,30 +22,36 @@ namespace EasyEject {
         readonly WindowsDiscovery discovery = new WindowsDiscovery(); readonly Operations operations = new Operations();
         readonly ImportCompletionRegistry completions = new ImportCompletionRegistry();
         AppSettings appSettings = new AppSettings(); AppIssue appIssue = new AppIssue(); ImportCompletionDialog activeCompletion;
-        ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu;
+        ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu;
+        readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
         int cardCount;
-        readonly ListView list = new ListView(); readonly Label status = new Label(); readonly Button refresh = new Button(), eject = new Button(), import = new Button(), cancel = new Button(), profile = new Button(), defaults = new Button(), history = new Button(), pending = new Button(), settings = new Button(), issue = new Button();
+        readonly ListView list = new ListView(); readonly Label status = new Label(); readonly Button refresh = new Button(), eject = new Button(), bulk = new Button(), import = new Button(), cancel = new Button(), profile = new Button(), defaults = new Button(), history = new Button(), pending = new Button(), settings = new Button(), issue = new Button();
         readonly NotifyIcon tray; readonly System.Windows.Forms.Timer debounce = new System.Windows.Forms.Timer();
         Inventory inventory; bool scanning, working, quit; CancellationTokenSource cancellation; IntPtr notification;
         [StructLayout(LayoutKind.Sequential)] struct BroadcastInterface { public int Size, Type, Reserved; public Guid ClassGuid; public short Name; }
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr RegisterDeviceNotification(IntPtr recipient, ref BroadcastInterface filter, uint flags);
         [DllImport("user32.dll")] static extern bool UnregisterDeviceNotification(IntPtr handle);
-        public DeviceWindow() {
+        public DeviceWindow() : this(false) {}
+        internal DeviceWindow(bool readOnly) {
+            this.readOnly = readOnly;
             try { appSettings = AppSettings.Load(); appIssue = AppIssue.Load(); } catch (Exception ex) { appIssue.Record("Saved application state could not be read: " + ex.Message); }
-            Text = "Easy Eject · Windows prototype"; ClientSize = new Size(1000, 540); MinimumSize = new Size(800, 420); StartPosition = FormStartPosition.CenterScreen; AutoScaleMode = AutoScaleMode.Dpi;
+            if (readOnly) appSettings = new AppSettings();
+            Text = "Easy Eject · Windows prototype"; ClientSize = new Size(1000, 600); MinimumSize = new Size(800, 500); StartPosition = FormStartPosition.CenterScreen; AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Segoe UI", 10);
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(16) };
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             var intro = new Label { AutoSize = true, MaximumSize = new Size(940, 0), Text = "Review connected storage before ejecting. Imports keep all originals and verify SHA-256.\nConnection events refresh the list. Import and eject start only when you choose them.", Margin = new Padding(0, 0, 0, 12) };
             list.Dock = DockStyle.Fill; list.View = View.Details; list.FullRowSelect = true; list.MultiSelect = false; list.HideSelection = false;
             list.Columns.Add("Volume / mount", 245); list.Columns.Add("Classification", 360); list.Columns.Add("Physical disk", 130); list.Columns.Add("Status", 190);
+            foreach (StorageGroup group in Enum.GetValues(typeof(StorageGroup))) list.Groups.Add(new ListViewGroup(group.ToString(), GroupLabel(group)));
             list.SelectedIndexChanged += delegate { UpdateActions(); };
             var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 12, 0, 8) };
             refresh.Text = "Refresh"; eject.Text = "Safe eject…"; import.Text = "Verified import…"; cancel.Text = "Cancel operation"; profile.Text = "Import profile…"; defaults.Text = "Import defaults…"; history.Text = "Import history…";
-            pending.Text = "Completed imports…"; settings.Text = "Settings…"; issue.Text = "View issue…";
-            foreach (var b in new[] { refresh, eject, import, profile, defaults, history, pending, settings, issue, cancel }) { b.AutoSize = true; b.MinimumSize = new Size(135, 36); actions.Controls.Add(b); }
+            pending.Text = "Completed imports…"; settings.Text = "Settings…"; issue.Text = "View issue…"; bulk.Text = "Eject cards…";
+            foreach (var b in new[] { refresh, eject, bulk, import, profile, defaults, history, pending, settings, issue, cancel }) { b.AutoSize = true; b.MinimumSize = new Size(135, 36); actions.Controls.Add(b); }
             cancel.Enabled = false;
             refresh.Click += async delegate { await RefreshDevices(); }; eject.Click += async delegate { await Eject(); }; import.Click += async delegate { await Import(); };
+            bulk.Click += async delegate { await EjectCards(); };
             profile.Click += async delegate { await EditProfile(); }; defaults.Click += delegate { EditDefaults(); };
             history.Click += async delegate { await ReviewHistory(); };
             pending.Click += async delegate { await ReviewCompletions(); }; settings.Click += delegate { EditSettings(); }; issue.Click += delegate { ViewIssue(); };
@@ -54,6 +60,7 @@ namespace EasyEject {
             layout.Controls.Add(intro); layout.Controls.Add(list); layout.Controls.Add(actions); layout.Controls.Add(status); Controls.Add(layout);
             var menu = new ContextMenuStrip(); menu.Items.Add("Show devices", null, delegate { Show(); WindowState = FormWindowState.Normal; Activate(); });
             menu.Items.Add("Refresh", null, async delegate { await RefreshDevices(); });
+            bulkMenu = new ToolStripMenuItem("Eject cards…", null, async delegate { await EjectCards(); }); menu.Items.Add(bulkMenu);
             pendingMenu = new ToolStripMenuItem("Completed imports…", null, async delegate { await ReviewCompletions(); }); menu.Items.Add(pendingMenu);
             settingsMenu = new ToolStripMenuItem("Settings…", null, delegate { EditSettings(); }); menu.Items.Add(settingsMenu);
             issueMenu = new ToolStripMenuItem("View issue…", null, delegate { ViewIssue(); }); menu.Items.Add(issueMenu);
@@ -77,10 +84,16 @@ namespace EasyEject {
             var filter = new BroadcastInterface { Size = Marshal.SizeOf(typeof(BroadcastInterface)), Type = 5, ClassGuid = new Guid("53f56307-b6bf-11d0-94f2-00a0c91efb8b") };
             notification = RegisterDeviceNotification(Handle, ref filter, 0);
             discovery.NotificationsAvailable = notification != IntPtr.Zero;
+            discovery.Instances.Start();
+            if (!readOnly && !hotkey.Configure(Handle, appSettings.ShortcutEnabled, appSettings.ShortcutKey)) appIssue.Record(hotkey.Status);
             if (notification == IntPtr.Zero) { status.Text = "Disk notifications unavailable. Refresh before every action."; discovery.ConnectionChanged(); }
         }
-        protected override void OnHandleDestroyed(EventArgs e) { discovery.NotificationsAvailable = false; discovery.ConnectionChanged(); ExpireCompletions(); if (notification != IntPtr.Zero) { UnregisterDeviceNotification(notification); notification = IntPtr.Zero; } base.OnHandleDestroyed(e); }
+        protected override void OnHandleDestroyed(EventArgs e) { hotkey.Stop(); hotkey.WindowDestroyed(); discovery.Instances.Stop(); discovery.NotificationsAvailable = false; discovery.ConnectionChanged(); ExpireCompletions(); if (notification != IntPtr.Zero) { UnregisterDeviceNotification(notification); notification = IntPtr.Zero; } base.OnHandleDestroyed(e); }
         protected override void WndProc(ref Message m) {
+            if (m.Msg == 0x312 && hotkey.Matches(m.WParam, m.LParam, working || scanning || readOnly)) {
+                IntPtr triggerId = m.WParam, triggerKeys = m.LParam;
+                BeginInvoke(new Action(async delegate { if (hotkey.Matches(triggerId, triggerKeys, working || scanning || readOnly)) await EjectCards(); })); m.Result = IntPtr.Zero; return;
+            }
             if (m.Msg == 0x219 && (m.WParam.ToInt64() == 7 || m.WParam.ToInt64() == 0x8000 || m.WParam.ToInt64() == 0x8003 || m.WParam.ToInt64() == 0x8004)) {
                 discovery.ConnectionChanged(); eject.Enabled = false; import.Enabled = false; debounce.Stop(); debounce.Start();
                 ExpireCompletions();
@@ -90,6 +103,7 @@ namespace EasyEject {
             base.WndProc(ref m);
         }
         Volume Selected { get { return list.SelectedItems.Count == 0 ? null : list.SelectedItems[0].Tag as Volume; } }
+        static string GroupLabel(StorageGroup group) { switch (group) { case StorageGroup.Camera: return "Camera cards (candidates)"; case StorageGroup.Emulator: return "Emulator cards (candidates)"; case StorageGroup.External: return "Other external volumes"; case StorageGroup.Internal: return "Internal storage"; case StorageGroup.Protected: return "Windows storage (protected)"; default: return "Unknown mapping"; } }
         void UpdateActions() {
             var v = Selected; bool ready = v != null && inventory != null && !working && !scanning && inventory.Epoch == discovery.Epoch;
             eject.Enabled = false; import.Enabled = false; profile.Enabled = false; defaults.Enabled = !working; history.Enabled = !working && !scanning; refresh.Enabled = !working && !scanning;
@@ -98,6 +112,8 @@ namespace EasyEject {
             pendingMenu.Enabled = pending.Enabled; issueMenu.Enabled = issue.Enabled; settingsMenu.Enabled = settings.Enabled; debugMenu.Visible = appSettings.DebugEnabled; debugMenu.Enabled = !working;
             tray.Icon = appIssue.NeedsAttention ? SystemIcons.Warning : SystemIcons.Information;
             tray.Text = appIssue.NeedsAttention ? "Easy Eject: needs attention. Choose View issue." : "Easy Eject: " + cardCount + " candidate card disks";
+            bulk.Enabled = !readOnly && !working && !scanning && inventory != null && inventory.Epoch == discovery.Epoch && inventory.Volumes.Any(x => x.IsCard);
+            bulkMenu.Enabled = bulk.Enabled;
             if (!ready) return;
             try { EjectService.Plan(inventory, v.Id); eject.Enabled = true; } catch (SafetyException) {}
             import.Enabled = inventory.Complete && v.Error == "" && !v.System && v.Disks.Count == 1 && v.Mounts.Any(x => x.Length >= 3 && x[1] == ':') && v.Classification != "Internal / fixed storage";
@@ -106,15 +122,35 @@ namespace EasyEject {
         async Task RefreshDevices() {
             if (scanning || working) return; scanning = true; UpdateActions();
             try {
-                var next = await Task.Run(() => discovery.Scan()); inventory = next; list.Items.Clear();
-                foreach (var v in next.Volumes.OrderBy(x => x.System).ThenBy(x => x.Classification).ThenBy(x => x.Display)) {
-                    var row = new ListViewItem(v.Display) { Tag = v };
-                    row.SubItems.Add(v.Classification); row.SubItems.Add(String.Join(", ", v.Disks)); row.SubItems.Add(v.System ? "System: protected" : v.Error == "" ? "Connected" : v.Error); list.Items.Add(row);
-                }
-                cardCount = next.Volumes.Where(v => v.Classification.IndexOf("candidate", StringComparison.OrdinalIgnoreCase) >= 0).SelectMany(v => v.Disks).Distinct().Count();
+                var next = await Task.Run(() => discovery.Scan()); PresentInventory(next);
                 status.Text = next.Complete ? "Read-only inventory: " + next.Volumes.Count + " volumes on " + next.Disks.Count + " disks. Closing this window keeps the tray app running." : "Incomplete inventory; actions blocked. " + String.Join(" ", next.Errors);
             } catch (Exception ex) { inventory = null; status.Text = ex.Message; }
             finally { scanning = false; UpdateActions(); }
+        }
+        internal void PresentInventory(Inventory next) {
+            inventory = next; list.Items.Clear();
+            foreach (var v in next.Volumes.OrderBy(x => x.Group).ThenBy(x => x.Display)) {
+                var row = new ListViewItem(v.Display) { Tag = v, Group = list.Groups[v.Group.ToString()] };
+                row.SubItems.Add(v.Classification); row.SubItems.Add(String.Join(", ", v.Disks.Select(n => { var disk = next.Disks.SingleOrDefault(d => d.Number == n); return n + (disk == null || disk.Model == "" ? "" : " · " + disk.Model); }))); row.SubItems.Add(v.System ? "System: protected" : v.Error == "" ? "Connected" : v.Error); list.Items.Add(row);
+            }
+            cardCount = next.Disks.Where(d => next.Volumes.Any(v => v.IsCard && v.Disks.Contains(d.Number))).Select(d => d.TargetId == "" ? "disk:" + d.Number : d.TargetId).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+        }
+        async Task EjectCards() {
+            if (working || scanning || readOnly) return;
+            working = true; UpdateActions();
+            try {
+                var state = await Task.Run(() => discovery.Scan()); var plan = BulkEjectPolicy.Plan(state);
+                if (plan.Targets.Length == 0) { status.Text = "No camera or emulator cards are connected."; return; }
+                using (var dialog = new BulkEjectDialog(plan)) if (dialog.ShowDialog(this) != DialogResult.Yes) return;
+                completions.InvalidateAll(); status.Text = "Requesting and verifying grouped card removal…"; Log("User confirmed grouped card removal | " + plan.Description);
+                var service = new BulkEjectService(discovery, new WindowsBulkConnections(discovery), operations, validate => new WindowsEjectApi(validate));
+                var result = await Task.Run(() => service.Execute(plan));
+                if (result.Success) ClearIssue(); else RecordIssue(result.Message);
+                status.Text = result.Summary; Notify(result.Success ? "Cards safely removed" : "Card removal stopped", result.Summary + " Open Easy Eject to review connected devices.", result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
+                if (ForegroundWindow) using (var dialog = new BulkEjectResultDialog(result)) dialog.ShowDialog(this);
+            } catch (Exception ex) { ShowError(ex); }
+            finally { working = false; UpdateActions(); debounce.Start(); }
+            await RefreshDevices();
         }
         async Task Eject() {
             var v = Selected; if (v == null || working) return;
@@ -225,7 +261,11 @@ namespace EasyEject {
         void EditSettings() {
             if (working || scanning) return;
             working = true; UpdateActions();
-            try { using (var dialog = new AppSettingsDialog(appSettings)) if (dialog.ShowDialog(this) == DialogResult.OK) { AppSettings.Save(dialog.Value); appSettings = dialog.Value; status.Text = "Application settings saved."; Log(status.Text); } }
+            try { using (var dialog = new AppSettingsDialog(appSettings, hotkey.Status)) if (dialog.ShowDialog(this) == DialogResult.OK) {
+                AppSettings.Save(dialog.Value); appSettings = dialog.Value;
+                bool registered = readOnly || !IsHandleCreated || hotkey.Configure(Handle, appSettings.ShortcutEnabled, appSettings.ShortcutKey);
+                status.Text = "Application settings saved. " + hotkey.Status; if (!registered) RecordIssue(hotkey.Status); Log(status.Text);
+            } }
             catch (Exception ex) { ShowError(ex); }
             finally { FinishOperation(); }
         }
@@ -346,6 +386,6 @@ namespace EasyEject {
             }
         }
         void ShowError(Exception ex) { RecordIssue(ex.Message); Notify("Easy Eject needs attention", ex.Message, ToolTipIcon.Warning); if (ForegroundWindow) ShowMessage(ex.Message, "Easy Eject", MessageBoxIcon.Warning); }
-        protected override void Dispose(bool disposing) { if (disposing) { tray.Dispose(); debounce.Dispose(); } base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { hotkey.Dispose(); discovery.Instances.Dispose(); tray.Dispose(); debounce.Dispose(); } base.Dispose(disposing); }
     }
 }

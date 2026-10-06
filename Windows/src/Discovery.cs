@@ -10,6 +10,8 @@ namespace EasyEject {
     public sealed class WindowsDiscovery : IDiscovery {
         long epoch; readonly object scanGate = new object(); string previous = null;
         public bool NotificationsAvailable;
+        internal readonly InstanceNotifications Instances;
+        public WindowsDiscovery() { Instances = new InstanceNotifications(ConnectionChanged); }
         public long Epoch { get { return Interlocked.Read(ref epoch); } }
         public void ConnectionChanged() { Interlocked.Increment(ref epoch); }
         public Inventory Scan() {
@@ -19,21 +21,19 @@ namespace EasyEject {
                 try { ScanVolumes(inventory); } catch (Exception ex) { inventory.Complete = false; inventory.Errors.Add("Volume inventory: " + ex.Message); }
                 foreach (var v in inventory.Volumes) {
                     var d = v.Disks.Count == 1 ? inventory.Disks.SingleOrDefault(x => x.Number == v.Disks[0]) : null;
-                    bool folders = false;
-                    if (d != null && (d.Removable || d.Hotplug || d.TargetId != "")) {
+                    bool folders = false; int emulatorHits = 0;
+                    if (!v.System && Classifier.External(d)) {
                         foreach (string root in v.Mounts) {
                             try {
-                                using (SafePaths.LockDirectories(root)) {
-                                    folders |= new[] { "DCIM", "PRIVATE", "AVCHD", "MP_ROOT", "XDROOT", "BPAV" }.Any(name => {
-                                        string child = Path.Combine(root, name);
-                                        return Directory.Exists(child) && (File.GetAttributes(child) & FileAttributes.ReparsePoint) == 0;
-                                    });
-                                }
+                                var evidence = FolderEvidence.Read(root); folders |= evidence.Camera; emulatorHits = Math.Max(emulatorHits, evidence.EmulatorHits);
                             } catch (Exception) { /* Classification evidence is optional, never permission to eject. */ }
                         }
                     }
-                    v.Classification = Classifier.Classify(d, folders);
+                    Classifier.Apply(v, d, folders, emulatorHits);
                     if (v.Disks.Any(n => !inventory.Disks.Any(x => x.Number == n))) { inventory.Complete = false; inventory.Errors.Add("A volume maps to a disk missing from PnP inventory."); }
+                }
+                foreach (string target in inventory.Disks.Where(d => d.TargetId != "").Select(d => d.TargetId).Distinct(StringComparer.OrdinalIgnoreCase)) {
+                    inventory.GroupConnections[target] = Instances.Versions.Stamp(GroupInstances(inventory, target));
                 }
                 string fingerprint = String.Join("\n", inventory.Disks.Select(d => d.Fingerprint).Concat(inventory.Volumes.Select(v => v.Fingerprint)).OrderBy(x => x));
                 if (start != Epoch) { inventory.Complete = false; inventory.Errors.Add("Connection changed while scanning; refresh again."); }
@@ -44,6 +44,7 @@ namespace EasyEject {
                 return inventory;
             }
         }
+        internal static string[] GroupInstances(Inventory state, string target) { return state.Disks.Where(x => x.InstanceId == target || x.Ancestors.Contains(target)).SelectMany(x => x.Ancestors.Concat(new[] { x.InstanceId, target })).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(); }
         static void ScanDisks(Inventory inventory) {
             Guid guid = new Guid("53f56307-b6bf-11d0-94f2-00a0c91efb8b");
             IntPtr set = Native.SetupDiGetClassDevs(ref guid, null, IntPtr.Zero, 0x12);

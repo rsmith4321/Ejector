@@ -50,15 +50,22 @@ namespace EasyEject {
         }
     }
     internal sealed class AppSettingsDialog : Form {
-        internal readonly CheckBox Notifications = new CheckBox(), Debug = new CheckBox();
-        internal AppSettings Value { get { return new AppSettings { ShowNotifications = Notifications.Checked, DebugLogging = Debug.Checked }; } }
-        internal AppSettingsDialog(AppSettings settings) {
+        internal readonly CheckBox Notifications = new CheckBox(), Debug = new CheckBox(), Shortcut = new CheckBox();
+        internal readonly ComboBox ShortcutLetter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 80 };
+        internal AppSettings Value { get { return new AppSettings { ShowNotifications = Notifications.Checked, DebugLogging = Debug.Checked, EnableShortcut = Shortcut.Checked, ShortcutLetter = ShortcutLetter.SelectedItem as string }; } }
+        internal AppSettingsDialog(AppSettings settings, string shortcutStatus = null) {
             Text = "Easy Eject settings"; Font = new Font("Segoe UI", 10); Size = new Size(650, 400); MinimumSize = new Size(600, 360); AutoScaleMode = AutoScaleMode.Dpi; StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
             var body = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(24) };
             Notifications.Text = "Show operation notifications"; Notifications.Checked = settings.NotificationsEnabled;
             Debug.Text = "Enable debug logging"; Debug.Checked = settings.DebugEnabled;
-            foreach (var box in new[] { Notifications, Debug }) { box.AutoSize = true; box.Margin = new Padding(0, 4, 0, 14); body.Controls.Add(box); }
-            var info = new Label { AutoSize = true, MaximumSize = new Size(540, 0), Text = "Notifications keep devices connected. Open Easy Eject to review completion choices. Windows notification and quiet-hour settings may hide alerts; completed imports remain available in the app.\n\nDebug logs can contain device names and file paths. They stay in local app-data and are never sent automatically." }; body.Controls.Add(info);
+            Shortcut.Text = "Enable global card-removal shortcut"; Shortcut.Checked = settings.ShortcutEnabled;
+            foreach (var box in new[] { Notifications, Debug, Shortcut }) { box.AutoSize = true; box.Margin = new Padding(0, 4, 0, 14); body.Controls.Add(box); }
+            var shortcutRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+            shortcutRow.Controls.Add(new Label { Text = "Ctrl + Alt + Shift +", AutoSize = true, Padding = new Padding(0, 4, 0, 0) });
+            ShortcutLetter.Items.AddRange(GlobalHotkey.Letters); ShortcutLetter.SelectedItem = settings.ShortcutKey; ShortcutLetter.Enabled = Shortcut.Checked;
+            Shortcut.CheckedChanged += delegate { ShortcutLetter.Enabled = Shortcut.Checked; }; shortcutRow.Controls.Add(ShortcutLetter); body.Controls.Add(shortcutRow);
+            if (shortcutStatus != null) body.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(500, 0), Text = shortcutStatus, Margin = new Padding(0, 8, 0, 8) });
+            var info = new Label { AutoSize = true, MaximumSize = new Size(540, 0), Text = "The shortcut opens the same confirmation as Eject cards. It stays off until enabled. A shortcut already used by another app is reported unavailable; no other key is registered.\n\nWindows notification and quiet-hour settings may hide alerts; completed imports remain available in the app. Debug logs can contain device names and file paths. They stay in local app-data and are never sent automatically." }; body.Controls.Add(info);
             body.SizeChanged += delegate { info.MaximumSize = new Size(Math.Max(250, body.ClientSize.Width - 60), 0); };
             var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(16), FlowDirection = FlowDirection.RightToLeft };
             var save = new Button { Text = "Save settings", AutoSize = true, MinimumSize = new Size(130, 36), DialogResult = DialogResult.OK };

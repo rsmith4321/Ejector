@@ -84,14 +84,15 @@ namespace EasyEject {
         }
     }
     public sealed class WindowsEjectApi : IEjectApi {
-        readonly IDiscovery discovery; readonly long epoch;
-        public WindowsEjectApi(IDiscovery discovery, long epoch) { this.discovery = discovery; this.epoch = epoch; }
+        readonly Action validate;
+        public WindowsEjectApi(IDiscovery discovery, long epoch) : this(delegate { if (discovery.Epoch != epoch) throw new SafetyException("Connection changed before the Windows removal request. Nothing was ejected."); }) {}
+        internal WindowsEjectApi(Action validate) { this.validate = validate; }
         public EjectResult Request(uint devInst, string instanceId) {
             uint located;
             if (Native.CM_Locate_DevNode(out located, instanceId, 0) != 0 || located != devInst || Native.DeviceId(devInst) != instanceId)
                 throw new SafetyException("The removal device changed. Nothing was ejected.");
             int veto; var name = new StringBuilder(260);
-            if (discovery.Epoch != epoch) throw new SafetyException("Connection changed before the Windows removal request. Nothing was ejected.");
+            validate();
             uint code = Native.CM_Request_Device_Eject(devInst, out veto, name, name.Capacity, 0);
             return new EjectResult { Success = code == 0, Code = code, Veto = veto, Name = name.ToString() };
         }
