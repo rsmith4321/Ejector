@@ -152,6 +152,17 @@ namespace EasyEject {
                     Render(window, Path.Combine(output, "device-window-long-result.png"));
                     var volumesList = (System.Windows.Forms.ListView)typeof(DeviceWindow).GetField("list", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(window);
                     Console.WriteLine("Long-result layout: list-height=" + volumesList.Height + " status-height=" + statusControl.Height + " client-height=" + window.ClientSize.Height);
+                    typeof(DeviceWindow).GetField("working", PrivateInstance).SetValue(window, true);
+                    var activity = ActivityField<TrayActivity>(window, "trayActivity"); var importing = activity.Begin(TrayOperationKind.Import, "Synthetic camera", "Preparing import");
+                    window.ApplyActivityProgress(importing, "Copying synthetic fixture.mp4; all originals kept.", new ImportWorkProgress("Copying", 0.43)); RefreshActivityWindow(window);
+                    Console.WriteLine("Native tray importing: " + ActivityField<System.Windows.Forms.NotifyIcon>(window, "tray").Text + " | " + ActivityField<System.Windows.Forms.ToolStripMenuItem>(window, "activityMenu").Text);
+                    using (var icon = ActivityField<System.Windows.Forms.NotifyIcon>(window, "tray").Icon.ToBitmap()) icon.Save(Path.Combine(output, "tray-busy-icon.png"));
+                    Render(window, Path.Combine(output, "device-window-importing.png"));
+                    ActivityField<AppIssue>(window, "appIssue").Record("Synthetic earlier issue remains available."); var sharing = activity.Begin(TrayOperationKind.Share, "Synthetic Luna", "Checking saved originals");
+                    window.ApplyActivityProgress(sharing, "Creating sharing copy: 27%"); RefreshActivityWindow(window);
+                    Console.WriteLine("Native tray sharing: " + ActivityField<System.Windows.Forms.NotifyIcon>(window, "tray").Text + " | " + ActivityField<System.Windows.Forms.ToolStripMenuItem>(window, "activityMenu").Text);
+                    using (var icon = ActivityField<System.Windows.Forms.NotifyIcon>(window, "tray").Icon.ToBitmap()) icon.Save(Path.Combine(output, "tray-busy-attention-icon.png"));
+                    Render(window, Path.Combine(output, "device-window-sharing.png"));
                 }
                 Console.WriteLine("Hidden forms rendered at minimum size. No device operations: " + output); return 0;
             }
@@ -678,6 +689,7 @@ namespace EasyEject {
             TrayStorageMenuTests();
             StatusLayoutTests();
             InformationDiagnosticsTests();
+            TrayActivityTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {

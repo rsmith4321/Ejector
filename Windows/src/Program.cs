@@ -29,6 +29,8 @@ namespace EasyEject {
         AppSettings appSettings = new AppSettings(); AppIssue appIssue = new AppIssue(); ImportCompletionDialog activeCompletion;
         ManualQuickShareService manualSharing;
         readonly ToolStripMenuItem storageMenu = new ToolStripMenuItem("Connected storage");
+        readonly ToolStripMenuItem activityMenu = new ToolStripMenuItem { Enabled = false };
+        readonly TrayActivity trayActivity = new TrayActivity(); readonly TrayBusyIcons trayBusyIcons = new TrayBusyIcons();
         ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu, helpMenu, aboutMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
         int cardCount;
@@ -71,11 +73,11 @@ namespace EasyEject {
             history.Click += async delegate { await ReviewHistory(); };
             resume.Click += async delegate { await ResumeImport(); };
             pending.Click += async delegate { await ReviewCompletions(); }; settings.Click += delegate { EditSettings(); }; issue.Click += delegate { ViewIssue(); };
-            cancel.Click += delegate { if (cancellation != null) { cancellation.Cancel(); status.Text = "Stopping after the current check. Verified copies and remaining source data are kept."; } };
+            cancel.Click += delegate { RequestCancellation(); };
             status.AutoSize = false; status.Multiline = true; status.ReadOnly = true; status.ScrollBars = ScrollBars.Vertical; status.WordWrap = true; status.Dock = DockStyle.Fill; status.MaximumSize = new Size(940, 0); status.Text = "Reading connected devices…";
             layout.Controls.Add(intro); layout.Controls.Add(list); layout.Controls.Add(actions); layout.Controls.Add(status); Controls.Add(layout);
             layout.SizeChanged += delegate { int width = Math.Max(350, layout.ClientSize.Width - layout.Padding.Horizontal - 8); intro.MaximumSize = status.MaximumSize = new Size(width, 0); };
-            var menu = new ContextMenuStrip(); menu.Items.Add("Show devices", null, delegate { Show(); WindowState = FormWindowState.Normal; Activate(); });
+            var menu = new ContextMenuStrip(); menu.Items.Add(activityMenu); menu.Items.Add(new ToolStripSeparator()); menu.Items.Add("Show devices", null, delegate { Show(); WindowState = FormWindowState.Normal; Activate(); });
             menu.Items.Add("Refresh", null, async delegate { await RefreshDevices(); });
             menu.Items.Add(storageMenu);
             bulkMenu = new ToolStripMenuItem("Eject cards…", null, async delegate { await EjectCards(); }); menu.Items.Add(bulkMenu);
@@ -88,6 +90,7 @@ namespace EasyEject {
             aboutMenu = new ToolStripMenuItem("About Easy Eject…", null, delegate { ViewInformation(true); }); menu.Items.Add(aboutMenu);
             menu.Items.Add("Quit", null, delegate { if (working) { MessageBox.Show(this, "Wait for the operation to finish or cancel the import before quitting."); return; } quit = true; Close(); });
             tray = new NotifyIcon { Icon = SystemIcons.Information, Text = "Easy Eject Windows prototype", Visible = true, ContextMenuStrip = menu };
+            status.TextChanged += delegate { UpdateTrayPresentation(); };
             tray.DoubleClick += delegate { Show(); WindowState = FormWindowState.Normal; Activate(); };
             // Balloon clicks carry no device token. They only reveal the app for a fresh review.
             tray.BalloonTipClicked += delegate { Show(); WindowState = FormWindowState.Normal; Activate(); };
@@ -140,8 +143,7 @@ namespace EasyEject {
             pending.Enabled &= completions.Entries.Length > 0; issue.Enabled &= appIssue.HasIssue;
             pendingMenu.Enabled = pending.Enabled; issueMenu.Enabled = issue.Enabled; settingsMenu.Enabled = settings.Enabled; debugMenu.Visible = appSettings.DebugEnabled; debugMenu.Enabled = !working && !scanning;
             helpMenu.Enabled = aboutMenu.Enabled = !working && !scanning;
-            tray.Icon = appIssue.NeedsAttention ? SystemIcons.Warning : SystemIcons.Information;
-            tray.Text = appIssue.NeedsAttention ? "Easy Eject: needs attention. Choose View issue." : "Easy Eject: " + cardCount + " candidate card disks";
+            UpdateTrayPresentation();
             bulk.Enabled = !readOnly && !working && !scanning && inventory != null && inventory.Epoch == discovery.Epoch && inventory.Volumes.Any(x => x.IsCard);
             bulkMenu.Enabled = bulk.Enabled;
             if (!ready) return;
@@ -192,14 +194,15 @@ namespace EasyEject {
                 string source = SafePaths.Normalize(Path.Combine(connection.Root, stored.RelativeSource)), destination = SafePaths.Normalize(stored.Destination);
                 if (!SafePaths.Within(source, connection.Root)) throw new SafetyException("The saved automatic media folder is outside this device.");
                 cancellation = new CancellationTokenSource(); cancel.Enabled = true; status.Text = "Preparing automatic import for " + ProfileName.Display(stored) + "…";
+                var activity = BeginActivity(TrayOperationKind.Import, ProfileName.Display(stored), "Preparing automatic import");
                 var guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, connection.Volume, connection.Disk, connection.Epoch));
                 request.ValidateAdmission(inventory, guard.DestinationIdentity); guard.Validate();
                 completions.InvalidateSource(connection.Root); Log("Automatic connection import | " + ProfileName.Display(stored) + " | " + source + " -> " + destination);
                 engineStarted = true;
-                var result = await Task.Run(() => new VerifiedImporter(operations).Run(connection.Root, source, destination, stored.VolumeId, guard, cancellation.Token, text => { if (!IsDisposed) BeginInvoke(new Action(() => status.Text = text)); }, request.Options));
+                var result = await Task.Run(() => new VerifiedImporter(operations).Run(connection.Root, source, destination, stored.VolumeId, guard, cancellation.Token, ActivityReporter(activity), request.Options, ImportReporter(activity)));
                 await PresentImportResult(result, stored, connection.Volume, guard, connection.Root, destination, request.Options);
             } catch (OperationCanceledException) {
-                status.Text = "Automatic import cancelled. Remaining originals/Trash data and verified copies are kept. No automatic retry occurs on this connection."; Log(status.Text); Notify("Automatic import cancelled", status.Text, ToolTipIcon.Info);
+                status.Text = "Automatic import cancelled. Remaining originals/Trash data and verified copies are kept. No automatic retry occurs on this connection."; FinishActivity(status.Text); Log(status.Text); Notify("Automatic import cancelled", status.Text, ToolTipIcon.Info);
             } catch (Exception ex) {
                 if (!engineStarted) automatic.PreflightWaiting(request);
                 ShowError(ex);
@@ -222,19 +225,19 @@ namespace EasyEject {
                 bool clean = appSettings.CleanupCardsEnabled; var cleanPlans = clean ? plan.Targets.Select(t => MetadataCleanupPlan.Bulk(state, t)).ToArray() : new MetadataCleanupPlan[0];
                 using (var dialog = new BulkEjectDialog(plan, String.Join("\r\n\r\n", cleanPlans.Select(p => p.Description)))) if (dialog.ShowDialog(this) != DialogResult.Yes) return;
                 completions.InvalidateAll(); status.Text = "Requesting and verifying grouped card removal…"; Log("User confirmed grouped card removal | " + plan.Description);
+                var activity = BeginActivity(TrayOperationKind.Eject, "Camera/emulator cards", "Requesting grouped removal");
                 var service = new BulkEjectService(discovery, new WindowsBulkConnections(discovery), operations, validate => new WindowsEjectApi(validate));
                 var counts = new CleanupCounts(); if (clean) { cancellation = new CancellationTokenSource(); cancel.Enabled = true; }
                 var result = await Task.Run(() => service.Execute(plan, initial => { foreach (var selection in cleanPlans) selection.Preflight(initial, WindowsDiscovery.VolumeId); },
-                    (target, validate) => { if (clean) cleanPlans.Single(p => p.TargetId == target.Id).Clean(validate, WindowsDiscovery.VolumeId, cancellation.Token, counts, ReportCleanup); }, clean ? cancellation.Token : CancellationToken.None));
+                    (target, validate) => { if (clean) cleanPlans.Single(p => p.TargetId == target.Id).Clean(validate, WindowsDiscovery.VolumeId, cancellation.Token, counts, ActivityReporter(activity)); }, clean ? cancellation.Token : CancellationToken.None));
                 if (clean) result.CleanupMessage = counts.Message;
                 if (result.Success) ClearIssue(); else RecordIssue(result.Message);
-                status.Text = result.Summary; Notify(result.Success ? "Cards safely removed" : "Card removal stopped", result.Summary + " Open Easy Eject to review connected devices.", result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
+                status.Text = result.Summary; FinishActivity(status.Text); Notify(result.Success ? "Cards safely removed" : "Card removal stopped", result.Summary + " Open Easy Eject to review connected devices.", result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
                 if (ForegroundWindow) using (var dialog = new BulkEjectResultDialog(result)) dialog.ShowDialog(this);
             } catch (Exception ex) { ShowError(ex); }
             finally { FinishOperation(); }
             await RefreshDevices();
         }
-        void ReportCleanup(string message) { BeginInvoke(new Action(() => status.Text = message)); }
         internal void UpdateTrayStorageMenu() {
             foreach (var item in storageMenu.DropDownItems.Cast<ToolStripItem>().ToArray()) item.Dispose(); storageMenu.DropDownItems.Clear();
             storageMenu.DropDownItems.AddRange(TrayStorageMenu.Build(inventory, discovery.Epoch, working || scanning, readOnly, appSettings.CleanupCardsEnabled, async (choice, clean) => {
@@ -255,14 +258,16 @@ namespace EasyEject {
                 if (MessageBox.Show(this, text, "Safe eject", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
                 completions.InvalidateAll(); Log("User requested manual safe removal | " + String.Join(", ", plan.Affected));
                 working = true; UpdateActions(); status.Text = "Requesting safe removal…";
+                var activity = BeginActivity(TrayOperationKind.Eject, v.Display, clean ? "Cleaning before safe removal" : "Requesting safe removal");
                 var counts = new CleanupCounts(); if (clean) { cancellation = new CancellationTokenSource(); cancel.Enabled = true; }
                 var result = await Task.Run(() => new EjectService(discovery, new WindowsEjectApi(discovery, plan.Epoch, clean ? cancellation.Token : CancellationToken.None), operations).Execute(plan, initial => {
                     if (cleanup == null) return;
                     cleanup.Preflight(initial, WindowsDiscovery.VolumeId);
-                    cleanup.Clean(() => { var fresh = discovery.Scan(); EjectService.Validate(discovery, fresh, plan); return fresh; }, WindowsDiscovery.VolumeId, cancellation.Token, counts, ReportCleanup);
+                    cleanup.Clean(() => { var fresh = discovery.Scan(); EjectService.Validate(discovery, fresh, plan); return fresh; }, WindowsDiscovery.VolumeId, cancellation.Token, counts, ActivityReporter(activity));
                 }, clean ? cancellation.Token : CancellationToken.None));
                 if (clean) result.CleanupMessage = counts.Message;
                 status.Text = result.Message;
+                FinishActivity(status.Text);
                 if (result.Success) ClearIssue(); else RecordIssue(result.Message);
                 Notify(result.Success ? "Safe removal accepted" : "Device still connected", result.Message, result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
                 if (ForegroundWindow) MessageBox.Show(this, result.Message, result.Success ? "Safe removal accepted" : "Device still connected", MessageBoxButtons.OK, result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
@@ -294,11 +299,10 @@ namespace EasyEject {
                 if (stored.SavedDestination == null) { guard.Validate(); stored.SavedDestination = guard.DestinationIdentity; Profiles.Save(stored); }
                 completions.InvalidateSource(root); Log("User started import | " + source + " -> " + destination);
                 working = true; cancellation = new CancellationTokenSource(); cancel.Enabled = true; UpdateActions();
-                var result = await Task.Run(() => new VerifiedImporter(operations).Run(root, source, destination, v.Id, guard, cancellation.Token, progressText => {
-                    if (!IsDisposed) BeginInvoke(new Action(() => status.Text = progressText));
-                }, options));
+                var activity = BeginActivity(TrayOperationKind.Import, ProfileName.Display(stored), "Preparing import");
+                var result = await Task.Run(() => new VerifiedImporter(operations).Run(root, source, destination, v.Id, guard, cancellation.Token, ActivityReporter(activity), options, ImportReporter(activity)));
                 await PresentImportResult(result, stored, v, guard, root, destination, options);
-            } catch (OperationCanceledException) { status.Text = "Import cancelled. All originals and completed copies kept. No completion receipt was written."; Log(status.Text); Notify("Import cancelled", status.Text, ToolTipIcon.Info); if (ForegroundWindow) MessageBox.Show(this, status.Text, "Import cancelled"); }
+            } catch (OperationCanceledException) { status.Text = "Import cancelled. All originals and completed copies kept. No completion receipt was written."; FinishActivity(status.Text); Log(status.Text); Notify("Import cancelled", status.Text, ToolTipIcon.Info); if (ForegroundWindow) MessageBox.Show(this, status.Text, "Import cancelled"); }
             catch (Exception ex) { ShowError(ex); }
             finally { FinishOperation(); }
             await RefreshDevices();
@@ -319,6 +323,7 @@ namespace EasyEject {
                 }
                 string sid; using (var identity = WindowsIdentity.GetCurrent()) { if (identity.User == null) throw new SafetyException("The current Windows Trash owner is unavailable."); sid = identity.User.Value; }
                 cancellation = new CancellationTokenSource(); cancel.Enabled = true; status.Text = "Reviewing the exact interrupted batch, owners, devices and complete saved copies…";
+                var activity = BeginActivity(TrayOperationKind.Resume, ProfileName.Display(stored), "Reviewing interrupted import");
                 var guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, volume, disk, epoch));
                 ProfileDestination.Require(stored, guard.DestinationIdentity, false); automatic.MarkManual(inventory, volume);
                 var reviewed = await Task.Run(() => RemovalResumeEvidence.Review(intentPath, root, source, destination, sid, guard, operations, cancellation.Token));
@@ -326,18 +331,17 @@ namespace EasyEject {
                 cancellation.Token.ThrowIfCancellationRequested();
                 guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, volume, disk, epoch));
                 completions.InvalidateSource(root); Log("User explicitly resumed verified import | " + reviewed.ImportId);
-                var result = await Task.Run(() => RemovalResumeEvidence.Resume(reviewed, intentPath, root, source, destination, sid, guard, operations, cancellation.Token, text => {
-                    if (!IsDisposed) BeginInvoke(new Action(() => status.Text = text));
-                }));
+                var result = await Task.Run(() => RemovalResumeEvidence.Resume(reviewed, intentPath, root, source, destination, sid, guard, operations, cancellation.Token, ActivityReporter(activity)));
                 await PresentImportResult(result, stored, volume, guard, root, destination, options);
             } catch (OperationCanceledException) {
-                status.Text = "Resume cancelled before any new permanent removal. Previously absent files remain absent; remaining source data and complete saved copies are kept. No completion receipt was written."; Log(status.Text); Notify("Resume cancelled", status.Text, ToolTipIcon.Info);
+                status.Text = "Resume cancelled before any new permanent removal. Previously absent files remain absent; remaining source data and complete saved copies are kept. No completion receipt was written."; FinishActivity(status.Text); Log(status.Text); Notify("Resume cancelled", status.Text, ToolTipIcon.Info);
                 if (ForegroundWindow) ShowMessage(status.Text, "Resume cancelled", MessageBoxIcon.Information);
             } catch (Exception ex) { ShowError(ex); }
             finally { FinishOperation(); }
             await RefreshDevices();
         }
         async Task PresentImportResult(ImportResult result, ImportProfile stored, Volume v, VolumeImportGuard guard, string root, string destination, MediaOptions options) {
+            BeginActivity(TrayOperationKind.Import, ProfileName.Display(stored), "Finishing import and saving history");
             string deviceName = String.IsNullOrWhiteSpace(stored.Name) ? v.Display : stored.Name;
             string removalMessage = result.Receipt != null && !String.IsNullOrEmpty(result.Receipt.ResumedUtc) ? RemovalResumeChoice.Summary(result) : OriginalRemovalChoice.Summary(result.RemovedOriginals) + " " + DeviceTrashChoice.Summary(result.RecoveredTrashFiles, result.ClearedTrashFiles, result.ClearedTrashRecords);
             string historyNote = ""; bool historyFailed = false;
@@ -372,7 +376,29 @@ namespace EasyEject {
             try { MessageBox.Show(this, message, title, MessageBoxButtons.OK, icon); }
             finally { working = previous; UpdateActions(); }
         }
-        void FinishOperation() { working = false; cancel.Enabled = false; if (cancellation != null) { cancellation.Dispose(); cancellation = null; } UpdateActions(); debounce.Start(); }
+        void FinishOperation() { FinishActivity(status.Text); working = false; cancel.Enabled = false; if (cancellation != null) { cancellation.Dispose(); cancellation = null; } UpdateActions(); debounce.Start(); }
+        void UpdateTrayPresentation() {
+            var view = TrayPresentation.Create(trayActivity, working, scanning, cardCount, appIssue.NeedsAttention);
+            tray.Text = view.Tooltip; tray.Icon = view.Busy ? view.Attention ? trayBusyIcons.Attention : trayBusyIcons.Busy : view.Attention ? SystemIcons.Warning : SystemIcons.Information;
+            activityMenu.Text = view.Heading;
+        }
+        internal void RequestCancellation() {
+            if (cancellation == null || trayActivity.Current == null) return;
+            trayActivity.RequestStop(); cancellation.Cancel(); status.Text = "Stopping after the current check. Verified copies and remaining source data are kept."; UpdateTrayPresentation();
+        }
+        TrayOperation BeginActivity(TrayOperationKind kind, string name, string phase) { var token = trayActivity.Begin(kind, name, phase); UpdateTrayPresentation(); return token; }
+        void FinishActivity(string outcome) { if (trayActivity.Current != null || trayActivity.AwaitingOutcome) { trayActivity.End(outcome); cancel.Enabled = false; } UpdateTrayPresentation(); }
+        internal void ApplyActivityProgress(TrayOperation token, string message, ImportWorkProgress measured = null) {
+            if (IsDisposed || !trayActivity.Report(token, message, measured)) return;
+            if (message != null) status.Text = message; UpdateTrayPresentation();
+        }
+        void QueueActivityProgress(TrayOperation token, string message, ImportWorkProgress measured = null) {
+            if (IsDisposed || !IsHandleCreated) return;
+            try { BeginInvoke(new Action(() => ApplyActivityProgress(token, message, measured))); }
+            catch (InvalidOperationException) { if (!IsDisposed && IsHandleCreated) throw; }
+        }
+        Action<string> ActivityReporter(TrayOperation token) { return message => QueueActivityProgress(token, message); }
+        Action<ImportWorkProgress> ImportReporter(TrayOperation token) { return measured => QueueActivityProgress(token, null, measured); }
         void ExpireCompletions() { completions.InvalidateAll(); if (activeCompletion != null && !activeCompletion.IsDisposed) activeCompletion.ExpireEject(); }
         void ShowDevices() { Show(); WindowState = FormWindowState.Normal; Activate(); }
         void Notify(string title, string text, ToolTipIcon icon) {
@@ -386,7 +412,7 @@ namespace EasyEject {
             catch (Exception ex) { status.Text += " Debug logging unavailable: " + ex.Message; }
         }
         void SaveIssue() { try { AppIssue.Save(appIssue); } catch (Exception ex) { status.Text += " Issue could not be saved: " + ex.Message; } }
-        void RecordIssue(string message) { appIssue.Record(message); status.Text = message; SaveIssue(); Log("Needs attention | " + message); UpdateActions(); }
+        void RecordIssue(string message) { trayActivity.End(message); cancel.Enabled = false; appIssue.Record(message); status.Text = message; SaveIssue(); Log("Needs attention | " + message); UpdateActions(); }
         void ClearIssue() { if (!appIssue.HasIssue) return; appIssue.Clear(); SaveIssue(); UpdateActions(); }
         void ViewIssue() {
             if (working || !appIssue.HasIssue) return;
@@ -484,13 +510,14 @@ namespace EasyEject {
                     }
                     if (choice != DialogResult.Yes) { status.Text = "Device kept connected. Original files unchanged."; break; }
                     Log("User requested post-import eject | " + entry.DeviceName);
+                    var activity = BeginActivity(TrayOperationKind.Eject, entry.DeviceName, cleanup == null ? "Requesting safe removal" : "Cleaning before safe removal");
                     var counts = new CleanupCounts(); if (cleanup != null) { cancellation = new CancellationTokenSource(); cancel.Enabled = true; }
                     var result = await Task.Run(() => new CompletedEjectService(completions, discovery, new WindowsEjectApi(discovery, entry.Origin.Epoch, cleanup == null ? CancellationToken.None : cancellation.Token), operations, WindowsDiscovery.VolumeId).Execute(id, initial => {
                         if (cleanup == null) return; cleanup.Preflight(initial, WindowsDiscovery.VolumeId);
-                        cleanup.Clean(() => { var fresh = discovery.Scan(); EjectService.Validate(discovery, fresh, entry.Origin.Plan); return fresh; }, WindowsDiscovery.VolumeId, cancellation.Token, counts, ReportCleanup);
+                        cleanup.Clean(() => { var fresh = discovery.Scan(); EjectService.Validate(discovery, fresh, entry.Origin.Plan); return fresh; }, WindowsDiscovery.VolumeId, cancellation.Token, counts, ActivityReporter(activity));
                     }, cleanup == null ? CancellationToken.None : cancellation.Token));
                     if (cleanup != null) result.CleanupMessage = counts.Message;
-                    status.Text = result.Message; Log(result.Message);
+                    status.Text = result.Message; FinishActivity(status.Text); Log(result.Message);
                     if (result.Success) { completions.InvalidateAll(); ClearIssue(); } else RecordIssue(result.Message);
                     Notify(result.Success ? "Safe removal accepted" : "Device still connected", result.Message, result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
                     MessageBox.Show(this, result.Message, result.Success ? "Safe removal accepted" : "Device still connected", MessageBoxButtons.OK, result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
@@ -511,15 +538,17 @@ namespace EasyEject {
                 if (choice == DialogResult.Retry) { await PerformQuickShare(batch); return; }
                 if (choice != DialogResult.OK || batch == null) return;
                 cancellation = new CancellationTokenSource(); cancel.Enabled = true;
+                var activity = BeginActivity(TrayOperationKind.Verify, batch.DeviceName, "Checking saved files");
                 await Task.Run(() => {
                     using (SafePaths.LockDirectories(batch.DestinationRoot)) {
                         var guard = new WindowsDestinationGuard(discovery, batch.DestinationRoot, batch.Destination);
-                        ImportHistory.Verify(batch, batch.Destination, guard, operations, cancellation.Token, message => { if (!IsDisposed) BeginInvoke(new Action(() => status.Text = message)); });
+                        ImportHistory.Verify(batch, batch.Destination, guard, operations, cancellation.Token, ActivityReporter(activity));
                     }
                 });
                 status.Text = "Verified all " + batch.Originals.Count + " exact saved files. Originals unchanged.";
+                FinishActivity(status.Text);
                 MessageBox.Show(this, status.Text + "\n" + batch.Folder, "Saved batch verified", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            } catch (OperationCanceledException) { status.Text = "Saved-file verification cancelled. Files unchanged."; }
+            } catch (OperationCanceledException) { status.Text = "Saved-file verification cancelled. Files unchanged."; FinishActivity(status.Text); }
             catch (Exception ex) { ShowError(ex); }
             finally { FinishOperation(); }
         }
@@ -528,25 +557,27 @@ namespace EasyEject {
         }
         void StopSharingCancellation(CancellationTokenSource active) {
             if (active == null || !Object.ReferenceEquals(cancellation, active)) return;
+            FinishActivity("");
             cancellation = null; cancel.Enabled = false; active.Dispose();
         }
         async Task<bool> PerformQuickShare(CompletedBatch expected) {
             if (readOnly || expected == null) return false;
             CancellationTokenSource active = null;
             try {
+                BeginActivity(TrayOperationKind.Share, expected.DeviceName, "Reviewing saved batch and sharing choices");
                 var offer = await Task.Run(() => SharingService.Prepare(expected)); ManualQuickShareRequest request;
                 using (var dialog = new QuickSharePromptDialog(offer.Batch.DeviceName, offer.Batch.Folder, offer.Profile)) {
                     if (dialog.ShowDialog(this) != DialogResult.OK) { status.Text = "Quick Share cancelled. No export started; full-quality imported originals are kept."; return false; }
                     request = offer.Choose(dialog.Preset, dialog.ColorChoice);
                 }
                 active = new CancellationTokenSource(); cancellation = active; cancel.Enabled = true;
+                var activity = BeginActivity(TrayOperationKind.Share, expected.DeviceName, "Checking saved originals");
                 status.Text = "Creating sharing copies from the exact verified saved originals…"; Log("User requested Quick Share | " + expected.DeviceName + " | " + request.Preset + " | " + request.Color);
-                var result = await Task.Run(() => SharingService.Run(request, active.Token, message => {
-                    if (!IsDisposed && IsHandleCreated) BeginInvoke(new Action(() => { if (Object.ReferenceEquals(cancellation, active)) status.Text = message; }));
-                }));
+                var result = await Task.Run(() => SharingService.Run(request, active.Token, ActivityReporter(activity)));
                 StopSharingCancellation(active);
                 string messageText = QuickSharePresentation.Success(request.Batch, request.Preset, result);
                 if (result.CleanupWarnings.Count != 0) RecordIssue(messageText); else { ClearIssue(); status.Text = messageText; Log(messageText); }
+                FinishActivity(status.Text);
                 Notify(result.CleanupWarnings.Count != 0 ? "Sharing copies ready; needs attention" : result.Created + result.Reused == 0 ? "No supported Luna master videos" : "Sharing copies ready", messageText, result.CleanupWarnings.Count == 0 ? ToolTipIcon.Info : ToolTipIcon.Warning);
                 if (ForegroundWindow) ShowMessage(messageText, "Quick Share", result.CleanupWarnings.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
                 return true;
@@ -554,10 +585,11 @@ namespace EasyEject {
                 StopSharingCancellation(active);
                 if (!ex.Cancelled) { ShowError(ex); return false; }
                 if (QuickSharePresentation.CancelNeedsAttention(ex)) RecordIssue(ex.Message); else { status.Text = ex.Message; Log(ex.Message); }
+                FinishActivity(status.Text);
                 Notify("Quick Share cancelled", ex.Message, QuickSharePresentation.CancelNeedsAttention(ex) ? ToolTipIcon.Warning : ToolTipIcon.Info);
                 if (ForegroundWindow) ShowMessage(ex.Message, "Quick Share cancelled", QuickSharePresentation.CancelNeedsAttention(ex) ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
             } catch (OperationCanceledException) {
-                StopSharingCancellation(active); status.Text = "Quick Share cancelled before export. Saved originals and earlier sharing copies are kept. Retry is manual."; Log(status.Text); Notify("Quick Share cancelled", status.Text, ToolTipIcon.Info);
+                StopSharingCancellation(active); status.Text = "Quick Share cancelled before export. Saved originals and earlier sharing copies are kept. Retry is manual."; FinishActivity(status.Text); Log(status.Text); Notify("Quick Share cancelled", status.Text, ToolTipIcon.Info);
             } catch (Exception ex) { StopSharingCancellation(active); ShowError(ex); }
             finally { StopSharingCancellation(active); }
             return false;
@@ -635,6 +667,6 @@ namespace EasyEject {
             }
         }
         void ShowError(Exception ex) { RecordIssue(ex.Message); Notify("Easy Eject needs attention", ex.Message, ToolTipIcon.Warning); if (ForegroundWindow) ShowMessage(ex.Message, "Easy Eject", MessageBoxIcon.Warning); }
-        protected override void Dispose(bool disposing) { if (disposing) { hotkey.Dispose(); discovery.Instances.Dispose(); tray.Dispose(); debounce.Dispose(); } base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { hotkey.Dispose(); discovery.Instances.Dispose(); tray.Dispose(); trayBusyIcons.Dispose(); debounce.Dispose(); } base.Dispose(disposing); }
     }
 }
