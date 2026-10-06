@@ -47,13 +47,23 @@ namespace EasyEject {
             }
             public void Dispose() { foreach (var h in handles.AsEnumerable().Reverse()) h.Dispose(); handles.Clear(); }
         }
-        internal static FileStream ReadFile(string path) {
+        internal static FileStream ReadFile(string path, int bufferSize = 1048576) {
             var h = Native.CreateFile(path, 0x80000000, 1, IntPtr.Zero, 3, 0x00200000, IntPtr.Zero);
             if (h.IsInvalid) { h.Dispose(); throw Native.Error("Cannot open source without following links"); }
             try {
                 var info = Native.Info(h); if ((info.Attributes & 0x10) != 0) throw new SafetyException("Expected a regular source file.");
                 if (!Native.FinalPath(h).Equals(path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Opened file resolves outside its planned path.");
-                return new FileStream(h, FileAccess.Read, 1048576, false);
+                return new FileStream(h, FileAccess.Read, bufferSize, false);
+            } catch { h.Dispose(); throw; }
+        }
+        internal static FileStream ProtectOriginal(string path, bool remove) {
+            var h = Native.CreateFile(path, remove ? 0x80010000U : 0x80000000U, remove ? 0U : 1U, IntPtr.Zero, 3, 0x00300000, IntPtr.Zero);
+            if (h.IsInvalid) { h.Dispose(); throw Native.Error("Cannot hold source for complete-batch verification/removal"); }
+            try {
+                var info = Native.Info(h);
+                if ((info.Attributes & 0x10) != 0 || !Native.FinalPath(h).Equals(path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("The held source is not the expected regular file.");
+                if (remove && ((info.Attributes & 0x1005) != 0 || info.Links != 1)) throw new SafetyException("Read-only, system, offline or hard-linked originals cannot be removed. No protection is changed.");
+                return new FileStream(h, FileAccess.Read, 4096, false);
             } catch { h.Dispose(); throw; }
         }
         internal static FileStream NewFile(string path) {

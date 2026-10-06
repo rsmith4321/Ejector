@@ -8,8 +8,8 @@ using System.Text.RegularExpressions;
 namespace EasyEject {
     // Immutable options are resolved before an operation; editing defaults cannot alter a running copy.
     public sealed class MediaOptions {
-        public readonly bool VideosOnly, IncludePreviews, CleanLayout, AskToEject;
-        public MediaOptions(bool videosOnly, bool includePreviews, bool cleanLayout = false, bool askToEject = false) { VideosOnly = videosOnly; IncludePreviews = includePreviews; CleanLayout = cleanLayout; AskToEject = askToEject; }
+        public readonly bool VideosOnly, IncludePreviews, CleanLayout, AskToEject, DeleteOriginals;
+        public MediaOptions(bool videosOnly, bool includePreviews, bool cleanLayout = false, bool askToEject = false, bool deleteOriginals = false) { VideosOnly = videosOnly; IncludePreviews = includePreviews; CleanLayout = cleanLayout; AskToEject = askToEject; DeleteOriginals = deleteOriginals; }
     }
     public sealed class MediaPlan {
         public List<string> Media, Indexes;
@@ -65,6 +65,9 @@ namespace EasyEject {
             var media = new HashSet<string>(masters.Concat(files.Where(x => Ext(x).Equals("lrv", StringComparison.OrdinalIgnoreCase) && masterKeys.Contains(MasterKey(x)))));
             var keys = new HashSet<string>(media.Select(Stem).Concat(media.Select(Key)));
             return new HashSet<string>(files.Where(x => media.Contains(x) || (sidecars.Contains(Ext(x)) && keys.Contains(Stem(x)))));
+        }
+        internal static HashSet<string> Deletable(MediaPlan plan, MediaOptions options) {
+            return new HashSet<string>((options.VideosOnly ? Ordinary(plan.Media, true) : Recognized(plan.Media).ToList()).Where(x => !IsDeviceIndex(x)), StringComparer.OrdinalIgnoreCase);
         }
         public static MediaPlan Plan(List<string> scanned, string source, string root, MediaOptions options) {
             if (options == null) throw new ArgumentNullException("options");

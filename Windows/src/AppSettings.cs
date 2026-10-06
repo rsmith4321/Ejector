@@ -74,8 +74,8 @@ namespace EasyEject {
     }
     internal static class CompletionPresentation {
         internal static bool ShowChoice(bool askToEject, bool foreground, bool notifications) { return askToEject && (foreground || !notifications); }
-        internal static string Notification(bool hasMedia) {
-            return (hasMedia ? "Selected files imported and verified." : "No media matches your import options. Photos or skipped files may remain.") + " Device remains connected. Open Easy Eject to review the import and choose whether to eject.";
+        internal static string Notification(bool hasMedia, int removed = 0) {
+            return (hasMedia ? "Selected files imported and verified." : "No media matches your import options. Photos or skipped files may remain.") + (removed > 0 ? " Permanently removed " + removed + " verified originals." : "") + " Device remains connected. Open Easy Eject to review the import and choose whether to eject.";
         }
     }
 }

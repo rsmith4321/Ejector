@@ -87,6 +87,9 @@ namespace EasyEject {
                     dialog.UseCustom.Checked = true; dialog.Selection.Previews.Checked = false; Render(dialog, Path.Combine(output, "profile-custom.png"));
                 }
                 using (var dialog = new ImportDefaultsDialog(defaults)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "shared-defaults.png")); }
+                using (var dialog = new ImportDefaultsDialog(new ImportDefaults { DeleteOriginals = true })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "shared-removal.png")); }
+                using (var dialog = new OriginalRemovalConfirmationDialog("Applies to EVERY device using defaults, including future profiles.", true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "enable-removal.png")); }
+                using (var dialog = new VerifiedImportConfirmationDialog("Copy selected videos and their required companions under:\nE:\\DCIM\n\nTo a date folder under:\nD:\\Travel backups\n\nOriginal filenames are kept. SHA-256 verifies new and reused copies.\n\n" + OriginalRemovalChoice.BeforeImport(RemoveOptions()) + "\n\nDevice remains connected. Start this manual import?")) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "manual-removal.png")); }
                 var previewBatch = new CompletedBatch { Id = Guid.NewGuid().ToString("N"), CompletedUtc = DateTime.UtcNow.ToString("o"), DeviceName = "Fixture Insta360 card", Folder = @"D:\Travel backups\2026-10-06", ReceiptPath = @"D:\Travel backups\2026-10-06\.easy-eject-receipts\fixture\verified-import.json", Originals = new List<VerifiedCopy> { new VerifiedCopy { Path = @"D:\Travel backups\2026-10-06\VID_20261006_001.mp4", Sha256 = new string('a', 64), Bytes = 1234567 } } };
                 using (var dialog = new ImportHistoryDialog(new[] { previewBatch })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history.png")); dialog.Batches.Items[0].Selected = true; Render(dialog, Path.Combine(output, "history-selected.png")); }
                 using (var dialog = new ImportHistoryDialog(new CompletedBatch[0])) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history-empty.png")); }
@@ -601,6 +604,7 @@ namespace EasyEject {
             } });
             BulkTests();
             CleanupTests();
+            RemovalTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {

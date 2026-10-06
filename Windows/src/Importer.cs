@@ -52,22 +52,24 @@ namespace EasyEject {
             return Resolve(state, sourceId).Fingerprint + "\n" + Resolve(state, destinationId).Fingerprint + "\n" + String.Join("\n", state.Disks.Where(d => disks.Contains(d.Number)).Select(d => d.Fingerprint).OrderBy(x => x));
         }
         public void Validate() {
-            if (discovery.Epoch != epoch) throw new SafetyException("Device connection changed during import. Originals are kept.");
+            if (discovery.Epoch != epoch) throw new SafetyException("Device connection changed during import. Remaining originals are kept.");
             var state = discovery.Scan();
-            if (state.Epoch != epoch || WindowsDiscovery.VolumeId(source) != sourceId || WindowsDiscovery.VolumeId(destination) != destinationId || Fingerprint(state) != fingerprint) throw new SafetyException("Import device identities changed. Originals are kept.");
+            if (state.Epoch != epoch || WindowsDiscovery.VolumeId(source) != sourceId || WindowsDiscovery.VolumeId(destination) != destinationId || Fingerprint(state) != fingerprint) throw new SafetyException("Import device identities changed. Remaining originals are kept.");
         }
     }
     [DataContract] public sealed class ReceiptEntry {
         [DataMember] public string RelativePath; [DataMember] public string Sha256; [DataMember] public long Bytes;
         [DataMember] public string SourceRelativePath; [DataMember] public bool IsMedia, Reused;
+        [DataMember] public bool RemovedSource;
     }
     [DataContract] public sealed class ImportReceipt {
         [DataMember] public string StartedUtc; [DataMember] public string SourceVolume; [DataMember] public bool OriginalsKept = true;
         [DataMember] public bool HasSelectedMedia;
         [DataMember] public string Id; [DataMember] public bool VideosOnly, IncludePreviews, CleanLayout;
+        [DataMember] public bool OriginalRemovalRequested;
         [DataMember] public List<ReceiptEntry> Files = new List<ReceiptEntry>();
     }
-    public sealed class ImportResult { public string Folder, ReceiptPath; public int Files, Reused; public long Bytes; public bool HasSelectedMedia; public ImportReceipt Receipt; }
+    public sealed class ImportResult { public string Folder, ReceiptPath; public int Files, Reused, RemovedOriginals; public long Bytes; public bool HasSelectedMedia; public ImportReceipt Receipt; }
     public sealed class VerifiedImporter {
         readonly Operations operations; readonly Func<string, ulong> capacity; readonly Action<string> auditCheck;
         public VerifiedImporter(Operations operations) : this(operations, Native.FreeSpace, x => {}) {}
@@ -104,7 +106,7 @@ namespace EasyEject {
                 });
                 EnsureDirectories(batch, destination);
                 using (SafePaths.LockDirectories(batch)) {
-                    var receipt = new ImportReceipt { Id = Guid.NewGuid().ToString("N"), StartedUtc = DateTime.UtcNow.ToString("o"), SourceVolume = volumeId, HasSelectedMedia = plan.Media.Count != 0, VideosOnly = options.VideosOnly, IncludePreviews = options.IncludePreviews, CleanLayout = options.CleanLayout };
+                    var receipt = new ImportReceipt { Id = Guid.NewGuid().ToString("N"), StartedUtc = DateTime.UtcNow.ToString("o"), SourceVolume = volumeId, HasSelectedMedia = plan.Media.Count != 0, VideosOnly = options.VideosOnly, IncludePreviews = options.IncludePreviews, CleanLayout = options.CleanLayout, OriginalRemovalRequested = options.DeleteOriginals };
                     var originals = new Dictionary<string, string>();
                     long bytes = 0; int reused = 0;
                     string receipts = Path.Combine(batch, ".easy-eject-receipts"); EnsureDirectories(receipts, batch);
@@ -169,28 +171,32 @@ namespace EasyEject {
                     }
                     guard.Validate(); cancel.ThrowIfCancellationRequested();
                     if (!manifest.SequenceEqual(MediaSelection.Plan(Scan(selectedFolder, cancel), sourceRoot, selectedFolder, options).Files)) throw new SafetyException("Source file list changed during import. Completed copies and all originals remain available.");
-                    // Recheck every final copy before marking this batch complete; fail closed on an edited earlier copy.
-                    foreach (var entry in receipt.Files) {
-                        string path = Path.Combine(batch, entry.RelativePath);
-                        using (SafePaths.LockDirectories(Path.GetDirectoryName(path))) using (var saved = SafePaths.ReadFile(path)) {
-                            if (saved.Length != entry.Bytes || Hash(saved, cancel) != entry.Sha256) throw new SafetyException("An earlier saved copy changed. Batch remains incomplete; originals are kept.");
-                        }
-                        string original = originals[entry.RelativePath];
-                        using (SafePaths.LockDirectories(Path.GetDirectoryName(original))) using (var input = SafePaths.ReadFile(original)) {
-                            if (!SameStamp(Native.Info(input.SafeFileHandle), stamps[original]) || Hash(input, cancel) != entry.Sha256) throw new SafetyException("A source recording changed after copying. Batch remains incomplete; originals are kept.");
-                        }
-                    }
+                    // Recheck and hold every source and saved dependency until receipt publication.
+                    using (var removal = new OriginalRemovalSession(batch, receipt, originals, stamps, options.DeleteOriginals ? MediaSelection.Deletable(plan, options) : new HashSet<string>())) {
+                    removal.VerifyAll(cancel, guard.Validate);
                     guard.Validate();
-                    log("Batch verification complete | " + receipt.Files.Count + " files, " + bytes + " bytes, " + reused + " reused; originals kept");
+                    log("Batch verification complete | " + receipt.Files.Count + " files, " + bytes + " bytes, " + reused + " reused; " + (options.DeleteOriginals ? "removal requested; originals still held on source" : "originals kept"));
+                    Action checkManifest = () => {
+                        var scanned = Scan(selectedFolder, cancel);
+                        if (scanned.Any(removal.WasRemoved)) throw new SafetyException("A new file appeared at a removed original's path. It is kept; review the device before retrying.");
+                        // Retain the frozen masters for companion/package association while checking remaining paths.
+                        var virtualFiles = scanned.Concat(manifest.Where(removal.WasRemoved)).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList();
+                        var current = MediaSelection.Plan(virtualFiles, sourceRoot, selectedFolder, options).Files.Where(f => !removal.WasRemoved(f));
+                        if (!current.SequenceEqual(manifest.Where(f => !removal.WasRemoved(f)))) throw new SafetyException("Source selection changed during original removal. Remaining originals are kept.");
+                    };
+                    if (options.DeleteOriginals) removal.Remove(cancel, guard.Validate, checkManifest, log, report);
+                    int removedCount = removal.Removed; receipt.OriginalsKept = removedCount == 0;
+                    report("Publishing verified import receipt. " + OriginalRemovalChoice.Summary(removedCount));
+                    cancel.ThrowIfCancellationRequested(); guard.Validate(); checkManifest(); removal.VerifyAll(cancel, guard.Validate);
                     string receiptPath = Path.Combine(record, "verified-import.json");
                     using (var stream = SafePaths.NewFile(Path.Combine(record, ".receipt-" + Guid.NewGuid().ToString("N") + ".partial"))) {
                         bool complete = false;
                         try { new DataContractJsonSerializer(typeof(ImportReceipt)).WriteObject(stream, receipt); stream.Flush(true); cancel.ThrowIfCancellationRequested(); guard.Validate(); Native.Rename(stream.SafeFileHandle, receiptPath); stream.Flush(true); complete = true; }
                         finally { if (!complete) Native.DeleteOnClose(stream.SafeFileHandle); }
                     }
-                    report("Verified " + receipt.Files.Count + " files. Originals kept. Device remains connected.");
-                    return new ImportResult { Folder = batch, ReceiptPath = receiptPath, Receipt = receipt, Files = receipt.Files.Count, Reused = reused, Bytes = bytes, HasSelectedMedia = receipt.HasSelectedMedia };
-                    } catch (Exception ex) { try { log("Stopped; originals kept | " + ex.Message); } catch {} throw; }
+                    return new ImportResult { Folder = batch, ReceiptPath = receiptPath, Receipt = receipt, Files = receipt.Files.Count, Reused = reused, RemovedOriginals = removedCount, Bytes = bytes, HasSelectedMedia = receipt.HasSelectedMedia };
+                    }
+                    } catch (Exception ex) { int removedCount = receipt.Files.Count(e => e.RemovedSource); try { log((removedCount == 0 ? "Stopped; originals kept" : "Stopped; " + removedCount + " verified originals removed; remaining originals kept") + " | " + ex.Message); } catch {} if (removedCount > 0) throw new OriginalRemovalFailure(removedCount, ex, batch, Path.Combine(record, "import-audit.log")); throw; }
                     }
                     }
                 }
@@ -204,7 +210,7 @@ namespace EasyEject {
         }
         // Production guard exposes an inexpensive connection-generation check for each copy chunk.
         static bool discoveryChanged(IImportGuard guard) { var fast = guard as IConnectionGuard; return fast != null && fast.Changed; }
-        static bool SameStamp(Native.FileInfo a, Native.FileInfo b) {
+        internal static bool SameStamp(Native.FileInfo a, Native.FileInfo b) {
             return a.VolumeSerial == b.VolumeSerial && a.IndexHigh == b.IndexHigh && a.IndexLow == b.IndexLow && a.SizeHigh == b.SizeHigh && a.SizeLow == b.SizeLow && a.Modified.dwHighDateTime == b.Modified.dwHighDateTime && a.Modified.dwLowDateTime == b.Modified.dwLowDateTime;
         }
         public static List<string> Scan(string root, CancellationToken cancel) {
@@ -216,6 +222,7 @@ namespace EasyEject {
                     cancel.ThrowIfCancellationRequested(); SafePaths.Normalize(item); SafePaths.Relative(item, root);
                     FileAttributes attrs = File.GetAttributes(item);
                     if ((attrs & FileAttributes.ReparsePoint) != 0) throw new SafetyException("Symbolic links, junctions, cloud placeholders, and other reparse points are not imported.");
+                    if (Path.GetFileName(item).StartsWith(".", StringComparison.Ordinal)) continue;
                     if ((attrs & FileAttributes.Directory) != 0) {
                         if (new[] { "System Volume Information", "$RECYCLE.BIN" }.Contains(Path.GetFileName(item), StringComparer.OrdinalIgnoreCase)) continue;
                         Walk(item, root, files, cancel);
@@ -229,7 +236,7 @@ namespace EasyEject {
             EnsureDirectories(Path.GetDirectoryName(directory), root);
             using (SafePaths.LockDirectories(Path.GetDirectoryName(directory))) { Directory.CreateDirectory(directory); using (SafePaths.LockDirectories(directory)) {} }
         }
-        static string Hash(Stream stream, CancellationToken cancel) {
+        internal static string Hash(Stream stream, CancellationToken cancel) {
             using (var sha = SHA256.Create()) { byte[] buffer = new byte[1048576]; int n; while ((n = stream.Read(buffer, 0, buffer.Length)) != 0) { cancel.ThrowIfCancellationRequested(); sha.TransformBlock(buffer, 0, n, null, 0); } sha.TransformFinalBlock(new byte[0], 0, 0); return Hex(sha.Hash); }
         }
         static string Hex(byte[] bytes) { return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant(); }
@@ -240,16 +247,18 @@ namespace EasyEject {
         [DataMember] public string RelativeSource; [DataMember] public string Destination;
         [DataMember] public bool? UsesImportDefaults; [DataMember] public bool? VideosOnly; [DataMember] public bool? IncludePreviews; [DataMember] public bool? CleanLayout;
         [DataMember] public bool? AskToEject;
+        [DataMember] public bool? DeleteOriginals;
         public bool FollowsDefaults { get { return UsesImportDefaults == true; } }
         public MediaOptions Resolve(ImportDefaults defaults) {
             if (defaults == null) throw new ArgumentNullException("defaults");
             // Prototype profiles without option fields used all-media with previews. Preserve that.
-            return FollowsDefaults ? defaults.Snapshot() : new MediaOptions(VideosOnly ?? false, IncludePreviews ?? true, CleanLayout ?? false, AskToEject ?? false);
+            return FollowsDefaults ? defaults.Snapshot() : new MediaOptions(VideosOnly ?? false, IncludePreviews ?? true, CleanLayout ?? false, AskToEject ?? false, DeleteOriginals ?? false);
         }
         public void SetCustom(bool custom, ImportDefaults defaults) {
             MediaOptions options = FollowsDefaults || !custom ? defaults.Snapshot() : Resolve(defaults);
-            VideosOnly = options.VideosOnly; IncludePreviews = options.IncludePreviews; CleanLayout = options.CleanLayout; AskToEject = options.AskToEject; UsesImportDefaults = !custom;
+            VideosOnly = options.VideosOnly; IncludePreviews = options.IncludePreviews; CleanLayout = options.CleanLayout; AskToEject = options.AskToEject; DeleteOriginals = options.DeleteOriginals; UsesImportDefaults = !custom;
         }
+        public void SetVideosOnly(bool value) { if (!value && (VideosOnly ?? false)) DeleteOriginals = false; VideosOnly = value; }
         public ImportProfile Copy() { return (ImportProfile)MemberwiseClone(); }
     }
     public static class Profiles {

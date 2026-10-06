@@ -202,8 +202,8 @@ namespace EasyEject {
                 string source = SafePaths.Normalize(Path.Combine(root, stored.RelativeSource)), destination = SafePaths.Normalize(stored.Destination);
                 if (!SafePaths.Within(source, root)) throw new SafetyException("Choose a folder within the selected device volume.");
                 var guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, v, disk, selectionEpoch));
-                string text = (options.VideosOnly ? "Copy selected videos and their required companions under:\n" : "Copy all media and sidecars under:\n") + source + "\n\nTo a date folder under:\n" + destination + "\n\n" + (options.IncludePreviews ? "Camera previews included." : "Optional previews stay on the device; required package files are included.") + "\n" + (options.CleanLayout ? "Ordinary media uses a clean layout; packages and unfamiliar media keep their tree." : "Media folder paths are retained.") + "\nOriginal filenames are kept. SHA-256 verifies new and reused copies. Originals and the device stay connected.\n\nStart this manual import?";
-                if (MessageBox.Show(this, text, "Verified import", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+                string text = (options.VideosOnly ? "Copy selected videos and their required companions under:\n" : "Copy all media and sidecars under:\n") + source + "\n\nTo a date folder under:\n" + destination + "\n\n" + (options.IncludePreviews ? "Camera previews included." : "Optional previews stay on the device; required package files are included.") + "\n" + (options.CleanLayout ? "Ordinary media uses a clean layout; packages and unfamiliar media keep their tree." : "Media folder paths are retained.") + "\nOriginal filenames are kept. SHA-256 verifies new and reused copies.\n\n" + OriginalRemovalChoice.BeforeImport(options) + "\n\nThe device remains connected. Start this manual import?";
+                using (var review = new VerifiedImportConfirmationDialog(text)) if (review.ShowDialog(this) != DialogResult.Yes) return;
                 completions.InvalidateSource(root); Log("User started import | " + source + " -> " + destination);
                 working = true; cancellation = new CancellationTokenSource(); cancel.Enabled = true; UpdateActions();
                 var result = await Task.Run(() => new VerifiedImporter(operations).Run(root, source, destination, v.Id, guard, cancellation.Token, progressText => {
@@ -216,7 +216,7 @@ namespace EasyEject {
                 }
                 string message = result.Files == 0 ? "No matching media or device indexes were found. No batch was created." : (result.HasSelectedMedia ? "Import complete. " : "No matching media. Device index backup only. ") + result.Files + " files verified (" + result.Bytes + " bytes; " + result.Reused + " reused).\n" + result.Folder;
                 bool sourceUnchanged = guard.CompletionOrigin.Epoch == discovery.Epoch;
-                message += historyNote + "\n\nOriginals kept. " + (sourceUnchanged ? "Device remains connected." : "The source connection changed after copying. Refresh and review the device."); status.Text = message; Log(message);
+                message += historyNote + "\n\n" + OriginalRemovalChoice.Summary(result.RemovedOriginals) + " " + (sourceUnchanged ? "Device remains connected." : "The source connection changed after copying. Refresh and review the device."); status.Text = message; Log(message);
                 if (!historyFailed) ClearIssue();
                 ImportCompletion completion = null;
                 if (options.AskToEject && sourceUnchanged) {
@@ -227,7 +227,7 @@ namespace EasyEject {
                 FinishOperation();
                 if (showChoice && completion != null) await ReviewCompletion(completion.Id);
                 else {
-                    Notify(historyFailed ? "Import verified; history needs attention" : result.HasSelectedMedia ? "Import complete" : "No matching media", historyFailed ? historyNote.Trim() : sourceUnchanged ? CompletionPresentation.Notification(result.HasSelectedMedia) : "The import finished, then the source connection changed. Open Easy Eject to review connected devices. Original files were kept.", historyFailed ? ToolTipIcon.Warning : ToolTipIcon.Info);
+                    Notify(historyFailed ? "Import verified; history needs attention" : result.HasSelectedMedia ? "Import complete" : "No matching media", historyFailed ? historyNote.Trim() : sourceUnchanged ? CompletionPresentation.Notification(result.HasSelectedMedia, result.RemovedOriginals) : "The import finished, then the source connection changed. Open Easy Eject to review connected devices. " + OriginalRemovalChoice.Summary(result.RemovedOriginals), historyFailed ? ToolTipIcon.Warning : ToolTipIcon.Info);
                     if (ForegroundWindow) ShowMessage(message, result.HasSelectedMedia ? "Import complete" : "No matching media", historyFailed ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
                 }
             } catch (OperationCanceledException) { status.Text = "Import cancelled. All originals and completed copies kept. No completion receipt was written."; Log(status.Text); Notify("Import cancelled", status.Text, ToolTipIcon.Info); if (ForegroundWindow) MessageBox.Show(this, status.Text, "Import cancelled"); }
