@@ -11,9 +11,9 @@ namespace EasyEject {
         internal readonly RemovalIntent Intent; internal readonly string Hash, RecordFolder;
         internal readonly Dictionary<string, FileStream> Copies, Inputs;
         internal readonly HashSet<string> Missing, PriorMissing;
-        internal readonly Action CheckManifest;
-        internal RemovalResumeContext(RemovalIntent intent, string hash, string folder, Dictionary<string, FileStream> copies, Dictionary<string, FileStream> inputs, HashSet<string> missing, Action checkManifest) {
-            Intent = intent; Hash = hash; RecordFolder = folder; Copies = copies; Inputs = inputs; Missing = missing; PriorMissing = new HashSet<string>(missing, StringComparer.OrdinalIgnoreCase); CheckManifest = checkManifest;
+        internal readonly Action CheckManifest, Validate, CheckPaths;
+        internal RemovalResumeContext(RemovalIntent intent, string hash, string folder, Dictionary<string, FileStream> copies, Dictionary<string, FileStream> inputs, HashSet<string> missing, Action checkManifest, Action validate, Action checkPaths) {
+            Intent = intent; Hash = hash; RecordFolder = folder; Copies = copies; Inputs = inputs; Missing = missing; PriorMissing = new HashSet<string>(missing, StringComparer.OrdinalIgnoreCase); CheckManifest = checkManifest; Validate = validate; CheckPaths = checkPaths;
         }
         internal void Verify(RemovalIntentFile entry, CancellationToken cancellation) {
             FileStream input;
@@ -37,7 +37,9 @@ namespace EasyEject {
         }
     }
     internal static class RemovalResumeTransaction {
-        internal static ImportResult Run(RemovalResumeContext context, CancellationToken cancellation, Action validate, Action<string> report, Action<string> auditCheck) {
+        internal static ImportResult Run(RemovalResumeContext context, CancellationToken cancellation, Action<string> report, Action<string> auditCheck) {
+            Action validate = context.Validate;
+            Action<string> reportChecked = line => { context.CheckPaths(); report(line); context.CheckPaths(); };
             var intent = context.Intent;
             var receipt = new ImportReceipt { Id = intent.ImportId, StartedUtc = intent.CreatedUtc, SourceVolume = intent.SourceVolume, VideosOnly = intent.VideosOnly, IncludePreviews = intent.IncludePreviews, CleanLayout = intent.CleanLayout, OriginalRemovalRequested = intent.DeleteOriginals, TrashRecoveryRequested = intent.RecoverTrash,
                 ResumedUtc = DateTime.UtcNow.ToString("o"), RemovalIntentSha256 = context.Hash };
@@ -46,15 +48,16 @@ namespace EasyEject {
                 PriorAbsentTrashFiles = intent.Files.Count(x => context.PriorMissing.Contains(x.SourcePath) && x.FromTrash && !x.IsTrashRecord),
                 PriorAbsentTrashRecords = intent.Files.Count(x => context.PriorMissing.Contains(x.SourcePath) && x.IsTrashRecord) };
             string auditPath = Path.Combine(context.RecordFolder, "resume-" + Guid.NewGuid().ToString("N").Substring(0, 16) + "-audit.log");
+            context.CheckPaths();
             using (var auditStream = SafePaths.NewFile(auditPath)) using (var writer = new StreamWriter(auditStream, new UTF8Encoding(false), 4096, true)) {
-                Action<string> audit = line => { writer.WriteLine(DateTime.UtcNow.ToString("o") + " " + line); writer.Flush(); auditStream.Flush(true); auditCheck(line); };
+                Action<string> audit = line => { context.CheckPaths(); writer.WriteLine(DateTime.UtcNow.ToString("o") + " " + line); writer.Flush(); auditStream.Flush(true); context.CheckPaths(); auditCheck(line); context.CheckPaths(); };
                 try {
                     cancellation.ThrowIfCancellationRequested(); validate(); context.CheckManifest(); context.VerifyAll(cancellation, validate);
                     audit("Started explicit resume | intent SHA256 " + context.Hash + " | " + intent.ImportId + " | prior absent: " + result.PriorAbsentOriginals + " originals, " + result.PriorAbsentTrashFiles + " Trash files, " + result.PriorAbsentTrashRecords + " records");
                     foreach (var entry in intent.Files.Where(x => x.Eligible && !context.PriorMissing.Contains(x.SourcePath)).OrderBy(x => x.IsTrashRecord)) {
                         cancellation.ThrowIfCancellationRequested(); validate(); context.CheckManifest(); context.Verify(entry, cancellation);
                         audit("Before resumed permanent removal | SHA256 " + entry.Sha256 + " | " + entry.SourcePath + " -> " + Path.Combine(intent.BatchFolder, entry.SavedRelativePath));
-                        report((entry.FromTrash ? "Resuming verified Trash " + (entry.IsTrashRecord ? "record: " : "file: ") : "Resuming verified original removal: ") + entry.SourceLabel);
+                        reportChecked((entry.FromTrash ? "Resuming verified Trash " + (entry.IsTrashRecord ? "record: " : "file: ") : "Resuming verified original removal: ") + entry.SourceLabel);
                         cancellation.ThrowIfCancellationRequested(); validate(); context.CheckManifest(); context.Verify(entry, cancellation);
                         var input = context.Inputs[entry.SourcePath]; Native.DeleteOnClose(input.SafeFileHandle, "Cannot remove the held verified resume source");
                         context.Missing.Add(entry.SourcePath);
@@ -71,7 +74,7 @@ namespace EasyEject {
                     receipt.HasSelectedMedia = result.HasSelectedMedia = receipt.Files.Any(x => x.IsMedia); receipt.OriginalsKept = !receipt.Files.Any(x => !x.FromTrash && x.RemovedSource);
                     result.RecoveredTrashFiles = receipt.Files.Count(x => x.FromTrash && !x.IsTrashRecord); receipt.ResumeAuditPath = SafePaths.Relative(auditPath, intent.BatchFolder);
                     audit("Complete resume batch verified before receipt | removed this action: " + result.RemovedOriginals + " originals, " + result.ClearedTrashFiles + " Trash files, " + result.ClearedTrashRecords + " records; device remains connected");
-                    report("Publishing verified resumed import receipt. Device remains connected.");
+                    reportChecked("Publishing verified resumed import receipt. Device remains connected.");
                     cancellation.ThrowIfCancellationRequested(); validate(); context.CheckManifest(); context.VerifyAll(cancellation, validate);
                     string target = Path.Combine(context.RecordFolder, "verified-import.json");
                     using (var output = SafePaths.NewFile(Path.Combine(context.RecordFolder, ".resume-receipt-" + Guid.NewGuid().ToString("N").Substring(0, 16) + ".partial"))) {
@@ -79,7 +82,7 @@ namespace EasyEject {
                         try { new DataContractJsonSerializer(typeof(ImportReceipt)).WriteObject(output, receipt); output.Flush(true); cancellation.ThrowIfCancellationRequested(); validate(); context.CheckManifest(); Native.Rename(output.SafeFileHandle, target); output.Flush(true); complete = true; }
                         finally { if (!complete) Native.DeleteOnClose(output.SafeFileHandle); }
                     }
-                    result.ReceiptPath = target; return result;
+                    context.CheckPaths(); result.ReceiptPath = target; return result;
                 } catch (Exception ex) {
                     try { audit("Resume stopped | removed this action: " + result.RemovedOriginals + " originals, " + result.ClearedTrashFiles + " Trash files, " + result.ClearedTrashRecords + " records | " + ex.Message); } catch {}
                     if (result.RemovedOriginals + result.ClearedTrashFiles + result.ClearedTrashRecords > 0) throw new RemovalResumeFailure(result, auditPath, ex); throw;
