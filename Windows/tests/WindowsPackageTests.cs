@@ -10,7 +10,7 @@ namespace EasyEject {
             internal readonly Fixture Files = new Fixture(); internal readonly ManifestSigningFixture Signing = new ManifestSigningFixture();
             internal readonly FakeExecutableTrust ExecutableTrust; internal readonly FakeManifestCertificateTrust CertificateTrust;
             internal string Root { get { return Files.Source; } }
-            internal WindowsPackageFixture(bool releaseVersion = true) {
+            internal WindowsPackageFixture(bool releaseVersion = true, bool managedReleaseVersion = true) {
                 ExecutableTrust = new FakeExecutableTrust { Evidence = Signing.Evidence() }; CertificateTrust = new FakeManifestCertificateTrust { Evidence = Signing.Evidence() };
                 string app = Path.Combine(Path.GetDirectoryName(typeof(Tests).Assembly.Location), WindowsReleaseManifest.Executable);
                 byte[] bytes = File.ReadAllBytes(app);
@@ -18,6 +18,7 @@ namespace EasyEject {
                     byte[] old = Encoding.Unicode.GetBytes("0.1.0-dev\0"), next = Encoding.Unicode.GetBytes("0.1.0.0\0\0\0"); int found = 0;
                     found = PatchFixtureBytes(bytes, old, next);
                     Check(found == 1, "Could not patch only the disposable product-version resource");
+                    if (managedReleaseVersion) PatchFixtureAttribute(bytes, "0.1.0-dev", "0.1.0.0");
                 }
                 File.WriteAllBytes(Path.Combine(Root, WindowsReleaseManifest.Executable), bytes);
                 File.Copy(Path.Combine(Path.GetDirectoryName(app), WindowsReleaseManifest.Configuration), Path.Combine(Root, WindowsReleaseManifest.Configuration));
@@ -58,6 +59,18 @@ namespace EasyEject {
             }
             return found;
         }
+        static void PatchFixtureAttribute(byte[] bytes, string old, string replacement, int expected = 1) {
+            byte[] text = Encoding.UTF8.GetBytes(old), next = Encoding.UTF8.GetBytes(replacement);
+            Check(text.Length < 128 && next.Length > 0 && next.Length <= text.Length, "Unsupported disposable metadata patch");
+            byte[] blob = new byte[] { 1, 0, (byte)text.Length }.Concat(text).Concat(new byte[2]).ToArray(); int found = 0;
+            for (int i = 1; i <= bytes.Length - blob.Length; i++) {
+                if (bytes[i - 1] != blob.Length || bytes[i] != 1) continue; int j = 1; while (j < blob.Length && bytes[i + j] == blob[j]) j++;
+                if (j != blob.Length) continue;
+                Array.Clear(bytes, i, blob.Length); byte[] changed = new byte[] { 1, 0, (byte)next.Length }.Concat(next).Concat(new byte[2]).ToArray();
+                Array.Copy(changed, 0, bytes, i, changed.Length); bytes[i - 1] = (byte)changed.Length; found++; i += blob.Length - 1;
+            }
+            Check(found == expected, "Disposable metadata patch for " + old + " expected " + expected + " matches; observed " + found);
+        }
         static void WindowsPackageTests() {
             Test("Windows package review authenticates exact payload and actual x64 GUI app version without execution", delegate {
                 using (var f = new WindowsPackageFixture()) {
@@ -83,6 +96,9 @@ namespace EasyEject {
             });
             Test("Windows package rejects development product version even if signed manifest says stable", delegate {
                 using (var f = new WindowsPackageFixture(false)) { Check(RefusePackage(() => f.Review()).Message.Contains("application/version identity"), "Development metadata became a release"); }
+            });
+            Test("Windows package refuses stable resources concealing a development managed informational version", delegate {
+                using (var f = new WindowsPackageFixture(managedReleaseVersion: false)) { Check(RefusePackage(() => f.Review()).Message.Contains("managed Windows application/version identity"), "Resource-only change became a managed release"); }
             });
             Test("Windows package refuses unconfigured publisher without opening creating or verifying", delegate {
                 using (var f = new Fixture()) { string missing = Path.Combine(f.Root, "missing-package"); var trust = new FakeExecutableTrust(); Throws<SafetyException>(() => new WindowsPackageReview(missing, null, trust, new WindowsManifestTrust(), CancellationToken.None)); Check(!Directory.Exists(missing) && trust.Calls == 0, "Unconfigured channel performed work"); }
