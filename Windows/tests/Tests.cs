@@ -141,7 +141,14 @@ namespace EasyEject {
                 using (var dialog = new BulkEjectDialog(cleanupBulk, String.Join("\r\n\r\n", cleanupBulk.Targets.Select(t => MetadataCleanupPlan.Bulk(cleanupState, t).Description)))) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "bulk-cleanup.png")); }
                 var bulkResult = new BulkEjectResult { Requested = 2, Confirmed = 1, Detail = "Fixture open-file veto. Close the editor before reviewing the remaining card." }; bulkResult.SafeDevices.Add(@"Fixture camera [E:\]");
                 using (var dialog = new BulkEjectResultDialog(bulkResult)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "bulk-partial-result.png")); }
-                using (var window = new DeviceWindow(true)) { window.Size = window.MinimumSize; window.PresentInventory(CardState()); Render(window, Path.Combine(output, "device-window.png")); }
+                using (var window = new DeviceWindow(true)) {
+                    window.Size = window.MinimumSize; window.PresentInventory(CardState()); Render(window, Path.Combine(output, "device-window.png"));
+                    var statusControl = (System.Windows.Forms.Control)typeof(DeviceWindow).GetField("status", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(window);
+                    statusControl.Text = String.Join(Environment.NewLine, Enumerable.Range(1, 80).Select(i => "Synthetic retained-work result " + i + ": full-quality originals are unchanged; retry is manual."));
+                    Render(window, Path.Combine(output, "device-window-long-result.png"));
+                    var volumesList = (System.Windows.Forms.ListView)typeof(DeviceWindow).GetField("list", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(window);
+                    Console.WriteLine("Long-result layout: list-height=" + volumesList.Height + " status-height=" + statusControl.Height + " client-height=" + window.ClientSize.Height);
+                }
                 Console.WriteLine("Hidden forms rendered at minimum size. No device operations: " + output); return 0;
             }
             if (args.Length == 1 && args[0] == "--ui-smoke") {
@@ -665,6 +672,7 @@ namespace EasyEject {
             QuickShareConfigurationTests();
             ManualQuickShareTests();
             TrayStorageMenuTests();
+            StatusLayoutTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {

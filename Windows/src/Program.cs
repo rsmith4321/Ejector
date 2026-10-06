@@ -34,7 +34,7 @@ namespace EasyEject {
         int cardCount;
         readonly Button resume = new Button();
         readonly Button savedProfiles = new Button();
-        readonly ListView list = new ListView(); readonly Label status = new Label(); readonly Button refresh = new Button(), eject = new Button(), cleanEject = new Button(), bulk = new Button(), import = new Button(), cancel = new Button(), profile = new Button(), defaults = new Button(), history = new Button(), pending = new Button(), settings = new Button(), issue = new Button();
+        readonly ListView list = new ListView(); readonly TextBox status = new TextBox(); readonly Button refresh = new Button(), eject = new Button(), cleanEject = new Button(), bulk = new Button(), import = new Button(), cancel = new Button(), profile = new Button(), defaults = new Button(), history = new Button(), pending = new Button(), settings = new Button(), issue = new Button();
         readonly NotifyIcon tray; readonly System.Windows.Forms.Timer debounce = new System.Windows.Forms.Timer();
         Inventory inventory; bool scanning, working, quit; CancellationTokenSource cancellation; IntPtr notification;
         [StructLayout(LayoutKind.Sequential)] struct BroadcastInterface { public int Size, Type, Reserved; public Guid ClassGuid; public short Name; }
@@ -50,7 +50,7 @@ namespace EasyEject {
             Text = "Easy Eject · Windows prototype"; ClientSize = new Size(1000, 600); MinimumSize = new Size(800, 500); StartPosition = FormStartPosition.CenterScreen; AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Segoe UI", 10);
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(16) };
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
             var intro = new Label { AutoSize = true, MaximumSize = new Size(940, 0), Text = "Review connected storage before ejecting. Imports retain originals by default and verify SHA-256.\nAutomatic import starts off. Enable it in a profile or shared defaults. Eject and sharing require a manual choice.", Margin = new Padding(0, 0, 0, 12) };
             list.Dock = DockStyle.Fill; list.View = View.Details; list.FullRowSelect = true; list.MultiSelect = false; list.HideSelection = false;
             list.Columns.Add("Volume / mount", 245); list.Columns.Add("Classification", 360); list.Columns.Add("Physical disk", 130); list.Columns.Add("Status", 190);
@@ -72,7 +72,7 @@ namespace EasyEject {
             resume.Click += async delegate { await ResumeImport(); };
             pending.Click += async delegate { await ReviewCompletions(); }; settings.Click += delegate { EditSettings(); }; issue.Click += delegate { ViewIssue(); };
             cancel.Click += delegate { if (cancellation != null) { cancellation.Cancel(); status.Text = "Stopping after the current check. Verified copies and remaining source data are kept."; } };
-            status.AutoSize = true; status.MaximumSize = new Size(940, 0); status.Text = "Reading connected devices…";
+            status.AutoSize = false; status.Multiline = true; status.ReadOnly = true; status.ScrollBars = ScrollBars.Vertical; status.WordWrap = true; status.Dock = DockStyle.Fill; status.MaximumSize = new Size(940, 0); status.Text = "Reading connected devices…";
             layout.Controls.Add(intro); layout.Controls.Add(list); layout.Controls.Add(actions); layout.Controls.Add(status); Controls.Add(layout);
             layout.SizeChanged += delegate { int width = Math.Max(350, layout.ClientSize.Width - layout.Padding.Horizontal - 8); intro.MaximumSize = status.MaximumSize = new Size(width, 0); };
             var menu = new ContextMenuStrip(); menu.Items.Add("Show devices", null, delegate { Show(); WindowState = FormWindowState.Normal; Activate(); });
