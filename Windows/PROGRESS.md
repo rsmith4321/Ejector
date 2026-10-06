@@ -2,6 +2,33 @@
 
 ## Full-port scope and latest software milestone
 
+### Card groups, connection-aware bulk removal and optional shortcut · goal continuation
+
+Implementation commit: `2571e98b508168f4d3fd20b8dc25010f9965e1ed`.
+
+Read the baseline Mac classifier in `EjectorApp.swift`, `BulkEjectPolicy.swift`/its nine cases, `GlobalHotkeyManager.swift`, and grouped-unmount tests before implementation. Windows now separates camera candidates, emulator candidates, other external volumes, internal storage and protected Windows volumes. All eleven camera root names count case-insensitively from regular directories. Emulator classification needs two distinct supported root folders plus SD hardware evidence and takes precedence over camera evidence. Links/files do not supply evidence; fixed/system storage is never promoted. CFexpress/XQD remain explicit hardware candidates; generic NVMe plus DCIM does not prove CFexpress. Model/physical disk and mount information are shown, and card counts deduplicate removal devices across partitions/LUNs.
+
+**Eject cards…** in the window/tray freezes all card groups in a scrollable confirmation; **Keep connected** is the Enter/Escape default. Mixed/unclassified siblings, hidden LUNs without classified volumes, protected/unknown/spanning mappings and unavailable connection proof refuse before removal. All confirmed disks are reserved together before any API. Requests run sequentially, revalidate all remaining groups, and verify each removed group's disks/volumes absent before continuing. A veto, changed peer or unverified disappearance stops later requests. The result preserves earlier verified-safe names; notifications lead with stopped/complete status, and failures persist in View issue. Newly connected cards are never added to an existing confirmation.
+
+Read-only `CM_Register_Notification` all-device-instance events track target/disk/recorded-ancestor versions. Global epochs still guard ordinary import/eject/completion; bulk alone tolerates its own earlier device removal with continuously registered, unchanged proof for each remaining confirmed group immediately before native removal. Identical reconnects/restarts and shared-ancestor changes invalidate proof. Malformed events/registration gaps fault it until fresh registration. Callbacks only update counters; failed unregistration retains callback lifetime and suppresses actions.
+
+The optional **Ctrl + Alt + Shift + D/E/F/G/K/M/R/T/X** shortcut starts off, including legacy settings, defaults to E, and opens the same fresh confirmation. Windows-key combinations are OS-reserved, hence different modifiers from Mac. Only the selected key is registered with `MOD_NOREPEAT`, releasing the previous registration first. Collisions/unsupported choices/release failures are explained without fallback keys. Busy/modal/scanning work and queued stale messages suppress activation. Saving settings installs no startup behavior.
+
+Validation commands:
+
+```powershell
+./Windows/build.ps1 -Test
+& "$env:LOCALAPPDATA/EasyEject/PrototypeBuild/EasyEject.Tests.exe" --ui-smoke
+& "$env:LOCALAPPDATA/EasyEject/PrototypeBuild/EasyEject.Tests.exe" --ui-render
+git diff --check
+```
+
+**127 passed; zero failed**, warnings as errors. Twenty-seven new tests cover folder/hardware evidence, partition/LUN grouping/counts, mixed/hidden/protected/unknown refusal, atomic reservations, own-removal events, absence verification/transient scans, veto/partial outcomes, identical reconnects, changed peer serial/classification/topology, unconfirmed new cards, live request guards, proof faults, immutable confirmation/default cancellation, shared ancestors/event decoding, shortcut defaults/reconfiguration/conflicts/release failure and settings migration/drafts. Removal/hotkey adapters are fakes; default tests register no real key and eject no device. Hidden native smoke registers disk/instance notifications, maps the same one internal disk/five volumes, blocks system eject, and confirms no shortcut registered. Test windows explicitly suppress production shortcut configuration even if saved settings later enable it.
+
+Minimum-size hidden renders inspected: `%USERPROFILE%\.codex\EasyEjectWindowsPreview\run-2ce4788ce55a44ba` (grouped window 800×500, confirmation/partial result 600×400, settings 600×360). Common-controls styles match the app; scrollable bodies preserve fixed footers. Hidden `DrawToBitmap` does not reliably paint native dropdown text; E/R selection/persistence/enabled states are fixture-verified, not foreground proof. Actual notification event delivery, native hotkey delivery/collisions, DPI/keyboard/tray interaction and disposable-hardware success/veto/reconnect remain unverified. No hardware-affecting action, security/power change, startup installation, push or publication occurred.
+
+The full-port goal remains active. Next: remaining shared/app options and offline profiles; safe optional metadata cleanup, verified original removal/device Trash recovery; complete opt-in manual Quick Share. Physical proof and trusted signing still gate completion/release.
+
 ### Connection-bound completion, notifications and issues · goal continuation
 
 Implementation commit: `9191d525463248a761b3b82f216c07842488e62d`.
