@@ -36,12 +36,7 @@ namespace EasyEject {
             if (authenticated == null) throw new SafetyException("Release metadata must come from an authenticated Windows manifest snapshot.");
             byte[] bytes = authenticated.CopyBytes();
             try {
-                RequireJsonDocument(new UTF8Encoding(false, true).GetString(bytes));
-                if (bytes.Length >= 3 && bytes[0] == 0xef && bytes[1] == 0xbb && bytes[2] == 0xbf) throw new SafetyException("The Windows release manifest must use UTF-8 without a byte-order mark.");
-                var quotas = new XmlDictionaryReaderQuotas { MaxDepth = 6, MaxStringContentLength = 65536, MaxArrayLength = 64, MaxBytesPerRead = 4096, MaxNameTableCharCount = 4096 };
-                var document = new XmlDocument { XmlResolver = null };
-                using (var reader = JsonReaderWriterFactory.CreateJsonReader(bytes, quotas)) document.Load(reader);
-                var root = Fields(document.DocumentElement, new[] { "format", "application", "platform", "version", "sourceRevision", "files" });
+                var root = Fields(ReadJson(bytes), new[] { "format", "application", "platform", "version", "sourceRevision", "files" });
                 if (Number(root["format"]) != 1 || Text(root["application"]) != Application || Text(root["platform"]) != Platform) throw new SafetyException("This is not a supported Easy Eject Windows x64 release manifest.");
                 string version = Text(root["version"]), source = Text(root["sourceRevision"]);
                 if (!StableVersion(version) || source.Length != 40 || source.Any(c => !(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'f'))) throw new SafetyException("The Windows release version or source revision is invalid.");
@@ -57,6 +52,17 @@ namespace EasyEject {
             } catch (DecoderFallbackException ex) { throw new SafetyException("The Windows release manifest is not valid UTF-8: " + ex.Message); }
             catch (XmlException ex) { throw new SafetyException("The Windows release manifest is malformed: " + ex.Message); }
             catch (SerializationException ex) { throw new SafetyException("The Windows release manifest is malformed: " + ex.Message); }
+        }
+        internal static XmlElement ReadJson(byte[] bytes) {
+            if (bytes == null || bytes.Length == 0 || bytes.Length > WindowsManifestTrust.MaximumManifest) throw new SafetyException("Signed Windows JSON metadata exceeds its supported bound.");
+            try {
+                RequireJsonDocument(new UTF8Encoding(false, true).GetString(bytes));
+                if (bytes.Length >= 3 && bytes[0] == 0xef && bytes[1] == 0xbb && bytes[2] == 0xbf) throw new SafetyException("Signed Windows JSON metadata must use UTF-8 without a byte-order mark.");
+                var quotas = new XmlDictionaryReaderQuotas { MaxDepth = 6, MaxStringContentLength = 65536, MaxArrayLength = 64, MaxBytesPerRead = 4096, MaxNameTableCharCount = 4096 };
+                var document = new XmlDocument { XmlResolver = null }; using (var reader = JsonReaderWriterFactory.CreateJsonReader(bytes, quotas)) document.Load(reader); return document.DocumentElement;
+            } catch (DecoderFallbackException ex) { throw new SafetyException("Signed Windows JSON metadata is not valid UTF-8: " + ex.Message); }
+            catch (XmlException ex) { throw new SafetyException("Signed Windows JSON metadata is malformed: " + ex.Message); }
+            catch (SerializationException ex) { throw new SafetyException("Signed Windows JSON metadata is malformed: " + ex.Message); }
         }
         static void RequireJsonDocument(string text) {
             var stack = new Stack<char>(); bool quoted = false, escape = false, started = false;
@@ -77,7 +83,7 @@ namespace EasyEject {
             throw new SafetyException("The Windows release JSON object is incomplete.");
         }
         static bool JsonSpace(char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; }
-        static Dictionary<string, XmlElement> Fields(XmlElement element, string[] expected) {
+        internal static Dictionary<string, XmlElement> Fields(XmlElement element, string[] expected) {
             Type(element, "object"); var result = new Dictionary<string, XmlElement>(StringComparer.Ordinal);
             foreach (XmlNode node in element.ChildNodes) {
                 var field = node as XmlElement;
@@ -87,7 +93,7 @@ namespace EasyEject {
             if (result.Count != expected.Length) throw new SafetyException("The Windows release metadata is incomplete."); return result;
         }
         static void Type(XmlElement element, string type) { if (element == null || element.Attributes.Count != 1 || element.GetAttribute("type") != type) throw new SafetyException("The Windows release contains unexpected metadata types or annotations."); }
-        static string Text(XmlElement element) { Type(element, "string"); if (element.ChildNodes.Cast<XmlNode>().Any(n => n.NodeType != XmlNodeType.Text)) throw new SafetyException("Invalid Windows release string."); return element.InnerText; }
-        static long Number(XmlElement element) { Type(element, "number"); string text = element.InnerText; long value; if (!Int64.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value) || value.ToString(CultureInfo.InvariantCulture) != text) throw new SafetyException("The Windows release requires canonical nonnegative integer metadata."); return value; }
+        internal static string Text(XmlElement element) { Type(element, "string"); if (element.ChildNodes.Cast<XmlNode>().Any(n => n.NodeType != XmlNodeType.Text)) throw new SafetyException("Invalid Windows release string."); return element.InnerText; }
+        internal static long Number(XmlElement element) { Type(element, "number"); string text = element.InnerText; long value; if (!Int64.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value) || value.ToString(CultureInfo.InvariantCulture) != text) throw new SafetyException("The Windows release requires canonical nonnegative integer metadata."); return value; }
     }
 }

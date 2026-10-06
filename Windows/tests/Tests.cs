@@ -91,6 +91,7 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--manual-installation") { ManualInstallationTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable directories, fake folder viewers and hidden native controls only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-signatures") { WindowsAuthenticodeTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake positive trust and disposable native unsigned refusals only; no execution or trusted release proof."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-manifests") { WindowsManifestTrustTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Ephemeral fixture keys, fake positive chain trust and real native untrusted refusals only; no trust-store import or release signing."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--windows-channels") { WindowsChannelTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable signed channel fixtures and fake positive native trust only; no endpoint network request or production channel configured."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-archives") { WindowsArchiveTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned disposable ZIP contents only; fake positive native certificate/executable trust, no extraction or release proof."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-managed") { WindowsManagedIdentityTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Read-only native managed metadata."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-packages") { WindowsPackageTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned disposable packages, patched unsigned PE resources, ephemeral fixture CMS and fake positive trust only; no execution/install/release proof."); return failed == 0 ? 0 : 1; }
@@ -707,7 +708,7 @@ namespace EasyEject {
             StartupTests();
             QuickShareRecipeTests();
             QuickShareProcessTests();
-            WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
+            WindowsChannelTests(); WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
             QuickShareDialogTests();
             QuickShareConfigurationTests();
             ManualQuickShareTests();
