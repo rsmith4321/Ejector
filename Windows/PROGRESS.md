@@ -1,6 +1,16 @@
 # Windows progress · October 6, 2026
 
-## Current runtime milestone
+## Full-port scope and latest software milestone
+
+Ryan's latest scope supersedes an Insta360-only/MVP interpretation: **port the full current project** at `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c`, including Luna/manual Quick Share, over the roughly one-month runway. Insta360 travel testing leads the order, without removing other features. Direct download only; no Microsoft Store work. [PARITY.md](PARITY.md) inventories source/test contracts, full feature gaps, Quick Share semantics, staged milestones and supported signing/direct-download options. Camera model/reader/destination will be confirmed later. No complete-port or hardware-compatibility claim is made.
+
+Latest `./Windows/build.ps1 -Test`: **49 passed, zero failed**, with warnings treated as errors. Two interrupted-transfer fixtures stop after exactly 1,048,576 bytes were written: cancellation and simulated disconnection retain byte-identical originals, remove private partials, publish no completed media/receipt and release disk reservations so a retry succeeds. Receipt finalization now marks completion only after the final flush succeeds; an I/O fault after rename is not directly injected by these tests.
+
+`MediaSelection.cs` ports the baseline extension/association/package rules into the verified-copy engine: immutable videos/all-media and preview choices, still/movie protection, same-folder companions and master/proxy association, required Sony/P2/RED structure, device-index separation, partial/unsupported package refusal and selected-media versus metadata-only results. Seven new fixtures exercise these paths through the real file-copy engine. Source manifests are reselected with the same frozen options at completion. The production window still uses all-media/include-previews; videos/preview controls, shared defaults, profile editor, clean layout and verified reuse are pending next milestones. Completed device index backups are stored under `.easy-eject-metadata`; no originals are removed. This is partial engine parity, not a complete import port.
+
+Build outputs remain outside OneDrive. No real card import, cleanup/deletion, eject, public download, security/power change or startup installation was performed. The earlier runtime milestone below records the preceding 40-test checkpoint.
+
+## Earlier runtime milestone
 
 Ryan reported execution ready after changing Smart App Control himself; readback `VerifiedAndReputablePolicyState=0`. Normal builds/test execution now succeed. **40 tests pass, zero fail.** Native read-only inventory maps **one internal disk and five volumes**, matching the OS-provider observations below. The hidden Windows Forms smoke check creates the window, registers disk notifications, reads complete native inventory, and confirms system-volume ejection is blocked. No real card/media import or device removal was performed. Visual UI acceptance and physical hardware compatibility remain unverified.
 

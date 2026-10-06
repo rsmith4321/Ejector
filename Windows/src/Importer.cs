@@ -56,20 +56,25 @@ namespace EasyEject {
     }
     [DataContract] public sealed class ImportReceipt {
         [DataMember] public string StartedUtc; [DataMember] public string SourceVolume; [DataMember] public bool OriginalsKept = true;
+        [DataMember] public bool HasSelectedMedia;
         [DataMember] public List<ReceiptEntry> Files = new List<ReceiptEntry>();
     }
-    public sealed class ImportResult { public string Folder; public int Files; public long Bytes; }
+    public sealed class ImportResult { public string Folder; public int Files; public long Bytes; public bool HasSelectedMedia; }
     public sealed class VerifiedImporter {
         readonly Operations operations;
         public VerifiedImporter(Operations operations) { this.operations = operations; }
         public ImportResult Run(string sourceRoot, string selectedFolder, string destination, string volumeId, IImportGuard guard, CancellationToken cancel, Action<string> report) {
+            return Run(sourceRoot, selectedFolder, destination, volumeId, guard, cancel, report, new MediaOptions(false, true));
+        }
+        public ImportResult Run(string sourceRoot, string selectedFolder, string destination, string volumeId, IImportGuard guard, CancellationToken cancel, Action<string> report, MediaOptions options) {
             sourceRoot = SafePaths.Normalize(sourceRoot); selectedFolder = SafePaths.Normalize(selectedFolder); destination = SafePaths.Normalize(destination);
             if (!SafePaths.Within(selectedFolder, sourceRoot) || SafePaths.Within(destination, sourceRoot) || SafePaths.Within(sourceRoot, destination)) throw new SafetyException("Source and destination folders overlap or the selection is outside the source volume.");
             if (new[] { "STREAM", "CLIP" }.Contains(Path.GetFileName(selectedFolder).ToUpperInvariant())) throw new SafetyException("Select the complete camera package or card, including audio and metadata, rather than a partial STREAM/CLIP folder.");
             using (operations.Reserve(guard.ProtectedDisks))
             using (SafePaths.LockDirectories(selectedFolder, destination)) {
                 cancel.ThrowIfCancellationRequested(); guard.Validate();
-                var manifest = Scan(selectedFolder, cancel);
+                var plan = MediaSelection.Plan(Scan(selectedFolder, cancel), sourceRoot, selectedFolder, options);
+                var manifest = plan.Files;
                 if (manifest.Count == 0) return new ImportResult { Folder = destination, Files = 0 };
                 var stamps = new Dictionary<string, Native.FileInfo>();
                 foreach (string file in manifest) {
@@ -79,11 +84,13 @@ namespace EasyEject {
                 // A fresh batch avoids collisions; finalization is also exclusive for every file.
                 if (!Native.CreateDirectory(batch, IntPtr.Zero)) throw Native.Error("Cannot create a new, exclusive import batch");
                 using (SafePaths.LockDirectories(batch)) {
-                    var receipt = new ImportReceipt { StartedUtc = DateTime.UtcNow.ToString("o"), SourceVolume = volumeId };
+                    var receipt = new ImportReceipt { StartedUtc = DateTime.UtcNow.ToString("o"), SourceVolume = volumeId, HasSelectedMedia = plan.Media.Count != 0 };
+                    var originals = new Dictionary<string, string>();
                     long bytes = 0;
                     foreach (string file in manifest) {
                         cancel.ThrowIfCancellationRequested(); guard.Validate();
-                        string relative = SafePaths.Relative(file, selectedFolder), target = Path.Combine(batch, "Camera originals", relative);
+                        string relative = SafePaths.Relative(file, selectedFolder), target = Path.Combine(batch, MediaSelection.IsDeviceIndex(file) ? ".easy-eject-metadata" : "Camera originals", relative);
+                        originals[SafePaths.Relative(target, batch)] = file;
                         SafePaths.Normalize(target); if (!SafePaths.Within(target, batch)) throw new SafetyException("Destination path escaped batch folder.");
                         EnsureDirectories(Path.GetDirectoryName(target), batch);
                         using (SafePaths.LockDirectories(Path.GetDirectoryName(file), Path.GetDirectoryName(target)))
@@ -120,14 +127,14 @@ namespace EasyEject {
                         }
                     }
                     guard.Validate(); cancel.ThrowIfCancellationRequested();
-                    if (!manifest.SequenceEqual(Scan(selectedFolder, cancel))) throw new SafetyException("Source file list changed during import. Completed copies and all originals remain available.");
+                    if (!manifest.SequenceEqual(MediaSelection.Plan(Scan(selectedFolder, cancel), sourceRoot, selectedFolder, options).Files)) throw new SafetyException("Source file list changed during import. Completed copies and all originals remain available.");
                     // Recheck every final copy before marking this batch complete; fail closed on an edited earlier copy.
                     foreach (var entry in receipt.Files) {
                         string path = Path.Combine(batch, entry.RelativePath);
                         using (SafePaths.LockDirectories(Path.GetDirectoryName(path))) using (var saved = SafePaths.ReadFile(path)) {
                             if (saved.Length != entry.Bytes || Hash(saved, cancel) != entry.Sha256) throw new SafetyException("An earlier saved copy changed. Batch remains incomplete; originals are kept.");
                         }
-                        string original = Path.Combine(selectedFolder, entry.RelativePath.Substring("Camera originals\\".Length));
+                        string original = originals[entry.RelativePath];
                         using (SafePaths.LockDirectories(Path.GetDirectoryName(original))) using (var input = SafePaths.ReadFile(original)) {
                             if (!SameStamp(Native.Info(input.SafeFileHandle), stamps[original]) || Hash(input, cancel) != entry.Sha256) throw new SafetyException("A source recording changed after copying. Batch remains incomplete; originals are kept.");
                         }
@@ -136,11 +143,11 @@ namespace EasyEject {
                     string receiptPath = Path.Combine(batch, "verified-import.json");
                     using (var stream = SafePaths.NewFile(Path.Combine(batch, ".receipt-" + Guid.NewGuid().ToString("N") + ".partial"))) {
                         bool complete = false;
-                        try { new DataContractJsonSerializer(typeof(ImportReceipt)).WriteObject(stream, receipt); stream.Flush(true); cancel.ThrowIfCancellationRequested(); guard.Validate(); Native.Rename(stream.SafeFileHandle, receiptPath); complete = true; stream.Flush(true); }
+                        try { new DataContractJsonSerializer(typeof(ImportReceipt)).WriteObject(stream, receipt); stream.Flush(true); cancel.ThrowIfCancellationRequested(); guard.Validate(); Native.Rename(stream.SafeFileHandle, receiptPath); stream.Flush(true); complete = true; }
                         finally { if (!complete) Native.DeleteOnClose(stream.SafeFileHandle); }
                     }
                     report("Verified " + receipt.Files.Count + " files. Originals kept. Device remains connected.");
-                    return new ImportResult { Folder = batch, Files = receipt.Files.Count, Bytes = bytes };
+                    return new ImportResult { Folder = batch, Files = receipt.Files.Count, Bytes = bytes, HasSelectedMedia = receipt.HasSelectedMedia };
                 }
             }
         }

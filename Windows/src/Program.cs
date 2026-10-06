@@ -133,7 +133,7 @@ namespace EasyEject {
                 var result = await Task.Run(() => new VerifiedImporter(operations).Run(root, source, destination, v.Id, guard, cancellation.Token, message => {
                     if (!IsDisposed) BeginInvoke(new Action(() => status.Text = message));
                 }));
-                MessageBox.Show(this, result.Files == 0 ? "The selected folder contains no files to import. No batch was created. Device remains connected." : result.Files + " files verified (" + result.Bytes + " bytes).\n" + result.Folder + "\n\nOriginals kept. Device remains connected.", "Import complete");
+                MessageBox.Show(this, result.Files == 0 ? "No matching media or device indexes were found. No batch was created. Device remains connected." : (result.HasSelectedMedia ? "Import complete. " : "No matching media. Device index backup only. ") + result.Files + " files verified (" + result.Bytes + " bytes).\n" + result.Folder + "\n\nOriginals kept. Device remains connected.", result.HasSelectedMedia ? "Import complete" : "No matching media");
             } catch (OperationCanceledException) { status.Text = "Import cancelled. All originals and completed copies kept. No completion receipt was written."; MessageBox.Show(this, status.Text, "Import cancelled"); }
             catch (Exception ex) { ShowError(ex); }
             finally { working = false; cancel.Enabled = false; if (cancellation != null) { cancellation.Dispose(); cancellation = null; } UpdateActions(); debounce.Start(); }

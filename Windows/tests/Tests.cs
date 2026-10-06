@@ -11,6 +11,23 @@ namespace EasyEject {
         sealed class FakeDiscovery : IDiscovery { public Inventory State; public Inventory Scan() { return State; } public long Epoch { get { return State.Epoch; } } }
         sealed class FakeEject : IEjectApi { public int Calls; public EjectResult Result = new EjectResult { Success = true }; public EjectResult Request(uint node, string id) { Calls++; return Result; } }
         sealed class FakeGuard : IImportGuard { public int Calls, FailAt = Int32.MaxValue; public int[] ProtectedDisks { get { return new[] { 700, 701 }; } } public void Validate() { if (++Calls >= FailAt) throw new SafetyException("Fixture disconnected"); } }
+        sealed class InterruptedGuard : IImportGuard, IConnectionGuard {
+            readonly Fixture fixture; readonly CancellationTokenSource cancellation; int checks; public long WrittenBeforeStop;
+            public InterruptedGuard(Fixture fixture, CancellationTokenSource cancellation) { this.fixture = fixture; this.cancellation = cancellation; }
+            public int[] ProtectedDisks { get { return new[] { 700, 701 }; } }
+            public bool Changed { get {
+                if (++checks != 2) return false;
+                string pending = Directory.GetFiles(fixture.Destination, "*.partial", SearchOption.AllDirectories).Single();
+                WrittenBeforeStop = new FileInfo(pending).Length;
+                if (cancellation != null) cancellation.Cancel();
+                return true;
+            } }
+            public void Validate() {
+                if (WrittenBeforeStop == 0) return;
+                if (cancellation != null) cancellation.Token.ThrowIfCancellationRequested();
+                throw new SafetyException("Fixture disconnected during transfer");
+            }
+        }
         static void CreateJunction(Fixture fixture, string link, string target) {
             Check(SafePaths.Within(link, fixture.Root) && SafePaths.Within(target, fixture.Root), "Junction fixture must stay isolated");
             Directory.CreateDirectory(link);
@@ -107,6 +124,20 @@ namespace EasyEject {
             Test("partial package selection rejected", delegate { using (var f = new Fixture()) { string clip = Path.Combine(f.Source, "CLIP"); Directory.CreateDirectory(clip); Throws<SafetyException>(() => new VerifiedImporter(new Operations()).Run(f.Source, clip, f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => {})); } });
             Test("empty source creates no batch or completion receipt", delegate { using (var f = new Fixture()) { Check(f.Run(x => {}).Files == 0 && Directory.GetFileSystemEntries(f.Destination).Length == 0, "Empty misleading batch"); } });
             Test("cancellation leaves originals and no completion receipt", delegate { using (var f = new Fixture()) { f.Put("clip.mov", new string('x', 2000000)); var token = new CancellationTokenSource(); Throws<OperationCanceledException>(() => new VerifiedImporter(new Operations()).Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), token.Token, x => token.Cancel())); Check(File.Exists(Path.Combine(f.Source, "clip.mov")) && Directory.GetFiles(f.Destination, "verified-import.json", SearchOption.AllDirectories).Length == 0 && Directory.GetFiles(f.Destination, "*.partial", SearchOption.AllDirectories).Length == 0, "Cancelled state unsafe"); } });
+            foreach (bool cancelled in new[] { false, true }) {
+                Test(cancelled ? "mid-transfer cancellation cleans partials and releases disks" : "mid-transfer disconnection cleans partials and releases disks", delegate { using (var f = new Fixture()) using (var token = new CancellationTokenSource()) {
+                    byte[] bytes = new byte[3145851]; for (int i = 0; i < bytes.Length; i++) bytes[i] = (byte)(i * 13 + 3);
+                    string original = Path.Combine(f.Source, "clip.mov"); File.WriteAllBytes(original, bytes);
+                    var operations = new Operations(); var guard = new InterruptedGuard(f, cancelled ? token : null);
+                    Action run = () => new VerifiedImporter(operations).Run(f.Source, f.Source, f.Destination, "fixture", guard, token.Token, x => {});
+                    if (cancelled) Throws<OperationCanceledException>(run);
+                    else Check(Throws<SafetyException>(run).Message == "Fixture disconnected during transfer", "Wrong interruption cause");
+                    Check(guard.WrittenBeforeStop == 1048576 && File.ReadAllBytes(original).SequenceEqual(bytes), "Test did not interrupt after a copied chunk or source changed");
+                    Check(Directory.GetFiles(f.Destination, "*.partial", SearchOption.AllDirectories).Length == 0 && Directory.GetFiles(f.Destination, "verified-import.json", SearchOption.AllDirectories).Length == 0 && Directory.GetFiles(f.Destination, "clip.mov", SearchOption.AllDirectories).Length == 0, "Interrupted batch was published or partial retained");
+                    var retry = new VerifiedImporter(operations).Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => {});
+                    Check(retry.Files == 1 && retry.Bytes == bytes.Length && File.ReadAllBytes(Path.Combine(retry.Folder, @"Camera originals\clip.mov")).SequenceEqual(bytes), "Disk reservation was not released or retry was incorrect");
+                } });
+            }
             Test("identity loss leaves originals and incomplete batch", delegate { using (var f = new Fixture()) { f.Put("clip.mov", "media"); var guard = new FakeGuard { FailAt = 3 }; var error = Throws<SafetyException>(() => new VerifiedImporter(new Operations()).Run(f.Source, f.Source, f.Destination, "fixture", guard, CancellationToken.None, x => {})); Check(guard.Calls == 3 && error.Message == "Fixture disconnected" && File.Exists(Path.Combine(f.Source, "clip.mov")) && Directory.GetFiles(f.Destination, "verified-import.json", SearchOption.AllDirectories).Length == 0, "Identity-loss state unsafe"); } });
             Test("destination conflict never overwritten", delegate { using (var f = new Fixture()) { f.Put("clip.mov", "new-media"); Throws<System.ComponentModel.Win32Exception>(() => f.Run(x => { if (x.StartsWith("Copying")) { string batch = Directory.GetDirectories(f.Destination).Single(); File.WriteAllText(Path.Combine(batch, @"Camera originals\clip.mov"), "existing"); } })); string saved = Directory.GetFiles(f.Destination, "clip.mov", SearchOption.AllDirectories).Single(); Check(File.ReadAllText(saved) == "existing", "Conflict overwritten"); } });
             Test("source cannot be modified while copied", delegate { using (var f = new Fixture()) { f.Put("clip.mov", "original"); bool denied = false; var r = f.Run(x => { if (x.StartsWith("Copying")) { try { File.WriteAllText(Path.Combine(f.Source, "clip.mov"), "changed"); } catch (IOException) { denied = true; } } }); Check(denied && r.Files == 1, "Source not pinned"); } });
@@ -138,6 +169,50 @@ namespace EasyEject {
                     finally { if (File.Exists(path)) { Check((File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0 && SafePaths.Within(path, root), "Unsafe disposable profile cleanup"); File.Delete(path); } }
                 }
             });
+            Test("video selection preserves still pairs and ambiguous companions", delegate { using (var f = new Fixture()) {
+                foreach (string name in new[] { "photo.JPG", "photo.MOV", "clip.mp4", "clip.mp4.xmp", "clip.xmp", "clip.bin", "orphan.LRV", "unknown.raw" }) f.Put(name, name);
+                var result = new VerifiedImporter(new Operations()).Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => {}, new MediaOptions(true, true));
+                var saved = Directory.GetFiles(result.Folder, "*", SearchOption.AllDirectories).Where(x => !x.EndsWith("verified-import.json")).Select(Path.GetFileName).OrderBy(x => x).ToArray();
+                Check(result.HasSelectedMedia && saved.SequenceEqual(new[] { "clip.mp4", "clip.mp4.xmp" }), "Live Photo, orphan preview or ambiguous companion selected");
+                Check(Directory.GetFiles(f.Source).Length == 8, "Selection deleted originals");
+            } });
+            Test("Insta360 lens pairs remain intact with previews disabled", delegate { using (var f = new Fixture()) {
+                foreach (string name in new[] { "VID_20261006_000001_00_001.insv", "VID_20261006_000001_10_001.insv", "LRV_20261006_000001_01_001.lrv", "VID_20261006_000001_00_001.thm" }) f.Put(name, name);
+                var withPreviews = MediaSelection.Plan(VerifiedImporter.Scan(f.Source, CancellationToken.None), f.Source, f.Source, new MediaOptions(true, true));
+                Check(withPreviews.Media.Count == 4, "Associated lens preview or thumbnail omitted by default");
+                var result = new VerifiedImporter(new Operations()).Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => {}, new MediaOptions(true, false));
+                Check(result.Files == 2 && Directory.GetFiles(result.Folder, "*.insv", SearchOption.AllDirectories).Length == 2 && Directory.GetFiles(result.Folder, "*.lrv", SearchOption.AllDirectories).Length == 0 && Directory.GetFiles(f.Source).Length == 4, "Lens names changed, preview copied or originals removed");
+            } });
+            Test("Sony package keeps audio metadata and required previews", delegate { using (var f = new Fixture()) {
+                foreach (string name in new[] { @"PRIVATE\M4ROOT\CLIP\clip.MP4", @"PRIVATE\M4ROOT\CLIP\clip.XML", @"PRIVATE\M4ROOT\THMBNL\clip.JPG", @"PRIVATE\M4ROOT\AUDIO\clip.WAV", @"DCIM\photo.JPG", @"DCIM\photo.MOV" }) f.Put(name, name);
+                var result = new VerifiedImporter(new Operations()).Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => {}, new MediaOptions(true, false));
+                Check(result.Files == 4 && File.Exists(Path.Combine(result.Folder, @"Camera originals\PRIVATE\M4ROOT\THMBNL\clip.JPG")) && !Directory.Exists(Path.Combine(result.Folder, @"Camera originals\DCIM")), "Package dependency dropped or photo workflow included");
+            } });
+            Test("P2 package keeps LASTCLIP and audio outside the selected video", delegate { using (var f = new Fixture()) {
+                foreach (string name in new[] { @"CONTENTS\VIDEO\clip.MXF", @"CONTENTS\AUDIO\clip.MXF", @"CONTENTS\ICON\clip.BMP", "LASTCLIP.TXT", @"DCIM\photo.JPG" }) f.Put(name, name);
+                var result = new VerifiedImporter(new Operations()).Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => {}, new MediaOptions(true, false));
+                Check(result.Files == 4 && File.Exists(Path.Combine(result.Folder, @"Camera originals\LASTCLIP.TXT")), "P2 support file omitted");
+            } });
+            Test("partial RED reel and unfamiliar video package stop before copying", delegate { using (var f = new Fixture()) {
+                f.Put(@"reel.RDC\clip.R3D", "recording");
+                Throws<SafetyException>(() => new VerifiedImporter(new Operations()).Run(f.Source, Path.Combine(f.Source, "reel.RDC"), f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => {}, new MediaOptions(false, true)));
+                f.Put("PRO.PRJ", "unknown package");
+                Throws<SafetyException>(() => new VerifiedImporter(new Operations()).Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => {}, new MediaOptions(true, true)));
+                Check(Directory.GetFileSystemEntries(f.Destination).Length == 0, "Unsupported package wrote a partial batch");
+                Check(f.Run(x => {}).Files == 2, "Whole-card all-media backup rejected");
+            } });
+            Test("device index backup is separate from a selected-media result", delegate { using (var f = new Fixture()) {
+                f.Put("fileinfo_list.list", "index"); f.Put("photo.JPG", "photo");
+                var result = new VerifiedImporter(new Operations()).Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => {}, new MediaOptions(true, true));
+                Check(result.Files == 1 && !result.HasSelectedMedia && File.Exists(Path.Combine(result.Folder, @".easy-eject-metadata\fileinfo_list.list")) && File.ReadAllText(Path.Combine(f.Source, "fileinfo_list.list")) == "index", "Index marked as media or original removed");
+                ImportReceipt receipt; using (var file = File.OpenRead(Path.Combine(result.Folder, "verified-import.json"))) receipt = (ImportReceipt)new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(ImportReceipt)).ReadObject(file);
+                Check(!receipt.HasSelectedMedia && receipt.Files.Single().RelativePath.StartsWith(".easy-eject-metadata"), "Receipt cannot distinguish metadata-only import");
+            } });
+            Test("preview-only video selection creates no misleading completion batch", delegate { using (var f = new Fixture()) {
+                f.Put("orphan.lrv", "preview"); f.Put("photo.jpg", "photo");
+                var result = new VerifiedImporter(new Operations()).Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => {}, new MediaOptions(true, false));
+                Check(!result.HasSelectedMedia && result.Files == 0 && Directory.GetFileSystemEntries(f.Destination).Length == 0, "No matching video was marked complete");
+            } });
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
     }
