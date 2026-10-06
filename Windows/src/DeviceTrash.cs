@@ -65,16 +65,33 @@ namespace EasyEject {
         }
     }
     internal sealed class DeviceTrashSnapshot {
-        internal readonly string SourceRoot, LogicalRoot, WindowsOwnerRoot, MacOwnerRoot;
+        internal readonly string SourceRoot, LogicalRoot, WindowsOwnerRoot, MacOwnerRoot, WindowsSid, MacUid;
         internal readonly ReadOnlyCollection<TrashSourceFile> Files; internal readonly ReadOnlyCollection<TrashRecord> Records;
-        internal DeviceTrashSnapshot(string root, string logical, string windowsOwner, string macOwner, List<TrashSourceFile> files, List<TrashRecord> records) {
-            SourceRoot = root; LogicalRoot = logical; WindowsOwnerRoot = windowsOwner; MacOwnerRoot = macOwner; Files = files.AsReadOnly(); Records = records.AsReadOnly();
+        internal DeviceTrashSnapshot(string root, string logical, string windowsOwner, string macOwner, List<TrashSourceFile> files, List<TrashRecord> records, string sid, string macUid) {
+            SourceRoot = root; LogicalRoot = logical; WindowsOwnerRoot = windowsOwner; MacOwnerRoot = macOwner; WindowsSid = sid; MacUid = macUid; Files = files.AsReadOnly(); Records = records.AsReadOnly();
             if (files.Select(x => x.LogicalPath.Normalize(NormalizationForm.FormC)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != files.Count
                 || files.Select(x => x.ActualPath.Normalize(NormalizationForm.FormC)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != files.Count) throw new SafetyException("Device Trash contains ambiguous duplicate original names. Restore those items manually before recovery; nothing was cleared.");
         }
         internal DeviceTrashSelection Select(MediaOptions options) { return new DeviceTrashSelection(this, options); }
+        internal void CheckManifest(MediaOptions options, Func<string, bool> removed, CancellationToken cancellation, Action validate) {
+            var expected = Select(options);
+            var current = DeviceTrash.ReadCurrent(this, expected, removed, cancellation, validate);
+            var virtualFiles = current.Files.Concat(Files.Where(x => removed(x.ActualPath))).ToList();
+            var records = current.Records.Concat(Records.Where(x => removed(x.MetadataPath))).ToList();
+            var virtualSnapshot = new DeviceTrashSnapshot(SourceRoot, LogicalRoot, current.WindowsOwnerRoot, current.MacOwnerRoot, virtualFiles, records, WindowsSid, MacUid);
+            var selected = virtualSnapshot.Select(options);
+            if (!selected.Files.Select(x => x.ActualPath).Where(x => !removed(x)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).SequenceEqual(expected.Files.Select(x => x.ActualPath).Where(x => !removed(x)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+                || !selected.Records.Select(x => x.MetadataPath).Where(x => !removed(x)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).SequenceEqual(expected.Records.Select(x => x.MetadataPath).Where(x => !removed(x)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))) throw new SafetyException("The selected device Trash changed during recovery. Remaining Trash files are kept.");
+        }
     }
     internal static class DeviceTrash {
+        sealed class ReadContext {
+            internal Dictionary<string, TrashSourceFile> ProtectedFiles; internal Dictionary<string, TrashRecord> ProtectedRecords, AllRecords; internal Func<string, bool> Removed;
+        }
+        internal static DeviceTrashSnapshot ReadCurrent(DeviceTrashSnapshot frozen, DeviceTrashSelection selected, Func<string, bool> removed, CancellationToken cancellation, Action validate) {
+            var context = new ReadContext { ProtectedFiles = selected.Files.ToDictionary(x => x.ActualPath, StringComparer.OrdinalIgnoreCase), ProtectedRecords = selected.Records.ToDictionary(x => x.MetadataPath, StringComparer.OrdinalIgnoreCase), AllRecords = frozen.Records.ToDictionary(x => x.MetadataPath, StringComparer.OrdinalIgnoreCase), Removed = removed };
+            return ReadCore(frozen.SourceRoot, frozen.WindowsSid, frozen.MacUid, cancellation, validate, context);
+        }
         internal static DeviceTrashSnapshot Read(string sourceRoot, string selectedMacUid, CancellationToken cancellation, Action validate) {
             using (var identity = WindowsIdentity.GetCurrent()) {
                 if (identity.User == null) throw new SafetyException("The current Windows Trash owner is unavailable.");
@@ -86,6 +103,9 @@ namespace EasyEject {
         }
         static void Check(CancellationToken cancellation, Action validate) { cancellation.ThrowIfCancellationRequested(); validate(); }
         internal static DeviceTrashSnapshot Read(string sourceRoot, string windowsSid, string selectedMacUid, CancellationToken cancellation, Action validate) {
+            return ReadCore(sourceRoot, windowsSid, selectedMacUid, cancellation, validate, null);
+        }
+        static DeviceTrashSnapshot ReadCore(string sourceRoot, string windowsSid, string selectedMacUid, CancellationToken cancellation, Action validate, ReadContext context) {
             sourceRoot = SafePaths.Normalize(sourceRoot);
             try { if (new SecurityIdentifier(windowsSid).Value != windowsSid) throw new SafetyException("Device Trash owner SID is not canonical."); }
             catch (ArgumentException) { throw new SafetyException("Device Trash owner SID is invalid."); }
@@ -96,18 +116,18 @@ namespace EasyEject {
                 Check(cancellation, validate); string bin = Child(sourceRoot, "$RECYCLE.BIN", cancellation, validate);
                 if (bin != null) {
                     using (SafePaths.LockDirectories(bin)) { windowsOwner = Child(bin, windowsSid, cancellation, validate); }
-                    if (windowsOwner != null) ReadWindows(windowsOwner, logical, files, records, cancellation, validate);
+                    if (windowsOwner != null) ReadWindows(windowsOwner, logical, files, records, cancellation, validate, context);
                 }
                 // No traversal of any Mac owner unless the profile explicitly selects that UID.
                 if (selectedMacUid != null) {
                     string parent = Child(sourceRoot, ".Trashes", cancellation, validate);
                     if (parent != null) {
                         using (SafePaths.LockDirectories(parent)) { macOwner = Child(parent, selectedMacUid, cancellation, validate); }
-                        if (macOwner != null) Walk(macOwner, Path.Combine(logical, "Mac Trash"), null, files, cancellation, validate);
+                        if (macOwner != null) Walk(macOwner, Path.Combine(logical, "Mac Trash"), null, files, cancellation, validate, context);
                     }
                 }
                 Check(cancellation, validate);
-                return new DeviceTrashSnapshot(sourceRoot, logical, windowsOwner, macOwner, files.OrderBy(x => x.LogicalPath, StringComparer.OrdinalIgnoreCase).ToList(), records);
+                return new DeviceTrashSnapshot(sourceRoot, logical, windowsOwner, macOwner, files.OrderBy(x => x.LogicalPath, StringComparer.OrdinalIgnoreCase).ToList(), records, windowsSid, selectedMacUid);
             }
         }
         // Throwing enumeration distinguishes absence from denied/inaccessible Trash; no File.Exists probe.
@@ -124,35 +144,51 @@ namespace EasyEject {
             if ((attributes & FileAttributes.Offline) != 0) throw new SafetyException("Device Trash contains offline data. Recovery requires ordinary local files.");
             return attributes;
         }
-        static TrashSourceFile FileItem(string path, string logical, string record, CancellationToken cancellation, Action validate) {
+        static TrashSourceFile FileItem(string path, string logical, string record, CancellationToken cancellation, Action validate, ReadContext context) {
             Check(cancellation, validate); SafePaths.Normalize(logical);
-            using (SafePaths.LockDirectories(Path.GetDirectoryName(path))) using (var handle = Native.CreateFile(path, 0x80, 1, IntPtr.Zero, 3, 0x00300000, IntPtr.Zero)) {
+            if (context != null) {
+                if (context.Removed(path)) throw new SafetyException("A replacement appeared at a cleared Trash payload path. The replacement is kept.");
+                TrashSourceFile known;
+                if (context.ProtectedFiles.TryGetValue(path, out known)) {
+                    if (known.LogicalPath != logical || known.RecordPath != record) throw new SafetyException("A protected Trash payload changed original-path mapping.");
+                    // The import session checks identity/hash on its held source; do not reopen an exclusive DELETE handle.
+                    return known;
+                }
+            }
+            using (SafePaths.LockDirectories(Path.GetDirectoryName(path))) using (var handle = Native.CreateFile(path, 0x80, 7, IntPtr.Zero, 3, 0x00300000, IntPtr.Zero)) {
                 if (handle.IsInvalid) throw Native.Error("Cannot inspect a device Trash payload without following links");
                 var stamp = Native.Info(handle);
                 if ((stamp.Attributes & 0x10) != 0 || !Native.FinalPath(handle).Equals(path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("A device Trash payload changed type or path while reading.");
                 return new TrashSourceFile(path, logical, record, stamp);
             }
         }
-        static void Walk(string directory, string logical, string record, List<TrashSourceFile> files, CancellationToken cancellation, Action validate) {
+        static void Walk(string directory, string logical, string record, List<TrashSourceFile> files, CancellationToken cancellation, Action validate, ReadContext context) {
             using (SafePaths.LockDirectories(directory)) {
                 Check(cancellation, validate);
                 foreach (string path in Directory.GetFileSystemEntries(directory).OrderBy(x => x, StringComparer.OrdinalIgnoreCase)) {
                     Check(cancellation, validate); var attributes = Attributes(path); string name = SafePaths.Normalize(Path.Combine(logical, Path.GetFileName(path)));
-                    if ((attributes & FileAttributes.Directory) != 0) Walk(path, name, record, files, cancellation, validate);
-                    else files.Add(FileItem(path, name, record, cancellation, validate));
+                    if ((attributes & FileAttributes.Directory) != 0) Walk(path, name, record, files, cancellation, validate, context);
+                    else files.Add(FileItem(path, name, record, cancellation, validate, context));
                 }
             }
         }
-        static void ReadWindows(string owner, string logical, List<TrashSourceFile> files, List<TrashRecord> records, CancellationToken cancellation, Action validate) {
+        static void ReadWindows(string owner, string logical, List<TrashSourceFile> files, List<TrashRecord> records, CancellationToken cancellation, Action validate, ReadContext context) {
             using (SafePaths.LockDirectories(owner)) {
                 Check(cancellation, validate); string[] items = Directory.GetFileSystemEntries(owner);
                 var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (string metadata in items.Where(x => Path.GetFileName(x).StartsWith("$I", StringComparison.OrdinalIgnoreCase)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase)) {
                     Check(cancellation, validate); string name = Path.GetFileName(metadata);
+                    if (context != null && context.Removed(metadata)) throw new SafetyException("A replacement appeared at a cleared Trash record path. The replacement is kept.");
                     if (name.Length <= 2 || (Attributes(metadata) & FileAttributes.Directory) != 0) throw new SafetyException("Invalid device Recycle Bin metadata item.");
                     string[] matching = items.Where(x => Path.GetFileName(x).Equals("$R" + name.Substring(2), StringComparison.OrdinalIgnoreCase)).ToArray();
-                    if (matching.Length != 1) throw new SafetyException("A device Recycle Bin record has no unique payload. Restore or review the item manually; nothing was cleared.");
+                    TrashRecord known = null;
+                    if (context != null) context.AllRecords.TryGetValue(metadata, out known);
+                    bool clearedPayload = matching.Length == 0 && known != null && !known.Directory && context.Removed(known.PayloadRoot);
+                    if (matching.Length != 1 && !clearedPayload) throw new SafetyException("A device Recycle Bin record has no unique payload. Restore or review the item manually; remaining Trash data is kept.");
                     WindowsTrashRecordInfo info; string hash; Native.FileInfo stamp;
+                    TrashRecord protectedRecord;
+                    if (context != null && context.ProtectedRecords.TryGetValue(metadata, out protectedRecord)) { info = protectedRecord.Original; hash = protectedRecord.MetadataSha256; stamp = protectedRecord.MetadataStamp; }
+                    else {
                     using (var input = SafePaths.ReadFile(metadata, 4096)) {
                         stamp = Native.Info(input.SafeFileHandle);
                         if (input.Length > 4096) throw new SafetyException("Device Recycle Bin metadata is too large.");
@@ -162,13 +198,14 @@ namespace EasyEject {
                         info = WindowsTrashRecordInfo.Parse(data); input.Position = 0; hash = VerifiedImporter.Hash(input, cancellation);
                         if (!VerifiedImporter.SameStamp(stamp, Native.Info(input.SafeFileHandle))) throw new SafetyException("Device Recycle Bin metadata changed while reading.");
                     }
-                    string payload = matching[0]; bool directory = (Attributes(payload) & FileAttributes.Directory) != 0;
+                    }
+                    string payload = clearedPayload ? known.PayloadRoot : matching[0]; bool directory = !clearedPayload && (Attributes(payload) & FileAttributes.Directory) != 0;
                     // Preserve original names and folder ancestry, independent of the randomized $R payload name/old drive letter.
                     string targetName = SafePaths.Normalize(Path.Combine(logical, "Windows Trash", info.OriginalPath.Substring(3)));
                     var members = new List<TrashSourceFile>();
-                    if (directory) Walk(payload, targetName, metadata, members, cancellation, validate);
-                    else {
-                        var item = FileItem(payload, targetName, metadata, cancellation, validate);
+                    if (directory) Walk(payload, targetName, metadata, members, cancellation, validate, context);
+                    else if (!clearedPayload) {
+                        var item = FileItem(payload, targetName, metadata, cancellation, validate, context);
                         long size = ((long)item.Stamp.SizeHigh << 32) | item.Stamp.SizeLow;
                         if (size != info.Bytes) throw new SafetyException("A device Recycle Bin payload size does not match its original record.");
                         members.Add(item);

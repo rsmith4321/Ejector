@@ -47,7 +47,7 @@ namespace EasyEject {
             foreach (string path in result.Values) { SafePaths.Normalize(path); if (!SafePaths.Within(path, dated)) throw new SafetyException("Import layout escaped the date folder."); }
             return result;
         }
-        static void Preserved(List<string> files, string root, string targetRoot, string sourceId, IDictionary<string, string> hashes, Func<string, string, bool> conflict, Dictionary<string, string> result) {
+        internal static void Preserved(List<string> files, string root, string targetRoot, string sourceId, IDictionary<string, string> hashes, Func<string, string, bool> conflict, Dictionary<string, string> result) {
             bool occupied = false;
             foreach (string file in files) if (conflict(file, Path.Combine(targetRoot, SafePaths.Relative(file, root)))) occupied = true;
             if (occupied) targetRoot = Path.Combine(targetRoot, "Additional media", Fingerprint(files, root, sourceId, hashes));

@@ -90,6 +90,10 @@ namespace EasyEject {
                 using (var dialog = new ImportDefaultsDialog(new ImportDefaults { DeleteOriginals = true })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "shared-removal.png")); }
                 using (var dialog = new OriginalRemovalConfirmationDialog("Applies to EVERY device using defaults, including future profiles.", true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "enable-removal.png")); }
                 using (var dialog = new VerifiedImportConfirmationDialog("Copy selected videos and their required companions under:\nE:\\DCIM\n\nTo a date folder under:\nD:\\Travel backups\n\nOriginal filenames are kept. SHA-256 verifies new and reused copies.\n\n" + OriginalRemovalChoice.BeforeImport(RemoveOptions()) + "\n\nDevice remains connected. Start this manual import?")) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "manual-removal.png")); }
+                using (var dialog = new DeviceTrashRecoveryConfirmationDialog("Applies to EVERY current/future device using defaults.")) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "enable-recovery.png")); }
+                using (var dialog = new VerifiedImportConfirmationDialog("Copy selected ordinary media and device Trash to:\nD:\\Travel backups\n\n" + OriginalRemovalChoice.BeforeImport(RecoverOptions(macUid: "501")) + "\n\n" + DeviceTrashChoice.BeforeImport(RecoverOptions(macUid: "501")))) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "manual-recovery.png")); RenderAtBottom(dialog, Path.Combine(output, "manual-recovery-bottom.png")); }
+                var recoveryDefaults = new ImportDefaults { RecoverTrash = true }; var recoveryProfile = recoveryDefaults.NewProfile(state.Volumes[0], state.Disks[0]); recoveryProfile.MacTrashUid = "501";
+                using (var dialog = new ImportProfileDialog(recoveryProfile, @"E:\", "Fixture camera card", recoveryDefaults, true)) { dialog.Size = dialog.MinimumSize; RenderAtBottom(dialog, Path.Combine(output, "profile-recovery-owner.png")); }
                 var previewBatch = new CompletedBatch { Id = Guid.NewGuid().ToString("N"), CompletedUtc = DateTime.UtcNow.ToString("o"), DeviceName = "Fixture Insta360 card", Folder = @"D:\Travel backups\2026-10-06", ReceiptPath = @"D:\Travel backups\2026-10-06\.easy-eject-receipts\fixture\verified-import.json", Originals = new List<VerifiedCopy> { new VerifiedCopy { Path = @"D:\Travel backups\2026-10-06\VID_20261006_001.mp4", Sha256 = new string('a', 64), Bytes = 1234567 } } };
                 using (var dialog = new ImportHistoryDialog(new[] { previewBatch })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history.png")); dialog.Batches.Items[0].Selected = true; Render(dialog, Path.Combine(output, "history-selected.png")); }
                 using (var dialog = new ImportHistoryDialog(new CompletedBatch[0])) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history-empty.png")); }
@@ -606,6 +610,7 @@ namespace EasyEject {
             CleanupTests();
             RemovalTests();
             TrashCatalogTests();
+            TrashRecoveryTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {
@@ -613,6 +618,28 @@ namespace EasyEject {
             Console.WriteLine(Path.GetFileName(path) + " size=" + form.Size + " minimum=" + form.MinimumSize);
             Check(handle != IntPtr.Zero && !form.Visible, "Rendering must use a hidden fixture window");
             using (var bitmap = new System.Drawing.Bitmap(form.Width, form.Height)) { form.DrawToBitmap(bitmap, new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height)); bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png); }
+        }
+        static void RenderAtBottom(System.Windows.Forms.Form form, string path) {
+            IntPtr handle = form.Handle; CreateRenderHandles(form); form.PerformLayout();
+            var body = form.Controls.OfType<System.Windows.Forms.Panel>().First(x => x.AutoScroll);
+            int offset = Math.Max(0, body.Controls.Cast<System.Windows.Forms.Control>().Max(x => x.Bottom) + body.Padding.Bottom - body.ClientSize.Height);
+            // Hidden WinForms don't apply native scroll positions. Composite the lower region of the owned
+            // fixture's body render for inspection; this is not proof of foreground scrolling/interaction.
+            Console.WriteLine(Path.GetFileName(path) + " bottom-region offset=" + offset + " viewport=" + body.ClientSize);
+            Check(handle != IntPtr.Zero && !form.Visible, "Bottom rendering must use hidden fixture windows");
+            using (var bitmap = new System.Drawing.Bitmap(form.Width, form.Height)) {
+                form.DrawToBitmap(bitmap, new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height));
+                int border = (form.Width - form.ClientSize.Width) / 2, left = border + body.Left, top = form.Height - form.ClientSize.Height - border + body.Top;
+                using (var graphics = System.Drawing.Graphics.FromImage(bitmap)) {
+                    graphics.SetClip(new System.Drawing.Rectangle(left, top, body.ClientSize.Width, body.ClientSize.Height));
+                    using (var background = new System.Drawing.SolidBrush(body.BackColor)) graphics.FillRectangle(background, left, top, body.ClientSize.Width, body.ClientSize.Height);
+                    foreach (System.Windows.Forms.Control child in body.Controls) using (var content = new System.Drawing.Bitmap(child.Width, child.Height)) {
+                        child.DrawToBitmap(content, new System.Drawing.Rectangle(0, 0, content.Width, content.Height));
+                        graphics.DrawImageUnscaled(content, left + child.Left, top + child.Top - offset);
+                    }
+                }
+                bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+            }
         }
         static void CreateRenderHandles(System.Windows.Forms.Control control) {
             IntPtr handle = control.Handle; control.PerformLayout();

@@ -6,8 +6,8 @@ using System.Threading;
 
 namespace EasyEject {
     internal sealed class OriginalRemovalFailure : Exception {
-        internal readonly int Removed; internal readonly string Folder, AuditPath;
-        internal OriginalRemovalFailure(int removed, Exception cause, string folder, string auditPath) : base("Import stopped after permanently removing " + removed + " verified originals. Remaining originals and complete saved copies are kept. No completion receipt or eject permission was issued. " + cause.Message + "\n\nSaved copies: " + folder + "\nRemoval audit: " + auditPath, cause) { Removed = removed; Folder = folder; AuditPath = auditPath; }
+        internal readonly int Removed, RemovedOriginals, ClearedTrashFiles, ClearedTrashRecords; internal readonly string Folder, AuditPath;
+        internal OriginalRemovalFailure(int removed, Exception cause, string folder, string auditPath, int clearedTrash = 0, int clearedRecords = 0) : base("Import stopped. " + OriginalRemovalChoice.Summary(removed) + (clearedTrash + clearedRecords > 0 ? " Permanently cleared " + clearedTrash + " verified Trash files and " + clearedRecords + " records." : "") + " Remaining originals/Trash files and complete saved copies are kept. No completion receipt or eject permission was issued. " + cause.Message + "\n\nSaved copies: " + folder + "\nRemoval audit: " + auditPath, cause) { Removed = removed + clearedTrash + clearedRecords; RemovedOriginals = removed; ClearedTrashFiles = clearedTrash; ClearedTrashRecords = clearedRecords; Folder = folder; AuditPath = auditPath; }
     }
     // All selected sources and saved dependencies remain held through removal and receipt publication.
     internal sealed class OriginalRemovalSession : IDisposable {
@@ -42,10 +42,10 @@ namespace EasyEject {
         internal void Remove(CancellationToken cancellation, Action validate, Action checkManifest, Action<string> audit, Action<string> report) {
             checkManifest(); VerifyAll(cancellation, validate);
             audit("Complete selected batch and all saved dependencies verified before original removal");
-            foreach (var item in held.Where(x => x.Eligible)) {
+            foreach (var item in held.Where(x => x.Eligible).OrderBy(x => x.Entry.IsTrashRecord)) {
                 cancellation.ThrowIfCancellationRequested(); validate(); checkManifest(); Verify(item, cancellation);
                 audit("Before permanent removal | SHA256 " + item.Entry.Sha256 + " | " + item.Source + " -> " + item.Saved);
-                report("Removing verified original: " + item.Entry.SourceRelativePath);
+                report((item.Entry.FromTrash ? "Clearing verified Trash " + (item.Entry.IsTrashRecord ? "record: " : "file: ") : "Removing verified original: ") + item.Entry.SourceRelativePath);
                 cancellation.ThrowIfCancellationRequested(); validate(); checkManifest(); Verify(item, cancellation);
                 Native.DeleteOnClose(item.Input.SafeFileHandle, "Cannot remove the held verified original");
                 removed.Add(item.Source); item.Entry.RemovedSource = true;
