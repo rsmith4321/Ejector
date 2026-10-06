@@ -20,6 +20,10 @@ namespace EasyEject {
                 SizeHigh == stamp.SizeHigh && SizeLow == stamp.SizeLow && Attributes == stamp.Attributes && Links == stamp.Links &&
                 ModifiedHigh == stamp.Modified.dwHighDateTime && ModifiedLow == stamp.Modified.dwLowDateTime;
         }
+        internal Native.FileInfo Stamp() {
+            return new Native.FileInfo { VolumeSerial = VolumeSerial, IndexHigh = IndexHigh, IndexLow = IndexLow, SizeHigh = SizeHigh, SizeLow = SizeLow,
+                Attributes = Attributes, Links = Links, Modified = new System.Runtime.InteropServices.ComTypes.FILETIME { dwHighDateTime = ModifiedHigh, dwLowDateTime = ModifiedLow } };
+        }
     }
     [DataContract] internal sealed class RemovalIntentFile {
         [DataMember] internal string SourcePath, SavedRelativePath, SourceLabel, Sha256;
