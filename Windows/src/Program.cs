@@ -3,6 +3,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -25,6 +26,7 @@ namespace EasyEject {
         ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
         int cardCount;
+        readonly Button resume = new Button();
         readonly ListView list = new ListView(); readonly Label status = new Label(); readonly Button refresh = new Button(), eject = new Button(), cleanEject = new Button(), bulk = new Button(), import = new Button(), cancel = new Button(), profile = new Button(), defaults = new Button(), history = new Button(), pending = new Button(), settings = new Button(), issue = new Button();
         readonly NotifyIcon tray; readonly System.Windows.Forms.Timer debounce = new System.Windows.Forms.Timer();
         Inventory inventory; bool scanning, working, quit; CancellationTokenSource cancellation; IntPtr notification;
@@ -40,7 +42,7 @@ namespace EasyEject {
             Font = new Font("Segoe UI", 10);
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(16) };
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            var intro = new Label { AutoSize = true, MaximumSize = new Size(940, 0), Text = "Review connected storage before ejecting. Imports keep all originals and verify SHA-256.\nConnection events refresh the list. Import and eject start only when you choose them.", Margin = new Padding(0, 0, 0, 12) };
+            var intro = new Label { AutoSize = true, MaximumSize = new Size(940, 0), Text = "Review connected storage before ejecting. Imports retain originals by default and verify SHA-256.\nConnection events refresh the list. Import and eject start only when you choose them.", Margin = new Padding(0, 0, 0, 12) };
             list.Dock = DockStyle.Fill; list.View = View.Details; list.FullRowSelect = true; list.MultiSelect = false; list.HideSelection = false;
             list.Columns.Add("Volume / mount", 245); list.Columns.Add("Classification", 360); list.Columns.Add("Physical disk", 130); list.Columns.Add("Status", 190);
             foreach (StorageGroup group in Enum.GetValues(typeof(StorageGroup))) list.Groups.Add(new ListViewGroup(group.ToString(), GroupLabel(group)));
@@ -48,15 +50,17 @@ namespace EasyEject {
             var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 12, 0, 8) };
             refresh.Text = "Refresh"; eject.Text = "Safe eject…"; import.Text = "Verified import…"; cancel.Text = "Cancel operation"; profile.Text = "Import profile…"; defaults.Text = "Import defaults…"; history.Text = "Import history…";
             pending.Text = "Completed imports…"; settings.Text = "Settings…"; issue.Text = "View issue…"; bulk.Text = "Eject cards…"; cleanEject.Text = "Clean && eject…";
-            foreach (var b in new[] { refresh, eject, cleanEject, bulk, import, profile, defaults, history, pending, settings, issue, cancel }) { b.AutoSize = true; b.MinimumSize = new Size(135, 36); actions.Controls.Add(b); }
+            resume.Text = "Resume interrupted import…";
+            foreach (var b in new[] { refresh, eject, cleanEject, bulk, import, resume, profile, defaults, history, pending, settings, issue, cancel }) { b.AutoSize = true; b.MinimumSize = new Size(135, 36); actions.Controls.Add(b); }
             cancel.Enabled = false;
             refresh.Click += async delegate { await RefreshDevices(); }; eject.Click += async delegate { await Eject(); }; import.Click += async delegate { await Import(); };
             bulk.Click += async delegate { await EjectCards(); };
             cleanEject.Click += async delegate { await Eject(true); };
             profile.Click += async delegate { await EditProfile(); }; defaults.Click += delegate { EditDefaults(); };
             history.Click += async delegate { await ReviewHistory(); };
+            resume.Click += async delegate { await ResumeImport(); };
             pending.Click += async delegate { await ReviewCompletions(); }; settings.Click += delegate { EditSettings(); }; issue.Click += delegate { ViewIssue(); };
-            cancel.Click += delegate { if (cancellation != null) { cancellation.Cancel(); status.Text = "Stopping after the current file check. Originals kept."; } };
+            cancel.Click += delegate { if (cancellation != null) { cancellation.Cancel(); status.Text = "Stopping after the current check. Verified copies and remaining source data are kept."; } };
             status.AutoSize = true; status.MaximumSize = new Size(940, 0); status.Text = "Reading connected devices…";
             layout.Controls.Add(intro); layout.Controls.Add(list); layout.Controls.Add(actions); layout.Controls.Add(status); Controls.Add(layout);
             var menu = new ContextMenuStrip(); menu.Items.Add("Show devices", null, delegate { Show(); WindowState = FormWindowState.Normal; Activate(); });
@@ -108,6 +112,7 @@ namespace EasyEject {
         void UpdateActions() {
             var v = Selected; bool ready = v != null && inventory != null && !working && !scanning && inventory.Epoch == discovery.Epoch;
             eject.Enabled = cleanEject.Enabled = false; import.Enabled = false; profile.Enabled = false; defaults.Enabled = !working; history.Enabled = !working && !scanning; refresh.Enabled = !working && !scanning;
+            resume.Enabled = false;
             settings.Enabled = pending.Enabled = issue.Enabled = !working && !scanning;
             pending.Enabled &= completions.Entries.Length > 0; issue.Enabled &= appIssue.HasIssue;
             pendingMenu.Enabled = pending.Enabled; issueMenu.Enabled = issue.Enabled; settingsMenu.Enabled = settings.Enabled; debugMenu.Visible = appSettings.DebugEnabled; debugMenu.Enabled = !working;
@@ -120,6 +125,7 @@ namespace EasyEject {
             if (eject.Enabled) try { MetadataCleanupPlan.Single(inventory, EjectService.Plan(inventory, v.Id), v.Id); cleanEject.Enabled = !readOnly; } catch (SafetyException) {}
             import.Enabled = inventory.Complete && v.Error == "" && !v.System && v.Disks.Count == 1 && v.Mounts.Any(x => x.Length >= 3 && x[1] == ':') && v.Classification != "Internal / fixed storage";
             profile.Enabled = import.Enabled;
+            resume.Enabled = import.Enabled && !readOnly;
         }
         async Task RefreshDevices() {
             if (scanning || working) return; scanning = true; UpdateActions();
@@ -209,31 +215,68 @@ namespace EasyEject {
                 var result = await Task.Run(() => new VerifiedImporter(operations).Run(root, source, destination, v.Id, guard, cancellation.Token, progressText => {
                     if (!IsDisposed) BeginInvoke(new Action(() => status.Text = progressText));
                 }, options));
-                string historyNote = ""; bool historyFailed = false;
-                if (result.HasSelectedMedia) {
-                    try { await Task.Run(() => ImportHistory.Add(ImportHistory.Create(result, stored, v.Display, guard.DestinationIdentity))); historyNote = "\nExact verified files saved in Import history."; }
-                    catch (Exception ex) { historyFailed = true; historyNote = "\nImport verified, but history could not be saved: " + ex.Message + "\nCopies and the completion receipt remain available."; RecordIssue(historyNote.Trim()); }
-                }
-                string message = result.Files == 0 ? "No matching media or device indexes were found. No batch was created." : (result.HasSelectedMedia ? "Import complete. " : "No matching media. Device index backup only. ") + result.Files + " files verified (" + result.Bytes + " bytes; " + result.Reused + " reused).\n" + result.Folder;
-                bool sourceUnchanged = guard.CompletionOrigin.Epoch == discovery.Epoch;
-                message += historyNote + "\n\n" + OriginalRemovalChoice.Summary(result.RemovedOriginals) + " " + DeviceTrashChoice.Summary(result.RecoveredTrashFiles, result.ClearedTrashFiles, result.ClearedTrashRecords) + " " + (sourceUnchanged ? "Device remains connected." : "The source connection changed after copying. Refresh and review the device."); status.Text = message; Log(message);
-                if (!historyFailed) ClearIssue();
-                ImportCompletion completion = null;
-                if (options.AskToEject && sourceUnchanged) {
-                    completion = new ImportCompletion(guard.CompletionOrigin, v.Display, result.Files > 0 ? result.Folder : destination, destination, guard.DestinationIdentity, result.HasSelectedMedia, message);
-                    completions.Insert(completion);
-                }
-                bool showChoice = CompletionPresentation.ShowChoice(options.AskToEject, ForegroundWindow, appSettings.NotificationsEnabled);
-                FinishOperation();
-                if (showChoice && completion != null) await ReviewCompletion(completion.Id);
-                else {
-                    Notify(historyFailed ? "Import verified; history needs attention" : result.HasSelectedMedia ? "Import complete" : "No matching media", historyFailed ? historyNote.Trim() : sourceUnchanged ? CompletionPresentation.Notification(result.HasSelectedMedia, result.RemovedOriginals, result.ClearedTrashFiles) : "The import finished, then the source connection changed. Open Easy Eject to review connected devices. " + OriginalRemovalChoice.Summary(result.RemovedOriginals) + " " + DeviceTrashChoice.Summary(result.RecoveredTrashFiles, result.ClearedTrashFiles, result.ClearedTrashRecords), historyFailed ? ToolTipIcon.Warning : ToolTipIcon.Info);
-                    if (ForegroundWindow) ShowMessage(message, result.HasSelectedMedia ? "Import complete" : "No matching media", historyFailed ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
-                }
+                await PresentImportResult(result, stored, v, guard, root, destination, options);
             } catch (OperationCanceledException) { status.Text = "Import cancelled. All originals and completed copies kept. No completion receipt was written."; Log(status.Text); Notify("Import cancelled", status.Text, ToolTipIcon.Info); if (ForegroundWindow) MessageBox.Show(this, status.Text, "Import cancelled"); }
             catch (Exception ex) { ShowError(ex); }
             finally { FinishOperation(); }
             await RefreshDevices();
+        }
+        async Task ResumeImport() {
+            var volume = Selected; if (volume == null || working || scanning || readOnly) return;
+            try {
+                var disk = inventory.Disks.Single(x => x.Number == volume.Disks.Single()); long epoch = inventory.Epoch;
+                working = true; UpdateActions();
+                string root = SafePaths.Normalize(volume.Mounts.First(x => x.Length >= 3 && x[1] == ':'));
+                var stored = ReadProfile(volume, disk);
+                if (stored == null) throw new SafetyException("Set up this device with its original media folder and destination first. Saving a profile starts no import. Then choose Resume interrupted import.");
+                string source = SafePaths.Normalize(Path.Combine(root, stored.RelativeSource)), destination = SafePaths.Normalize(stored.Destination), intentPath;
+                if (!SafePaths.Within(source, root)) throw new SafetyException("The saved media folder is outside this source volume.");
+                var options = stored.Resolve(ReadDefaults());
+                using (var picker = new OpenFileDialog { Title = "Choose the interrupted batch's removal-intent.json beside its import audit", InitialDirectory = destination, FileName = "removal-intent.json", Filter = "Removal intent (removal-intent.json)|removal-intent.json", CheckFileExists = true, Multiselect = false, RestoreDirectory = true }) {
+                    if (picker.ShowDialog(this) != DialogResult.OK) return; intentPath = picker.FileName;
+                }
+                string sid; using (var identity = WindowsIdentity.GetCurrent()) { if (identity.User == null) throw new SafetyException("The current Windows Trash owner is unavailable."); sid = identity.User.Value; }
+                cancellation = new CancellationTokenSource(); cancel.Enabled = true; status.Text = "Reviewing the exact interrupted batch, owners, devices and complete saved copies…";
+                var guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, volume, disk, epoch));
+                var reviewed = await Task.Run(() => RemovalResumeEvidence.Review(intentPath, root, source, destination, sid, guard, operations, cancellation.Token));
+                using (var dialog = new RemovalResumeConfirmationDialog(RemovalResumeChoice.Explanation(reviewed, volume.Display, source, destination))) if (dialog.ShowDialog(this) != DialogResult.Yes) return;
+                cancellation.Token.ThrowIfCancellationRequested();
+                guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, volume, disk, epoch));
+                completions.InvalidateSource(root); Log("User explicitly resumed verified import | " + reviewed.ImportId);
+                var result = await Task.Run(() => RemovalResumeEvidence.Resume(reviewed, intentPath, root, source, destination, sid, guard, operations, cancellation.Token, text => {
+                    if (!IsDisposed) BeginInvoke(new Action(() => status.Text = text));
+                }));
+                await PresentImportResult(result, stored, volume, guard, root, destination, options);
+            } catch (OperationCanceledException) {
+                status.Text = "Resume cancelled before any new permanent removal. Previously absent files remain absent; remaining source data and complete saved copies are kept. No completion receipt was written."; Log(status.Text); Notify("Resume cancelled", status.Text, ToolTipIcon.Info);
+                if (ForegroundWindow) ShowMessage(status.Text, "Resume cancelled", MessageBoxIcon.Information);
+            } catch (Exception ex) { ShowError(ex); }
+            finally { FinishOperation(); }
+            await RefreshDevices();
+        }
+        async Task PresentImportResult(ImportResult result, ImportProfile stored, Volume v, VolumeImportGuard guard, string root, string destination, MediaOptions options) {
+            string removalMessage = result.Receipt != null && !String.IsNullOrEmpty(result.Receipt.ResumedUtc) ? RemovalResumeChoice.Summary(result) : OriginalRemovalChoice.Summary(result.RemovedOriginals) + " " + DeviceTrashChoice.Summary(result.RecoveredTrashFiles, result.ClearedTrashFiles, result.ClearedTrashRecords);
+            string historyNote = ""; bool historyFailed = false;
+            if (result.HasSelectedMedia) {
+                try { await Task.Run(() => ImportHistory.Add(ImportHistory.Create(result, stored, v.Display, guard.DestinationIdentity))); historyNote = "\nExact verified files saved in Import history."; }
+                catch (Exception ex) { historyFailed = true; historyNote = "\nImport verified, but history could not be saved: " + ex.Message + "\nCopies and the completion receipt remain available."; RecordIssue(historyNote.Trim()); }
+            }
+            string message = result.Files == 0 ? "No matching media or device indexes were found. No batch was created." : (result.HasSelectedMedia ? "Import complete. " : "No matching media. Device index backup only. ") + result.Files + " files verified (" + result.Bytes + " bytes; " + result.Reused + " reused).\n" + result.Folder;
+            bool sourceUnchanged = guard.CompletionOrigin.Epoch == discovery.Epoch;
+            message += historyNote + "\n\n" + removalMessage + " " + (sourceUnchanged ? "Device remains connected." : "The source connection changed after copying. Refresh and review the device."); status.Text = message; Log(message);
+            if (!historyFailed) ClearIssue();
+            ImportCompletion completion = null;
+            if (options.AskToEject && sourceUnchanged) {
+                completion = new ImportCompletion(guard.CompletionOrigin, v.Display, result.Files > 0 ? result.Folder : destination, destination, guard.DestinationIdentity, result.HasSelectedMedia, message);
+                completions.Insert(completion);
+            }
+            bool showChoice = CompletionPresentation.ShowChoice(options.AskToEject, ForegroundWindow, appSettings.NotificationsEnabled);
+            FinishOperation();
+            if (showChoice && completion != null) await ReviewCompletion(completion.Id);
+            else {
+                Notify(historyFailed ? "Import verified; history needs attention" : result.HasSelectedMedia ? "Import complete" : "No matching media", historyFailed ? historyNote.Trim() : sourceUnchanged ? CompletionPresentation.Notification(result.HasSelectedMedia, result.RemovedOriginals, result.ClearedTrashFiles) : "The import finished, then the source connection changed. Open Easy Eject to review connected devices. " + removalMessage, historyFailed ? ToolTipIcon.Warning : ToolTipIcon.Info);
+                if (ForegroundWindow) ShowMessage(message, result.HasSelectedMedia ? "Import complete" : "No matching media", historyFailed ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+            }
         }
         static bool ConfigurationError(Exception ex) {
             return ex is SafetyException || ex is System.Runtime.Serialization.SerializationException || ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception;

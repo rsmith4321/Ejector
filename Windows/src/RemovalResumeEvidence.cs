@@ -8,12 +8,23 @@ using System.Text;
 using System.Threading;
 
 namespace EasyEject {
-    // Read-only review. All handles are released on return; a later manual action must verify afresh.
-    // This object cannot delete, complete an import, or restore eject authority.
+    // Review releases handles and grants no authority. Execution verifies the confirmation afresh,
+    // then invokes its transaction while the journal, audit, full batch and all paths remain held.
     internal sealed class RemovalResumeEvidence {
         internal readonly ReadOnlyCollection<string> PendingWindowsRecords;
         internal readonly string ImportId, IntentSha256;
-        RemovalResumeEvidence(RemovalIntent intent, string hash, List<string> pending) { ImportId = intent.ImportId; IntentSha256 = hash; PendingWindowsRecords = pending.AsReadOnly(); }
+        internal readonly string BatchFolder;
+        internal readonly MediaOptions Options;
+        internal readonly ReadOnlyCollection<string> AbsentSources;
+        internal readonly int RemainingOriginals, RemainingTrashFiles, RemainingTrashRecords;
+        RemovalResumeEvidence(RemovalIntent intent, string hash, List<string> pending, HashSet<string> missing) {
+            ImportId = intent.ImportId; IntentSha256 = hash; PendingWindowsRecords = pending.AsReadOnly(); BatchFolder = intent.BatchFolder;
+            Options = new MediaOptions(intent.VideosOnly, intent.IncludePreviews, intent.CleanLayout, false, intent.DeleteOriginals, intent.RecoverTrash, intent.MacTrashUid);
+            AbsentSources = missing.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList().AsReadOnly();
+            RemainingOriginals = intent.Files.Count(x => x.Eligible && !missing.Contains(x.SourcePath) && !x.FromTrash);
+            RemainingTrashFiles = intent.Files.Count(x => x.Eligible && !missing.Contains(x.SourcePath) && x.FromTrash && !x.IsTrashRecord);
+            RemainingTrashRecords = intent.Files.Count(x => x.Eligible && !missing.Contains(x.SourcePath) && x.IsTrashRecord);
+        }
         static void Require(bool value, string explanation) { if (!value) throw new SafetyException("Interrupted recovery evidence refused. " + explanation + " Remaining data is kept."); }
         static bool Exists(string path) {
             string[] entries = Directory.GetFileSystemEntries(Path.GetDirectoryName(path)).Where(x => x.Equals(path, StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -26,7 +37,19 @@ namespace EasyEject {
             Require(offset == data.Length, "A restoration record was truncated."); return data;
         }
         internal static RemovalResumeEvidence Review(string intentPath, string sourceRoot, string selectedFolder, string destination, string windowsSid, IImportGuard guard, Operations operations, CancellationToken cancellation) {
+            return Inspect(intentPath, sourceRoot, selectedFolder, destination, windowsSid, guard, operations, cancellation, null, null);
+        }
+        internal static ImportResult Resume(RemovalResumeEvidence confirmed, string intentPath, string sourceRoot, string selectedFolder, string destination, string windowsSid, IImportGuard guard, Operations operations, CancellationToken cancellation, Action<string> report, Action<string> auditCheck = null) {
+            if (confirmed == null) throw new ArgumentNullException("confirmed");
+            ImportResult result = null;
+            Inspect(intentPath, sourceRoot, selectedFolder, destination, windowsSid, guard, operations, cancellation, confirmed, context => result = RemovalResumeTransaction.Run(context, cancellation, guard.Validate, report, auditCheck ?? (x => {})));
+            return result;
+        }
+        static RemovalResumeEvidence Inspect(string intentPath, string sourceRoot, string selectedFolder, string destination, string windowsSid, IImportGuard guard, Operations operations, CancellationToken cancellation, RemovalResumeEvidence confirmed, Action<RemovalResumeContext> execute) {
             intentPath = SafePaths.Normalize(intentPath); sourceRoot = SafePaths.Normalize(sourceRoot); selectedFolder = SafePaths.Normalize(selectedFolder); destination = SafePaths.Normalize(destination);
+            Require(SafePaths.Within(selectedFolder, sourceRoot) && !SafePaths.Within(destination, sourceRoot) && !SafePaths.Within(sourceRoot, destination) && SafePaths.Within(intentPath, destination) && Path.GetFileName(intentPath) == "removal-intent.json", "Choose this destination's exact removal-intent.json and the original source scope.");
+            string selectedRelative = selectedFolder == sourceRoot ? "" : SafePaths.Relative(selectedFolder, sourceRoot);
+            Require(!selectedRelative.Split('\\').Any(x => x.Equals(".Trashes", StringComparison.OrdinalIgnoreCase) || x.Equals("$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase) || x.Equals("System Volume Information", StringComparison.OrdinalIgnoreCase)), "The ordinary media folder cannot be a protected Trash/system tree.");
             var device = guard as IImportDeviceEvidence;
             Require(device != null, "A fresh source/destination device guard is required.");
             using (operations.Reserve(guard.ProtectedDisks)) using (SafePaths.LockDirectories(sourceRoot, selectedFolder, destination, Path.GetDirectoryName(intentPath)))
@@ -34,10 +57,11 @@ namespace EasyEject {
                 cancellation.ThrowIfCancellationRequested(); guard.Validate(); Require(intentStream.Length <= 16777216, "The journal is too large.");
                 string hash = VerifiedImporter.Hash(intentStream, cancellation); intentStream.Position = 0;
                 var intent = (RemovalIntent)new DataContractJsonSerializer(typeof(RemovalIntent)).ReadObject(intentStream);
-                Require(intent != null && intent.Version == 1 && !intent.IsCompletionReceipt && intent.RecoverTrash, "This is not a supported interrupted Trash operation.");
+                Require(intent != null && intent.Version == 1 && !intent.IsCompletionReceipt && (intent.RecoverTrash || intent.DeleteOriginals), "This is not a supported interrupted verified source-removal operation.");
+                Require(confirmed == null || (confirmed.ImportId == intent.ImportId && confirmed.IntentSha256 == hash), "The journal differs from the reviewed batch.");
                 Require(intent.SourceDevice != null && intent.DestinationDevice != null && intent.SourceDevice.Matches(device.SourceDevice) && intent.DestinationDevice.Matches(device.DestinationDevice), "The source or destination device changed.");
                 Require(intent.SourceVolume == intent.SourceDevice.VolumeId && intent.SourceRoot == sourceRoot && intent.SelectedFolder == selectedFolder && intent.DestinationRoot == destination, "The current device/profile scope differs from the journal.");
-                Require(intent.WindowsTrashSid == windowsSid, "The recorded Windows Trash owner differs from the current user.");
+                Require(intent.RecoverTrash ? intent.WindowsTrashSid == windowsSid : intent.WindowsTrashSid == null, "The recorded Windows Trash owner differs from the current user.");
                 Require(intent.MacTrashUid == null || DeviceTrash.ValidMacOwner(intent.MacTrashUid), "The recorded Mac owner is invalid.");
                 Guid id; Require(Guid.TryParseExact(intent.ImportId, "N", out id), "The import identity is invalid.");
                 string batch = SafePaths.Normalize(intent.BatchFolder), folder = Path.GetDirectoryName(intentPath);
@@ -53,6 +77,7 @@ namespace EasyEject {
                     Require(bindings == 1, "The audit does not bind this exact journal hash.");
                     Require(intent.Files != null && intent.Files.Count > 0 && intent.Files.Count <= 100000, "The dependency list is invalid.");
                     var files = intent.Files; var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase); var savedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    Require(intent.RecoverTrash || files.All(x => x != null && !x.FromTrash && !x.IsTrashRecord), "A recovery-off batch contains Trash sources.");
                     foreach (var file in files) {
                         Require(file != null && file.SourceIdentity != null && file.SavedIdentity != null && file.Bytes >= 0 && file.Sha256 != null && file.Sha256.Length == 64 && file.Sha256.All(x => (x >= '0' && x <= '9') || (x >= 'a' && x <= 'f')), "A dependency has invalid identity/hash evidence.");
                         string source = SafePaths.Normalize(file.SourcePath), saved = SafePaths.Normalize(Path.Combine(batch, file.SavedRelativePath));
@@ -62,13 +87,13 @@ namespace EasyEject {
                     using (SafePaths.LockDirectories(files.SelectMany(x => new[] { Path.GetDirectoryName(x.SourcePath), Path.GetDirectoryName(Path.Combine(batch, x.SavedRelativePath)) }).ToArray())) {
                         var held = new List<FileStream>();
                         try {
-                            var missing = new HashSet<string>(StringComparer.OrdinalIgnoreCase); var saved = new Dictionary<string, FileStream>(StringComparer.OrdinalIgnoreCase);
+                            var missing = new HashSet<string>(StringComparer.OrdinalIgnoreCase); var saved = new Dictionary<string, FileStream>(StringComparer.OrdinalIgnoreCase); var inputs = new Dictionary<string, FileStream>(StringComparer.OrdinalIgnoreCase);
                             foreach (var file in files) {
                                 cancellation.ThrowIfCancellationRequested(); guard.Validate();
                                 var copy = SafePaths.ReadFile(Path.Combine(batch, file.SavedRelativePath), 4096); held.Add(copy); saved.Add(file.SourcePath, copy);
                                 Require(file.SavedIdentity.Matches(Native.Info(copy.SafeFileHandle)) && copy.Length == file.Bytes && VerifiedImporter.Hash(copy, cancellation) == file.Sha256, "A complete saved dependency changed.");
                                 if (!Exists(file.SourcePath)) { Require(file.Eligible && (file.FromTrash || intent.DeleteOriginals), "A retained source dependency is missing."); missing.Add(file.SourcePath); continue; }
-                                var input = SafePaths.ReadFile(file.SourcePath, 4096); held.Add(input);
+                                var input = execute != null ? SafePaths.ProtectOriginal(file.SourcePath, file.Eligible) : SafePaths.ReadFile(file.SourcePath, 4096); held.Add(input); inputs.Add(file.SourcePath, input);
                                 Require(file.SourceIdentity.Matches(Native.Info(input.SafeFileHandle)) && input.Length == file.Bytes && VerifiedImporter.Hash(input, cancellation) == file.Sha256, "A remaining source or restoration record changed.");
                             }
                             var options = new MediaOptions(intent.VideosOnly, intent.IncludePreviews, intent.CleanLayout, false, intent.DeleteOriginals, intent.RecoverTrash, intent.MacTrashUid);
@@ -104,11 +129,23 @@ namespace EasyEject {
                             var selection = snapshot.Select(options);
                             Require(selection.Files.Count == trashFiles.Count && selection.Records.Count == records.Count, "Recorded recovery selection is inconsistent.");
                             foreach (var file in files.Where(x => x.FromTrash)) Require(file.Eligible == (file.IsTrashRecord ? selection.RemovableRecords.Contains(file.SourcePath) : selection.RemovablePayloads.Contains(file.SourcePath)), "Recorded clearing eligibility differs from media policy.");
-                            snapshot.CheckManifest(options, missing.Contains, cancellation, guard.Validate);
+                            if (options.RecoverTrash) snapshot.CheckManifest(options, missing.Contains, cancellation, guard.Validate);
                             var pending = records.Where(x => !x.Directory && missing.Contains(x.PayloadRoot) && !missing.Contains(x.MetadataPath) && selection.RemovableRecords.Contains(x.MetadataPath)).Select(x => x.MetadataPath).ToList();
-                            Require(pending.Count > 0, "No interrupted Windows restoration records qualify for review.");
+                            Require(files.Any(x => x.Eligible) && (missing.Count > 0 || files.Any(x => x.Eligible && inputs.ContainsKey(x.SourcePath))), "No interrupted source removals qualify for review.");
+                            Require(confirmed == null || confirmed.AbsentSources.SequenceEqual(missing.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)), "Source presence changed after confirmation; review the batch again.");
                             cancellation.ThrowIfCancellationRequested(); guard.Validate();
-                            return new RemovalResumeEvidence(intent, hash, pending);
+                            var reviewed = new RemovalResumeEvidence(intent, hash, pending, missing);
+                            if (execute != null) {
+                                Action checkManifest = () => {
+                                    var scan = VerifiedImporter.Scan(selectedFolder, cancellation);
+                                    Require(!scan.Any(missing.Contains), "A replacement appeared at a removed ordinary source path.");
+                                    var virtualFiles = scan.Concat(ordinary.Where(missing.Contains)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
+                                    Require(MediaSelection.Plan(virtualFiles, sourceRoot, selectedFolder, options).Files.SequenceEqual(ordinary), "The selected ordinary source manifest changed.");
+                                    if (options.RecoverTrash) snapshot.CheckManifest(options, missing.Contains, cancellation, guard.Validate);
+                                };
+                                execute(new RemovalResumeContext(intent, hash, folder, saved, inputs, missing, checkManifest));
+                            }
+                            return reviewed;
                         } finally { foreach (var handle in held) handle.Dispose(); }
                     }
                 }

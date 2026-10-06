@@ -66,6 +66,7 @@ namespace EasyEject {
         [DataMember] public string SourceRelativePath; [DataMember] public bool IsMedia, Reused;
         [DataMember] public bool RemovedSource;
         [DataMember] public bool FromTrash, IsTrashRecord;
+        [DataMember] public bool SourceAbsentAtResume;
     }
     [DataContract] public sealed class ImportReceipt {
         [DataMember] public string StartedUtc; [DataMember] public string SourceVolume; [DataMember] public bool OriginalsKept = true;
@@ -73,9 +74,10 @@ namespace EasyEject {
         [DataMember] public string Id; [DataMember] public bool VideosOnly, IncludePreviews, CleanLayout;
         [DataMember] public bool OriginalRemovalRequested;
         [DataMember] public bool TrashRecoveryRequested;
+        [DataMember] public string ResumedUtc, RemovalIntentSha256, ResumeAuditPath;
         [DataMember] public List<ReceiptEntry> Files = new List<ReceiptEntry>();
     }
-    public sealed class ImportResult { public string Folder, ReceiptPath; public int Files, Reused, RemovedOriginals, RecoveredTrashFiles, ClearedTrashFiles, ClearedTrashRecords; public long Bytes; public bool HasSelectedMedia; public ImportReceipt Receipt; }
+    public sealed class ImportResult { public string Folder, ReceiptPath; public int Files, Reused, RemovedOriginals, RecoveredTrashFiles, ClearedTrashFiles, ClearedTrashRecords, PriorAbsentOriginals, PriorAbsentTrashFiles, PriorAbsentTrashRecords; public long Bytes; public bool HasSelectedMedia; public ImportReceipt Receipt; }
     public sealed class VerifiedImporter {
         readonly Operations operations; readonly Func<string, ulong> capacity; readonly Action<string> auditCheck;
         readonly Func<string, string, CancellationToken, Action, DeviceTrashSnapshot> trashCatalog;

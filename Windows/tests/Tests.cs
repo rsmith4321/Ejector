@@ -98,6 +98,8 @@ namespace EasyEject {
                 using (var dialog = new ImportHistoryDialog(new[] { previewBatch })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history.png")); dialog.Batches.Items[0].Selected = true; Render(dialog, Path.Combine(output, "history-selected.png")); }
                 using (var dialog = new ImportHistoryDialog(new CompletedBatch[0])) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history-empty.png")); }
                 using (var fixture = new Fixture()) {
+                    InterruptedRecovery(fixture); var resumeReview = ReviewInterrupted(fixture);
+                    using (var dialog = new RemovalResumeConfirmationDialog(RemovalResumeChoice.Explanation(resumeReview, "Fixture camera card", fixture.Source, fixture.Destination))) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "resume-import.png")); RenderAtBottom(dialog, Path.Combine(output, "resume-import-bottom.png")); }
                     var completion = Completion(state, fixture, true);
                     using (var dialog = new ImportCompletionDialog(completion, true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "completion.png")); dialog.ExpireEject(); Render(dialog, Path.Combine(output, "completion-expired.png")); }
                     using (var dialog = new ImportCompletionDialog(completion, true, "Permanently remove macOS metadata from E:\\ before safe removal. Photos, recordings and device Trash are kept. Cleanup failure stops ejection.")) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "completion-cleanup.png")); }
@@ -613,6 +615,7 @@ namespace EasyEject {
             TrashRecoveryTests();
             RemovalIntentTests();
             RemovalResumeTests();
+            RemovalResumeActionTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {
@@ -632,13 +635,15 @@ namespace EasyEject {
             using (var bitmap = new System.Drawing.Bitmap(form.Width, form.Height)) {
                 form.DrawToBitmap(bitmap, new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height));
                 int border = (form.Width - form.ClientSize.Width) / 2, left = border + body.Left, top = form.Height - form.ClientSize.Height - border + body.Top;
-                using (var graphics = System.Drawing.Graphics.FromImage(bitmap)) {
-                    graphics.SetClip(new System.Drawing.Rectangle(left, top, body.ClientSize.Width, body.ClientSize.Height));
-                    using (var background = new System.Drawing.SolidBrush(body.BackColor)) graphics.FillRectangle(background, left, top, body.ClientSize.Width, body.ClientSize.Height);
+                // A separate viewport bitmap bounds native drawing physically; negative child origins
+                // cannot overwrite the form's caption/footer even when a GDI paint ignores clipping.
+                using (var viewport = new System.Drawing.Bitmap(body.ClientSize.Width, body.ClientSize.Height)) using (var graphics = System.Drawing.Graphics.FromImage(viewport)) {
+                    graphics.Clear(body.BackColor);
                     foreach (System.Windows.Forms.Control child in body.Controls) using (var content = new System.Drawing.Bitmap(child.Width, child.Height)) {
                         child.DrawToBitmap(content, new System.Drawing.Rectangle(0, 0, content.Width, content.Height));
-                        graphics.DrawImageUnscaled(content, left + child.Left, top + child.Top - offset);
+                        graphics.DrawImageUnscaled(content, child.Left, child.Top - offset);
                     }
+                    using (var target = System.Drawing.Graphics.FromImage(bitmap)) target.DrawImageUnscaled(viewport, left, top);
                 }
                 bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
             }
