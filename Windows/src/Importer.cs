@@ -201,20 +201,21 @@ namespace EasyEject {
                     plan.CheckManifest(x => false, cancel, validate);
                     // Recheck and hold every source and saved dependency until receipt publication.
                     using (var removal = new OriginalRemovalSession(batch, receipt, originals, stamps, plan.Deletable)) {
-                    removal.VerifyAll(cancel, validate);
-                    validate();
+                    Action removalValidate = () => { removal.CheckPaths(); validate(); removal.CheckPaths(); cancel.ThrowIfCancellationRequested(); };
+                    removal.VerifyAll(cancel, removalValidate);
+                    removalValidate();
                     log("Batch verification complete | " + receipt.Files.Count + " files, " + bytes + " bytes, " + reused + " reused; " + (plan.Deletable.Count > 0 ? "removal/Trash clearing requested; source files still held" : "originals kept"));
-                    Action checkManifest = () => plan.CheckManifest(removal.WasRemoved, cancel, validate);
-                    using (var removalIntent = plan.Deletable.Count > 0 ? removal.CaptureIntent(plan, receipt, destination, batch, cancel, guard).Publish(record, cancel, validate, log) : null) {
-                    if (plan.Deletable.Count > 0) removal.Remove(cancel, validate, checkManifest, log, report);
+                    Action checkManifest = () => plan.CheckManifest(removal.WasRemoved, cancel, removalValidate);
+                    using (var removalIntent = plan.Deletable.Count > 0 ? removal.CaptureIntent(plan, receipt, destination, batch, cancel, guard).Publish(record, cancel, removalValidate, log) : null) {
+                    if (plan.Deletable.Count > 0) removal.Remove(cancel, removalValidate, checkManifest, log, report);
                     int removedCount = receipt.Files.Count(e => e.RemovedSource && !e.FromTrash), clearedTrash = receipt.Files.Count(e => e.RemovedSource && e.FromTrash && !e.IsTrashRecord), clearedRecords = receipt.Files.Count(e => e.RemovedSource && e.IsTrashRecord);
                     receipt.OriginalsKept = removedCount == 0;
                     work.Emit("Publishing receipt", 0.99); report("Publishing verified import receipt. " + OriginalRemovalChoice.Summary(removedCount) + " Cleared " + clearedTrash + " verified Trash files and " + clearedRecords + " records.");
-                    cancel.ThrowIfCancellationRequested(); validate(); checkManifest(); removal.VerifyAll(cancel, validate);
+                    cancel.ThrowIfCancellationRequested(); removalValidate(); checkManifest(); removal.VerifyAll(cancel, removalValidate);
                     string receiptPath = Path.Combine(record, "verified-import.json");
                     using (var stream = SafePaths.NewFile(Path.Combine(record, ".receipt-" + Guid.NewGuid().ToString("N") + ".partial"))) {
                         bool complete = false;
-                        try { new DataContractJsonSerializer(typeof(ImportReceipt)).WriteObject(stream, receipt); stream.Flush(true); cancel.ThrowIfCancellationRequested(); validate(); Native.Rename(stream.SafeFileHandle, receiptPath); stream.Flush(true); complete = true; }
+                        try { new DataContractJsonSerializer(typeof(ImportReceipt)).WriteObject(stream, receipt); stream.Flush(true); cancel.ThrowIfCancellationRequested(); removalValidate(); Native.Rename(stream.SafeFileHandle, receiptPath); stream.Flush(true); complete = true; }
                         finally { if (!complete) Native.DeleteOnClose(stream.SafeFileHandle); }
                     }
                     work.Complete();

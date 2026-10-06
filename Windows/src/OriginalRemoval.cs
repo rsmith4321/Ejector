@@ -16,18 +16,19 @@ namespace EasyEject {
             internal ReceiptEntry Entry; internal bool Eligible;
         }
         readonly List<Held> held = new List<Held>(); readonly HashSet<string> removed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        IDisposable directories;
+        SafePaths.DirectoryLease directories;
         internal int Removed { get { return removed.Count; } }
         internal bool WasRemoved(string path) { return removed.Contains(path); }
         internal OriginalRemovalSession(string batch, ImportReceipt receipt, IDictionary<string, string> sources, IDictionary<string, Native.FileInfo> stamps, HashSet<string> eligible) {
             try {
-                directories = SafePaths.LockDirectories(receipt.Files.SelectMany(e => new[] { Path.GetDirectoryName(sources[e.RelativePath]), Path.GetDirectoryName(Path.Combine(batch, e.RelativePath)) }).ToArray());
+                directories = SafePaths.HoldDirectories(receipt.Files.SelectMany(e => new[] { Path.GetDirectoryName(sources[e.RelativePath]), Path.GetDirectoryName(Path.Combine(batch, e.RelativePath)) }).ToArray());
                 foreach (var entry in receipt.Files) {
                     string source = sources[entry.RelativePath], saved = SafePaths.Normalize(Path.Combine(batch, entry.RelativePath));
                     if (!SafePaths.Within(saved, batch)) throw new SafetyException("A saved removal dependency escaped its batch.");
                     var item = new Held { Entry = entry, Source = source, Saved = saved, SourceStamp = stamps[source], Eligible = eligible.Contains(source) && !MediaSelection.IsDeviceIndex(source) };
                     held.Add(item); item.Input = SafePaths.ProtectOriginal(source, item.Eligible); item.Copy = SafePaths.ReadFile(saved, 4096); item.CopyStamp = Native.Info(item.Copy.SafeFileHandle);
                 }
+                CheckPaths();
             } catch { Dispose(); throw; }
         }
         void Verify(Held item, CancellationToken cancellation) {
@@ -38,7 +39,12 @@ namespace EasyEject {
             if (!VerifiedImporter.SameStamp(Native.Info(item.Copy.SafeFileHandle), item.CopyStamp) || !Native.FinalPath(item.Copy.SafeFileHandle).Equals(item.Saved, StringComparison.OrdinalIgnoreCase) || item.Copy.Length != item.Entry.Bytes) throw new SafetyException("An earlier saved copy changed before batch completion/removal.");
             item.Copy.Position = 0; if (VerifiedImporter.Hash(item.Copy, cancellation) != item.Entry.Sha256) throw new SafetyException("An earlier saved copy changed before batch completion/removal.");
         }
-        internal void VerifyAll(CancellationToken cancellation, Action validate) { foreach (var item in held) { cancellation.ThrowIfCancellationRequested(); validate(); Verify(item, cancellation); } }
+        internal void CheckPaths() { directories.Validate(); }
+        internal void VerifyAll(CancellationToken cancellation, Action validate) {
+            CheckPaths();
+            foreach (var item in held) { cancellation.ThrowIfCancellationRequested(); CheckPaths(); validate(); CheckPaths(); cancellation.ThrowIfCancellationRequested(); Verify(item, cancellation); }
+            CheckPaths();
+        }
         internal RemovalIntent CaptureIntent(ImportSourcePlan plan, ImportReceipt receipt, string destination, string batch, CancellationToken cancellation, IImportGuard guard) {
             VerifyAll(cancellation, guard.Validate);
             var intent = plan.NewRemovalIntent(receipt, destination, batch);
@@ -50,22 +56,26 @@ namespace EasyEject {
                     SourceIdentity = RemovalFileIdentity.Capture(Native.Info(item.Input.SafeFileHandle)), SavedIdentity = RemovalFileIdentity.Capture(Native.Info(item.Copy.SafeFileHandle)) };
                 plan.LinkRemovalIntent(entry); intent.Files.Add(entry);
             }
-            return intent;
+            CheckPaths(); return intent;
         }
         internal void Remove(CancellationToken cancellation, Action validate, Action checkManifest, Action<string> audit, Action<string> report) {
-            checkManifest(); VerifyAll(cancellation, validate);
-            audit("Complete selected batch and all saved dependencies verified before original removal");
+            Action check = () => { cancellation.ThrowIfCancellationRequested(); CheckPaths(); validate(); CheckPaths(); cancellation.ThrowIfCancellationRequested(); };
+            Action manifest = () => { CheckPaths(); checkManifest(); CheckPaths(); cancellation.ThrowIfCancellationRequested(); };
+            Action<string> log = line => { CheckPaths(); audit(line); CheckPaths(); };
+            Action<string> progress = line => { CheckPaths(); report(line); CheckPaths(); };
+            manifest(); VerifyAll(cancellation, validate);
+            log("Complete selected batch and all saved dependencies verified before original removal");
             foreach (var item in held.Where(x => x.Eligible).OrderBy(x => x.Entry.IsTrashRecord)) {
-                cancellation.ThrowIfCancellationRequested(); validate(); checkManifest(); Verify(item, cancellation);
-                audit("Before permanent removal | SHA256 " + item.Entry.Sha256 + " | " + item.Source + " -> " + item.Saved);
-                report((item.Entry.FromTrash ? "Clearing verified Trash " + (item.Entry.IsTrashRecord ? "record: " : "file: ") : "Removing verified original: ") + item.Entry.SourceRelativePath);
-                cancellation.ThrowIfCancellationRequested(); validate(); checkManifest(); Verify(item, cancellation);
+                check(); manifest(); Verify(item, cancellation);
+                log("Before permanent removal | SHA256 " + item.Entry.Sha256 + " | " + item.Source + " -> " + item.Saved);
+                progress((item.Entry.FromTrash ? "Clearing verified Trash " + (item.Entry.IsTrashRecord ? "record: " : "file: ") : "Removing verified original: ") + item.Entry.SourceRelativePath);
+                check(); manifest(); Verify(item, cancellation);
                 Native.DeleteOnClose(item.Input.SafeFileHandle, "Cannot remove the held verified original");
                 removed.Add(item.Source); item.Entry.RemovedSource = true;
                 item.Input.Dispose(); item.Input = null;
-                audit("Removed verified original | SHA256 " + item.Entry.Sha256 + " | " + item.Source);
+                log("Removed verified original | SHA256 " + item.Entry.Sha256 + " | " + item.Source);
             }
-            checkManifest(); VerifyAll(cancellation, validate);
+            manifest(); VerifyAll(cancellation, validate);
         }
         public void Dispose() {
             foreach (var item in held) { if (item.Input != null) item.Input.Dispose(); if (item.Copy != null) item.Copy.Dispose(); }
