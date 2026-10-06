@@ -82,6 +82,7 @@ namespace EasyEject {
             if (AppDomain.CurrentDomain.FriendlyName == "EasyEject.ShareFixture.exe") return ShareToolFixture(args);
             System.Windows.Forms.Application.EnableVisualStyles(); System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
             if (args.Length == 1 && args[0] == "--media-parity") { MediaParityTests(); MediaMatrixTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable files and native read-only path resolution only."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--storage-connections") { StorageConnectionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake notifications, fake eject and disposable files only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--ui-render") {
                 string output = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectWindowsPreview", "run-" + Guid.NewGuid().ToString("N").Substring(0, 16));
                 Directory.CreateDirectory(output); var state = State(); var defaults = new ImportDefaults(); var profile = defaults.NewProfile(state.Volumes[0], state.Disks[0]); profile.RelativeSource = "DCIM"; profile.Destination = @"D:\Travel backups";
@@ -177,13 +178,15 @@ namespace EasyEject {
                     var hotkey = (GlobalHotkey)typeof(DeviceWindow).GetField("hotkey", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(window);
                     Check(!hotkey.Registered, "Read-only smoke registered a global key");
                     Check(state.Complete && state.Volumes.Any(v => v.System), "Read-only UI inventory incomplete");
+                    var storageProof = new StorageConnectionProof(discovery, state, state.Disks.Select(d => d.Number));
+                    Check(storageProof.Scoped, "Native internal-disk connection proof unavailable"); storageProof.Validate(discovery.Scan());
                     foreach (var v in state.Volumes.Where(v => v.System)) Throws<SafetyException>(() => EjectService.Plan(state, v.Id));
                     var menuState = TrayState(); menuState.Epoch = discovery.Epoch; window.PresentInventory(menuState); window.UpdateTrayStorageMenu();
                     var storageMenu = (System.Windows.Forms.ToolStripMenuItem)typeof(DeviceWindow).GetField("storageMenu", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(window);
                     var menuActions = TrayActions(storageMenu.DropDownItems.Cast<System.Windows.Forms.ToolStripItem>()).ToArray();
                     Check(menuActions.Length == 4 && menuActions.All(item => !item.Enabled), "Read-only native window exposes tray removal"); foreach (var action in menuActions) action.PerformClick();
                     Check(!hotkey.Registered, "Read-only tray inspection registered a shortcut");
-                    Console.WriteLine("PASS hidden device window initializes, disk and per-instance notifications register, read-only inventory maps " + state.Volumes.Count + " volumes, system eject is blocked, no global key is registered, and fake tray storage actions remain disabled in the real read-only window.");
+                    Console.WriteLine("PASS hidden device window initializes, disk and per-instance notifications register, read-only inventory maps " + state.Volumes.Count + " volumes, scoped internal-disk identity proof validates, system eject is blocked, no global key is registered, and fake tray storage actions remain disabled in the real read-only window.");
                     return 0;
                 }
             }
@@ -693,6 +696,7 @@ namespace EasyEject {
             TrayActivityTests();
             MediaParityTests();
             MediaMatrixTests();
+            StorageConnectionTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {

@@ -11,7 +11,8 @@ namespace EasyEject {
     public interface IImportGuard { int[] ProtectedDisks { get; } void Validate(); }
     internal interface IImportDeviceEvidence { DestinationIdentity SourceDevice { get; } DestinationIdentity DestinationDevice { get; } }
     public sealed class VolumeImportGuard : IImportGuard, IConnectionGuard, IImportDeviceEvidence {
-        readonly IDiscovery discovery; readonly string sourceId, destinationId, fingerprint; readonly long epoch;
+        readonly IDiscovery discovery; readonly string sourceId, destinationId; readonly Func<string, string> volumeId;
+        readonly StorageConnectionProof connection;
         readonly string source, destination; readonly int[] disks;
         readonly DestinationIdentity destinationIdentity;
         readonly DestinationIdentity sourceIdentity;
@@ -19,17 +20,19 @@ namespace EasyEject {
         public DestinationIdentity DestinationIdentity { get { return destinationIdentity.Copy(); } }
         DestinationIdentity IImportDeviceEvidence.SourceDevice { get { return sourceIdentity.Copy(); } }
         DestinationIdentity IImportDeviceEvidence.DestinationDevice { get { return destinationIdentity.Copy(); } }
-        public int[] ProtectedDisks { get { return disks; } }
-        public bool Changed { get { return discovery.Epoch != epoch; } }
-        public VolumeImportGuard(IDiscovery discovery, string source, string destination, Volume expectedVolume, Disk expectedDisk, long selectionEpoch) {
-            this.discovery = discovery; this.source = source; this.destination = destination;
-            sourceId = WindowsDiscovery.VolumeId(source); destinationId = WindowsDiscovery.VolumeId(destination);
+        public int[] ProtectedDisks { get { return (int[])disks.Clone(); } }
+        public bool Changed { get { return connection.Changed; } }
+        public VolumeImportGuard(IDiscovery discovery, string source, string destination, Volume expectedVolume, Disk expectedDisk, long selectionEpoch)
+            : this(discovery, source, destination, expectedVolume, expectedDisk, selectionEpoch, WindowsDiscovery.VolumeId) {}
+        internal VolumeImportGuard(IDiscovery discovery, string source, string destination, Volume expectedVolume, Disk expectedDisk, long selectionEpoch, Func<string, string> volumeId) {
+            this.discovery = discovery; this.source = source; this.destination = destination; this.volumeId = volumeId;
+            sourceId = volumeId(source); destinationId = volumeId(destination);
             if (sourceId != expectedVolume.Id) throw new SafetyException("The selected source belongs to a different volume.");
-            var state = discovery.Scan(); epoch = state.Epoch;
+            var state = discovery.Scan(); long epoch = state.Epoch;
             var currentSource = Resolve(state, sourceId);
             if (epoch != selectionEpoch || currentSource.Fingerprint != expectedVolume.Fingerprint || state.Disks.Single(d => d.Number == currentSource.Disks[0]).Fingerprint != expectedDisk.Fingerprint)
                 throw new SafetyException("The selected card connection changed while choosing folders. Refresh and choose the device again.");
-            disks = PlanProtection(state, sourceId, destinationId); fingerprint = Fingerprint(state); destinationIdentity = DestinationIdentity.Capture(state, destinationId); sourceIdentity = DestinationIdentity.Capture(state, sourceId);
+            disks = PlanProtection(state, sourceId, destinationId); connection = new StorageConnectionProof(discovery, state, disks); destinationIdentity = DestinationIdentity.Capture(state, destinationId); sourceIdentity = DestinationIdentity.Capture(state, sourceId);
             string root = currentSource.Mounts.Where(x => SafePaths.Within(source, SafePaths.Normalize(x))).OrderByDescending(x => x.Length).FirstOrDefault();
             if (root == null) throw new SafetyException("The selected import source root is unavailable.");
             CompletionOrigin = new ImportCompletionOrigin(state, sourceId, root);
@@ -52,13 +55,11 @@ namespace EasyEject {
             var chosen = state.Disks.Where(x => numbers.Contains(x.Number)).ToArray();
             return state.Disks.Where(x => chosen.Any(d => d.Number == x.Number || (d.TargetId != "" && x.Ancestors.Contains(d.TargetId)))).Select(x => x.Number).Distinct().ToArray();
         }
-        string Fingerprint(Inventory state) {
-            return Resolve(state, sourceId).Fingerprint + "\n" + Resolve(state, destinationId).Fingerprint + "\n" + String.Join("\n", state.Disks.Where(d => disks.Contains(d.Number)).Select(d => d.Fingerprint).OrderBy(x => x));
-        }
         public void Validate() {
-            if (discovery.Epoch != epoch) throw new SafetyException("Device connection changed during import. Remaining originals are kept.");
             var state = discovery.Scan();
-            if (state.Epoch != epoch || WindowsDiscovery.VolumeId(source) != sourceId || WindowsDiscovery.VolumeId(destination) != destinationId || Fingerprint(state) != fingerprint) throw new SafetyException("Import device identities changed. Remaining originals are kept.");
+            Resolve(state, sourceId); Resolve(state, destinationId);
+            if (volumeId(source) != sourceId || volumeId(destination) != destinationId) throw new SafetyException("Import device identities changed. Remaining originals are kept.");
+            connection.Validate(state);
         }
     }
     [DataContract] public sealed class ReceiptEntry {

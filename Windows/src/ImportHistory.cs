@@ -32,26 +32,25 @@ namespace EasyEject {
             result.Validate(); return result;
         }
     }
-    internal sealed class WindowsDestinationGuard : IImportGuard {
-        readonly WindowsDiscovery discovery; readonly string root, fingerprint; readonly DestinationIdentity expected; readonly long epoch; readonly int[] disks;
+    internal sealed class WindowsDestinationGuard : IImportGuard, IConnectionGuard {
+        readonly IDiscovery discovery; readonly string root; readonly DestinationIdentity expected; readonly int[] disks;
+        readonly Func<string, string> volumeId; readonly StorageConnectionProof connection;
         public int[] ProtectedDisks { get { return (int[])disks.Clone(); } }
-        internal WindowsDestinationGuard(WindowsDiscovery discovery, string root, DestinationIdentity expected) {
-            this.discovery = discovery; this.root = SafePaths.Normalize(root); this.expected = expected.Copy();
-            var state = discovery.Scan(); epoch = state.Epoch; CheckIdentity(state);
+        public bool Changed { get { return connection.Changed; } }
+        internal WindowsDestinationGuard(IDiscovery discovery, string root, DestinationIdentity expected, Func<string, string> volumeId = null) {
+            this.discovery = discovery; this.root = SafePaths.Normalize(root); this.expected = expected.Copy(); this.volumeId = volumeId ?? WindowsDiscovery.VolumeId;
+            var state = discovery.Scan(); CheckIdentity(state);
             var volume = state.Volumes.Single(x => x.Id == expected.VolumeId); var disk = state.Disks.Single(x => x.Number == volume.Disks.Single());
             disks = state.Disks.Where(x => x.Number == disk.Number || (disk.TargetId != "" && (x.InstanceId == disk.TargetId || x.Ancestors.Contains(disk.TargetId)))).Select(x => x.Number).ToArray();
-            fingerprint = Fingerprint(state);
+            connection = new StorageConnectionProof(discovery, state, disks);
         }
         void CheckIdentity(Inventory state) {
-            if (WindowsDiscovery.VolumeId(root) != expected.VolumeId || !expected.Matches(DestinationIdentity.Capture(state, expected.VolumeId)))
+            if (volumeId(root) != expected.VolumeId || !expected.Matches(DestinationIdentity.Capture(state, expected.VolumeId)))
                 throw new SafetyException("The saved destination changed. No saved original or export was changed.");
-        }
-        string Fingerprint(Inventory state) {
-            return state.Volumes.Single(x => x.Id == expected.VolumeId).Fingerprint + "\n" + String.Join("\n", state.Disks.Where(x => disks.Contains(x.Number)).Select(x => x.Fingerprint).OrderBy(x => x));
         }
         public void Validate() {
             var state = discovery.Scan(); CheckIdentity(state);
-            if (discovery.Epoch != epoch || state.Epoch != epoch || Fingerprint(state) != fingerprint) throw new SafetyException("Destination connection changed. Review the saved batch again.");
+            connection.Validate(state);
         }
     }
     [DataContract] public sealed class VerifiedCopy {

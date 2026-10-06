@@ -7,12 +7,13 @@ using System.Text;
 using System.Threading;
 
 namespace EasyEject {
-    public sealed class WindowsDiscovery : IDiscovery {
+    public sealed class WindowsDiscovery : IDiscovery, IScopedConnectionDiscovery {
         long epoch; readonly object scanGate = new object(); string previous = null;
         public bool NotificationsAvailable;
         internal readonly InstanceNotifications Instances;
         public WindowsDiscovery() { Instances = new InstanceNotifications(ConnectionChanged); }
         public long Epoch { get { return Interlocked.Read(ref epoch); } }
+        string IScopedConnectionDiscovery.Stamp(string[] instances) { return Instances.Versions.Stamp(instances); }
         public void ConnectionChanged() { Interlocked.Increment(ref epoch); }
         public Inventory Scan() {
             lock (scanGate) {
@@ -35,7 +36,7 @@ namespace EasyEject {
                 foreach (string target in inventory.Disks.Where(d => d.TargetId != "").Select(d => d.TargetId).Distinct(StringComparer.OrdinalIgnoreCase)) {
                     inventory.GroupConnections[target] = Instances.Versions.Stamp(GroupInstances(inventory, target));
                 }
-                foreach (var disk in inventory.Disks.Where(d => d.TargetId == "" && Classifier.External(d))) inventory.GroupConnections[disk.InstanceId] = Instances.Versions.Stamp(disk.Ancestors.Concat(new[] { disk.InstanceId }));
+                foreach (var disk in inventory.Disks.Where(d => d.TargetId == "" && d.InstanceId != "")) inventory.GroupConnections[disk.InstanceId] = Instances.Versions.Stamp(GroupInstances(inventory, disk.InstanceId));
                 string fingerprint = String.Join("\n", inventory.Disks.Select(d => d.Fingerprint).Concat(inventory.Volumes.Select(v => v.Fingerprint)).OrderBy(x => x));
                 if (start != Epoch) { inventory.Complete = false; inventory.Errors.Add("Connection changed while scanning; refresh again."); }
                 if (!NotificationsAvailable) { inventory.Complete = false; inventory.Errors.Add("Connection notifications unavailable; operations are blocked."); }
