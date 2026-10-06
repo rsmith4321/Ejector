@@ -108,7 +108,8 @@ namespace EasyEject {
                                         cancel.ThrowIfCancellationRequested(); guard.Validate();
                                         Native.Rename(output.SafeFileHandle, target); published = true; output.Flush(true);
                                         output.Position = 0;
-                                        if (!Native.FinalPath(output.SafeFileHandle).Equals(target, StringComparison.OrdinalIgnoreCase) || Hash(output, cancel) != originalHash) throw new SafetyException("Published copy verification failed. Originals are kept.");
+                                        string publishedPath = Native.FinalPath(output.SafeFileHandle), publishedHash = Hash(output, cancel);
+                                        if (!publishedPath.Equals(target, StringComparison.OrdinalIgnoreCase) || publishedHash != originalHash) throw new SafetyException("Published copy verification failed. Originals are kept. Expected path: " + target + "; resolved path: " + publishedPath + "; hash match: " + (publishedHash == originalHash));
                                         receipt.Files.Add(new ReceiptEntry { RelativePath = SafePaths.Relative(target, batch), Sha256 = originalHash, Bytes = count }); bytes += count;
                                     }
                                 } finally {
@@ -181,12 +182,33 @@ namespace EasyEject {
         [DataMember] public string RelativeSource; [DataMember] public string Destination;
     }
     public static class Profiles {
-        static string Root { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EasyEject", "Profiles"); } }
+        internal static string Root {
+            get {
+                string appData = SafePaths.Normalize(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+                // Codex's packaged process redirects newly created app-data folders. Resolve only
+                // our own configuration folder inside app-data; media import paths stay strict.
+                using (SafePaths.LockDirectories(appData)) {
+                    string app = Path.Combine(appData, "EasyEject"); Directory.CreateDirectory(app);
+                    using (var handle = Native.CreateFile(app, 0x80, 1, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero)) {
+                        if (handle.IsInvalid) throw Native.Error("Cannot open Easy Eject configuration folder");
+                        Native.Info(handle); string physical = Native.FinalPath(handle);
+                        if (!SafePaths.Within(physical, appData)) throw new SafetyException("Configuration folder resolves outside local app-data.");
+                        using (SafePaths.LockDirectories(physical)) {
+                            string folder = Path.Combine(physical, "Profiles"); Directory.CreateDirectory(folder);
+                            using (SafePaths.LockDirectories(folder)) {} return folder;
+                        }
+                    }
+                }
+            }
+        }
         static string FileName(string volumeId) { using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(volumeId))).Replace("-", "") + ".json"; }
         public static void Save(ImportProfile profile) {
-            Directory.CreateDirectory(Root);
-            using (SafePaths.LockDirectories(Root)) {
-                string temporary = Path.Combine(Root, Guid.NewGuid().ToString("N") + ".tmp"), final = Path.Combine(Root, FileName(profile.VolumeId));
+            Save(profile, Root);
+        }
+        internal static void Save(ImportProfile profile, string root) {
+            Directory.CreateDirectory(root);
+            using (SafePaths.LockDirectories(root)) {
+                string temporary = Path.Combine(root, Guid.NewGuid().ToString("N") + ".tmp"), final = Path.Combine(root, FileName(profile.VolumeId));
                 try {
                     using (var stream = SafePaths.NewFile(temporary)) { new DataContractJsonSerializer(typeof(ImportProfile)).WriteObject(stream, profile); stream.Flush(true); }
                     if (File.Exists(final)) File.Replace(temporary, final, null); else File.Move(temporary, final);
@@ -194,8 +216,11 @@ namespace EasyEject {
             }
         }
         public static ImportProfile Load(Volume volume, Disk disk) {
-            string path = Path.Combine(Root, FileName(volume.Id)); if (!File.Exists(path)) return null;
-            using (SafePaths.LockDirectories(Root)) using (var stream = SafePaths.ReadFile(path)) {
+            return Load(volume, disk, Root);
+        }
+        internal static ImportProfile Load(Volume volume, Disk disk, string root) {
+            string path = Path.Combine(root, FileName(volume.Id)); if (!File.Exists(path)) return null;
+            using (SafePaths.LockDirectories(root)) using (var stream = SafePaths.ReadFile(path)) {
                 var p = (ImportProfile)new DataContractJsonSerializer(typeof(ImportProfile)).ReadObject(stream);
                 if (p.VolumeId != volume.Id || p.VolumeSerial != volume.Serial || p.DiskInstance != disk.InstanceId) throw new SafetyException("Saved import profile no longer matches this card. Choose the folders again and save a new profile.");
                 return p;

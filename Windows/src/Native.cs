@@ -63,12 +63,14 @@ namespace EasyEject {
         // Rename the held, verified file itself; never replace an existing target.
         internal static void Rename(SafeFileHandle handle, string target) {
             byte[] name = Encoding.Unicode.GetBytes(target); int offset = IntPtr.Size == 8 ? 20 : 12; int rootOffset = IntPtr.Size == 8 ? 8 : 4;
-            IntPtr data = Marshal.AllocHGlobal(offset + name.Length);
+            // The Win32 wrapper normalizes a NUL-terminated path before issuing the counted NT rename.
+            int size = offset + name.Length + 2;
+            IntPtr data = Marshal.AllocHGlobal(size);
             try {
-                Marshal.Copy(new byte[offset + name.Length], 0, data, offset + name.Length);
+                Marshal.Copy(new byte[size], 0, data, size);
                 Marshal.WriteIntPtr(data, rootOffset, IntPtr.Zero); Marshal.WriteInt32(data, offset - 4, name.Length);
                 Marshal.Copy(name, 0, IntPtr.Add(data, offset), name.Length);
-                if (!SetFileInformationByHandle(handle, 3, data, (uint)(offset + name.Length))) throw Error("Cannot publish verified copy without overwriting");
+                if (!SetFileInformationByHandle(handle, 3, data, (uint)size)) throw Error("Cannot publish verified copy without overwriting");
             } finally { Marshal.FreeHGlobal(data); }
         }
         internal static void DeleteOnClose(SafeFileHandle handle) {

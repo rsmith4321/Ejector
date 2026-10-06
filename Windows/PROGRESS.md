@@ -1,5 +1,25 @@
 # Windows progress · October 6, 2026
 
+## Current runtime milestone
+
+Ryan reported execution ready after changing Smart App Control himself; readback `VerifiedAndReputablePolicyState=0`. Normal builds/test execution now succeed. **40 tests pass, zero fail.** Native read-only inventory maps **one internal disk and five volumes**, matching the OS-provider observations below. The hidden Windows Forms smoke check creates the window, registers disk notifications, reads complete native inventory, and confirms system-volume ejection is blocked. No real card/media import or device removal was performed. Visual UI acceptance and physical hardware compatibility remain unverified.
+
+Executed successfully:
+
+```powershell
+./Windows/build.ps1 -Test
+& "$env:LOCALAPPDATA/EasyEject/PrototypeBuild/EasyEject.Tests.exe" --inventory
+& "$env:LOCALAPPDATA/EasyEject/PrototypeBuild/EasyEject.Tests.exe" --ui-smoke
+```
+
+Initial runtime failures exposed two real defects: alternate-stream syntax reached Framework path parsing before the safety rejection, and `FILE_RENAME_INFO` lacked the terminating UTF-16 NUL required by the Win32 path-normalization wrapper. Both are fixed. Fixture files now use the ordinary `%USERPROFILE%\.codex\EasyEjectFixtures` directory outside OneDrive, avoiding the packaged host's app-data virtualization. Generic import-path checks remain strict. Production profile storage resolves only its own redirected configuration folder within local app-data and is covered by a passing save/load test. Tests now assert the intended failure stage for disconnection, tampering and junction rejection, instead of accepting an unrelated early path error. Large binary files, empty sidecars, byte totals, receipt hashes, profile replacement and post-format invalidation pass.
+
+Ryan asked for independent overnight continuation. The app heartbeat `easy-eject-overnight-windows-port` is active every 30 minutes, bounded in its instructions to October 6 at 08:00 America/New_York. It may continue safe implementation/testing in this Windows checkout and update this report. No push, real-device operation, startup installation, or additional power/security change is authorized overnight. The Windows app and laptop must remain running/awake for local continuation.
+
+The sections below preserve the initial source milestone and readiness evidence as historical records; their original execution blocker and zero-executed-tests statements have been superseded by this runtime milestone.
+
+## Initial source milestone and readiness record
+
 Workspace: `C:\Users\rsmit\OneDrive\Documents\EasyEject`.
 Branch: `windows/native-tray-milestone`, based on `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c`.
 Remote: `https://github.com/rsmith4321/Ejector.git`. No push, release, deployment, or Store submission.

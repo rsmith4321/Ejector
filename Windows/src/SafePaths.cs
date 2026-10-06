@@ -9,11 +9,11 @@ namespace EasyEject {
         public static string Normalize(string path) {
             if (String.IsNullOrWhiteSpace(path) || path.Length < 3 || !Char.IsLetter(path[0]) || path[1] != ':' || path[2] != '\\')
                 throw new SafetyException("Choose an absolute folder on a local drive. Network and device paths are unsupported.");
-            string full = Path.GetFullPath(path).TrimEnd('\\'); if (full.Length == 2) full += "\\";
-            if (full.Length > 240 || path.Substring(2).Contains(":")) throw new SafetyException("Long paths and alternate streams are unsupported.");
+            if (path.Length > 240 || path.Substring(2).Contains(":")) throw new SafetyException("Long paths and alternate streams are unsupported.");
             foreach (string part in path.Substring(3).Split('\\')) {
                 if (part == "." || part == ".." || part.EndsWith(".") || part.EndsWith(" ")) throw new SafetyException("Ambiguous path components are not allowed.");
             }
+            string full = Path.GetFullPath(path).TrimEnd('\\'); if (full.Length == 2) full += "\\";
             return full;
         }
         public static bool Within(string child, string parent) {
@@ -39,7 +39,8 @@ namespace EasyEject {
                             if (h.IsInvalid) { h.Dispose(); throw Native.Error("Cannot lock import directory: " + piece); }
                             handles.Add(h); var info = Native.Info(h);
                             if ((info.Attributes & 0x10) == 0) throw new SafetyException("Import path is not a directory.");
-                            if (!Native.FinalPath(h).TrimEnd('\\').Equals(piece.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Directory resolves to another path.");
+                            string resolved = Native.FinalPath(h);
+                            if (!resolved.TrimEnd('\\').Equals(piece.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Directory resolves to another path: " + piece + " -> " + resolved);
                         }
                     }
                 } catch { Dispose(); throw; }

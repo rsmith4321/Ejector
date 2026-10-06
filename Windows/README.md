@@ -1,6 +1,6 @@
 # Easy Eject for Windows · prototype 0.1
 
-Native C# / Windows Forms source for Windows 11 x64, using .NET Framework 4.8 and supported Windows storage/PnP APIs. This implementation is isolated from the Mac targets and website. It is a source-and-static-build milestone; runtime and hardware acceptance are pending. See [PROGRESS.md](PROGRESS.md) for exact evidence and the Application Control blocker.
+Native C# / Windows Forms source for Windows 11 x64, using .NET Framework 4.8 and supported Windows storage/PnP APIs. This implementation is isolated from the Mac targets and website. The current prototype passes 40 fixture/policy tests, native read-only enumeration, and a hidden-window notification smoke check. Real card/removal compatibility and visual UI acceptance are pending. See [PROGRESS.md](PROGRESS.md) for exact evidence.
 
 ## Build and run
 
@@ -18,18 +18,21 @@ Only in an environment where execution is permitted by the existing security pol
 ```powershell
 ./Windows/build.ps1 -Test
 & "$env:LOCALAPPDATA/EasyEject/PrototypeBuild/EasyEject.Tests.exe" --inventory
+& "$env:LOCALAPPDATA/EasyEject/PrototypeBuild/EasyEject.Tests.exe" --ui-smoke
 & "$env:LOCALAPPDATA/EasyEject/PrototypeBuild/EasyEject.Windows.exe"
 ```
 
-`-Test` runs 37 cases. They use fake discovery/removal adapters and disposable files under `%LOCALAPPDATA%\EasyEject\TestFixtures\run-<guid>`. Source and destination fixture directories share the host disk while the fake guard supplies two conceptual disk identities. Production imports always require different physical disks. Junction tests create junctions only within that fixture and do not change OS permissions. Default tests never invoke `CM_Request_Device_Eject`. `--inventory` reads native storage inventory, without a notification window or device operations. The separate PowerShell diagnostic uses OS CIM providers and must not be mistaken for a successful run of the prototype's native layer.
+`-Test` runs 40 cases. They use fake discovery/removal adapters and disposable files under `%USERPROFILE%\.codex\EasyEjectFixtures\run-<id>`. Source and destination fixture directories share the host disk while the fake guard supplies two conceptual disk identities. Production imports always require different physical disks. Junction tests create junctions only within that fixture and do not change OS permissions. A configuration test writes/removes its own randomly identified fixture profile in the app's configuration storage. Default tests never invoke `CM_Request_Device_Eject`. `--inventory` reads native storage inventory, without a notification window or device operations. `--ui-smoke` constructs a hidden device window, registers disk notifications, reads inventory and verifies system-eject policy; it briefly creates/disposes its tray icon but does not show a window or operate on devices. The separate PowerShell diagnostic uses OS CIM providers.
 
-On this laptop, Smart App Control blocked an unsigned disposable compiler probe. App/test launch was therefore deferred. Do not disable App Control, modify allowlists, install a trusted root, or load the application through an alternate host to bypass the block. Microsoft documents trusted code signing as the supported path; no signing account or credentials were used here.
+Smart App Control initially blocked an unsigned compiler probe. Ryan subsequently turned it off himself, after reviewing Microsoft instructions, and authorized continued testing. Ordinary executable launches now work. The agent did not change security policy, modify allowlists, install a trusted root, or use an alternate loader. Microsoft documents trusted code signing as the supported path for distributing an app with Smart App Control enabled; no signing account or credentials were used here.
 
 ## Use after runtime acceptance
 
 The app opens a device window and adds a tray icon. Close hides the window; the tray's Quit exits when no operation is active. A session mutex prevents duplicate instances. Refresh performs read-only inventory. Device notifications refresh the list and invalidate pending actions. Connections never start import or eject automatically.
 
 Select a device and choose **Safe eject…**. The confirmation names every known volume under the selected removal target, including sibling partitions and LUNs. No is the default. The service reserves affected physical disks, re-enumerates and compares identities/topology/connection generation, and requests Windows safe removal. Windows veto type, veto name, and CONFIGRET failures are shown without forced removal, retries, permissions changes, or broad hub ejection. Do not unplug after a failure.
+
+Profiles normally live under local app-data. When launched by Codex's packaged host, Windows redirects the app's own configuration folder into that host's LocalCache. The profile store resolves this folder within local app-data and pins its canonical path. Source/destination media paths still reject redirection and all reparse points; there is no import-path exception for host virtualization.
 
 For **Verified import…**, choose a complete media folder or camera package on the selected volume and an existing destination on a different physical disk. The app explains both paths and asks before copying. Saving folder choices as a volume-bound profile is optional and never enables automatic import. Formatting or a changed identity invalidates a profile; choose the folders again. Imports leave the device connected.
 
