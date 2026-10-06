@@ -2,6 +2,18 @@
 
 ## Full-port scope and latest software milestone
 
+### Connection-bound completion, notifications and issues · goal continuation
+
+Implementation commit: `9191d525463248a761b3b82f216c07842488e62d`.
+
+Profiles/shared defaults now expose **Ask to eject after import**, off initially and in older custom profiles. The choice freezes with media options for each operation. A completed scan can offer **Keep Connected** (Enter/Escape default), **Eject Now / Eject Device**, and **Open Import Folder**. No matching media explicitly warns that photos/skipped previews may remain. The grouped explanation names every affected partition/LUN. Import reservations are released before the choice. Completion authority captures the original source root, volume/disk identities, connection epoch and removal topology before copying; it stays in memory and is never restored from history/notifications. A new import invalidates its source action, device events invalidate all stale choices, and the removal request consumes its token once after reservation/revalidation. Busy disks retain the choice; vetoes do not retry.
+
+**Completed imports…** in the window/tray preserves background choices when Windows notifications are suppressed. Notifications start on and debug logging off. Native NotifyIcon balloons reveal the app for review; clicking never requests removal or supplies device authority. When notifications are disabled, an opted-in post-import choice still uses the native dialog. Settings save only app preferences. Debug logging is local, explicitly enabled, flushed and capped at 1 MiB without deleting earlier diagnostics. **View issue…** persists the explanation and acknowledgment; Dismiss never retries, and even an identical later failure restores attention. Close hides the device window during a copy; quitting remains blocked while operations/dialogs are active. No startup registration is installed.
+
+Validation: `./Windows/build.ps1 -Test` **100 passed; zero failed**, warnings as errors. Twenty new tests cover completion identity/root/topology/epoch, new-import/restart invalidation, immutable capture, one-use explicit eject, busy and veto behavior, grouped sibling reservations, safe destination opening, media/no-match dialog defaults, notification routing, prompting defaults/custom/frozen migration, app/issue persistence, debug size refusal, draft settings and close-during-work behavior. Removal/folder-opening callbacks are fakes; no real device eject or Explorer launch is used by default tests. `EasyEject.Tests.exe --ui-smoke` passes with read-only native inventory. `--ui-render` outputs in `%USERPROFILE%\.codex\EasyEjectWindowsPreview\run-28e9d96721a84e65` were inspected for completion/expired/no-media, pending imports, settings, issue and device windows at minimum sizes. Foreground interaction/DPI, actual notification delivery/suppression, Explorer integration and hardware removal remain unverified.
+
+The full-port goal remains active. Next: classifier/card grouping and optional global shortcut, remaining settings/shared options and offline profiles, safe optional metadata cleanup/original removal/Trash recovery, and full manual Quick Share. Physical disposable-device validation and trusted signing remain required. No real-device action, security/power change, startup installation, push, publication or paid service occurred.
+
 ### Persistent exact batch history · goal continuation
 
 Implementation commit: `01933cebfb27db2276a6bedad81105ba93c3825d`. Prior layout/reuse/audit milestone: `5f03d41`.
