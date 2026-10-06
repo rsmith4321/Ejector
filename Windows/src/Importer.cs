@@ -187,6 +187,18 @@ namespace EasyEject {
     [DataContract] public sealed class ImportProfile {
         [DataMember] public string VolumeId; [DataMember] public string VolumeSerial; [DataMember] public string DiskInstance;
         [DataMember] public string RelativeSource; [DataMember] public string Destination;
+        [DataMember] public bool? UsesImportDefaults; [DataMember] public bool? VideosOnly; [DataMember] public bool? IncludePreviews;
+        public bool FollowsDefaults { get { return UsesImportDefaults == true; } }
+        public MediaOptions Resolve(ImportDefaults defaults) {
+            if (defaults == null) throw new ArgumentNullException("defaults");
+            // Prototype profiles without option fields used all-media with previews. Preserve that.
+            return FollowsDefaults ? defaults.Snapshot() : new MediaOptions(VideosOnly ?? false, IncludePreviews ?? true);
+        }
+        public void SetCustom(bool custom, ImportDefaults defaults) {
+            MediaOptions options = FollowsDefaults || !custom ? defaults.Snapshot() : Resolve(defaults);
+            VideosOnly = options.VideosOnly; IncludePreviews = options.IncludePreviews; UsesImportDefaults = !custom;
+        }
+        public ImportProfile Copy() { return (ImportProfile)MemberwiseClone(); }
     }
     public static class Profiles {
         internal static string Root {
@@ -213,11 +225,17 @@ namespace EasyEject {
             Save(profile, Root);
         }
         internal static void Save(ImportProfile profile, string root) {
+            if (profile == null || String.IsNullOrWhiteSpace(profile.VolumeId)) throw new SafetyException("Import profile has no volume identity.");
+            WriteJson(profile, typeof(ImportProfile), root, FileName(profile.VolumeId));
+        }
+        internal static void WriteJson(object value, Type type, string root, string name) {
             Directory.CreateDirectory(root);
             using (SafePaths.LockDirectories(root)) {
-                string temporary = Path.Combine(root, Guid.NewGuid().ToString("N") + ".tmp"), final = Path.Combine(root, FileName(profile.VolumeId));
+                string temporary = Path.Combine(root, Guid.NewGuid().ToString("N") + ".tmp"), final = Path.Combine(root, name);
+                SafePaths.Normalize(final); if (!SafePaths.Within(final, root) || Path.GetFileName(final) != name) throw new SafetyException("Configuration filename escaped its folder.");
                 try {
-                    using (var stream = SafePaths.NewFile(temporary)) { new DataContractJsonSerializer(typeof(ImportProfile)).WriteObject(stream, profile); stream.Flush(true); }
+                    using (var stream = SafePaths.NewFile(temporary)) { new DataContractJsonSerializer(type).WriteObject(stream, value); stream.Flush(true); }
+                    if (File.Exists(final)) { using (var existing = SafePaths.ReadFile(final)) {} }
                     if (File.Exists(final)) File.Replace(temporary, final, null); else File.Move(temporary, final);
                 } finally { if (File.Exists(temporary)) File.Delete(temporary); }
             }
@@ -228,9 +246,24 @@ namespace EasyEject {
         internal static ImportProfile Load(Volume volume, Disk disk, string root) {
             string path = Path.Combine(root, FileName(volume.Id)); if (!File.Exists(path)) return null;
             using (SafePaths.LockDirectories(root)) using (var stream = SafePaths.ReadFile(path)) {
+                if (stream.Length > 65536) throw new SafetyException("Saved import profile is too large to read.");
                 var p = (ImportProfile)new DataContractJsonSerializer(typeof(ImportProfile)).ReadObject(stream);
-                if (p.VolumeId != volume.Id || p.VolumeSerial != volume.Serial || p.DiskInstance != disk.InstanceId) throw new SafetyException("Saved import profile no longer matches this card. Choose the folders again and save a new profile.");
+                if (p == null || p.VolumeId != volume.Id || p.VolumeSerial != volume.Serial || p.DiskInstance != disk.InstanceId) throw new SafetyException("Saved import profile no longer matches this card. Choose the folders again and save a new profile.");
+                if (p.RelativeSource == null || p.Destination == null) throw new SafetyException("Saved import folders are invalid. Choose the folders again.");
                 return p;
+            }
+        }
+        public static void Remove(Volume volume, Disk disk) { Remove(volume, disk, Root); }
+        internal static void Remove(Volume volume, Disk disk, string root) {
+            using (SafePaths.LockDirectories(root)) {
+                if (Load(volume, disk, root) == null) return;
+                string path = Path.Combine(root, FileName(volume.Id));
+                using (var handle = Native.CreateFile(path, 0x10080, 0, IntPtr.Zero, 3, 0x00200000, IntPtr.Zero)) {
+                    if (handle.IsInvalid) throw Native.Error("Cannot forget the saved import profile");
+                    Native.Info(handle);
+                    if (!Native.FinalPath(handle).Equals(path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Saved profile resolves to another path.");
+                    Native.DeleteOnClose(handle);
+                }
             }
         }
     }

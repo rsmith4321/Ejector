@@ -74,6 +74,17 @@ namespace EasyEject {
             }
         }
         [STAThread] public static int Main(string[] args) {
+            if (args.Length == 1 && args[0] == "--ui-render") {
+                string output = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectWindowsPreview", "run-" + Guid.NewGuid().ToString("N").Substring(0, 16));
+                Directory.CreateDirectory(output); var state = State(); var defaults = new ImportDefaults(); var profile = defaults.NewProfile(state.Volumes[0], state.Disks[0]); profile.RelativeSource = "DCIM"; profile.Destination = @"D:\Travel backups";
+                using (var dialog = new ImportProfileDialog(profile, @"E:\", "Fixture Insta360 card · E:\\", defaults, true)) {
+                    dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "profile-defaults.png"));
+                    dialog.UseCustom.Checked = true; dialog.Selection.Previews.Checked = false; Render(dialog, Path.Combine(output, "profile-custom.png"));
+                }
+                using (var dialog = new ImportDefaultsDialog(defaults)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "shared-defaults.png")); }
+                using (var window = new DeviceWindow()) { window.Size = window.MinimumSize; Render(window, Path.Combine(output, "device-window.png")); }
+                Console.WriteLine("Hidden forms rendered at minimum size. No device operations: " + output); return 0;
+            }
             if (args.Length == 1 && args[0] == "--ui-smoke") {
                 using (var window = new DeviceWindow()) {
                     IntPtr handle = window.Handle;
@@ -213,7 +224,80 @@ namespace EasyEject {
                 var result = new VerifiedImporter(new Operations()).Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => {}, new MediaOptions(true, false));
                 Check(!result.HasSelectedMedia && result.Files == 0 && Directory.GetFileSystemEntries(f.Destination).Length == 0, "No matching video was marked complete");
             } });
+            Test("shared defaults preserve custom choices and freeze an in-flight selection", delegate {
+                var state = State(); var defaults = new ImportDefaults(); var profile = defaults.NewProfile(state.Volumes[0], state.Disks[0]);
+                Check(profile.FollowsDefaults && profile.Resolve(defaults).VideosOnly && profile.Resolve(defaults).IncludePreviews, "Factory selection or inheritance incorrect");
+                var frozen = profile.Resolve(defaults); defaults.VideosOnly = false; defaults.IncludePreviews = false;
+                var current = profile.Resolve(defaults);
+                Check(!current.VideosOnly && !current.IncludePreviews && frozen.VideosOnly && frozen.IncludePreviews && profile.VideosOnly == true && profile.IncludePreviews == true, "Resolution changed stored profile or frozen options");
+                profile.SetCustom(true, defaults); profile.VideosOnly = true;
+                defaults.VideosOnly = false; defaults.IncludePreviews = true;
+                Check(!profile.FollowsDefaults && profile.Resolve(defaults).VideosOnly && !profile.Resolve(defaults).IncludePreviews, "Custom settings followed shared edits");
+                profile.SetCustom(false, defaults);
+                Check(profile.FollowsDefaults && !profile.Resolve(defaults).VideosOnly && profile.Resolve(defaults).IncludePreviews, "Switch to defaults failed");
+            });
+            Test("legacy profiles remain custom all-media after settings roundtrip", delegate { using (var f = new Fixture()) {
+                var state = State(); string root = Path.Combine(f.Root, "profiles");
+                var profile = new ImportProfile { VolumeId = state.Volumes[0].Id, VolumeSerial = state.Volumes[0].Serial, DiskInstance = state.Disks[0].InstanceId, RelativeSource = "DCIM", Destination = f.Destination };
+                Profiles.Save(profile, root);
+                // Remove new option keys entirely to represent an actual pre-options JSON file.
+                string path = Directory.GetFiles(root).Single();
+                string legacy = File.ReadAllText(path); legacy = System.Text.RegularExpressions.Regex.Replace(legacy, @",?""(?:UsesImportDefaults|VideosOnly|IncludePreviews)"":null", ""); File.WriteAllText(path, legacy);
+                var loaded = Profiles.Load(state.Volumes[0], state.Disks[0], root); var options = loaded.Resolve(new ImportDefaults { VideosOnly = true, IncludePreviews = false });
+                Check(!loaded.FollowsDefaults && !options.VideosOnly && options.IncludePreviews, "Legacy import semantics changed");
+                loaded.SetCustom(false, new ImportDefaults()); Profiles.Save(loaded, root); var restored = Profiles.Load(state.Volumes[0], state.Disks[0], root);
+                Check(restored.FollowsDefaults && restored.Resolve(new ImportDefaults()).VideosOnly, "Explicit migration was not retained");
+            } });
+            Test("defaults persistence does not overwrite device profiles", delegate { using (var f = new Fixture()) {
+                var state = State(); string root = Path.Combine(f.Root, "profiles"); Directory.CreateDirectory(root);
+                var empty = ImportDefaults.Load(root); Check(empty.Snapshot().VideosOnly && empty.Snapshot().IncludePreviews, "Absent settings not factory defaults");
+                var profile = empty.NewProfile(state.Volumes[0], state.Disks[0]); profile.Destination = f.Destination; Profiles.Save(profile, root);
+                ImportDefaults.Save(new ImportDefaults { VideosOnly = false, IncludePreviews = false }, root); ImportDefaults.Save(new ImportDefaults { VideosOnly = true, IncludePreviews = false }, root);
+                Check(Directory.GetFiles(root).Length == 2 && ImportDefaults.Load(root).Snapshot().VideosOnly && !ImportDefaults.Load(root).Snapshot().IncludePreviews && Profiles.Load(state.Volumes[0], state.Disks[0], root).Destination == f.Destination, "Settings replacement damaged another profile");
+                File.WriteAllText(Path.Combine(root, "import-defaults.json"), "{}"); Check(ImportDefaults.Load(root).Snapshot().VideosOnly && ImportDefaults.Load(root).Snapshot().IncludePreviews, "Missing defaults fields changed factory behavior");
+                File.WriteAllText(Path.Combine(root, "import-defaults.json"), "null"); Throws<SafetyException>(() => ImportDefaults.Load(root));
+                File.WriteAllText(Path.Combine(root, "import-defaults.json"), "invalid-json"); Throws<System.Runtime.Serialization.SerializationException>(() => ImportDefaults.Load(root));
+                File.WriteAllText(Path.Combine(root, "import-defaults.json"), "{}" + new string(' ', 20000)); Throws<SafetyException>(() => ImportDefaults.Load(root));
+            } });
+            Test("forget profile leaves defaults and all fixture media intact", delegate { using (var f = new Fixture()) {
+                var state = State(); string root = Path.Combine(f.Root, "profiles"); var defaults = new ImportDefaults(); var profile = defaults.NewProfile(state.Volumes[0], state.Disks[0]); profile.Destination = f.Destination;
+                f.Put("clip.mov", "source-original"); Profiles.Save(profile, root); ImportDefaults.Save(defaults, root);
+                string serial = state.Volumes[0].Serial; state.Volumes[0].Serial = "changed"; Throws<SafetyException>(() => Profiles.Remove(state.Volumes[0], state.Disks[0], root)); state.Volumes[0].Serial = serial;
+                Check(Profiles.Load(state.Volumes[0], state.Disks[0], root) != null, "Stale device identity removed the profile");
+                Profiles.Remove(state.Volumes[0], state.Disks[0], root);
+                Check(Profiles.Load(state.Volumes[0], state.Disks[0], root) == null && Directory.GetFiles(root).Length == 1 && ImportDefaults.Load(root).Snapshot().VideosOnly && File.ReadAllText(Path.Combine(f.Source, "clip.mov")) == "source-original", "Forget affected media or defaults");
+            } });
+            Test("profile editor mode changes stay isolated until saving", delegate { using (var f = new Fixture()) {
+                var state = State(); var defaults = new ImportDefaults(); var original = defaults.NewProfile(state.Volumes[0], state.Disks[0]); original.Destination = f.Destination;
+                using (var dialog = new ImportProfileDialog(original, f.Source, "Fixture card", defaults, true)) {
+                    Check(dialog.UseDefaults.Checked && !dialog.Selection.Enabled, "Default values are editable as custom");
+                    dialog.UseCustom.Checked = true; Check(!dialog.Draft.FollowsDefaults && dialog.Selection.Enabled, "Custom radio did not enable fields");
+                    dialog.Selection.Videos.Checked = false; dialog.Selection.Previews.Checked = false; dialog.SaveCustomSelection();
+                    Check(!dialog.Draft.Resolve(defaults).VideosOnly && !dialog.Draft.Resolve(defaults).IncludePreviews && original.FollowsDefaults && original.VideosOnly == true, "Draft or original isolation broken");
+                    dialog.UseDefaults.Checked = true; Check(dialog.Draft.FollowsDefaults && !dialog.Selection.Enabled && dialog.Selection.Videos.Checked && dialog.Selection.Previews.Checked, "Switching back did not inherit defaults");
+                    Check(dialog.AcceptButton != null && dialog.CancelButton != null, "Save/Cancel keyboard controls unavailable");
+                }
+                Check(original.FollowsDefaults && original.Resolve(defaults).VideosOnly, "Closing an unsaved editor mutated its profile");
+            } });
+            Test("editing defaults during a copy affects only the next import", delegate { using (var f = new Fixture()) {
+                f.Put("clip.mp4", "video"); f.Put("photo.jpg", "photo"); var state = State(); var defaults = new ImportDefaults(); var profile = defaults.NewProfile(state.Volumes[0], state.Disks[0]); var frozen = profile.Resolve(defaults);
+                var importer = new VerifiedImporter(new Operations());
+                var first = importer.Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => { if (x.StartsWith("Copying")) defaults.VideosOnly = false; }, frozen);
+                var second = importer.Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), CancellationToken.None, x => {}, profile.Resolve(defaults));
+                Check(first.Files == 1 && !Directory.GetFiles(first.Folder, "*.jpg", SearchOption.AllDirectories).Any() && second.Files == 2 && Directory.GetFiles(second.Folder, "*.jpg", SearchOption.AllDirectories).Length == 1 && Directory.GetFiles(f.Source).Length == 2, "Running selection changed or future defaults were ignored");
+            } });
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
+        }
+        static void Render(System.Windows.Forms.Form form, string path) {
+            IntPtr handle = form.Handle; CreateRenderHandles(form); form.PerformLayout();
+            Console.WriteLine(Path.GetFileName(path) + " size=" + form.Size + " minimum=" + form.MinimumSize);
+            Check(handle != IntPtr.Zero && !form.Visible, "Rendering must use a hidden fixture window");
+            using (var bitmap = new System.Drawing.Bitmap(form.Width, form.Height)) { form.DrawToBitmap(bitmap, new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height)); bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png); }
+        }
+        static void CreateRenderHandles(System.Windows.Forms.Control control) {
+            IntPtr handle = control.Handle; control.PerformLayout();
+            if (control is System.Windows.Forms.TextBox) Console.WriteLine("Text field bounds=" + control.Bounds + " characters=" + control.Text.Length);
+            foreach (System.Windows.Forms.Control child in control.Controls) CreateRenderHandles(child);
         }
     }
 }
