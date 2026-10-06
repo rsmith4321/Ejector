@@ -101,7 +101,12 @@ namespace EasyEject {
         internal static bool ValidMacOwner(string uid) {
             uint parsed; return uid != null && UInt32.TryParse(uid, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out parsed) && parsed.ToString(System.Globalization.CultureInfo.InvariantCulture) == uid;
         }
-        static void Check(CancellationToken cancellation, Action validate) { cancellation.ThrowIfCancellationRequested(); validate(); }
+        static Action Checked(SafePaths.DirectoryLease directories, Action validate) {
+            // Attribute handles alone cannot stop every directory rename. Keep the original
+            // lease across nested traversal and refuse replacement on either side of callbacks.
+            return () => { directories.Validate(); validate(); directories.Validate(); };
+        }
+        static void Check(CancellationToken cancellation, Action validate) { cancellation.ThrowIfCancellationRequested(); validate(); cancellation.ThrowIfCancellationRequested(); }
         internal static DeviceTrashSnapshot Read(string sourceRoot, string windowsSid, string selectedMacUid, CancellationToken cancellation, Action validate) {
             return ReadCore(sourceRoot, windowsSid, selectedMacUid, cancellation, validate, null);
         }
@@ -112,18 +117,25 @@ namespace EasyEject {
             if (selectedMacUid != null && !ValidMacOwner(selectedMacUid)) throw new SafetyException("Choose an explicit numeric Mac Trash owner folder; a Mac UID cannot be inferred from Windows.");
             string logical = SafePaths.Normalize(Path.Combine(sourceRoot, ".easy-eject-trash-names"));
             var files = new List<TrashSourceFile>(); var records = new List<TrashRecord>(); string windowsOwner = null, macOwner = null;
-            using (SafePaths.LockDirectories(sourceRoot)) {
+            using (var directories = SafePaths.HoldDirectories(sourceRoot)) {
+                validate = Checked(directories, validate);
                 Check(cancellation, validate); string bin = Child(sourceRoot, "$RECYCLE.BIN", cancellation, validate);
                 if (bin != null) {
-                    using (SafePaths.LockDirectories(bin)) { windowsOwner = Child(bin, windowsSid, cancellation, validate); }
-                    if (windowsOwner != null) ReadWindows(windowsOwner, logical, files, records, cancellation, validate, context);
+                    using (var binDirectories = SafePaths.HoldDirectories(bin)) {
+                        var binValidate = Checked(binDirectories, validate); windowsOwner = Child(bin, windowsSid, cancellation, binValidate);
+                        if (windowsOwner != null) ReadWindows(windowsOwner, logical, files, records, cancellation, binValidate, context);
+                        binDirectories.Validate();
+                    }
                 }
                 // No traversal of any Mac owner unless the profile explicitly selects that UID.
                 if (selectedMacUid != null) {
                     string parent = Child(sourceRoot, ".Trashes", cancellation, validate);
                     if (parent != null) {
-                        using (SafePaths.LockDirectories(parent)) { macOwner = Child(parent, selectedMacUid, cancellation, validate); }
-                        if (macOwner != null) Walk(macOwner, Path.Combine(logical, "Mac Trash"), null, files, cancellation, validate, context);
+                        using (var parentDirectories = SafePaths.HoldDirectories(parent)) {
+                            var parentValidate = Checked(parentDirectories, validate); macOwner = Child(parent, selectedMacUid, cancellation, parentValidate);
+                            if (macOwner != null) Walk(macOwner, Path.Combine(logical, "Mac Trash"), null, files, cancellation, parentValidate, context);
+                            parentDirectories.Validate();
+                        }
                     }
                 }
                 Check(cancellation, validate);
@@ -136,7 +148,7 @@ namespace EasyEject {
             string[] found = Directory.GetFileSystemEntries(parent).Where(x => Path.GetFileName(x).Equals(name, StringComparison.OrdinalIgnoreCase)).ToArray();
             if (found.Length == 0) return null;
             if (found.Length != 1 || (Attributes(found[0]) & FileAttributes.Directory) == 0) throw new SafetyException("The selected device Trash location is ambiguous or is not a directory.");
-            using (SafePaths.LockDirectories(found[0])) {} return found[0];
+            using (var directories = SafePaths.HoldDirectories(found[0])) { directories.Validate(); } return found[0];
         }
         static FileAttributes Attributes(string path) {
             SafePaths.Normalize(path); var attributes = File.GetAttributes(path);
@@ -155,25 +167,28 @@ namespace EasyEject {
                     return known;
                 }
             }
-            using (SafePaths.LockDirectories(Path.GetDirectoryName(path))) using (var handle = Native.CreateFile(path, 0x80, 7, IntPtr.Zero, 3, 0x00300000, IntPtr.Zero)) {
+            using (var directories = SafePaths.HoldDirectories(Path.GetDirectoryName(path))) using (var handle = Native.CreateFile(path, 0x80, 7, IntPtr.Zero, 3, 0x00300000, IntPtr.Zero)) {
                 if (handle.IsInvalid) throw Native.Error("Cannot inspect a device Trash payload without following links");
                 var stamp = Native.Info(handle);
                 if ((stamp.Attributes & 0x10) != 0 || !Native.FinalPath(handle).Equals(path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("A device Trash payload changed type or path while reading.");
-                return new TrashSourceFile(path, logical, record, stamp);
+                directories.Validate(); return new TrashSourceFile(path, logical, record, stamp);
             }
         }
         static void Walk(string directory, string logical, string record, List<TrashSourceFile> files, CancellationToken cancellation, Action validate, ReadContext context) {
-            using (SafePaths.LockDirectories(directory)) {
+            using (var directories = SafePaths.HoldDirectories(directory)) {
+                validate = Checked(directories, validate);
                 Check(cancellation, validate);
                 foreach (string path in Directory.GetFileSystemEntries(directory).OrderBy(x => x, StringComparer.OrdinalIgnoreCase)) {
                     Check(cancellation, validate); var attributes = Attributes(path); string name = SafePaths.Normalize(Path.Combine(logical, Path.GetFileName(path)));
                     if ((attributes & FileAttributes.Directory) != 0) Walk(path, name, record, files, cancellation, validate, context);
                     else files.Add(FileItem(path, name, record, cancellation, validate, context));
                 }
+                directories.Validate();
             }
         }
         static void ReadWindows(string owner, string logical, List<TrashSourceFile> files, List<TrashRecord> records, CancellationToken cancellation, Action validate, ReadContext context) {
-            using (SafePaths.LockDirectories(owner)) {
+            using (var directories = SafePaths.HoldDirectories(owner)) {
+                validate = Checked(directories, validate);
                 Check(cancellation, validate); string[] items = Directory.GetFileSystemEntries(owner);
                 var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (string metadata in items.Where(x => Path.GetFileName(x).StartsWith("$I", StringComparison.OrdinalIgnoreCase)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase)) {

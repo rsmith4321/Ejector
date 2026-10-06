@@ -93,6 +93,7 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--windows-manifests") { WindowsManifestTrustTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Ephemeral fixture keys, fake positive chain trust and real native untrusted refusals only; no trust-store import or release signing."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-update-coordinator") { WindowsUpdateCoordinatorTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned fake checks, disposable settings/replay and hidden native controls only; no production channel request."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-release-review") { WindowsReleaseReviewTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Read-only disposable ZIP/package review and fake positive native trust only; no real download, extraction, execution or installation."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--trash-ownership") { TrashOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned disposable read-only Trash directory replacements only; no real media or device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--path-ownership") { PathOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned disposable directory replacement only; no real device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--bulk-final") { BulkFinalTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake removal and inventory only; no real eject."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--defaults-contract") { DefaultsContractTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Isolated settings/generated media and fake devices only; no real eject or native notification delivery."); return failed == 0 ? 0 : 1; }
@@ -725,7 +726,7 @@ namespace EasyEject {
             StartupTests();
             QuickShareRecipeTests();
             QuickShareProcessTests();
-            QuickShareContractTests(); DefaultsContractTests(); BulkFinalTests(); PathOwnershipTests(); WindowsReleaseReviewTests(); WindowsUpdateCoordinatorTests(); WindowsChannelReplayTests(); WindowsChannelDiscoveryTests(); WindowsChannelTests(); WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
+            TrashOwnershipTests(); QuickShareContractTests(); DefaultsContractTests(); BulkFinalTests(); PathOwnershipTests(); WindowsReleaseReviewTests(); WindowsUpdateCoordinatorTests(); WindowsChannelReplayTests(); WindowsChannelDiscoveryTests(); WindowsChannelTests(); WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
             QuickShareDialogTests();
             QuickShareConfigurationTests();
             ManualQuickShareTests();
