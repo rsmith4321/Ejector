@@ -113,6 +113,12 @@ namespace EasyEject {
                 var previewBatch = new CompletedBatch { Id = Guid.NewGuid().ToString("N"), CompletedUtc = DateTime.UtcNow.ToString("o"), DeviceName = "Fixture Insta360 card", Folder = @"D:\Travel backups\2026-10-06", ReceiptPath = @"D:\Travel backups\2026-10-06\.easy-eject-receipts\fixture\verified-import.json", Originals = new List<VerifiedCopy> { new VerifiedCopy { Path = @"D:\Travel backups\2026-10-06\VID_20261006_001.mp4", Sha256 = new string('a', 64), Bytes = 1234567 } } };
                 using (var dialog = new ImportHistoryDialog(new[] { previewBatch })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history.png")); dialog.Batches.Items[0].Selected = true; Render(dialog, Path.Combine(output, "history-selected.png")); }
                 using (var dialog = new ImportHistoryDialog(new CompletedBatch[0])) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history-empty.png")); }
+                previewBatch.ProfileId = "fixture-preview-volume"; previewBatch.DestinationRoot = @"D:\Travel backups"; previewBatch.Destination = HistoryIdentity(); previewBatch.ReceiptSha256 = new string('a', 64); previewBatch.ReceiptPath = Path.Combine(previewBatch.Folder, ".easy-eject-receipts", previewBatch.Id, "verified-import.json");
+                var previewShareProfile = new ImportProfile { Name = previewBatch.DeviceName, VolumeId = previewBatch.ProfileId, VolumeSerial = "fixture", DiskInstance = "fixture-source", RelativeSource = "", Destination = previewBatch.DestinationRoot, SharingPreset = QuickShareProfile.Hd, SharingColor = QuickShareProfile.Standard };
+                var previewShareCatalog = new[] { new SavedProfile(Profiles.FileName(previewShareProfile.VolumeId), previewShareProfile, new string('a', 64), new Native.FileInfo()) };
+                using (var dialog = new ImportHistoryDialog(new[] { previewBatch }, previewShareCatalog)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history-share-unselected.png")); dialog.Batches.Items[0].Selected = true; Render(dialog, Path.Combine(output, "history-share-selected.png")); }
+                using (var dialog = new ImportCompletionDialog(ShareCompletion(previewBatch), true, canShare: true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "completion-share.png")); RenderAtBottom(dialog, Path.Combine(output, "completion-share-bottom.png")); dialog.ExpireEject(); Render(dialog, Path.Combine(output, "completion-share-source-expired.png")); }
+                using (var dialog = new ImportCompletionDialog(ShareCompletion(previewBatch), true, "Permanently remove only reviewed macOS metadata before manual eject.", true, "Fixture: 1 sharing copy ready. Imported originals are unchanged. No device was ejected.")) { dialog.Size = dialog.MinimumSize; RenderAtBottom(dialog, Path.Combine(output, "completion-share-return.png")); }
                 using (var fixture = new Fixture()) {
                     InterruptedRecovery(fixture); var resumeReview = ReviewInterrupted(fixture);
                     using (var dialog = new RemovalResumeConfirmationDialog(RemovalResumeChoice.Explanation(resumeReview, "Fixture camera card", fixture.Source, fixture.Destination))) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "resume-import.png")); RenderAtBottom(dialog, Path.Combine(output, "resume-import-bottom.png")); }
@@ -652,6 +658,7 @@ namespace EasyEject {
             QuickShareEngineTests();
             QuickShareDialogTests();
             QuickShareConfigurationTests();
+            ManualQuickShareTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {

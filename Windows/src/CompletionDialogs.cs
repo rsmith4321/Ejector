@@ -5,10 +5,10 @@ using System.Windows.Forms;
 
 namespace EasyEject {
     internal sealed class ImportCompletionDialog : Form {
-        internal readonly Button Keep = new Button(), Eject = new Button(), OpenFolder = new Button();
+        internal readonly Button Keep = new Button(), Eject = new Button(), OpenFolder = new Button(), Share = new Button();
         internal readonly Label Explanation = new Label();
         bool expired;
-        internal ImportCompletionDialog(ImportCompletion entry, bool canEject, string cleanupText = "") {
+        internal ImportCompletionDialog(ImportCompletion entry, bool canEject, string cleanupText = "", bool canShare = false, string shareMessage = "") {
             Text = entry.HasMedia ? "Import complete. Eject now?" : "No matching media. Eject now?";
             Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi; Size = new Size(740, 500); MinimumSize = new Size(680, 440); StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
             var body = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(24) };
@@ -19,13 +19,16 @@ namespace EasyEject {
                 + "\n\nChoose Keep Connected for Lightroom or other transfers. Eject Now requests Windows safe removal of this device and all affected partitions/storage sources."
                 + (plan == null ? "\n\n" + entry.Origin.BlockedReason : "\n\nAffected storage:\n" + String.Join("\n", plan.Affected))
                 + (cleanupText == "" ? "" : "\n\n" + cleanupText)
+                + (canShare ? "\n\nQuick Share creates validated copies from this exact saved import. It asks size and LUT choice and never ejects automatically." : "")
+                + (shareMessage == "" ? "" : "\n\n" + shareMessage)
                 + "\n\nSaved folder:\n" + entry.Folder;
             body.Controls.Add(Explanation); body.SizeChanged += delegate { Explanation.MaximumSize = new Size(Math.Max(250, body.ClientSize.Width - 60), 0); };
             Keep.Text = "Keep Connected"; Keep.DialogResult = DialogResult.Cancel;
             Eject.Text = cleanupText == "" ? plan != null && plan.Affected.Length > 1 ? "Eject Device" : "Eject Now" : "Clean && Eject"; Eject.DialogResult = DialogResult.Yes; Eject.Enabled = canEject;
             OpenFolder.Text = "Open Import Folder"; OpenFolder.DialogResult = DialogResult.Ignore;
+            Share.Text = "Quick Share…"; Share.DialogResult = DialogResult.Retry; Share.Visible = Share.Enabled = canShare && entry.Batch != null;
             var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(16), FlowDirection = FlowDirection.RightToLeft };
-            foreach (var button in new[] { Keep, Eject, OpenFolder }) { button.AutoSize = true; button.MinimumSize = new Size(150, 36); footer.Controls.Add(button); }
+            foreach (var button in new[] { Keep, Eject, OpenFolder, Share }) { button.AutoSize = true; button.MinimumSize = new Size(150, 36); footer.Controls.Add(button); }
             Controls.Add(body); Controls.Add(footer); AcceptButton = Keep; CancelButton = Keep;
             if (!canEject && plan != null) ExpireEject();
         }

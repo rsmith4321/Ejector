@@ -10,8 +10,9 @@ namespace EasyEject {
         internal readonly ListView Batches = new ListView();
         internal readonly TextBox Details = new TextBox();
         readonly Button verify = new Button();
+        internal readonly Button Share = new Button();
         internal CompletedBatch SelectedBatch { get { return Batches.SelectedItems.Count == 0 ? null : ImportHistory.Clone((CompletedBatch)Batches.SelectedItems[0].Tag); } }
-        internal ImportHistoryDialog(IEnumerable<CompletedBatch> values) {
+        internal ImportHistoryDialog(IEnumerable<CompletedBatch> values, SavedProfile[] profiles = null) {
             Text = "Verified import history"; Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi;
             Size = new Size(860, 620); MinimumSize = new Size(700, 500); StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 1, RowCount = 4 };
@@ -31,14 +32,17 @@ namespace EasyEject {
             var close = new Button { Text = "Close", AutoSize = true, MinimumSize = new Size(100, 36), DialogResult = DialogResult.Cancel };
             verify.Text = "Verify saved originals…"; verify.AutoSize = true; verify.MinimumSize = new Size(190, 36); verify.Enabled = false;
             verify.Click += delegate { if (SelectedBatch != null) { DialogResult = DialogResult.OK; Close(); } };
+            Share.Text = "Quick Share…"; Share.AutoSize = true; Share.MinimumSize = new Size(150, 36); Share.Visible = false; Share.Enabled = false;
+            Share.Click += delegate { if (SelectedBatch != null && profiles != null && ManualQuickShareService.EligibleProfile(SelectedBatch, profiles) != null) { DialogResult = DialogResult.Retry; Close(); } };
             Batches.SelectedIndexChanged += delegate {
                 var batch = SelectedBatch; verify.Enabled = batch != null;
+                Share.Visible = Share.Enabled = profiles != null && ManualQuickShareService.EligibleProfile(batch, profiles) != null;
                 if (batch == null) return;
                 Details.Text = batch.DeviceName + Environment.NewLine + batch.Folder + Environment.NewLine + "Receipt: " + batch.ReceiptPath + Environment.NewLine + Environment.NewLine
                     + String.Join(Environment.NewLine, batch.Originals.Take(100).Select(x => SafePaths.Relative(x.Path, batch.Folder) + " (" + x.Bytes + " bytes)"))
                     + (batch.Originals.Count > 100 ? Environment.NewLine + "… " + (batch.Originals.Count - 100) + " more recorded files; verification checks all." : "");
             };
-            footer.Controls.Add(close); footer.Controls.Add(verify); CancelButton = close;
+            footer.Controls.Add(close); footer.Controls.Add(verify); footer.Controls.Add(Share); CancelButton = close;
             layout.Controls.Add(intro); layout.Controls.Add(Batches); layout.Controls.Add(Details); layout.Controls.Add(footer); Controls.Add(layout);
         }
     }

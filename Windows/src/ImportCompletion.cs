@@ -39,11 +39,18 @@ namespace EasyEject {
         internal readonly bool HasMedia;
         internal readonly ImportCompletionOrigin Origin;
         readonly DestinationIdentity destination;
+        readonly CompletedBatch batch;
+        internal CompletedBatch Batch { get { return batch == null ? null : ImportHistory.Clone(batch); } }
         internal DestinationIdentity Destination { get { return destination.Copy(); } }
-        internal ImportCompletion(ImportCompletionOrigin origin, string deviceName, string folder, string destinationRoot, DestinationIdentity destination, bool hasMedia, string message) {
+        internal ImportCompletion(ImportCompletionOrigin origin, string deviceName, string folder, string destinationRoot, DestinationIdentity destination, bool hasMedia, string message, CompletedBatch completedBatch = null) {
             Id = Guid.NewGuid().ToString("N"); Origin = origin; DeviceName = deviceName; Folder = SafePaths.Normalize(folder); DestinationRoot = SafePaths.Normalize(destinationRoot);
             if (!SafePaths.Within(Folder, DestinationRoot)) throw new SafetyException("Completion folder escaped its destination.");
             destination.Validate(); this.destination = destination.Copy(); HasMedia = hasMedia; Message = message;
+            if (completedBatch != null) {
+                ImportHistory.Validate(completedBatch);
+                if (!hasMedia || completedBatch.ProfileId != origin.VolumeId || !completedBatch.Folder.Equals(Folder, StringComparison.OrdinalIgnoreCase) || !completedBatch.DestinationRoot.Equals(DestinationRoot, StringComparison.OrdinalIgnoreCase) || !completedBatch.Destination.Matches(destination)) throw new SafetyException("The sharing batch does not belong to this exact import completion.");
+                batch = ImportHistory.Clone(completedBatch);
+            }
         }
     }
     internal sealed class ImportCompletionRegistry {

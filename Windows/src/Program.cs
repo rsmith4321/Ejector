@@ -27,6 +27,7 @@ namespace EasyEject {
         bool automaticPumping, createdBefore; long automaticConfigIssueEpoch = -1;
         readonly StartupPresentation startupPresentation; bool monitoringStarted;
         AppSettings appSettings = new AppSettings(); AppIssue appIssue = new AppIssue(); ImportCompletionDialog activeCompletion;
+        ManualQuickShareService manualSharing;
         ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
         int cardCount;
@@ -326,8 +327,9 @@ namespace EasyEject {
             string deviceName = String.IsNullOrWhiteSpace(stored.Name) ? v.Display : stored.Name;
             string removalMessage = result.Receipt != null && !String.IsNullOrEmpty(result.Receipt.ResumedUtc) ? RemovalResumeChoice.Summary(result) : OriginalRemovalChoice.Summary(result.RemovedOriginals) + " " + DeviceTrashChoice.Summary(result.RecoveredTrashFiles, result.ClearedTrashFiles, result.ClearedTrashRecords);
             string historyNote = ""; bool historyFailed = false;
+            CompletedBatch savedBatch = null;
             if (result.HasSelectedMedia) {
-                try { await Task.Run(() => ImportHistory.Add(ImportHistory.Create(result, stored, deviceName, guard.DestinationIdentity))); historyNote = "\nExact verified files saved in Import history."; }
+                try { savedBatch = await Task.Run(() => { var batch = ImportHistory.Create(result, stored, deviceName, guard.DestinationIdentity); ImportHistory.Add(batch); return batch; }); historyNote = "\nExact verified files saved in Import history."; }
                 catch (Exception ex) { historyFailed = true; historyNote = "\nImport verified, but history could not be saved: " + ex.Message + "\nCopies and the completion receipt remain available."; RecordIssue(historyNote.Trim()); }
             }
             string message = result.Files == 0 ? "No matching media or device indexes were found. No batch was created." : (result.HasSelectedMedia ? "Import complete. " : "No matching media. Device index backup only. ") + result.Files + " files verified (" + result.Bytes + " bytes; " + result.Reused + " reused).\n" + result.Folder;
@@ -336,7 +338,7 @@ namespace EasyEject {
             if (!historyFailed) ClearIssue();
             ImportCompletion completion = null;
             if (options.AskToEject && sourceUnchanged) {
-                completion = new ImportCompletion(guard.CompletionOrigin, deviceName, result.Files > 0 ? result.Folder : destination, destination, guard.DestinationIdentity, result.HasSelectedMedia, message);
+                completion = new ImportCompletion(guard.CompletionOrigin, deviceName, result.Files > 0 ? result.Folder : destination, destination, guard.DestinationIdentity, result.HasSelectedMedia, message, savedBatch);
                 completions.Insert(completion);
             }
             bool showChoice = CompletionPresentation.ShowChoice(options.AskToEject, ForegroundWindow, appSettings.NotificationsEnabled);
@@ -422,6 +424,7 @@ namespace EasyEject {
             var entry = completions.Get(id); if (entry == null) { ShowError(new SafetyException("This import choice expired. Refresh and review the connected device.")); return; }
             working = true; UpdateActions(); ShowDevices();
             try {
+                string shareMessage = "";
                 while (true) {
                     bool canEject = false;
                     MetadataCleanupPlan cleanup = null;
@@ -435,8 +438,18 @@ namespace EasyEject {
                             catch (Exception ex) { if (!ConfigurationError(ex)) throw; return false; }
                         });
                     }
+                    bool canShare = false;
+                    if (!readOnly && entry.Batch != null) {
+                        try { canShare = await Task.Run(() => SharingService.CanOffer(entry.Batch)); }
+                        catch (Exception ex) { if (!ConfigurationError(ex)) throw; Log("Completion sharing unavailable | " + ex.Message); }
+                    }
                     DialogResult choice;
-                    using (var dialog = new ImportCompletionDialog(entry, canEject, cleanup == null ? "" : cleanup.Description)) { activeCompletion = dialog; choice = dialog.ShowDialog(this); activeCompletion = null; }
+                    using (var dialog = new ImportCompletionDialog(entry, canEject, cleanup == null ? "" : cleanup.Description, canShare, shareMessage)) { activeCompletion = dialog; choice = dialog.ShowDialog(this); activeCompletion = null; }
+                    if (choice == DialogResult.Retry) {
+                        bool shared = await PerformQuickShare(entry.Batch);
+                        if (!QuickSharePresentation.ReturnToCompletion(completions, entry, shared)) break;
+                        shareMessage = status.Text; ShowDevices(); continue;
+                    }
                     if (choice == DialogResult.Ignore) {
                         await Task.Run(() => {
                             using (SafePaths.LockDirectories(entry.DestinationRoot)) {
@@ -468,8 +481,12 @@ namespace EasyEject {
             try {
                 working = true; UpdateActions();
                 var values = await Task.Run(() => ImportHistory.Load());
-                CompletedBatch batch;
-                using (var dialog = new ImportHistoryDialog(values)) { if (dialog.ShowDialog(this) != DialogResult.OK) return; batch = dialog.SelectedBatch; }
+                SavedProfile[] profiles = null;
+                if (!readOnly) try { profiles = await Task.Run(() => Profiles.Catalog()); } catch (Exception ex) { if (!ConfigurationError(ex)) throw; RecordIssue("History remains available, but sharing profile choices could not be read. " + ex.Message); }
+                CompletedBatch batch; DialogResult choice;
+                using (var dialog = new ImportHistoryDialog(values, profiles)) { choice = dialog.ShowDialog(this); batch = dialog.SelectedBatch; }
+                if (choice == DialogResult.Retry) { await PerformQuickShare(batch); return; }
+                if (choice != DialogResult.OK || batch == null) return;
                 cancellation = new CancellationTokenSource(); cancel.Enabled = true;
                 await Task.Run(() => {
                     using (SafePaths.LockDirectories(batch.DestinationRoot)) {
@@ -481,7 +498,46 @@ namespace EasyEject {
                 MessageBox.Show(this, status.Text + "\n" + batch.Folder, "Saved batch verified", MessageBoxButtons.OK, MessageBoxIcon.Information);
             } catch (OperationCanceledException) { status.Text = "Saved-file verification cancelled. Files unchanged."; }
             catch (Exception ex) { ShowError(ex); }
-            finally { working = false; cancel.Enabled = false; if (cancellation != null) { cancellation.Dispose(); cancellation = null; } UpdateActions(); debounce.Start(); }
+            finally { FinishOperation(); }
+        }
+        ManualQuickShareService SharingService {
+            get { if (manualSharing == null) manualSharing = new ManualQuickShareService(Profiles.Root, operations, new WindowsQuickShareProcess(), batch => new WindowsDestinationGuard(discovery, batch.DestinationRoot, batch.Destination)); return manualSharing; }
+        }
+        void StopSharingCancellation(CancellationTokenSource active) {
+            if (active == null || !Object.ReferenceEquals(cancellation, active)) return;
+            cancellation = null; cancel.Enabled = false; active.Dispose();
+        }
+        async Task<bool> PerformQuickShare(CompletedBatch expected) {
+            if (readOnly || expected == null) return false;
+            CancellationTokenSource active = null;
+            try {
+                var offer = await Task.Run(() => SharingService.Prepare(expected)); ManualQuickShareRequest request;
+                using (var dialog = new QuickSharePromptDialog(offer.Batch.DeviceName, offer.Batch.Folder, offer.Profile)) {
+                    if (dialog.ShowDialog(this) != DialogResult.OK) { status.Text = "Quick Share cancelled. No export started; full-quality imported originals are kept."; return false; }
+                    request = offer.Choose(dialog.Preset, dialog.ColorChoice);
+                }
+                active = new CancellationTokenSource(); cancellation = active; cancel.Enabled = true;
+                status.Text = "Creating sharing copies from the exact verified saved originals…"; Log("User requested Quick Share | " + expected.DeviceName + " | " + request.Preset + " | " + request.Color);
+                var result = await Task.Run(() => SharingService.Run(request, active.Token, message => {
+                    if (!IsDisposed && IsHandleCreated) BeginInvoke(new Action(() => { if (Object.ReferenceEquals(cancellation, active)) status.Text = message; }));
+                }));
+                StopSharingCancellation(active);
+                string messageText = QuickSharePresentation.Success(request.Batch, request.Preset, result);
+                if (result.CleanupWarnings.Count != 0) RecordIssue(messageText); else { ClearIssue(); status.Text = messageText; Log(messageText); }
+                Notify(result.CleanupWarnings.Count != 0 ? "Sharing copies ready; needs attention" : result.Created + result.Reused == 0 ? "No supported Luna master videos" : "Sharing copies ready", messageText, result.CleanupWarnings.Count == 0 ? ToolTipIcon.Info : ToolTipIcon.Warning);
+                if (ForegroundWindow) ShowMessage(messageText, "Quick Share", result.CleanupWarnings.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                return true;
+            } catch (QuickShareFailure ex) {
+                StopSharingCancellation(active);
+                if (!ex.Cancelled) { ShowError(ex); return false; }
+                if (QuickSharePresentation.CancelNeedsAttention(ex)) RecordIssue(ex.Message); else { status.Text = ex.Message; Log(ex.Message); }
+                Notify("Quick Share cancelled", ex.Message, QuickSharePresentation.CancelNeedsAttention(ex) ? ToolTipIcon.Warning : ToolTipIcon.Info);
+                if (ForegroundWindow) ShowMessage(ex.Message, "Quick Share cancelled", QuickSharePresentation.CancelNeedsAttention(ex) ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+            } catch (OperationCanceledException) {
+                StopSharingCancellation(active); status.Text = "Quick Share cancelled before export. Saved originals and earlier sharing copies are kept. Retry is manual."; Log(status.Text); Notify("Quick Share cancelled", status.Text, ToolTipIcon.Info);
+            } catch (Exception ex) { StopSharingCancellation(active); ShowError(ex); }
+            finally { StopSharingCancellation(active); }
+            return false;
         }
         ImportDefaults ReadDefaults() {
             try { return ImportDefaults.Load(); }
