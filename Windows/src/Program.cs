@@ -194,7 +194,7 @@ namespace EasyEject {
             } finally { automaticPumping = false; }
         }
         async Task RunAutomaticImport(AutomaticImportRequest request) {
-            bool engineStarted = false;
+            bool engineStarted = false; long admissionEpoch = request.Connection.Epoch;
             try {
                 working = true; UpdateActions();
                 var connection = request.Connection; var stored = request.Profile;
@@ -205,8 +205,7 @@ namespace EasyEject {
                 if (!SafePaths.Within(source, connection.Root)) throw new SafetyException("The saved automatic media folder is outside this device.");
                 cancellation = new CancellationTokenSource(); cancel.Enabled = true; status.Text = "Preparing automatic import for " + ProfileName.Display(stored) + "…";
                 var activity = BeginActivity(TrayOperationKind.Import, ProfileName.Display(stored), "Preparing automatic import");
-                var guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, connection.Volume, connection.Disk, connection.Epoch));
-                request.ValidateAdmission(inventory, guard.DestinationIdentity); guard.Validate();
+                var guard = await Task.Run(() => AutomaticImportAdmission.Bind(request, discovery, source, destination, value => Interlocked.Exchange(ref admissionEpoch, value)));
                 completions.InvalidateSource(connection.Root); Log("Automatic connection import | " + ProfileName.Display(stored) + " | " + source + " -> " + destination);
                 engineStarted = true;
                 AttachStorageWork(activity, guard);
@@ -215,7 +214,7 @@ namespace EasyEject {
             } catch (OperationCanceledException) {
                 status.Text = "Automatic import cancelled. Remaining originals/Trash data and verified copies are kept. No automatic retry occurs on this connection."; FinishActivity(status.Text); Log(status.Text); Notify("Automatic import cancelled", status.Text, ToolTipIcon.Info);
             } catch (Exception ex) {
-                if (!engineStarted) automatic.PreflightWaiting(request);
+                if (!engineStarted) automatic.PreflightWaiting(request, Interlocked.Read(ref admissionEpoch));
                 ShowError(ex);
             } finally { FinishOperation(); }
         }

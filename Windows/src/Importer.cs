@@ -25,13 +25,13 @@ namespace EasyEject {
         bool IConcurrentStorageGuard.AllowsUnrelatedOperations { get { return connection.Scoped && !connection.ProtectedConnectionChanged; } }
         public VolumeImportGuard(IDiscovery discovery, string source, string destination, Volume expectedVolume, Disk expectedDisk, long selectionEpoch)
             : this(discovery, source, destination, expectedVolume, expectedDisk, selectionEpoch, WindowsDiscovery.VolumeId) {}
-        internal VolumeImportGuard(IDiscovery discovery, string source, string destination, Volume expectedVolume, Disk expectedDisk, long selectionEpoch, Func<string, string> volumeId) {
+        internal VolumeImportGuard(IDiscovery discovery, string source, string destination, Volume expectedVolume, Disk expectedDisk, long selectionEpoch, Func<string, string> volumeId, Func<Inventory, bool> selectionCurrent = null) {
             this.discovery = discovery; this.source = source; this.destination = destination; this.volumeId = volumeId;
             sourceId = volumeId(source); destinationId = volumeId(destination);
             if (sourceId != expectedVolume.Id) throw new SafetyException("The selected source belongs to a different volume.");
             var state = discovery.Scan(); long epoch = state.Epoch;
             var currentSource = Resolve(state, sourceId);
-            if (epoch != selectionEpoch || currentSource.Fingerprint != expectedVolume.Fingerprint || state.Disks.Single(d => d.Number == currentSource.Disks[0]).Fingerprint != expectedDisk.Fingerprint)
+            if (!(selectionCurrent == null ? epoch == selectionEpoch : selectionCurrent(state)) || currentSource.Fingerprint != expectedVolume.Fingerprint || state.Disks.Single(d => d.Number == currentSource.Disks[0]).Fingerprint != expectedDisk.Fingerprint)
                 throw new SafetyException("The selected card connection changed while choosing folders. Refresh and choose the device again.");
             disks = PlanProtection(state, sourceId, destinationId); connection = new StorageConnectionProof(discovery, state, disks); destinationIdentity = DestinationIdentity.Capture(state, destinationId); sourceIdentity = DestinationIdentity.Capture(state, sourceId);
             string root = currentSource.Mounts.Where(x => SafePaths.Within(source, SafePaths.Normalize(x))).OrderByDescending(x => x.Length).FirstOrDefault();

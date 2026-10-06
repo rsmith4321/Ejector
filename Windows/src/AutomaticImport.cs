@@ -31,11 +31,12 @@ namespace EasyEject {
             if (String.IsNullOrEmpty(stamp)) return null;
             string root = volume.Mounts.Where(x => x.Length >= 3 && Char.IsLetter(x[0]) && x[1] == ':' && x[2] == '\\').OrderBy(x => x.Length).ThenBy(x => x, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
             if (root == null) return null; root = SafePaths.Normalize(root);
-            return new AutomaticConnection(state, volume, disk, root, volume.Fingerprint + "\n" + disk.Fingerprint + "\n" + stamp);
+            return new AutomaticConnection(state, volume, disk, root, volume.Fingerprint + "\n" + disk.Fingerprint + "|" + disk.Bus + "|" + disk.Removable + "|" + disk.Hotplug + "\n" + state.GroupFingerprint(target) + "\n" + stamp);
         }
-        internal void RequireCurrent(Inventory state) {
-            var volume = state.Volumes.SingleOrDefault(x => x.Id == VolumeId); var current = volume == null ? null : Capture(state, volume);
-            if (current == null || current.Token != Token || current.Epoch != Epoch) throw new SafetyException("Automatic import connection changed before work started. Reconnect the source or choose a fresh manual import.");
+        internal AutomaticConnection RequireCurrent(Inventory state) {
+            var volumes = state.Volumes.Where(x => x.Id == VolumeId).ToArray(); var current = volumes.Length != 1 ? null : Capture(state, volumes[0]);
+            if (current == null || current.Token != Token) throw new SafetyException("Automatic import source connection or related storage changed before work started. Reconnect the source or choose a fresh manual import.");
+            return current;
         }
     }
     internal sealed class AutomaticImportRequest {
@@ -82,8 +83,28 @@ namespace EasyEject {
             }
             return null;
         }
-        internal void PreflightWaiting(AutomaticImportRequest request) {
-            Attempt current; if (attempts.TryGetValue(request.Connection.VolumeId, out current) && current.Token == request.Connection.Token) current.WaitingEpoch = request.Connection.Epoch;
+        internal void PreflightWaiting(AutomaticImportRequest request, long? observedEpoch = null) {
+            Attempt current; if (attempts.TryGetValue(request.Connection.VolumeId, out current) && current.Token == request.Connection.Token) current.WaitingEpoch = observedEpoch ?? request.Connection.Epoch;
+        }
+    }
+    internal static class AutomaticImportAdmission {
+        internal static VolumeImportGuard Bind(AutomaticImportRequest request, IDiscovery discovery, string source, string destination, Action<long> observed = null, Func<string, string> volumeId = null) {
+            var profile = request.Profile; var connection = request.Connection; Profiles.ValidateStoredFolders(profile);
+            string expectedSource = SafePaths.Normalize(Path.Combine(connection.Root, profile.RelativeSource));
+            if (!SafePaths.Within(expectedSource, connection.Root) || !SafePaths.Normalize(source).Equals(expectedSource, StringComparison.OrdinalIgnoreCase) || !SafePaths.Normalize(destination).Equals(SafePaths.Normalize(profile.Destination), StringComparison.OrdinalIgnoreCase))
+                throw new SafetyException("Automatic import folders do not match the frozen device profile. No import started.");
+            if (observed != null) observed(discovery.Epoch);
+            var guard = new VolumeImportGuard(discovery, source, destination, connection.Volume, connection.Disk, connection.Epoch, volumeId ?? WindowsDiscovery.VolumeId, state => {
+                if (observed != null) observed(state.Epoch); connection.RequireCurrent(state);
+                if (state.Epoch != connection.Epoch) {
+                    string target = connection.Disk.TargetId;
+                    var numbers = state.Disks.Where(d => d.Number == connection.Disk.Number || target != "" && (d.InstanceId == target || d.Ancestors.Contains(target))).Select(d => d.Number);
+                    if (!new StorageConnectionProof(discovery, state, numbers).Scoped) throw new SafetyException("Continuous source connection proof is unavailable. Review a fresh import choice.");
+                }
+                return true;
+            });
+            var fresh = discovery.Scan(); if (observed != null) observed(fresh.Epoch);
+            request.ValidateAdmission(fresh, guard.DestinationIdentity); guard.Validate(); return guard;
         }
     }
 }

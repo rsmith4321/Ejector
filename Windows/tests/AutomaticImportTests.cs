@@ -91,7 +91,7 @@ namespace EasyEject {
                 Check(request.Options.VideosOnly && !request.Options.IncludePreviews && request.Options.AskToEject && request.Options.DeleteOriginals && request.Options.RecoverTrash && request.Options.MacTrashUid == "501" && request.Profile.RelativeSource == "" && request.Profile.SavedDestination.Matches(HistoryIdentity()), "Running request adopted later choices or alias mutations");
             });
             Test("automatic admission refuses changed source serial disk mount or connection before copying", delegate {
-                foreach (Action<Inventory> change in new Action<Inventory>[] { s => s.Volumes[0].Serial = "formatted", s => s.Disks[0].InstanceId = "replacement", s => s.Volumes[0].Mounts[0] = @"Q:\", s => s.GroupConnections["usb-a"] = "reconnected", s => s.Epoch++, s => s.Complete = false }) {
+                foreach (Action<Inventory> change in new Action<Inventory>[] { s => s.Volumes[0].Serial = "formatted", s => s.Disks[0].InstanceId = "replacement", s => s.Volumes[0].Mounts[0] = @"Q:\", s => s.GroupConnections["usb-a"] = "reconnected", s => s.Complete = false }) {
                     var state = CardState(); var request = Admit(new AutomaticImportScheduler(), state, AutomaticProfile(state.Volumes[0], state.Disks[0])); change(state);
                     Throws<SafetyException>(() => request.ValidateAdmission(state, HistoryIdentity()));
                 }
