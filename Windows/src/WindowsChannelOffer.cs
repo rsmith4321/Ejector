@@ -83,14 +83,15 @@ namespace EasyEject {
     internal sealed class WindowsChannelHighWater {
         readonly ApprovedWindowsChannel channel; readonly object sync = new object(); WindowsChannelOffer highest;
         internal WindowsChannelHighWater(ApprovedWindowsChannel channel) { if (channel == null) throw new ArgumentNullException("channel"); this.channel = channel; }
-        internal void Accept(WindowsChannelOffer offer, CancellationToken cancel) {
+        internal void Accept(WindowsChannelOffer offer, CancellationToken cancel, Func<bool> stillAllowed = null) {
             if (offer == null) throw new ArgumentNullException("offer"); cancel.ThrowIfCancellationRequested(); if (!offer.IsFor(channel)) throw new SafetyException("A Windows discovery result belongs to a different approved channel policy."); offer.Revalidate(cancel);
             lock (sync) {
                 offer.RequireTime(); cancel.ThrowIfCancellationRequested();
                 if (highest != null) {
                     if (offer.IssuedUtc < highest.IssuedUtc || offer.IssuedUtc == highest.IssuedUtc && offer.Authenticated.BodyHash != highest.Authenticated.BodyHash || new Version(offer.Release.Version).CompareTo(new Version(highest.Release.Version)) < 0 || offer.Release.Version == highest.Release.Version && !offer.Release.SameRelease(highest.Release)) throw new SafetyException("The signed Windows channel rolled back or changed an already observed release/version.");
                 }
-                highest = offer;
+                if (stillAllowed != null && !stillAllowed()) throw new SafetyException("The Windows release check's activity/lifetime scope changed before discovery commit.");
+                cancel.ThrowIfCancellationRequested(); highest = offer;
             }
         }
     }
