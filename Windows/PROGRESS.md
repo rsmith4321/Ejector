@@ -2,6 +2,26 @@
 
 ## Full-port scope and latest software milestone
 
+### Durable complete-batch removal evidence · goal continuation
+
+Implementation commit: `757972ba3049427e0cbf3e9b79301e11d5461bcb`.
+
+Before any original/Trash disposition, the importer now exclusively publishes and flushes `removal-intent.json` beside its audit. It records the complete verified selected batch, SHA-256/size, source and saved file identities/stamps, frozen source/destination paths/options/owner scope, production volume/disk identities and Windows payload/restoration-record links. Its SHA-256 binding is flushed to the audit before removal. The journal remains exclusively held through final receipt publication; cancellation, incomplete device evidence, audit failure and conflicting publication prevent the first removal. Private unpublished work is cleaned by its held handle, while published evidence remains for diagnosis after partial failure. Copy-only imports create no intent. This journal explicitly grants no completion/eject authority; it is evidence for the pending verified manual-resume implementation, not permission to clear arbitrary orphan records.
+
+Validation: `./Windows/build.ps1 -Test` **227 passed; zero failed**, warnings as errors; `git diff --check` passes. Ten new fixture cases cover complete retained-dependency evidence, flushed audit hash binding, payload/record links after partial cancellation, failed intent audit, cancellation before clearing, exclusive protection through both clearing stages, conflict preservation/private cleanup, device loss before publication, frozen physical/volume identities and incomplete identity refusal. No new UI behavior was added in this stage. Verified resume validation/action UI and foreground/disposable-hardware proof remain pending; the full-port goal stays active.
+
+### Verified owner-aware device Trash recovery · goal continuation
+
+Implementation commit: `d44a3a9`.
+
+Integrated the catalog into the complete ordinary-plus-Trash import transaction. Recovery starts off, remains independent of ordinary original deletion, follows shared/custom defaults and freezes per operation. Enabling requires a separate Cancel-default acknowledgment; every manual import reviews owner scope and permanent clearing. Broadening Videos only to All media disables both removal choices. A Mac owner is selected explicitly per profile from `.Trashes/<numeric UID>`, independently of inherited settings; Windows accounts never imply that UID. Saving starts no work.
+
+Recovered originals preserve their logical original names/ancestry under `Recovered Device Trash`, with whole-group conflict placement and hash-verified reuse. Selected Windows restoration records are backed up separately as non-media dependencies. All ordinary/Trash sources, saved payloads and saved records are verified and held before any clearing. Recognized selected payloads clear first; eligible single-file Windows records clear afterward. Unknowns, excluded photos/previews, device indexes, other owners and Windows folder records/retained package contents remain. Captured identities/metadata hashes and selected manifests reject changes and replacements through partial clearing. Receipts, failures and completion messages distinguish ordinary originals, recovered Trash files and restoration records. Saved original history excludes raw restoration records and works after source removal/restart.
+
+Validation: `./Windows/build.ps1 -Test` **217 passed; zero failed**, warnings as errors; `--ui-smoke`, `--ui-render` and `git diff --check` pass. Twenty-five additional fixture/UI-policy cases cover independent recovery, both owner scopes, lens/companion/package dependencies, saved-record tampering, held handles, ordered/partial clearing, cancellation/reservation release, changed selections/replacements, preservation/reuse/conflicts, history, migration/default reset, acknowledgments and owner-picker drafts. Minimum-size confirmation/profile renders were inspected in `%USERPROFILE%\.codex\EasyEjectWindowsPreview\run-adbfec7ccb8d45a6`. Lower scroll-region render composites check owned fixture content/footer placement; they do not prove foreground native scrolling. No actual user/device Trash was inspected or cleared.
+
+**Remaining recovery gap:** interruption after clearing a Windows payload but before its `$I` restoration record leaves that record intact. A later catalog refuses the orphan rather than clearing it without fresh proof. Complete saved payload/record copies and the durable audit remain; no final receipt or eject authority is issued. Verified journal-bound manual resume is still required before claiming full retry parity. Foreground/DPI and explicitly identified disposable hardware/filesystem tests remain required. Offline profiles, automatic import/startup/debug controls and full manual Quick Share also remain; the full-port goal stays active.
+
 ### Device Trash ownership and original-path catalog · recovery implementation in progress
 
 Implementation commit: `04bd63557a9d2f1ee1af3caff2d221d29ade11aa`.
