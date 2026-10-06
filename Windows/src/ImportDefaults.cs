@@ -4,16 +4,17 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 
 namespace EasyEject {
-    // Supported media/preview/layout choices. Removal/automatic options are added
+    // Supported media/preview/layout and manual completion choices. Removal/automatic options are added
     // alongside their engine implementation rather than stored as inert flags.
     [DataContract] public sealed class ImportDefaults {
         [DataMember] public bool? VideosOnly;
         [DataMember] public bool? IncludePreviews; [DataMember] public bool? CleanLayout;
-        public MediaOptions Snapshot() { return new MediaOptions(VideosOnly ?? true, IncludePreviews ?? true, CleanLayout ?? true); }
+        [DataMember] public bool? AskToEject;
+        public MediaOptions Snapshot() { return new MediaOptions(VideosOnly ?? true, IncludePreviews ?? true, CleanLayout ?? true, AskToEject ?? false); }
         public ImportProfile NewProfile(Volume volume, Disk disk) {
             var options = Snapshot();
             return new ImportProfile { VolumeId = volume.Id, VolumeSerial = volume.Serial, DiskInstance = disk.InstanceId,
-                RelativeSource = "", Destination = "", UsesImportDefaults = true, VideosOnly = options.VideosOnly, IncludePreviews = options.IncludePreviews, CleanLayout = options.CleanLayout };
+                RelativeSource = "", Destination = "", UsesImportDefaults = true, VideosOnly = options.VideosOnly, IncludePreviews = options.IncludePreviews, CleanLayout = options.CleanLayout, AskToEject = options.AskToEject };
         }
         public static ImportDefaults Load() { return Load(Profiles.Root); }
         internal static ImportDefaults Load(string root) {

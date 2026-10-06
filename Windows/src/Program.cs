@@ -20,13 +20,18 @@ namespace EasyEject {
     }
     internal sealed class DeviceWindow : Form {
         readonly WindowsDiscovery discovery = new WindowsDiscovery(); readonly Operations operations = new Operations();
-        readonly ListView list = new ListView(); readonly Label status = new Label(); readonly Button refresh = new Button(), eject = new Button(), import = new Button(), cancel = new Button(), profile = new Button(), defaults = new Button(), history = new Button();
+        readonly ImportCompletionRegistry completions = new ImportCompletionRegistry();
+        AppSettings appSettings = new AppSettings(); AppIssue appIssue = new AppIssue(); ImportCompletionDialog activeCompletion;
+        ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu;
+        int cardCount;
+        readonly ListView list = new ListView(); readonly Label status = new Label(); readonly Button refresh = new Button(), eject = new Button(), import = new Button(), cancel = new Button(), profile = new Button(), defaults = new Button(), history = new Button(), pending = new Button(), settings = new Button(), issue = new Button();
         readonly NotifyIcon tray; readonly System.Windows.Forms.Timer debounce = new System.Windows.Forms.Timer();
         Inventory inventory; bool scanning, working, quit; CancellationTokenSource cancellation; IntPtr notification;
         [StructLayout(LayoutKind.Sequential)] struct BroadcastInterface { public int Size, Type, Reserved; public Guid ClassGuid; public short Name; }
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr RegisterDeviceNotification(IntPtr recipient, ref BroadcastInterface filter, uint flags);
         [DllImport("user32.dll")] static extern bool UnregisterDeviceNotification(IntPtr handle);
         public DeviceWindow() {
+            try { appSettings = AppSettings.Load(); appIssue = AppIssue.Load(); } catch (Exception ex) { appIssue.Record("Saved application state could not be read: " + ex.Message); }
             Text = "Easy Eject · Windows prototype"; ClientSize = new Size(1000, 540); MinimumSize = new Size(800, 420); StartPosition = FormStartPosition.CenterScreen; AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Segoe UI", 10);
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(16) };
@@ -37,24 +42,33 @@ namespace EasyEject {
             list.SelectedIndexChanged += delegate { UpdateActions(); };
             var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 12, 0, 8) };
             refresh.Text = "Refresh"; eject.Text = "Safe eject…"; import.Text = "Verified import…"; cancel.Text = "Cancel operation"; profile.Text = "Import profile…"; defaults.Text = "Import defaults…"; history.Text = "Import history…";
-            foreach (var b in new[] { refresh, eject, import, profile, defaults, history, cancel }) { b.AutoSize = true; b.MinimumSize = new Size(135, 36); actions.Controls.Add(b); }
+            pending.Text = "Completed imports…"; settings.Text = "Settings…"; issue.Text = "View issue…";
+            foreach (var b in new[] { refresh, eject, import, profile, defaults, history, pending, settings, issue, cancel }) { b.AutoSize = true; b.MinimumSize = new Size(135, 36); actions.Controls.Add(b); }
             cancel.Enabled = false;
             refresh.Click += async delegate { await RefreshDevices(); }; eject.Click += async delegate { await Eject(); }; import.Click += async delegate { await Import(); };
             profile.Click += async delegate { await EditProfile(); }; defaults.Click += delegate { EditDefaults(); };
             history.Click += async delegate { await ReviewHistory(); };
+            pending.Click += async delegate { await ReviewCompletions(); }; settings.Click += delegate { EditSettings(); }; issue.Click += delegate { ViewIssue(); };
             cancel.Click += delegate { if (cancellation != null) { cancellation.Cancel(); status.Text = "Stopping after the current file check. Originals kept."; } };
             status.AutoSize = true; status.MaximumSize = new Size(940, 0); status.Text = "Reading connected devices…";
             layout.Controls.Add(intro); layout.Controls.Add(list); layout.Controls.Add(actions); layout.Controls.Add(status); Controls.Add(layout);
             var menu = new ContextMenuStrip(); menu.Items.Add("Show devices", null, delegate { Show(); WindowState = FormWindowState.Normal; Activate(); });
             menu.Items.Add("Refresh", null, async delegate { await RefreshDevices(); });
+            pendingMenu = new ToolStripMenuItem("Completed imports…", null, async delegate { await ReviewCompletions(); }); menu.Items.Add(pendingMenu);
+            settingsMenu = new ToolStripMenuItem("Settings…", null, delegate { EditSettings(); }); menu.Items.Add(settingsMenu);
+            issueMenu = new ToolStripMenuItem("View issue…", null, delegate { ViewIssue(); }); menu.Items.Add(issueMenu);
+            debugMenu = new ToolStripMenuItem("View debug log…", null, delegate { ViewDebugLog(); }); menu.Items.Add(debugMenu);
             menu.Items.Add("Quit", null, delegate { if (working) { MessageBox.Show(this, "Wait for the operation to finish or cancel the import before quitting."); return; } quit = true; Close(); });
             tray = new NotifyIcon { Icon = SystemIcons.Information, Text = "Easy Eject Windows prototype", Visible = true, ContextMenuStrip = menu };
             tray.DoubleClick += delegate { Show(); WindowState = FormWindowState.Normal; Activate(); };
+            // Balloon clicks carry no device token. They only reveal the app for a fresh review.
+            tray.BalloonTipClicked += delegate { Show(); WindowState = FormWindowState.Normal; Activate(); };
+            menu.Opening += delegate { UpdateActions(); };
             debounce.Interval = 800; debounce.Tick += async delegate { debounce.Stop(); await RefreshDevices(); };
             Shown += async delegate { await RefreshDevices(); };
             FormClosing += delegate(object sender, FormClosingEventArgs e) {
+                if (!quit && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); return; }
                 if (working) { e.Cancel = true; status.Text = "Wait for completion or cancel the import before closing."; return; }
-                if (!quit && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); }
             };
             UpdateActions();
         }
@@ -65,10 +79,12 @@ namespace EasyEject {
             discovery.NotificationsAvailable = notification != IntPtr.Zero;
             if (notification == IntPtr.Zero) { status.Text = "Disk notifications unavailable. Refresh before every action."; discovery.ConnectionChanged(); }
         }
-        protected override void OnHandleDestroyed(EventArgs e) { discovery.NotificationsAvailable = false; discovery.ConnectionChanged(); if (notification != IntPtr.Zero) { UnregisterDeviceNotification(notification); notification = IntPtr.Zero; } base.OnHandleDestroyed(e); }
+        protected override void OnHandleDestroyed(EventArgs e) { discovery.NotificationsAvailable = false; discovery.ConnectionChanged(); ExpireCompletions(); if (notification != IntPtr.Zero) { UnregisterDeviceNotification(notification); notification = IntPtr.Zero; } base.OnHandleDestroyed(e); }
         protected override void WndProc(ref Message m) {
             if (m.Msg == 0x219 && (m.WParam.ToInt64() == 7 || m.WParam.ToInt64() == 0x8000 || m.WParam.ToInt64() == 0x8003 || m.WParam.ToInt64() == 0x8004)) {
                 discovery.ConnectionChanged(); eject.Enabled = false; import.Enabled = false; debounce.Stop(); debounce.Start();
+                ExpireCompletions();
+                UpdateActions();
             }
             if (m.Msg == 0x11 && working) { m.Result = IntPtr.Zero; return; }
             base.WndProc(ref m);
@@ -77,6 +93,11 @@ namespace EasyEject {
         void UpdateActions() {
             var v = Selected; bool ready = v != null && inventory != null && !working && !scanning && inventory.Epoch == discovery.Epoch;
             eject.Enabled = false; import.Enabled = false; profile.Enabled = false; defaults.Enabled = !working; history.Enabled = !working && !scanning; refresh.Enabled = !working && !scanning;
+            settings.Enabled = pending.Enabled = issue.Enabled = !working && !scanning;
+            pending.Enabled &= completions.Entries.Length > 0; issue.Enabled &= appIssue.HasIssue;
+            pendingMenu.Enabled = pending.Enabled; issueMenu.Enabled = issue.Enabled; settingsMenu.Enabled = settings.Enabled; debugMenu.Visible = appSettings.DebugEnabled; debugMenu.Enabled = !working;
+            tray.Icon = appIssue.NeedsAttention ? SystemIcons.Warning : SystemIcons.Information;
+            tray.Text = appIssue.NeedsAttention ? "Easy Eject: needs attention. Choose View issue." : "Easy Eject: " + cardCount + " candidate card disks";
             if (!ready) return;
             try { EjectService.Plan(inventory, v.Id); eject.Enabled = true; } catch (SafetyException) {}
             import.Enabled = inventory.Complete && v.Error == "" && !v.System && v.Disks.Count == 1 && v.Mounts.Any(x => x.Length >= 3 && x[1] == ':') && v.Classification != "Internal / fixed storage";
@@ -90,8 +111,7 @@ namespace EasyEject {
                     var row = new ListViewItem(v.Display) { Tag = v };
                     row.SubItems.Add(v.Classification); row.SubItems.Add(String.Join(", ", v.Disks)); row.SubItems.Add(v.System ? "System: protected" : v.Error == "" ? "Connected" : v.Error); list.Items.Add(row);
                 }
-                int cards = next.Volumes.Where(v => v.Classification.IndexOf("candidate", StringComparison.OrdinalIgnoreCase) >= 0).SelectMany(v => v.Disks).Distinct().Count();
-                tray.Text = "Easy Eject: " + cards + " candidate card disks";
+                cardCount = next.Volumes.Where(v => v.Classification.IndexOf("candidate", StringComparison.OrdinalIgnoreCase) >= 0).SelectMany(v => v.Disks).Distinct().Count();
                 status.Text = next.Complete ? "Read-only inventory: " + next.Volumes.Count + " volumes on " + next.Disks.Count + " disks. Closing this window keeps the tray app running." : "Incomplete inventory; actions blocked. " + String.Join(" ", next.Errors);
             } catch (Exception ex) { inventory = null; status.Text = ex.Message; }
             finally { scanning = false; UpdateActions(); }
@@ -99,13 +119,17 @@ namespace EasyEject {
         async Task Eject() {
             var v = Selected; if (v == null || working) return;
             try {
+                working = true; UpdateActions();
                 var plan = EjectService.Plan(inventory, v.Id);
                 string text = "Windows will remove this device and all affected volumes:\n\n" + String.Join("\n", plan.Affected) + "\n\nFinish all transfers first. Request safe removal?";
                 if (MessageBox.Show(this, text, "Safe eject", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+                completions.InvalidateAll(); Log("User requested manual safe removal | " + String.Join(", ", plan.Affected));
                 working = true; UpdateActions(); status.Text = "Requesting safe removal…";
                 var result = await Task.Run(() => new EjectService(discovery, new WindowsEjectApi(discovery, plan.Epoch), operations).Execute(plan));
                 status.Text = result.Message;
-                MessageBox.Show(this, result.Message, result.Success ? "Safe removal accepted" : "Device still connected", MessageBoxButtons.OK, result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                if (result.Success) ClearIssue(); else RecordIssue(result.Message);
+                Notify(result.Success ? "Safe removal accepted" : "Device still connected", result.Message, result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
+                if (ForegroundWindow) MessageBox.Show(this, result.Message, result.Success ? "Safe removal accepted" : "Device still connected", MessageBoxButtons.OK, result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             } catch (Exception ex) { ShowError(ex); }
             finally { working = false; UpdateActions(); debounce.Start(); }
             await RefreshDevices();
@@ -129,23 +153,124 @@ namespace EasyEject {
                 var guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, v, disk, selectionEpoch));
                 string text = (options.VideosOnly ? "Copy selected videos and their required companions under:\n" : "Copy all media and sidecars under:\n") + source + "\n\nTo a date folder under:\n" + destination + "\n\n" + (options.IncludePreviews ? "Camera previews included." : "Optional previews stay on the device; required package files are included.") + "\n" + (options.CleanLayout ? "Ordinary media uses a clean layout; packages and unfamiliar media keep their tree." : "Media folder paths are retained.") + "\nOriginal filenames are kept. SHA-256 verifies new and reused copies. Originals and the device stay connected.\n\nStart this manual import?";
                 if (MessageBox.Show(this, text, "Verified import", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+                completions.InvalidateSource(root); Log("User started import | " + source + " -> " + destination);
                 working = true; cancellation = new CancellationTokenSource(); cancel.Enabled = true; UpdateActions();
-                var result = await Task.Run(() => new VerifiedImporter(operations).Run(root, source, destination, v.Id, guard, cancellation.Token, message => {
-                    if (!IsDisposed) BeginInvoke(new Action(() => status.Text = message));
+                var result = await Task.Run(() => new VerifiedImporter(operations).Run(root, source, destination, v.Id, guard, cancellation.Token, progressText => {
+                    if (!IsDisposed) BeginInvoke(new Action(() => status.Text = progressText));
                 }, options));
-                string historyNote = "";
+                string historyNote = ""; bool historyFailed = false;
                 if (result.HasSelectedMedia) {
                     try { await Task.Run(() => ImportHistory.Add(ImportHistory.Create(result, stored, v.Display, guard.DestinationIdentity))); historyNote = "\nExact verified files saved in Import history."; }
-                    catch (Exception ex) { historyNote = "\nImport verified, but history could not be saved: " + ex.Message + "\nCopies and the completion receipt remain available."; }
+                    catch (Exception ex) { historyFailed = true; historyNote = "\nImport verified, but history could not be saved: " + ex.Message + "\nCopies and the completion receipt remain available."; RecordIssue(historyNote.Trim()); }
                 }
-                MessageBox.Show(this, result.Files == 0 ? "No matching media or device indexes were found. No batch was created. Device remains connected." : (result.HasSelectedMedia ? "Import complete. " : "No matching media. Device index backup only. ") + result.Files + " files verified (" + result.Bytes + " bytes; " + result.Reused + " existing copies reused).\n" + result.Folder + historyNote + "\n\nOriginals kept. Device remains connected.", result.HasSelectedMedia ? "Import complete" : "No matching media");
-            } catch (OperationCanceledException) { status.Text = "Import cancelled. All originals and completed copies kept. No completion receipt was written."; MessageBox.Show(this, status.Text, "Import cancelled"); }
+                string message = result.Files == 0 ? "No matching media or device indexes were found. No batch was created." : (result.HasSelectedMedia ? "Import complete. " : "No matching media. Device index backup only. ") + result.Files + " files verified (" + result.Bytes + " bytes; " + result.Reused + " reused).\n" + result.Folder;
+                bool sourceUnchanged = guard.CompletionOrigin.Epoch == discovery.Epoch;
+                message += historyNote + "\n\nOriginals kept. " + (sourceUnchanged ? "Device remains connected." : "The source connection changed after copying. Refresh and review the device."); status.Text = message; Log(message);
+                if (!historyFailed) ClearIssue();
+                ImportCompletion completion = null;
+                if (options.AskToEject && sourceUnchanged) {
+                    completion = new ImportCompletion(guard.CompletionOrigin, v.Display, result.Files > 0 ? result.Folder : destination, destination, guard.DestinationIdentity, result.HasSelectedMedia, message);
+                    completions.Insert(completion);
+                }
+                bool showChoice = CompletionPresentation.ShowChoice(options.AskToEject, ForegroundWindow, appSettings.NotificationsEnabled);
+                FinishOperation();
+                if (showChoice && completion != null) await ReviewCompletion(completion.Id);
+                else {
+                    Notify(historyFailed ? "Import verified; history needs attention" : result.HasSelectedMedia ? "Import complete" : "No matching media", historyFailed ? historyNote.Trim() : sourceUnchanged ? CompletionPresentation.Notification(result.HasSelectedMedia) : "The import finished, then the source connection changed. Open Easy Eject to review connected devices. Original files were kept.", historyFailed ? ToolTipIcon.Warning : ToolTipIcon.Info);
+                    if (ForegroundWindow) ShowMessage(message, result.HasSelectedMedia ? "Import complete" : "No matching media", historyFailed ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+                }
+            } catch (OperationCanceledException) { status.Text = "Import cancelled. All originals and completed copies kept. No completion receipt was written."; Log(status.Text); Notify("Import cancelled", status.Text, ToolTipIcon.Info); if (ForegroundWindow) MessageBox.Show(this, status.Text, "Import cancelled"); }
             catch (Exception ex) { ShowError(ex); }
-            finally { working = false; cancel.Enabled = false; if (cancellation != null) { cancellation.Dispose(); cancellation = null; } UpdateActions(); debounce.Start(); }
+            finally { FinishOperation(); }
             await RefreshDevices();
         }
         static bool ConfigurationError(Exception ex) {
             return ex is SafetyException || ex is System.Runtime.Serialization.SerializationException || ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception;
+        }
+        bool ForegroundWindow { get { return Visible && WindowState != FormWindowState.Minimized && (ContainsFocus || Form.ActiveForm == this); } }
+        void ShowMessage(string message, string title, MessageBoxIcon icon) {
+            bool previous = working; working = true; UpdateActions();
+            try { MessageBox.Show(this, message, title, MessageBoxButtons.OK, icon); }
+            finally { working = previous; UpdateActions(); }
+        }
+        void FinishOperation() { working = false; cancel.Enabled = false; if (cancellation != null) { cancellation.Dispose(); cancellation = null; } UpdateActions(); debounce.Start(); }
+        void ExpireCompletions() { completions.InvalidateAll(); if (activeCompletion != null && !activeCompletion.IsDisposed) activeCompletion.ExpireEject(); }
+        void ShowDevices() { Show(); WindowState = FormWindowState.Normal; Activate(); }
+        void Notify(string title, string text, ToolTipIcon icon) {
+            if (!appSettings.NotificationsEnabled) return;
+            try { tray.ShowBalloonTip(5000, title.Length > 63 ? title.Substring(0, 63) : title, text.Length > 255 ? text.Substring(0, 255) : text, icon); }
+            catch (Exception ex) { status.Text += " Notification unavailable: " + ex.Message + " Review completed imports or View issue in the app."; }
+        }
+        void Log(string text) {
+            if (!appSettings.DebugEnabled) return;
+            try { DebugLog.Append(Profiles.Root, text); }
+            catch (Exception ex) { status.Text += " Debug logging unavailable: " + ex.Message; }
+        }
+        void SaveIssue() { try { AppIssue.Save(appIssue); } catch (Exception ex) { status.Text += " Issue could not be saved: " + ex.Message; } }
+        void RecordIssue(string message) { appIssue.Record(message); status.Text = message; SaveIssue(); Log("Needs attention | " + message); UpdateActions(); }
+        void ClearIssue() { if (!appIssue.HasIssue) return; appIssue.Clear(); SaveIssue(); UpdateActions(); }
+        void ViewIssue() {
+            if (working || !appIssue.HasIssue) return;
+            working = true; UpdateActions();
+            try { using (var dialog = new IssueDialog(appIssue)) if (dialog.ShowDialog(this) == DialogResult.Yes) { appIssue.Dismiss(); SaveIssue(); status.Text = "Issue acknowledged. No operation was retried."; } }
+            finally { FinishOperation(); }
+        }
+        void ViewDebugLog() {
+            if (working || !appSettings.DebugEnabled) return;
+            working = true; UpdateActions();
+            try { using (var dialog = new DiagnosticsDialog(DebugLog.Read(Profiles.Root))) dialog.ShowDialog(this); }
+            catch (Exception ex) { ShowError(ex); }
+            finally { FinishOperation(); }
+        }
+        void EditSettings() {
+            if (working || scanning) return;
+            working = true; UpdateActions();
+            try { using (var dialog = new AppSettingsDialog(appSettings)) if (dialog.ShowDialog(this) == DialogResult.OK) { AppSettings.Save(dialog.Value); appSettings = dialog.Value; status.Text = "Application settings saved."; Log(status.Text); } }
+            catch (Exception ex) { ShowError(ex); }
+            finally { FinishOperation(); }
+        }
+        async Task ReviewCompletions() {
+            if (working || scanning) return;
+            string id = null; working = true; UpdateActions();
+            try { using (var dialog = new PendingCompletionsDialog(completions.Entries)) if (dialog.ShowDialog(this) == DialogResult.OK) id = dialog.SelectedId; }
+            finally { FinishOperation(); }
+            if (id != null) await ReviewCompletion(id);
+        }
+        async Task ReviewCompletion(string id) {
+            if (working || scanning) return;
+            var entry = completions.Get(id); if (entry == null) { ShowError(new SafetyException("This import choice expired. Refresh and review the connected device.")); return; }
+            working = true; UpdateActions(); ShowDevices();
+            try {
+                while (true) {
+                    bool canEject = false;
+                    if (entry.Origin.Plan != null) {
+                        canEject = await Task.Run(() => {
+                            try { var state = discovery.Scan(); return state.Epoch == discovery.Epoch && completions.Matches(id, state, WindowsDiscovery.VolumeId(entry.Origin.SourceRoot), entry.Origin.SourceRoot); }
+                            catch (Exception ex) { if (!ConfigurationError(ex)) throw; return false; }
+                        });
+                    }
+                    DialogResult choice;
+                    using (var dialog = new ImportCompletionDialog(entry, canEject)) { activeCompletion = dialog; choice = dialog.ShowDialog(this); activeCompletion = null; }
+                    if (choice == DialogResult.Ignore) {
+                        await Task.Run(() => {
+                            using (SafePaths.LockDirectories(entry.DestinationRoot)) {
+                                var guard = new WindowsDestinationGuard(discovery, entry.DestinationRoot, entry.Destination);
+                                CompletionFolder.Open(entry, entry.Destination, guard, operations, folder => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "explorer.exe", Arguments = "\"" + folder + "\"", UseShellExecute = false }));
+                            }
+                        });
+                        continue;
+                    }
+                    if (choice != DialogResult.Yes) { status.Text = "Device kept connected. Original files unchanged."; break; }
+                    Log("User requested post-import eject | " + entry.DeviceName);
+                    var result = await Task.Run(() => new CompletedEjectService(completions, discovery, new WindowsEjectApi(discovery, entry.Origin.Epoch), operations, WindowsDiscovery.VolumeId).Execute(id));
+                    status.Text = result.Message; Log(result.Message);
+                    if (result.Success) { completions.InvalidateAll(); ClearIssue(); } else RecordIssue(result.Message);
+                    Notify(result.Success ? "Safe removal accepted" : "Device still connected", result.Message, result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
+                    MessageBox.Show(this, result.Message, result.Success ? "Safe removal accepted" : "Device still connected", MessageBoxButtons.OK, result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                    break;
+                }
+            } catch (Exception ex) { ShowError(ex); }
+            finally { activeCompletion = null; FinishOperation(); }
         }
         async Task ReviewHistory() {
             if (working || scanning) return;
@@ -220,7 +345,7 @@ namespace EasyEject {
                 return draft;
             }
         }
-        void ShowError(Exception ex) { status.Text = ex.Message; MessageBox.Show(this, ex.Message, "Easy Eject", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        void ShowError(Exception ex) { RecordIssue(ex.Message); Notify("Easy Eject needs attention", ex.Message, ToolTipIcon.Warning); if (ForegroundWindow) ShowMessage(ex.Message, "Easy Eject", MessageBoxIcon.Warning); }
         protected override void Dispose(bool disposing) { if (disposing) { tray.Dispose(); debounce.Dispose(); } base.Dispose(disposing); }
     }
 }

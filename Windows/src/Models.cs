@@ -66,10 +66,14 @@ namespace EasyEject {
                 Fingerprint = inventory.GroupFingerprint(disk.TargetId), Disks = numbers.ToArray(), Affected = siblings.Select(v => v.Display).ToArray() };
         }
         public EjectResult Execute(EjectPlan plan) {
+            return Execute(plan, state => {});
+        }
+        internal EjectResult Execute(EjectPlan plan, Action<Inventory> beforeRequest) {
             using (operations.Reserve(plan.Disks)) {
                 var current = discovery.Scan();
                 if (!current.Complete || current.Epoch != plan.Epoch || discovery.Epoch != plan.Epoch || current.GroupFingerprint(plan.TargetId) != plan.Fingerprint)
                     throw new SafetyException("The device connection or volumes changed. Refresh and review a new eject confirmation.");
+                beforeRequest(current);
                 return api.Request(plan.TargetDevInst, plan.TargetId);
             }
         }

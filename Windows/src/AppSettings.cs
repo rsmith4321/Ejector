@@ -1,0 +1,72 @@
+using System;
+using System.IO;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Json;
+using System.Text;
+
+namespace EasyEject {
+    [DataContract] internal sealed class AppSettings {
+        [DataMember] internal bool? ShowNotifications, DebugLogging;
+        internal bool NotificationsEnabled { get { return ShowNotifications ?? true; } }
+        internal bool DebugEnabled { get { return DebugLogging ?? false; } }
+        internal static AppSettings Load() { return Load(Profiles.Root); }
+        internal static AppSettings Load(string root) { return Configuration.Read<AppSettings>(root, "app-settings.json") ?? new AppSettings(); }
+        internal static void Save(AppSettings settings) { Save(settings, Profiles.Root); }
+        internal static void Save(AppSettings settings, string root) { if (settings == null) throw new ArgumentNullException("settings"); Profiles.WriteJson(settings, typeof(AppSettings), root, "app-settings.json"); }
+    }
+    internal static class Configuration {
+        internal static T Read<T>(string root, string name) where T : class {
+            using (SafePaths.LockDirectories(root)) {
+                string path = Path.Combine(root, name); if (!File.Exists(path)) return null;
+                using (var stream = SafePaths.ReadFile(path)) {
+                    if (stream.Length > 16384) throw new SafetyException("Saved application settings are too large to read.");
+                    var value = (T)new DataContractJsonSerializer(typeof(T)).ReadObject(stream);
+                    if (value == null) throw new SafetyException("Saved application settings are invalid."); return value;
+                }
+            }
+        }
+    }
+    [DataContract] internal sealed class AppIssue {
+        [DataMember] internal string Message = "", ObservedUtc = "";
+        [DataMember] internal bool Dismissed;
+        internal bool HasIssue { get { return !String.IsNullOrEmpty(Message); } }
+        internal bool NeedsAttention { get { return HasIssue && !Dismissed; } }
+        internal void Record(string message) { Message = message.Length > 4096 ? message.Substring(0, 4096) : message; ObservedUtc = DateTime.UtcNow.ToString("o"); Dismissed = false; }
+        internal void Dismiss() { Dismissed = true; }
+        internal void Clear() { Message = ""; ObservedUtc = ""; Dismissed = false; }
+        internal static AppIssue Load() { return Load(Profiles.Root); }
+        internal static AppIssue Load(string root) {
+            var value = Configuration.Read<AppIssue>(root, "issue-state.json") ?? new AppIssue();
+            DateTime date;
+            if (value.Message == null || value.Message.Length > 4096 || (value.HasIssue && !DateTime.TryParse(value.ObservedUtc, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out date))) throw new SafetyException("Saved issue state is invalid.");
+            return value;
+        }
+        internal static void Save(AppIssue issue) { Save(issue, Profiles.Root); }
+        internal static void Save(AppIssue issue, string root) { Profiles.WriteJson(issue, typeof(AppIssue), root, "issue-state.json"); }
+    }
+    internal static class DebugLog {
+        const long MaximumBytes = 1048576;
+        internal static void Append(string root, string message) {
+            using (SafePaths.LockDirectories(root)) {
+                string path = Path.Combine(root, "debug.log");
+                using (var stream = File.Exists(path) ? SafePaths.ExistingCopy(path) : SafePaths.NewFile(path)) {
+                    byte[] line = Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("o") + " " + message.Replace("\r", " ").Replace("\n", " ") + Environment.NewLine);
+                    if (stream.Length + line.Length > MaximumBytes) throw new SafetyException("Debug log reached 1 MiB. Existing diagnostics were kept.");
+                    stream.Position = stream.Length; stream.Write(line, 0, line.Length); stream.Flush(true);
+                }
+            }
+        }
+        internal static string Read(string root) {
+            using (SafePaths.LockDirectories(root)) {
+                string path = Path.Combine(root, "debug.log"); if (!File.Exists(path)) return "No debug events have been recorded.";
+                using (var stream = SafePaths.ReadFile(path)) { if (stream.Length > MaximumBytes) throw new SafetyException("Debug log is too large to display."); using (var reader = new StreamReader(stream, Encoding.UTF8)) return reader.ReadToEnd(); }
+            }
+        }
+    }
+    internal static class CompletionPresentation {
+        internal static bool ShowChoice(bool askToEject, bool foreground, bool notifications) { return askToEject && (foreground || !notifications); }
+        internal static string Notification(bool hasMedia) {
+            return (hasMedia ? "Selected files imported and verified." : "No media matches your import options. Photos or skipped files may remain.") + " Device remains connected. Open Easy Eject to review the import and choose whether to eject.";
+        }
+    }
+}

@@ -13,6 +13,7 @@ namespace EasyEject {
         readonly IDiscovery discovery; readonly string sourceId, destinationId, fingerprint; readonly long epoch;
         readonly string source, destination; readonly int[] disks;
         readonly DestinationIdentity destinationIdentity;
+        internal readonly ImportCompletionOrigin CompletionOrigin;
         public DestinationIdentity DestinationIdentity { get { return destinationIdentity.Copy(); } }
         public int[] ProtectedDisks { get { return disks; } }
         public bool Changed { get { return discovery.Epoch != epoch; } }
@@ -25,6 +26,9 @@ namespace EasyEject {
             if (epoch != selectionEpoch || currentSource.Fingerprint != expectedVolume.Fingerprint || state.Disks.Single(d => d.Number == currentSource.Disks[0]).Fingerprint != expectedDisk.Fingerprint)
                 throw new SafetyException("The selected card connection changed while choosing folders. Refresh and choose the device again.");
             disks = PlanProtection(state, sourceId, destinationId); fingerprint = Fingerprint(state); destinationIdentity = DestinationIdentity.Capture(state, destinationId);
+            string root = currentSource.Mounts.Where(x => SafePaths.Within(source, SafePaths.Normalize(x))).OrderByDescending(x => x.Length).FirstOrDefault();
+            if (root == null) throw new SafetyException("The selected import source root is unavailable.");
+            CompletionOrigin = new ImportCompletionOrigin(state, sourceId, root);
         }
         public static int[] PlanProtection(Inventory state, string sourceId, string destinationId) {
             var s = Resolve(state, sourceId); var d = Resolve(state, destinationId);
@@ -235,15 +239,16 @@ namespace EasyEject {
         [DataMember] public string VolumeId; [DataMember] public string VolumeSerial; [DataMember] public string DiskInstance;
         [DataMember] public string RelativeSource; [DataMember] public string Destination;
         [DataMember] public bool? UsesImportDefaults; [DataMember] public bool? VideosOnly; [DataMember] public bool? IncludePreviews; [DataMember] public bool? CleanLayout;
+        [DataMember] public bool? AskToEject;
         public bool FollowsDefaults { get { return UsesImportDefaults == true; } }
         public MediaOptions Resolve(ImportDefaults defaults) {
             if (defaults == null) throw new ArgumentNullException("defaults");
             // Prototype profiles without option fields used all-media with previews. Preserve that.
-            return FollowsDefaults ? defaults.Snapshot() : new MediaOptions(VideosOnly ?? false, IncludePreviews ?? true, CleanLayout ?? false);
+            return FollowsDefaults ? defaults.Snapshot() : new MediaOptions(VideosOnly ?? false, IncludePreviews ?? true, CleanLayout ?? false, AskToEject ?? false);
         }
         public void SetCustom(bool custom, ImportDefaults defaults) {
             MediaOptions options = FollowsDefaults || !custom ? defaults.Snapshot() : Resolve(defaults);
-            VideosOnly = options.VideosOnly; IncludePreviews = options.IncludePreviews; CleanLayout = options.CleanLayout; UsesImportDefaults = !custom;
+            VideosOnly = options.VideosOnly; IncludePreviews = options.IncludePreviews; CleanLayout = options.CleanLayout; AskToEject = options.AskToEject; UsesImportDefaults = !custom;
         }
         public ImportProfile Copy() { return (ImportProfile)MemberwiseClone(); }
     }

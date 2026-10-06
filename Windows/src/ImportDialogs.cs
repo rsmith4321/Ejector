@@ -5,23 +5,24 @@ using System.Windows.Forms;
 
 namespace EasyEject {
     internal sealed class SelectionControls : UserControl {
-        internal readonly CheckBox Videos = new CheckBox(), Previews = new CheckBox(), Clean = new CheckBox();
+        internal readonly CheckBox Videos = new CheckBox(), Previews = new CheckBox(), Clean = new CheckBox(), AskEject = new CheckBox();
         readonly Label explanation = new Label();
         internal SelectionControls() {
             AutoSize = true; Dock = DockStyle.Top;
             var layout = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             Videos.Text = "Videos only"; Previews.Text = "Include camera previews"; Clean.Text = "Clean folder layout";
-            foreach (var box in new[] { Videos, Previews, Clean }) { box.AutoSize = true; box.Margin = new Padding(0, 4, 0, 8); layout.Controls.Add(box); }
+            AskEject.Text = "Ask to eject after import";
+            foreach (var box in new[] { Videos, Previews, Clean, AskEject }) { box.AutoSize = true; box.Margin = new Padding(0, 4, 0, 8); layout.Controls.Add(box); }
             explanation.AutoSize = true; explanation.MaximumSize = new Size(580, 0); explanation.Text = "Videos only leaves photos and unfamiliar files on the device. Required camera-package audio and metadata stay with their recordings.\n\nTurning previews off skips optional proxies and thumbnails.\n\nClean layout puts ordinary media directly in the date folder. Recording packages and unfamiliar media keep their folder tree. Conflicting groups stay together with unchanged filenames."; layout.Controls.Add(explanation);
             Controls.Add(layout);
         }
-        internal void Set(MediaOptions options) { Videos.Checked = options.VideosOnly; Previews.Checked = options.IncludePreviews; Clean.Checked = options.CleanLayout; }
-        internal MediaOptions Snapshot() { return new MediaOptions(Videos.Checked, Previews.Checked, Clean.Checked); }
+        internal void Set(MediaOptions options) { Videos.Checked = options.VideosOnly; Previews.Checked = options.IncludePreviews; Clean.Checked = options.CleanLayout; AskEject.Checked = options.AskToEject; }
+        internal MediaOptions Snapshot() { return new MediaOptions(Videos.Checked, Previews.Checked, Clean.Checked, AskEject.Checked); }
         internal void SetTextWidth(int width) { explanation.MaximumSize = new Size(Math.Max(250, width - 12), 0); }
     }
     internal sealed class ImportDefaultsDialog : Form {
         internal readonly SelectionControls Selection = new SelectionControls();
-        internal ImportDefaults Value { get { var options = Selection.Snapshot(); return new ImportDefaults { VideosOnly = options.VideosOnly, IncludePreviews = options.IncludePreviews, CleanLayout = options.CleanLayout }; } }
+        internal ImportDefaults Value { get { var options = Selection.Snapshot(); return new ImportDefaults { VideosOnly = options.VideosOnly, IncludePreviews = options.IncludePreviews, CleanLayout = options.CleanLayout, AskToEject = options.AskToEject }; } }
         internal ImportDefaultsDialog(ImportDefaults defaults) {
             Text = "Import defaults"; Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(650, 400); MinimumSize = new Size(600, 380); StartPosition = FormStartPosition.CenterParent;
@@ -100,7 +101,7 @@ namespace EasyEject {
         }
         internal void SaveCustomSelection() {
             if (Draft.FollowsDefaults) return;
-            var options = Selection.Snapshot(); Draft.VideosOnly = options.VideosOnly; Draft.IncludePreviews = options.IncludePreviews; Draft.CleanLayout = options.CleanLayout;
+            var options = Selection.Snapshot(); Draft.VideosOnly = options.VideosOnly; Draft.IncludePreviews = options.IncludePreviews; Draft.CleanLayout = options.CleanLayout; Draft.AskToEject = options.AskToEject;
         }
         internal void UpdateSelection() {
             updating = true;

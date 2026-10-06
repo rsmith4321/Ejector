@@ -8,8 +8,8 @@ using System.Text.RegularExpressions;
 namespace EasyEject {
     // Immutable options are resolved before an operation; editing defaults cannot alter a running copy.
     public sealed class MediaOptions {
-        public readonly bool VideosOnly, IncludePreviews, CleanLayout;
-        public MediaOptions(bool videosOnly, bool includePreviews, bool cleanLayout = false) { VideosOnly = videosOnly; IncludePreviews = includePreviews; CleanLayout = cleanLayout; }
+        public readonly bool VideosOnly, IncludePreviews, CleanLayout, AskToEject;
+        public MediaOptions(bool videosOnly, bool includePreviews, bool cleanLayout = false, bool askToEject = false) { VideosOnly = videosOnly; IncludePreviews = includePreviews; CleanLayout = cleanLayout; AskToEject = askToEject; }
     }
     public sealed class MediaPlan {
         public List<string> Media, Indexes;

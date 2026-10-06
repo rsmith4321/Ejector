@@ -9,7 +9,7 @@ namespace EasyEject {
     public static class Tests {
         static int passed, failed;
         sealed class FakeDiscovery : IDiscovery { public Inventory State; public Inventory Scan() { return State; } public long Epoch { get { return State.Epoch; } } }
-        sealed class FakeEject : IEjectApi { public int Calls; public EjectResult Result = new EjectResult { Success = true }; public EjectResult Request(uint node, string id) { Calls++; return Result; } }
+        sealed class FakeEject : IEjectApi { public int Calls; public uint LastNode; public string LastId; public Action BeforeRequest; public EjectResult Result = new EjectResult { Success = true }; public EjectResult Request(uint node, string id) { if (BeforeRequest != null) BeforeRequest(); Calls++; LastNode = node; LastId = id; return Result; } }
         sealed class FakeGuard : IImportGuard { public int Calls, FailAt = Int32.MaxValue; public int[] ProtectedDisks { get { return new[] { 700, 701 }; } } public void Validate() { if (++Calls >= FailAt) throw new SafetyException("Fixture disconnected"); } }
         sealed class InterruptedGuard : IImportGuard, IConnectionGuard {
             readonly Fixture fixture; readonly CancellationTokenSource cancellation; int checks; public long WrittenBeforeStop;
@@ -50,6 +50,7 @@ namespace EasyEject {
         static string Saved(ImportResult result, string sourceRelative) { return Path.Combine(result.Folder, result.Receipt.Files.Single(x => x.SourceRelativePath == sourceRelative).RelativePath); }
         static DestinationIdentity HistoryIdentity() { return new DestinationIdentity { VolumeId = "destination-fixture", VolumeSerial = "ABC", DiskInstance = "destination-disk", DiskSerial = "serial-destination" }; }
         static CompletedBatch Batch(Fixture fixture, ImportResult result) { return ImportHistory.Create(result, new ImportProfile { VolumeId = result.Receipt.SourceVolume, Destination = fixture.Destination }, "Fixture camera", HistoryIdentity()); }
+        static ImportCompletion Completion(Inventory state, Fixture fixture, bool hasMedia) { return new ImportCompletion(new ImportCompletionOrigin(state, state.Volumes[0].Id, state.Volumes[0].Mounts[0]), "Fixture camera", fixture.Destination, fixture.Destination, HistoryIdentity(), hasMedia, hasMedia ? "Files verified. Originals kept." : "No media matches your import options."); }
         static void Test(string name, Action action) { try { action(); passed++; Console.WriteLine("PASS " + name); } catch (Exception ex) { failed++; Console.WriteLine("FAIL " + name + ": " + ex); } }
         static Inventory State() {
             var state = new Inventory { Epoch = 1 };
@@ -88,6 +89,15 @@ namespace EasyEject {
                 var previewBatch = new CompletedBatch { Id = Guid.NewGuid().ToString("N"), CompletedUtc = DateTime.UtcNow.ToString("o"), DeviceName = "Fixture Insta360 card", Folder = @"D:\Travel backups\2026-10-06", ReceiptPath = @"D:\Travel backups\2026-10-06\.easy-eject-receipts\fixture\verified-import.json", Originals = new List<VerifiedCopy> { new VerifiedCopy { Path = @"D:\Travel backups\2026-10-06\VID_20261006_001.mp4", Sha256 = new string('a', 64), Bytes = 1234567 } } };
                 using (var dialog = new ImportHistoryDialog(new[] { previewBatch })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history.png")); dialog.Batches.Items[0].Selected = true; Render(dialog, Path.Combine(output, "history-selected.png")); }
                 using (var dialog = new ImportHistoryDialog(new CompletedBatch[0])) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history-empty.png")); }
+                using (var fixture = new Fixture()) {
+                    var completion = Completion(state, fixture, true);
+                    using (var dialog = new ImportCompletionDialog(completion, true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "completion.png")); dialog.ExpireEject(); Render(dialog, Path.Combine(output, "completion-expired.png")); }
+                    using (var dialog = new ImportCompletionDialog(Completion(state, fixture, false), true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "completion-no-media.png")); }
+                    using (var dialog = new PendingCompletionsDialog(new[] { completion })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "completed-imports.png")); }
+                    using (var dialog = new AppSettingsDialog(new AppSettings())) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "app-settings.png")); }
+                    var issue = new AppIssue(); issue.Record("Fixture open-file veto. Finish transfers and close programs using the device, then review a fresh safe-removal choice.");
+                    using (var dialog = new IssueDialog(issue)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "issue.png")); }
+                }
                 using (var window = new DeviceWindow()) { window.Size = window.MinimumSize; Render(window, Path.Combine(output, "device-window.png")); }
                 Console.WriteLine("Hidden forms rendered at minimum size. No device operations: " + output); return 0;
             }
@@ -248,7 +258,7 @@ namespace EasyEject {
                 Profiles.Save(profile, root);
                 // Remove new option keys entirely to represent an actual pre-options JSON file.
                 string path = Directory.GetFiles(root).Single();
-                string legacy = File.ReadAllText(path); legacy = System.Text.RegularExpressions.Regex.Replace(legacy, @",?""(?:UsesImportDefaults|VideosOnly|IncludePreviews|CleanLayout)"":null", "").Replace("{,", "{"); File.WriteAllText(path, legacy);
+                string legacy = File.ReadAllText(path); legacy = System.Text.RegularExpressions.Regex.Replace(legacy, @",?""(?:UsesImportDefaults|VideosOnly|IncludePreviews|CleanLayout|AskToEject)"":null", "").Replace("{,", "{"); File.WriteAllText(path, legacy);
                 var loaded = Profiles.Load(state.Volumes[0], state.Disks[0], root); var options = loaded.Resolve(new ImportDefaults { VideosOnly = true, IncludePreviews = false });
                 Check(!loaded.FollowsDefaults && !options.VideosOnly && options.IncludePreviews && !options.CleanLayout, "Legacy import semantics changed");
                 loaded.SetCustom(false, new ImportDefaults()); Profiles.Save(loaded, root); var restored = Profiles.Load(state.Volumes[0], state.Disks[0], root);
@@ -441,6 +451,143 @@ namespace EasyEject {
                     Check(handle != IntPtr.Zero && !dialog.Visible && selected != null && selected.DeviceName == "Fixture camera" && selected.Originals.Count == 1 && dialog.Details.Text.Contains("clip.mov"), "History UI depended on mutable caller or lost membership");
                     selected.Originals.Clear(); Check(dialog.SelectedBatch.Originals.Count == 1, "UI selection exposed stored entries for mutation");
                 }
+            } });
+            Test("completion registry checks source root, volume, disk, topology and connection", delegate { using (var f = new Fixture()) {
+                var state = State(); var entry = Completion(state, f, true); var registry = new ImportCompletionRegistry(); registry.Insert(entry);
+                Check(registry.Matches(entry.Id, state, "volume-a", @"E:\"), "Exact source rejected");
+                Check(!registry.Matches(entry.Id, state, "replacement", @"E:\") && !registry.Matches(entry.Id, state, "volume-a", @"E:\DCIM") && !registry.Matches("untrusted-payload", state, "volume-a", @"E:\"), "Untrusted source/token accepted");
+                state.Disks[0].Serial = "changed"; Check(!registry.Matches(entry.Id, state, "volume-a", @"E:\"), "Changed physical identity accepted"); state.Disks[0].Serial = "serial-a";
+                state.Volumes[0].Serial = "format"; Check(!registry.Matches(entry.Id, state, "volume-a", @"E:\"), "Reformatted source accepted"); state.Volumes[0].Serial = "ABC";
+                state.Epoch++; Check(!registry.Matches(entry.Id, state, "volume-a", @"E:\"), "Reconnected identical card accepted"); state.Epoch--;
+                state.Volumes.Add(new Volume { Id = "sibling", Serial = "DEF", Disks = new List<int> { 7 }, Extents = "7:1000:1000", Mounts = new List<string> { @"F:\" } });
+                Check(!registry.Matches(entry.Id, state, "volume-a", @"E:\"), "New sibling accepted");
+            } });
+            Test("new import replaces only its source action and restart restores none", delegate { using (var f = new Fixture()) {
+                var state = State(); var registry = new ImportCompletionRegistry(); var first = Completion(state, f, true); var next = Completion(state, f, false); registry.Insert(first);
+                state.Disks.Add(new Disk { Number = 8, DevInst = 11, InstanceId = "disk-b", Serial = "serial-b", TargetId = "usb-b", TargetDevInst = 21, Ancestors = new List<string> { "disk-b", "usb-b" } });
+                state.Volumes.Add(new Volume { Id = "volume-b", Serial = "DEF", Disks = new List<int> { 8 }, Mounts = new List<string> { @"F:\" } });
+                var other = new ImportCompletion(new ImportCompletionOrigin(state, "volume-b", @"F:\"), "Other camera", f.Destination, f.Destination, HistoryIdentity(), true, "Other complete"); registry.Insert(other);
+                Check(registry.Insert(next).SequenceEqual(new[] { first.Id }) && registry.Get(first.Id) == null && registry.Get(other.Id) != null, "New import retained old authority or erased another device");
+                Check(registry.InvalidateSource(@"E:\").SequenceEqual(new[] { next.Id }) && registry.Get(other.Id) != null && new ImportCompletionRegistry().Entries.Length == 0, "Disconnect/restart authority incorrect");
+                Check(registry.InvalidateAll().SequenceEqual(new[] { other.Id }) && registry.Entries.Length == 0, "Connection invalidation left tokens");
+            } });
+            Test("completion captures immutable removal plan and destination identity", delegate { using (var f = new Fixture()) {
+                var state = State(); var entry = Completion(state, f, true); var changed = entry.Origin.Plan; changed.Disks[0] = 999; changed.TargetId = "hub"; changed.Affected[0] = "wrong";
+                var destination = entry.Destination; destination.VolumeSerial = "wrong";
+                Check(entry.Origin.Plan.Disks[0] == 7 && entry.Origin.Plan.TargetId == "usb-a" && entry.Destination.VolumeSerial == "ABC" && entry.Origin.Matches(state, "volume-a", @"E:\"), "Caller mutated captured authorization");
+                state.Disks[0].DevInst = 999; Check(!entry.Origin.Matches(state, "volume-a", @"E:\"), "Origin retained a mutable source reference");
+                Throws<SafetyException>(() => new ImportCompletionOrigin(state, "volume-a", @"E:\DCIM"));
+            } });
+            Test("post-import eject is explicit and consumed once before fake removal", delegate { using (var f = new Fixture()) {
+                var state = State(); var registry = new ImportCompletionRegistry(); var entry = Completion(state, f, true); registry.Insert(entry); var fake = new FakeEject();
+                var service = new CompletedEjectService(registry, new FakeDiscovery { State = state }, fake, new Operations(), x => "volume-a");
+                Check(fake.Calls == 0 && registry.Get(entry.Id) != null, "Completion automatically ejected");
+                Check(service.Execute(entry.Id).Success && fake.Calls == 1 && registry.Get(entry.Id) == null, "Explicit action not consumed once"); Throws<SafetyException>(() => service.Execute(entry.Id)); Check(fake.Calls == 1, "Repeat token requested another removal");
+            } });
+            Test("busy post-import eject preserves the choice for a later explicit attempt", delegate { using (var f = new Fixture()) {
+                var state = State(); var registry = new ImportCompletionRegistry(); var entry = Completion(state, f, true); registry.Insert(entry); var fake = new FakeEject(); var operations = new Operations();
+                var service = new CompletedEjectService(registry, new FakeDiscovery { State = state }, fake, operations, x => "volume-a");
+                using (operations.Reserve(new[] { 7 })) Throws<SafetyException>(() => service.Execute(entry.Id));
+                Check(fake.Calls == 0 && registry.Get(entry.Id) != null, "Busy operation consumed authorization or ejected"); Check(service.Execute(entry.Id).Success && fake.Calls == 1, "Busy reservation not released");
+            } });
+            Test("changed source path and topology cannot use a completed-import action", delegate { using (var f = new Fixture()) {
+                var state = State(); var registry = new ImportCompletionRegistry(); var entry = Completion(state, f, true); registry.Insert(entry); var fake = new FakeEject(); var discovery = new FakeDiscovery { State = state };
+                Throws<SafetyException>(() => new CompletedEjectService(registry, discovery, fake, new Operations(), x => "replacement-volume").Execute(entry.Id));
+                state.Epoch++; Throws<SafetyException>(() => new CompletedEjectService(registry, discovery, fake, new Operations(), x => "volume-a").Execute(entry.Id)); state.Epoch--;
+                state.Complete = false; Throws<SafetyException>(() => new CompletedEjectService(registry, discovery, fake, new Operations(), x => "volume-a").Execute(entry.Id));
+                Check(fake.Calls == 0, "Stale action reached fake eject");
+            } });
+            Test("veto consumes completed action and never retries automatically", delegate { using (var f = new Fixture()) {
+                var state = State(); var registry = new ImportCompletionRegistry(); var entry = Completion(state, f, true); registry.Insert(entry); var fake = new FakeEject { Result = new EjectResult { Code = 23, Veto = 6, Name = "Fixture process" } };
+                var service = new CompletedEjectService(registry, new FakeDiscovery { State = state }, fake, new Operations(), x => "volume-a"); var result = service.Execute(entry.Id);
+                Check(!result.Success && result.Message.Contains("Fixture process") && registry.Get(entry.Id) == null && fake.Calls == 1, "Veto lost reason or kept replay authority"); Throws<SafetyException>(() => service.Execute(entry.Id)); Check(fake.Calls == 1, "Veto retried");
+            } });
+            Test("completion with no removable node keeps files accessible without eject authority", delegate { using (var f = new Fixture()) {
+                var state = State(); state.Disks[0].TargetId = ""; var entry = Completion(state, f, false); var registry = new ImportCompletionRegistry(); registry.Insert(entry);
+                Check(entry.Origin.Plan == null && entry.Origin.BlockedReason != "" && !registry.Matches(entry.Id, state, "volume-a", @"E:\"), "Missing target authorized removal");
+                int opened = 0; CompletionFolder.Open(entry, HistoryIdentity(), new FakeGuard(), new Operations(), x => { Check(x == f.Destination, "Wrong folder opened"); opened++; }); Check(opened == 1, "Safe destination access needed source eject authority");
+            } });
+            Test("completion folder refuses changed destination and redirected paths", delegate { using (var f = new Fixture()) {
+                var entry = Completion(State(), f, true); var changed = HistoryIdentity(); changed.VolumeSerial = "wrong"; int opened = 0;
+                Throws<SafetyException>(() => CompletionFolder.Open(entry, changed, new FakeGuard(), new Operations(), x => opened++));
+                string moved = Path.Combine(f.Root, "moved-destination"); Directory.Move(f.Destination, moved); CreateJunction(f, f.Destination, moved);
+                Throws<SafetyException>(() => CompletionFolder.Open(entry, HistoryIdentity(), new FakeGuard(), new Operations(), x => opened++)); Check(opened == 0, "Unsafe folder was opened");
+            } });
+            Test("completion dialogs default to keep connected for media and no-match outcomes", delegate { using (var f = new Fixture()) {
+                foreach (bool media in new[] { true, false }) using (var dialog = new ImportCompletionDialog(Completion(State(), f, media), true)) {
+                    Check(dialog.AcceptButton == dialog.Keep && dialog.CancelButton == dialog.Keep && dialog.Keep.DialogResult == System.Windows.Forms.DialogResult.Cancel && dialog.Eject.DialogResult == System.Windows.Forms.DialogResult.Yes, "Default/escape authorized removal");
+                    if (!media) Check(dialog.Explanation.Text.Contains("Photos, skipped previews"), "No-match claimed empty device");
+                    Check(dialog.Explanation.Text.Contains("all affected partitions") && dialog.Explanation.Text.Contains("Fixture camera"), "Affected storage explanation missing");
+                    dialog.ExpireEject(); Check(!dialog.Eject.Enabled && dialog.Explanation.Text.Contains("connection changed"), "Changed connection kept dialog action enabled");
+                }
+            } });
+            Test("notification route keeps completion choices manual with opt-in eject prompting", delegate {
+                foreach (bool ask in new[] { true, false }) foreach (bool foreground in new[] { true, false }) foreach (bool notifications in new[] { true, false })
+                    Check(CompletionPresentation.ShowChoice(ask, foreground, notifications) == (ask && (foreground || !notifications)), "Wrong foreground/background completion route");
+                Check(CompletionPresentation.Notification(false).Contains("Photos or skipped files") && CompletionPresentation.Notification(true).Contains("Device remains connected") && !CompletionPresentation.Notification(true).Contains("volume-a"), "Notification contains authority or misleading outcome");
+            });
+            Test("ask-to-eject defaults start off and preserve custom legacy and frozen choices", delegate { using (var f = new Fixture()) {
+                var state = State(); var defaults = new ImportDefaults(); var profile = defaults.NewProfile(state.Volumes[0], state.Disks[0]); Check(!profile.Resolve(defaults).AskToEject && profile.AskToEject == false, "Eject prompting not opt-in");
+                defaults.AskToEject = true; var frozen = profile.Resolve(defaults); defaults.AskToEject = false; Check(frozen.AskToEject && !profile.Resolve(defaults).AskToEject, "In-flight completion option changed");
+                profile.SetCustom(true, new ImportDefaults { AskToEject = true }); profile.AskToEject = false; Check(!profile.Resolve(new ImportDefaults { AskToEject = true }).AskToEject, "Custom choice inherited defaults");
+                profile.AskToEject = null; profile.UsesImportDefaults = null; Check(!profile.Resolve(new ImportDefaults { AskToEject = true }).AskToEject, "Legacy profile enabled prompting");
+                string root = Path.Combine(f.Root, "preferences"); ImportDefaults.Save(new ImportDefaults { AskToEject = true }, root); Check(ImportDefaults.Load(root).Snapshot().AskToEject, "Prompting choice did not persist");
+            } });
+            Test("app notification and debug settings persist without altering import profiles", delegate { using (var f = new Fixture()) {
+                Check(AppSettings.Load(f.Root).NotificationsEnabled && !AppSettings.Load(f.Root).DebugEnabled, "Wrong factory app settings");
+                var state = State(); var profile = new ImportDefaults().NewProfile(state.Volumes[0], state.Disks[0]); profile.Destination = f.Destination; Profiles.Save(profile, f.Root);
+                AppSettings.Save(new AppSettings { ShowNotifications = false, DebugLogging = true }, f.Root); var restored = AppSettings.Load(f.Root);
+                Check(!restored.NotificationsEnabled && restored.DebugEnabled && Profiles.Load(state.Volumes[0], state.Disks[0], f.Root).Destination == f.Destination, "App settings altered profile or failed roundtrip");
+                File.WriteAllText(Path.Combine(f.Root, "app-settings.json"), "{}"); Check(AppSettings.Load(f.Root).NotificationsEnabled && !AppSettings.Load(f.Root).DebugEnabled, "Missing fields changed defaults");
+                File.WriteAllText(Path.Combine(f.Root, "app-settings.json"), "null"); Throws<SafetyException>(() => AppSettings.Load(f.Root)); File.WriteAllText(Path.Combine(f.Root, "app-settings.json"), new string(' ', 17000)); Throws<SafetyException>(() => AppSettings.Load(f.Root));
+                Throws<ArgumentNullException>(() => AppSettings.Save(null, f.Root));
+            } });
+            Test("issue dismissal persists without retry and later identical failure restores attention", delegate { using (var f = new Fixture()) {
+                var issue = AppIssue.Load(f.Root); var fake = new FakeEject(); Check(!issue.HasIssue && !issue.NeedsAttention, "Factory issue present");
+                issue.Record("Fixture veto"); AppIssue.Save(issue, f.Root); issue = AppIssue.Load(f.Root); Check(issue.NeedsAttention, "Failure attention not persisted");
+                issue.Dismiss(); AppIssue.Save(issue, f.Root); issue = AppIssue.Load(f.Root); Check(issue.HasIssue && !issue.NeedsAttention && fake.Calls == 0, "Dismiss cleared context or retried eject");
+                issue.Record("Fixture veto"); Check(issue.NeedsAttention && !issue.Dismissed && fake.Calls == 0, "Later failure did not restore attention"); issue.Clear(); AppIssue.Save(issue, f.Root); Check(!AppIssue.Load(f.Root).HasIssue, "Successful clear not retained");
+                using (var dialog = new IssueDialog(issue)) Check(dialog.AcceptButton == dialog.CancelButton, "Issue dialog default changed state");
+            } });
+            Test("debug logs stay bounded and retain existing diagnostics on capacity refusal", delegate { using (var f = new Fixture()) {
+                DebugLog.Append(f.Root, "one\nsecond line"); DebugLog.Append(f.Root, "two"); string text = DebugLog.Read(f.Root); Check(text.Contains("one second line") && text.Contains("two") && !text.Contains("\nsecond line"), "Debug events lost or multiline entries escaped boundaries");
+                string path = Path.Combine(f.Root, "debug.log"); File.WriteAllText(path, new string('x', 1048576)); Throws<SafetyException>(() => DebugLog.Append(f.Root, "overflow")); Check(new FileInfo(path).Length == 1048576 && File.ReadAllText(path).All(x => x == 'x'), "Log limit deleted or replaced diagnostics");
+            } });
+            Test("settings editor uses a draft and saving never changes source files", delegate { using (var f = new Fixture()) {
+                f.Put("clip.mov", "original"); var settings = new AppSettings();
+                using (var dialog = new AppSettingsDialog(settings)) { dialog.Notifications.Checked = false; dialog.Debug.Checked = true; Check(settings.NotificationsEnabled && !settings.DebugEnabled && !dialog.Value.NotificationsEnabled && dialog.Value.DebugEnabled, "Unsaved editor mutated live settings"); AppSettings.Save(dialog.Value, f.Root); }
+                Check(File.ReadAllText(Path.Combine(f.Source, "clip.mov")) == "original", "Saving preferences changed media");
+            } });
+            Test("closing the device window during work hides it while keeping the operation alive", delegate {
+                using (var window = new DeviceWindow()) {
+                    var field = typeof(DeviceWindow).GetField("working", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance); field.SetValue(window, true);
+                    var argsClose = new System.Windows.Forms.FormClosingEventArgs(System.Windows.Forms.CloseReason.UserClosing, false);
+                    typeof(System.Windows.Forms.Form).GetMethod("OnFormClosing", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).Invoke(window, new object[] { argsClose });
+                    Check(argsClose.Cancel && !window.Visible && !window.IsDisposed && (bool)field.GetValue(window), "Close terminated or cancelled background work");
+                }
+            });
+            Test("completion origin refuses protected or unconfirmed source identities", delegate { using (var f = new Fixture()) {
+                var state = State(); state.Volumes[0].Serial = ""; Throws<SafetyException>(() => Completion(state, f, true)); state.Volumes[0].Serial = "ABC";
+                state.Volumes[0].System = true; Throws<SafetyException>(() => Completion(state, f, true)); state.Volumes[0].System = false;
+                state.Disks[0].InstanceId = ""; Throws<SafetyException>(() => Completion(state, f, true)); state.Disks[0].InstanceId = "disk-a";
+                state.Complete = false; Throws<SafetyException>(() => Completion(state, f, true));
+            } });
+            Test("completed camera eject confirms and reserves every sibling LUN", delegate { using (var f = new Fixture()) {
+                var state = State(); state.Volumes[0].Label = "Internal camera storage";
+                state.Disks.Add(new Disk { Number = 8, DevInst = 11, InstanceId = "disk-b", Serial = "serial-b", TargetId = "usb-a", TargetDevInst = 20, Ancestors = new List<string> { "disk-b", "usb-a" } });
+                state.Volumes.Add(new Volume { Id = "volume-b", Label = "Camera SD Card", Serial = "DEF", Disks = new List<int> { 8 }, Mounts = new List<string> { @"F:\" } });
+                var entry = Completion(state, f, true); var registry = new ImportCompletionRegistry(); registry.Insert(entry); var operations = new Operations();
+                using (var dialog = new ImportCompletionDialog(entry, true)) Check(dialog.Eject.Text == "Eject Device" && dialog.Explanation.Text.Contains("Internal camera storage") && dialog.Explanation.Text.Contains("Camera SD Card"), "Grouped camera storage not fully described");
+                var fake = new FakeEject { BeforeRequest = delegate { Throws<SafetyException>(() => operations.Reserve(new[] { 7 })); Throws<SafetyException>(() => operations.Reserve(new[] { 8 })); } };
+                var service = new CompletedEjectService(registry, new FakeDiscovery { State = state }, fake, operations, x => "volume-a");
+                using (operations.Reserve(new[] { 8 })) Throws<SafetyException>(() => service.Execute(entry.Id));
+                Check(fake.Calls == 0 && registry.Get(entry.Id) != null, "Busy sibling was ignored"); Check(service.Execute(entry.Id).Success && fake.Calls == 1 && fake.LastId == "usb-a" && fake.LastNode == 20, "Wrong removal group or repeated API request");
+            } });
+            Test("corrupt or redirected issue storage fails without concealing a failure", delegate { using (var f = new Fixture()) {
+                string path = Path.Combine(f.Root, "issue-state.json"); File.WriteAllText(path, "{\"Message\":\"Failure\",\"ObservedUtc\":\"invalid\"}"); Throws<SafetyException>(() => AppIssue.Load(f.Root));
+                File.WriteAllText(path, "invalid"); Throws<System.Runtime.Serialization.SerializationException>(() => AppIssue.Load(f.Root));
+                string root = Path.Combine(f.Root, "settings"), target = Path.Combine(f.Root, "redirect"); Directory.CreateDirectory(target); CreateJunction(f, root, target);
+                var issue = new AppIssue(); issue.Record("Failure still needs attention"); Throws<SafetyException>(() => AppIssue.Save(issue, root)); Check(issue.NeedsAttention && Directory.GetFileSystemEntries(target).Length == 0, "Rejected storage concealed issue or wrote through a link");
             } });
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
