@@ -110,28 +110,28 @@ namespace EasyEject {
             });
             Test("Mac parity orphan LRV is excluded in videos-only and retained after opted-in all-media backup", delegate {
                 using (var f = new Fixture()) {
-                    f.Put("orphan.LRV", "unpaired proxy fixture"); var skipped = ParityImport(f, f.Source, options: new MediaOptions(true, true, true, true)); Check(skipped.Files == 0 && !skipped.HasSelectedMedia, "Orphan treated as a selected master");
-                    var backed = ParityImport(f, f.Source, options: new MediaOptions(false, true, true, true)); Check(backed.Files == 1 && backed.RemovedOriginals == 0 && File.ReadAllText(Saved(backed, "orphan.LRV")) == "unpaired proxy fixture" && File.ReadAllText(Path.Combine(f.Source, "orphan.LRV")) == "unpaired proxy fixture", "Unrecognized orphan was deleted or not backed up");
+                    f.Put("orphan.LRV", "unpaired proxy fixture"); var skipped = ParityImport(f, f.Source, options: RemoveOptions()); Check(skipped.Files == 0 && !skipped.HasSelectedMedia, "Orphan treated as a selected master");
+                    var backed = ParityImport(f, f.Source, options: RemoveOptions(false)); Check(backed.Files == 1 && backed.RemovedOriginals == 0 && File.ReadAllText(Saved(backed, "orphan.LRV")) == "unpaired proxy fixture" && File.ReadAllText(Path.Combine(f.Source, "orphan.LRV")) == "unpaired proxy fixture", "Unrecognized orphan was deleted or not backed up");
                 }
             });
             Test("Mac parity late Live Photo companion prevents opted-in video removal", delegate {
                 using (var f = new Fixture()) {
                     f.Put("live.MOV", "movie retained"); bool arrived = false;
-                    Throws<SafetyException>(() => ParityImport(f, f.Source, options: new MediaOptions(true, true, true, true), audit: line => { if (line.StartsWith("Copied verified SHA256", StringComparison.Ordinal)) { f.Put("live.HEIC", "photo arrived"); arrived = true; } }));
+                    Throws<SafetyException>(() => ParityImport(f, f.Source, options: RemoveOptions(), audit: line => { if (line.StartsWith("Copied verified SHA256", StringComparison.Ordinal)) { f.Put("live.HEIC", "photo arrived"); arrived = true; } }));
                     Check(arrived && File.ReadAllText(Path.Combine(f.Source, "live.MOV")) == "movie retained" && File.ReadAllText(Path.Combine(f.Source, "live.HEIC")) == "photo arrived" && Directory.GetFiles(f.Destination, "verified-import.json", SearchOption.AllDirectories).Length == 0, "Late photo association lost an original or allowed completion");
                 }
             });
             Test("Mac parity lost saved Sony companion prevents every opted-in original disposition", delegate {
                 using (var f = new Fixture()) {
                     string[] paths = { "M4ROOT/CLIP/C0001.MP4", "M4ROOT/CLIP/C0001M01.XML", "M4ROOT/MEDIAPRO.XML" }; foreach (string path in paths) f.Put(path, path); int copies = 0; bool removed = false;
-                    Throws<Exception>(() => ParityImport(f, f.Source, options: new MediaOptions(true, true, true, true), audit: line => { if (line.StartsWith("Copied verified SHA256", StringComparison.Ordinal) && ++copies == paths.Length) { File.Delete(Directory.GetFiles(f.Destination, "C0001M01.XML", SearchOption.AllDirectories).Single()); removed = true; } }));
+                    Throws<Exception>(() => ParityImport(f, f.Source, options: RemoveOptions(), audit: line => { if (line.StartsWith("Copied verified SHA256", StringComparison.Ordinal) && ++copies == paths.Length) { File.Delete(Directory.GetFiles(f.Destination, "C0001M01.XML", SearchOption.AllDirectories).Single()); removed = true; } }));
                     Check(removed && Directory.GetFiles(f.Destination, "verified-import.json", SearchOption.AllDirectories).Length == 0, "Companion loss not exercised or batch completed"); foreach (string path in paths) Check(File.ReadAllText(Path.Combine(f.Source, path.Replace('/', '\\'))) == path, "Original disposed despite incomplete saved package");
                 }
             });
             Test("Mac parity same-size saved-copy mutation with restored time prevents all original removal", delegate {
                 using (var f = new Fixture()) {
                     f.Put("a.mp4", "original-a"); f.Put("z.mp4", "original-z"); int copies = 0; bool changed = false;
-                    Throws<SafetyException>(() => ParityImport(f, f.Source, options: new MediaOptions(true, true, true, true), audit: line => { if (line.StartsWith("Copied verified SHA256", StringComparison.Ordinal) && ++copies == 2) { string saved = Directory.GetFiles(f.Destination, "a.mp4", SearchOption.AllDirectories).Single(); DateTime time = File.GetLastWriteTimeUtc(saved); File.WriteAllText(saved, "changed--a"); File.SetLastWriteTimeUtc(saved, time); changed = true; } }));
+                    Throws<SafetyException>(() => ParityImport(f, f.Source, options: RemoveOptions(), audit: line => { if (line.StartsWith("Copied verified SHA256", StringComparison.Ordinal) && ++copies == 2) { string saved = Directory.GetFiles(f.Destination, "a.mp4", SearchOption.AllDirectories).Single(); DateTime time = File.GetLastWriteTimeUtc(saved); File.WriteAllText(saved, "changed--a"); File.SetLastWriteTimeUtc(saved, time); changed = true; } }));
                     Check(changed && File.ReadAllText(Path.Combine(f.Source, "a.mp4")) == "original-a" && File.ReadAllText(Path.Combine(f.Source, "z.mp4")) == "original-z" && Directory.GetFiles(f.Destination, "verified-import.json", SearchOption.AllDirectories).Length == 0, "Restored stamp bypassed batch verification");
                 }
             });
