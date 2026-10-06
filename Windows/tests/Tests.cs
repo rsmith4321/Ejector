@@ -84,6 +84,9 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--ui-render") {
                 string output = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectWindowsPreview", "run-" + Guid.NewGuid().ToString("N").Substring(0, 16));
                 Directory.CreateDirectory(output); var state = State(); var defaults = new ImportDefaults(); var profile = defaults.NewProfile(state.Volumes[0], state.Disks[0]); profile.RelativeSource = "DCIM"; profile.Destination = @"D:\Travel backups";
+                var shareProfile = profile.Copy(); shareProfile.Name = "Fixture Luna travel card"; shareProfile.SharingPreset = QuickShareProfile.Uhd; shareProfile.SharingColor = QuickShareProfile.Standard;
+                using (var dialog = new ImportProfileDialog(shareProfile, null, shareProfile.Name, defaults, true)) { dialog.Size = dialog.MinimumSize; RenderAtBottom(dialog, Path.Combine(output, "profile-quick-share-bottom.png")); }
+                using (var dialog = new QuickSharePromptDialog(shareProfile.Name, @"D:\Travel backups\2026-10-06\Fixture Luna travel card", shareProfile)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "quick-share-prompt.png")); RenderAtBottom(dialog, Path.Combine(output, "quick-share-prompt-bottom.png")); }
                 using (var dialog = new ImportProfileDialog(profile, @"E:\", "Fixture Insta360 card · E:\\", defaults, true)) {
                     dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "profile-defaults.png"));
                     dialog.UseCustom.Checked = true; dialog.Selection.Previews.Checked = false; Render(dialog, Path.Combine(output, "profile-custom.png"));
@@ -646,6 +649,7 @@ namespace EasyEject {
             QuickShareRecipeTests();
             QuickShareProcessTests();
             QuickShareEngineTests();
+            QuickShareDialogTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {

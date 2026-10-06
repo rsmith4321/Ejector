@@ -262,6 +262,8 @@ namespace EasyEject {
         [DataMember] public bool? AskToEject;
         [DataMember] public bool? DeleteOriginals;
         [DataMember] public bool? RecoverTrash; [DataMember] public string MacTrashUid;
+        // Per-device manual offer. Missing fields preserve legacy off/default-Luna behavior.
+        [DataMember] public string SharingPreset; [DataMember] public string SharingColor;
         public bool FollowsDefaults { get { return UsesImportDefaults == true; } }
         public bool AutomaticEnabled(ImportDefaults defaults) { if (defaults == null) throw new ArgumentNullException("defaults"); return FollowsDefaults ? defaults.AutomaticEnabled : AutomaticImport ?? false; }
         public MediaOptions Resolve(ImportDefaults defaults) {
@@ -307,6 +309,7 @@ namespace EasyEject {
             if (profile == null || String.IsNullOrWhiteSpace(profile.VolumeId)) throw new SafetyException("Import profile has no volume identity.");
             if (profile.MacTrashUid != null && !DeviceTrash.ValidMacOwner(profile.MacTrashUid)) throw new SafetyException("Saved Mac Trash owner selection is invalid. Review this device's profile.");
             ValidateName(profile.Name, false);
+            QuickShareProfile.Validate(profile);
             if (profile.SavedDestination != null) profile.SavedDestination.Validate();
             Directory.CreateDirectory(root);
             using (SafePaths.LockDirectories(root)) using (WriterGate(root)) WriteJson(profile, typeof(ImportProfile), root, FileName(profile.VolumeId));
@@ -334,6 +337,7 @@ namespace EasyEject {
                 if (p == null || p.VolumeId != volume.Id || p.VolumeSerial != volume.Serial || p.DiskInstance != disk.InstanceId) throw new SafetyException("Saved import profile no longer matches this card. Choose the folders again and save a new profile.");
                 if (p.RelativeSource == null || p.Destination == null) throw new SafetyException("Saved import folders are invalid. Choose the folders again.");
                 ValidateName(p.Name, false);
+                QuickShareProfile.Validate(p);
                 if (p.SavedDestination != null) p.SavedDestination.Validate();
                 if (p.MacTrashUid != null && !DeviceTrash.ValidMacOwner(p.MacTrashUid)) throw new SafetyException("Saved Mac Trash owner selection is invalid. Review this device's profile.");
                 return p;

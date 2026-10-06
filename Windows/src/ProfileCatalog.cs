@@ -54,6 +54,7 @@ namespace EasyEject {
                 var value = (ImportProfile)new DataContractJsonSerializer(typeof(ImportProfile)).ReadObject(stream);
                 if (value == null || String.IsNullOrWhiteSpace(value.VolumeId) || value.VolumeSerial == null || String.IsNullOrWhiteSpace(value.DiskInstance) || FileName(value.VolumeId) != name) throw new SafetyException("Saved profile filename or device identity is invalid.");
                 ValidateName(value.Name, false); ValidateStoredFolders(value);
+                QuickShareProfile.Validate(value);
                 if (value.SavedDestination != null) value.SavedDestination.Validate();
                 if (value.MacTrashUid != null && !DeviceTrash.ValidMacOwner(value.MacTrashUid)) throw new SafetyException("Saved Mac Trash owner is invalid.");
                 return new SavedProfile(name, value, hash, stamp);
@@ -85,6 +86,7 @@ namespace EasyEject {
             var original = expected.Profile;
             if (draft.VolumeId != original.VolumeId || draft.VolumeSerial != original.VolumeSerial || draft.DiskInstance != original.DiskInstance || draft.RelativeSource != original.RelativeSource || draft.MacTrashUid != original.MacTrashUid && draft.MacTrashUid != null) throw new SafetyException("Connect the original device to change its identity, media folder or Mac Trash owner.");
             ValidateName(draft.Name, true); ValidateStoredFolders(draft); SafePaths.Normalize(draft.Destination);
+            QuickShareProfile.Validate(draft);
             bool changedDestination = !String.Equals(original.Destination, draft.Destination, StringComparison.OrdinalIgnoreCase) || !ProfileDestination.Same(original.SavedDestination, draft.SavedDestination);
             if (changedDestination || selectedDestination != null) {
                 if (selectedDestination == null) throw new SafetyException("Choose and verify the destination again before changing its folder or identity.");

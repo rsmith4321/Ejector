@@ -54,6 +54,7 @@ namespace EasyEject {
     }
     internal sealed class ImportProfileDialog : Form {
         internal readonly ImportProfile Draft; internal readonly SelectionControls Selection = new SelectionControls();
+        internal readonly QuickShareControls Sharing;
         internal readonly RadioButton UseDefaults = new RadioButton(), UseCustom = new RadioButton();
         internal readonly TextBox DeviceName = new TextBox();
         internal readonly TextBox SourceFolder = new TextBox(), DestinationFolder = new TextBox();
@@ -64,6 +65,7 @@ namespace EasyEject {
         readonly string root; ImportDefaults defaults; bool updating;
         internal ImportProfileDialog(ImportProfile profile, string sourceRoot, string deviceName, ImportDefaults defaults, bool existing, Action settingsSaved = null) {
             Draft = profile.Copy(); root = sourceRoot; this.defaults = defaults;
+            Sharing = new QuickShareControls(Draft);
             Text = existing ? "Edit import profile" : "Set up import profile"; Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(720, 560); MinimumSize = new Size(680, 500); StartPosition = FormStartPosition.CenterParent;
             var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(20), AutoScroll = true };
@@ -105,6 +107,7 @@ namespace EasyEject {
             };
             clearOwner.Click += delegate { Draft.MacTrashUid = null; UpdateOwner(); };
             layout.Controls.Add(trashOwner, 0, 8); layout.SetColumnSpan(trashOwner, 2); UpdateOwner();
+            layout.Controls.Add(Sharing, 0, 9); layout.SetColumnSpan(Sharing, 2);
             UseCustom.CheckedChanged += delegate { if (!updating && UseCustom.Checked) { Draft.SetCustom(true, this.defaults); UpdateSelection(); } };
             UseDefaults.CheckedChanged += delegate { if (!updating && UseDefaults.Checked) { SaveCustomSelection(); Draft.SetCustom(false, this.defaults); UpdateSelection(); } };
             editDefaults.Click += delegate {
@@ -127,7 +130,7 @@ namespace EasyEject {
             footer.Controls.Add(save); footer.Controls.Add(cancel);
             if (existing) { var forget = new Button { Text = "Forget profile", AutoSize = true, DialogResult = DialogResult.Retry, MinimumSize = new Size(130, 36) }; footer.Controls.Add(forget); }
             Controls.Add(footer); AcceptButton = save; CancelButton = cancel; UpdateSelection();
-            body.SizeChanged += delegate { int width = Math.Max(300, body.ClientSize.Width - 60); intro.MaximumSize = retained.MaximumSize = new Size(width, 0); DeviceName.Width = width; Selection.SetTextWidth(width); };
+            body.SizeChanged += delegate { int width = Math.Max(300, body.ClientSize.Width - 60); intro.MaximumSize = retained.MaximumSize = new Size(width, 0); DeviceName.Width = width; Selection.SetTextWidth(width); Sharing.SetTextWidth(width); };
         }
         internal void ApplyEdits() {
             string name = DeviceName.Text.Trim(); Profiles.ValidateName(name, true);
@@ -138,6 +141,7 @@ namespace EasyEject {
                 Draft.RelativeSource = selected.TrimEnd('\\').Equals(root.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) ? "" : SafePaths.Relative(selected, root);
             }
             SaveCustomSelection(); Draft.Name = name; Draft.Destination = target;
+            Sharing.SaveTo(Draft);
             if (DestinationWasChosen) Draft.SavedDestination = null;
             if (root == null && Draft.AutomaticEnabled(defaults) && Draft.SavedDestination == null && !DestinationWasChosen) throw new SafetyException("Choose the destination folder again to bind its disk identity before enabling automatic import for this older profile.");
         }
