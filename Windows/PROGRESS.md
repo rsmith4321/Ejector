@@ -2,6 +2,16 @@
 
 ## Full-port scope and latest software milestone
 
+### Read-only verified interrupted-recovery review · goal continuation
+
+Implementation: `5f458cdb5d80e76b6be8755134f2858deaf258f8`; extended identity/selection fixtures: `f0e9c3a56168156d7921de378aeae954fe5597f5`.
+
+Added a read-only resume-evidence engine for the Windows payload-cleared/record-retained interruption. It requires a fresh device guard and exact current profile paths/owner, reserves source/destination disks and pins the journal/batch/source ancestors. Bounded journal parsing checks version, identity, exact record-folder placement and absence of a completion receipt. Exactly one flushed audit binding must match the journal SHA-256. Every saved dependency is held and checked against its original saved-file identity, size and hash; every remaining source/record must still match its captured source identity and bytes. Missing retained dependencies refuse. Logical payload/record mappings, owner scope, ordinary deletion eligibility and Trash media/package eligibility are reconstructed and compared to fresh manifests with only proven removed paths virtually restored. Only eligible Windows single-file restoration records whose matching payload is absent qualify for review. Arbitrary orphan records, replacements, newly selected/ambiguous media and changed manifests refuse; unselected new photos do not broaden a video-only review.
+
+Validation: `./Windows/build.ps1 -Test` **246 passed; zero failed**, warnings as errors; `git diff --check` passes. Nineteen new disposable-fixture cases cover exact read-only review, complete-copy/remaining-record tampering with restored timestamps, changed source/destination/owner, missing device evidence, modified journal/audit binding, payload replacements, new recordings/still pairing, unselected photos, unrelated orphans, completed batches, cancellation, missing retained indexes, redirected copies, byte-identical replacement file identities, mid-review guard loss, reservation conflicts and release of all handles. Existing minimum-size owner/manual-review render captions, disclosure and fixed footers were re-inspected; no new UI behavior or foreground scrolling proof is claimed.
+
+**Resume action/UI remains pending.** Review releases its handles on return and supplies no deletion, completion or eject authority; a future explicitly reviewed action must reacquire and verify all dependencies through disposition/publication, with its own durable audit and cancellation/partial-count handling. Ordinary retry still refuses orphan records. The full-port goal remains active; full manual Quick Share, offline profiles/automatic import/startup/debug controls, foreground/DPI, explicitly identified disposable hardware and trusted signing remain on the checklist. No actual user/device Trash or media was inspected/modified, and no push/publication, startup or security/power change occurred.
+
 ### Durable complete-batch removal evidence · goal continuation
 
 Implementation commit: `757972ba3049427e0cbf3e9b79301e11d5461bcb`.
