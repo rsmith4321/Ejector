@@ -19,9 +19,10 @@ namespace EasyEject {
             executable = SafePaths.Normalize(executable); directory = SafePaths.Normalize(directory);
             if (!Path.GetExtension(executable).Equals(".exe", StringComparison.OrdinalIgnoreCase) || !QuickShareProbe.Finite(timeoutSeconds) || timeoutSeconds <= 0) throw new SafetyException("Quick Share requires a local executable and a finite positive process deadline.");
             string command = Command(executable, arguments);
-            Action check = () => { cancel.ThrowIfCancellationRequested(); if (validate != null) validate(); };
-            check();
-            using (SafePaths.LockDirectories(Path.GetDirectoryName(executable), directory)) using (SafePaths.ReadFile(executable)) {
+            Action checkOperation = () => { cancel.ThrowIfCancellationRequested(); if (validate != null) validate(); };
+            checkOperation();
+            using (var directories = SafePaths.HoldDirectories(Path.GetDirectoryName(executable), directory)) using (SafePaths.ReadFile(executable)) {
+                Action check = () => { directories.Validate(); checkOperation(); directories.Validate(); };
                 check();
                 using (var input = QuickShareProcessNative.Inheritable((security) => Native.CreateFile("NUL", 0x80000000, 3, security, 3, 0, IntPtr.Zero))) {
                     if (input.IsInvalid) throw Native.Error("Cannot prepare null tool input");

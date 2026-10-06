@@ -23,10 +23,12 @@ namespace EasyEject {
             if (!Within(file, root) || file.Equals(root, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Source path escaped the selected folder.");
             return file.Substring(root.TrimEnd('\\').Length + 1);
         }
-        public static IDisposable LockDirectories(params string[] directories) { return new DirectoryLocks(directories); }
-        sealed class DirectoryLocks : IDisposable {
-            readonly List<SafeFileHandle> handles = new List<SafeFileHandle>();
-            public DirectoryLocks(IEnumerable<string> paths) {
+        public static IDisposable LockDirectories(params string[] directories) { return new DirectoryLease(directories); }
+        internal static DirectoryLease HoldDirectories(params string[] directories) { return new DirectoryLease(directories); }
+        internal sealed class DirectoryLease : IDisposable {
+            sealed class Entry { internal string Path; internal SafeFileHandle Handle; internal Native.FileInfo Identity; }
+            readonly List<Entry> entries = new List<Entry>(); bool disposed;
+            internal DirectoryLease(IEnumerable<string> paths) {
                 try {
                     var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     foreach (string input in paths) {
@@ -38,7 +40,7 @@ namespace EasyEject {
                             // still be renamed on Windows; users of a long-lived path must recheck identity.
                             var h = Native.CreateFile(piece, 0x80, 1, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero);
                             if (h.IsInvalid) { h.Dispose(); throw Native.Error("Cannot lock import directory: " + piece); }
-                            handles.Add(h); var info = Native.Info(h);
+                            var entry = new Entry { Path = piece, Handle = h }; entries.Add(entry); var info = Native.Info(h); entry.Identity = info;
                             if ((info.Attributes & 0x10) == 0) throw new SafetyException("Import path is not a directory.");
                             string resolved = Native.FinalPath(h);
                             if (!resolved.TrimEnd('\\').Equals(piece.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Directory resolves to another path: " + piece + " -> " + resolved);
@@ -46,7 +48,22 @@ namespace EasyEject {
                     }
                 } catch { Dispose(); throw; }
             }
-            public void Dispose() { foreach (var h in handles.AsEnumerable().Reverse()) h.Dispose(); handles.Clear(); }
+            internal void Validate() {
+                if (disposed) throw new ObjectDisposedException("DirectoryLease");
+                foreach (var entry in entries) {
+                    Check(entry.Handle, entry);
+                    using (var current = Native.CreateFile(entry.Path, 0x80, 1, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero)) {
+                        if (current.IsInvalid) throw Native.Error("Cannot recheck held directory: " + entry.Path);
+                        Check(current, entry);
+                    }
+                }
+            }
+            static void Check(SafeFileHandle handle, Entry entry) {
+                var info = Native.Info(handle);
+                if ((info.Attributes & 0x10) == 0 || info.VolumeSerial != entry.Identity.VolumeSerial || info.IndexHigh != entry.Identity.IndexHigh || info.IndexLow != entry.Identity.IndexLow || !Native.FinalPath(handle).TrimEnd('\\').Equals(entry.Path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                    throw new SafetyException("A held directory moved or was replaced. Existing files are kept: " + entry.Path);
+            }
+            public void Dispose() { disposed = true; foreach (var entry in entries.AsEnumerable().Reverse()) entry.Handle.Dispose(); entries.Clear(); }
         }
         internal static FileStream ReadFile(string path, int bufferSize = 1048576) {
             var h = Native.CreateFile(path, 0x80000000, 1, IntPtr.Zero, 3, 0x00200000, IntPtr.Zero);

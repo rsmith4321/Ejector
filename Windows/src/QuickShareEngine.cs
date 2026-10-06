@@ -68,42 +68,48 @@ namespace EasyEject {
                     if (color == QuickShareColor.LunaILog && tools.Lut == null) throw new SafetyException("Choose the official Luna Rec.709 s33 v2 LUT before applying I-Log conversion.");
                     byte[] lut = color == QuickShareColor.LunaILog ? QuickShareMedia.ReadOfficialLut(tools.Lut, cancel) : null;
                     using (tools.Hold()) {
-                        held.Check(); EnsureDirectory(result.Folder);
-                        using (SafePaths.LockDirectories(result.Folder)) {
-                            string audits = Path.Combine(result.Folder, ".easy-share-audits"); EnsureDirectory(audits);
-                            using (SafePaths.LockDirectories(audits)) {
+                        held.Check();
+                        using (var sharingDirectories = EnsureDirectory(result.Folder)) {
+                            string audits = Path.Combine(result.Folder, ".easy-share-audits"); sharingDirectories.Validate();
+                            using (var auditDirectories = EnsureDirectory(audits)) {
                                 string attempt = SafePaths.Normalize(Path.Combine(audits, Guid.NewGuid().ToString("N")));
+                                sharingDirectories.Validate(); auditDirectories.Validate();
                                 if (!Native.CreateDirectory(attempt, IntPtr.Zero)) throw Native.Error("Cannot create an exclusive Quick Share audit attempt");
-                                using (SafePaths.LockDirectories(attempt)) using (var auditFile = SafePaths.NewFile(Path.Combine(attempt, "export-audit.log"))) using (var audit = new StreamWriter(auditFile, new UTF8Encoding(false), 4096, true)) {
+                                using (var attemptDirectories = SafePaths.HoldDirectories(attempt)) using (var auditFile = SafePaths.NewFile(Path.Combine(attempt, "export-audit.log"))) using (var audit = new StreamWriter(auditFile, new UTF8Encoding(false), 4096, true)) {
+                                    Action check = () => { held.Check(); sharingDirectories.Validate(); auditDirectories.Validate(); attemptDirectories.Validate(); };
+                                    check();
                                     result.AuditPath = Path.Combine(attempt, "export-audit.log");
-                                    Action<string> log = line => { audit.WriteLine(DateTime.UtcNow.ToString("o") + " " + line); audit.Flush(); auditFile.Flush(true); auditCheck(line); };
+                                    Action<string> log = line => { check(); audit.WriteLine(DateTime.UtcNow.ToString("o") + " " + line); audit.Flush(); auditFile.Flush(true); auditCheck(line); };
                                     log("Manual Quick Share | batch " + held.Batch.Id + " | destination " + held.Batch.Destination.VolumeId + " | " + preset + " | " + color);
                                     try {
                                         foreach (var original in candidates) {
-                                            held.Check(); report("Reading Luna video " + Path.GetFileName(original.Record.Path));
-                                            var plan = new QuickSharePlan(Probe(tools, original.Record.Path, attempt, held, cancel), preset, color);
+                                            check(); report("Reading Luna video " + Path.GetFileName(original.Record.Path));
+                                            var plan = new QuickSharePlan(Probe(tools, original.Record.Path, attempt, check, cancel), preset, color);
                                             using (var choice = Choose(result.Folder, original.Record, plan, held, cancel)) {
+                                            check();
                                             if (choice.Reused) { held.VerifyOriginal(original); log("Reused verified sharing copy | source SHA256 " + original.Record.Sha256 + " | " + choice.Path); result.Reused++; result.Outputs.Add(choice.Path); continue; }
                                             double required = Math.Ceiling(plan.Seconds * (plan.Bitrate + (plan.HasAudio ? 160000.0 : 0)) / 8) + 1073741824;
                                             if (!QuickShareProbe.Finite(required) || required >= UInt64.MaxValue || freeSpace(result.Folder) <= required) throw new SafetyException("Quick Share needs estimated export space plus 1 GiB free. Saved originals remain intact.");
                                             var work = new PrivateShareWork(result.Folder); FileStream heldLut = null;
                                             try {
+                                                Action checkWork = () => { check(); work.Validate(); };
+                                                checkWork();
                                                 if (lut != null) { using (var target = SafePaths.NewFile(Path.Combine(work.Path, "luna.cube"))) { target.Write(lut, 0, lut.Length); target.Flush(true); } heldLut = SafePaths.ReadFile(Path.Combine(work.Path, "luna.cube")); }
                                                 string temporary = Path.Combine(work.Path, "output.mp4");
                                                 log("Before encode | source SHA256 " + original.Record.Sha256 + " | " + original.Record.Path + " -> " + choice.Path);
-                                                report("Creating " + plan.PresetName + " sharing copy " + Path.GetFileName(original.Record.Path)); held.Check();
-                                                process.Run(tools.Ffmpeg, plan.EncodeArguments(original.Record.Path, temporary), work.Path, plan.EncodeTimeout, cancel, held.Check, line => { if (line.StartsWith("out_time_us=", StringComparison.Ordinal)) { double? micros = QuickShareProbe.Number(line.Substring(12)); if (micros.HasValue) report("Creating sharing copy: " + Math.Round(Math.Min(1, Math.Max(0, micros.Value / 1000000 / plan.Seconds)) * 100).ToString(System.Globalization.CultureInfo.InvariantCulture) + "%"); } });
-                                                held.Check(); Native.FileInfo stamp; string outputHash; long outputBytes;
+                                                report("Creating " + plan.PresetName + " sharing copy " + Path.GetFileName(original.Record.Path)); checkWork();
+                                                process.Run(tools.Ffmpeg, plan.EncodeArguments(original.Record.Path, temporary), work.Path, plan.EncodeTimeout, cancel, checkWork, line => { if (line.StartsWith("out_time_us=", StringComparison.Ordinal)) { double? micros = QuickShareProbe.Number(line.Substring(12)); if (micros.HasValue) report("Creating sharing copy: " + Math.Round(Math.Min(1, Math.Max(0, micros.Value / 1000000 / plan.Seconds)) * 100).ToString(System.Globalization.CultureInfo.InvariantCulture) + "%"); } });
+                                                checkWork(); Native.FileInfo stamp; string outputHash; long outputBytes;
                                                 using (var output = SafePaths.ReadFile(temporary)) {
                                                     stamp = Native.Info(output.SafeFileHandle); outputBytes = output.Length;
                                                     if (outputBytes <= 0 || stamp.Links != 1) throw new SafetyException("The sharing output is empty or has another file alias.");
                                                     output.Position = 0; outputHash = ImportHistory.Hash(output, cancel);
                                                     report("Checking sharing copy " + Path.GetFileName(original.Record.Path));
-                                                    plan.ValidateOutput(Probe(tools, temporary, work.Path, held, cancel));
-                                                    process.Run(tools.Ffmpeg, QuickSharePlan.DecodeArguments(temporary), work.Path, plan.DecodeTimeout, cancel, held.Check);
+                                                    plan.ValidateOutput(Probe(tools, temporary, work.Path, checkWork, cancel));
+                                                    process.Run(tools.Ffmpeg, QuickSharePlan.DecodeArguments(temporary), work.Path, plan.DecodeTimeout, cancel, checkWork);
                                                     output.Position = 0; if (!VerifiedImporter.SameStamp(stamp, Native.Info(output.SafeFileHandle)) || ImportHistory.Hash(output, cancel) != outputHash) throw new SafetyException("The sharing output changed during validation.");
                                                 }
-                                                held.VerifyOriginal(original); checkpoint("Before publication handle", temporary); held.Check();
+                                                held.VerifyOriginal(original); checkpoint("Before publication handle", temporary); checkWork();
                                                 using (var output = OpenPublication(temporary)) {
                                                     output.Position = 0; if (!VerifiedImporter.SameStamp(stamp, Native.Info(output.SafeFileHandle)) || output.Length != outputBytes || ImportHistory.Hash(output, cancel) != outputHash) throw new SafetyException("The sharing output was replaced after validation.");
                                                     output.Flush(true);
@@ -113,10 +119,10 @@ namespace EasyEject {
                                                         try {
                                                             new DataContractJsonSerializer(typeof(QuickShareReceipt)).WriteObject(record, receipt); record.Flush(true);
                                                             log("Before exclusive publication | source SHA256 " + original.Record.Sha256 + " | output SHA256 " + outputHash + " | " + choice.Path);
-                                                            checkpoint("Before output publication", choice.Path); held.Check();
+                                                            checkpoint("Before output publication", choice.Path); checkWork();
                                                             if (Occupied(ReceiptPath(choice.Path))) throw new SafetyException("The sharing receipt filename became occupied. Existing files are kept.");
                                                             Native.Rename(output.SafeFileHandle, choice.Path); result.PublishedCopies++; output.Flush(true);
-                                                            checkpoint("Before receipt publication", ReceiptPath(choice.Path)); held.Check();
+                                                            checkpoint("Before receipt publication", ReceiptPath(choice.Path)); checkWork();
                                                             Native.Rename(record.SafeFileHandle, ReceiptPath(choice.Path)); receiptPublished = true; result.PublishedReceipts++; record.Flush(true); result.Created++; result.Outputs.Add(choice.Path);
                                                             log("Verified sharing copy | " + QuickSharePlan.Recipe + " | source SHA256 " + original.Record.Sha256 + " | LUT " + (plan.LutSha ?? "none") + " | output SHA256 " + outputHash + " | " + choice.Path);
                                                         } finally { if (!receiptPublished) Native.DeleteOnClose(record.SafeFileHandle); }
@@ -125,7 +131,7 @@ namespace EasyEject {
                                             } finally { if (heldLut != null) heldLut.Dispose(); string warning = work.Clean(); if (warning != null) result.CleanupWarnings.Add(warning); }
                                             }
                                         }
-                                        held.VerifyAll(); log("Completed manual Quick Share | new " + result.Created + " | reused " + result.Reused + " | skipped MP4 " + result.Skipped); held.Check();
+                                        held.VerifyAll(); log("Completed manual Quick Share | new " + result.Created + " | reused " + result.Reused + " | skipped MP4 " + result.Skipped); check();
                                     } catch (Exception ex) { try { log("Stopped Quick Share | new " + result.Created + " | reused " + result.Reused + " | published files/receipts " + result.PublishedCopies + "/" + result.PublishedReceipts + " | " + ex.Message); } catch (Exception) {} throw; }
                                 }
                             }
@@ -135,7 +141,7 @@ namespace EasyEject {
                 return result;
             } catch (Exception ex) { throw new QuickShareFailure(ex, result); }
         }
-        QuickShareProbe Probe(QuickShareTools tools, string path, string directory, QuickShareBatch held, CancellationToken cancel) { return QuickShareProbe.Parse(process.Run(tools.Ffprobe, QuickSharePlan.ProbeArguments(path), directory, 60, cancel, held.Check)); }
+        QuickShareProbe Probe(QuickShareTools tools, string path, string directory, Action validate, CancellationToken cancel) { return QuickShareProbe.Parse(process.Run(tools.Ffprobe, QuickSharePlan.ProbeArguments(path), directory, 60, cancel, validate)); }
         sealed class Choice : IDisposable { internal string Path; internal bool Reused; internal FileStream Copy, Receipt; public void Dispose() { if (Copy != null) Copy.Dispose(); if (Receipt != null) Receipt.Dispose(); } }
         Choice Choose(string folder, VerifiedCopy original, QuickSharePlan plan, QuickShareBatch held, CancellationToken cancel) {
             string name = Path.GetFileNameWithoutExtension(original.Path) + "-sharing-" + plan.PresetName;
@@ -164,14 +170,20 @@ namespace EasyEject {
             try { if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new SafetyException("A sharing path is redirected. Existing files are kept."); return true; }
             catch (FileNotFoundException) { return false; } catch (DirectoryNotFoundException) { return false; }
         }
-        static void EnsureDirectory(string path) { path = SafePaths.Normalize(path); using (SafePaths.LockDirectories(Path.GetDirectoryName(path))) { Directory.CreateDirectory(path); using (SafePaths.LockDirectories(path)) {} } }
+        static SafePaths.DirectoryLease EnsureDirectory(string path) {
+            path = SafePaths.Normalize(path);
+            using (var parent = SafePaths.HoldDirectories(Path.GetDirectoryName(path))) {
+                parent.Validate(); Directory.CreateDirectory(path); parent.Validate();
+                var result = SafePaths.HoldDirectories(path); try { result.Validate(); return result; } catch { result.Dispose(); throw; }
+            }
+        }
         static FileStream OpenPublication(string path) {
             var handle = Native.CreateFile(path, 0xC0010000, 0, IntPtr.Zero, 3, 0x80200000, IntPtr.Zero);
             if (handle.IsInvalid) { handle.Dispose(); throw Native.Error("Cannot exclusively hold validated sharing output"); }
             try { var info = Native.Info(handle); if ((info.Attributes & 0x1015) != 0 || info.Links != 1 || !Native.FinalPath(handle).Equals(path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Sharing output is protected, redirected or has another alias. No protection is changed."); return new FileStream(handle, FileAccess.ReadWrite, 1048576, false); } catch { handle.Dispose(); throw; }
         }
         sealed class PrivateShareWork {
-            internal readonly string Path; readonly Native.FileInfo identity; IDisposable directories;
+            internal readonly string Path; readonly Native.FileInfo identity; SafePaths.DirectoryLease directories;
             internal PrivateShareWork(string parent) {
                 Path = SafePaths.Normalize(System.IO.Path.Combine(parent, ".easy-share-" + Guid.NewGuid().ToString("N")));
                 if (!Native.CreateDirectory(Path, IntPtr.Zero)) throw Native.Error("Cannot create an exclusive private sharing folder");
@@ -179,15 +191,18 @@ namespace EasyEject {
                     using (var handle = Native.CreateFile(Path, 0x80, 1, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero)) {
                         if (handle.IsInvalid) throw Native.Error("Cannot identify private sharing folder"); identity = Native.Info(handle);
                         if ((identity.Attributes & 0x10) == 0 || !Native.FinalPath(handle).Equals(Path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Private sharing folder resolves elsewhere.");
-                        directories = SafePaths.LockDirectories(Path);
+                        directories = SafePaths.HoldDirectories(Path); directories.Validate();
+                        if (!Native.FinalPath(handle).Equals(Path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Private sharing folder moved while acquiring its directory proof.");
                     }
                 } catch (Exception ex) { if (directories != null) directories.Dispose(); throw new SafetyException("The exclusive private sharing folder could not be guarded and was retained at " + Path + ". " + ex.Message); }
             }
+            internal void Validate() { if (directories == null) throw new SafetyException("Private sharing work is no longer held."); directories.Validate(); }
             internal string Clean() {
                 string error = null;
+                try { Validate(); } catch (Exception ex) { if (directories != null) { directories.Dispose(); directories = null; } return "Private sharing work retained at " + Path + ": " + ex.Message; }
                 foreach (string name in new[] { "output.mp4", "luna.cube", "receipt.partial" }) {
                     string file = System.IO.Path.Combine(Path, name);
-                    try { if (!Occupied(file)) continue; using (var held = SafePaths.ProtectOriginal(file, true)) Native.DeleteOnClose(held.SafeFileHandle); } catch (Exception ex) { error = ex.Message; }
+                    try { Validate(); if (!Occupied(file)) continue; using (var held = SafePaths.ProtectOriginal(file, true)) { Validate(); Native.DeleteOnClose(held.SafeFileHandle); } } catch (Exception ex) { error = ex.Message; break; }
                 }
                 if (directories != null) { directories.Dispose(); directories = null; }
                 try {

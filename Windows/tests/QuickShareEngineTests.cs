@@ -23,7 +23,7 @@ namespace EasyEject {
                 }
                 if (decode) { Decodes++; Check(args.Contains("-xerror") && args.Contains("0:v:0") && args.Contains("0:a:0?") && !args.Contains("-t"), "Engine did not request full video/audio decode"); OnStage("Decode", path); }
                 else {
-                    Encodes++; Inputs.Add(path); Temporary = args.Last(); OnStage("Before encode", path);
+                    Encodes++; Inputs.Add(path); Temporary = args.Last(); OnStage("Before encode", path); validate();
                     var plan = SharePlan(Input, ShareOption(args, "-b:v") == "24000000" ? QuickSharePreset.Uhd : QuickSharePreset.Hd, ShareOption(args, "-vf").Contains("lut3d") ? QuickShareColor.LunaILog : QuickShareColor.Standard);
                     Check(args.Contains("-n") && !File.Exists(Temporary), "Encoder was allowed to overwrite private work");
                     File.WriteAllText(Temporary, "synthetic encoded output " + plan.PresetName + " " + plan.Color + " " + File.ReadAllText(path)); outputs[Temporary] = plan;
@@ -62,6 +62,38 @@ namespace EasyEject {
             File.WriteAllText(output, "SYNTHETIC_SHARE|" + (ShareOption(args, "-b:v") == "24000000" ? "4K" : "1080p") + "|" + File.ReadAllText(input)); Console.WriteLine("out_time_us=1000000"); return 0;
         }
         static void QuickShareEngineTests() {
+            Test("manual Quick Share replaced empty work refuses cleanup before touching same-named foreign files", delegate {
+                using (var fixture = new Fixture()) {
+                    var batch = LunaBatch(fixture); var process = new FakeShareProcess(); string replacement = null, moved = null;
+                    process.OnStage = (stage, path) => { if (stage == "Before encode") {
+                        replacement = Path.GetDirectoryName(process.Temporary); moved = replacement + "-moved"; Directory.Move(replacement, moved); Directory.CreateDirectory(replacement);
+                        foreach (string name in new[] { "output.mp4", "luna.cube", "receipt.partial" }) File.WriteAllText(Path.Combine(replacement, name), "foreign " + name);
+                        throw new SafetyException("Injected stop after work replacement");
+                    } };
+                    var failure = Throws<QuickShareFailure>(() => RunShare(fixture, batch, process));
+                    Check(failure.Partial.PublishedCopies == 0 && failure.Partial.CleanupWarnings.Count == 1 && Directory.Exists(moved), "Changed work was published or swept");
+                    foreach (string name in new[] { "output.mp4", "luna.cube", "receipt.partial" }) Check(File.Exists(Path.Combine(replacement, name)) && File.ReadAllText(Path.Combine(replacement, name)) == "foreign " + name, "Cleanup touched replacement file " + name);
+                    VerifyShareOriginals(batch);
+                }
+            });
+            Test("manual Quick Share detects empty work replacement at process validation before writing output", delegate {
+                using (var fixture = new Fixture()) {
+                    var batch = LunaBatch(fixture); var process = new FakeShareProcess(); string replacement = null, moved = null;
+                    process.OnStage = (stage, path) => { if (stage == "Before encode") { replacement = Path.GetDirectoryName(process.Temporary); moved = replacement + "-moved"; Directory.Move(replacement, moved); Directory.CreateDirectory(replacement); } };
+                    var failure = Throws<QuickShareFailure>(() => RunShare(fixture, batch, process));
+                    Check(failure.Partial.PublishedCopies == 0 && failure.Partial.CleanupWarnings.Count == 1 && Directory.Exists(moved) && Directory.Exists(replacement) && Directory.GetFileSystemEntries(replacement).Length == 0 && process.Decodes == 0, "Encoder or cleanup used replacement work");
+                    VerifyShareOriginals(batch);
+                }
+            });
+            Test("manual Quick Share cancellation preserves replacement work and releases reservations", delegate {
+                using (var fixture = new Fixture()) using (var token = new CancellationTokenSource()) {
+                    var batch = LunaBatch(fixture); var process = new FakeShareProcess(); var operations = new Operations(); string replacement = null;
+                    process.OnStage = (stage, path) => { if (stage == "Before encode") { replacement = Path.GetDirectoryName(process.Temporary); Directory.Move(replacement, replacement + "-moved"); Directory.CreateDirectory(replacement); File.WriteAllText(Path.Combine(replacement, "receipt.partial"), "keep cancelled replacement"); token.Cancel(); token.Token.ThrowIfCancellationRequested(); } };
+                    var failure = Throws<QuickShareFailure>(() => RunShare(fixture, batch, process, operations: operations, cancel: token.Token));
+                    Check(failure.Cancelled && failure.Partial.PublishedCopies == 0 && failure.Partial.CleanupWarnings.Count == 1 && File.Exists(Path.Combine(replacement, "receipt.partial")) && File.ReadAllText(Path.Combine(replacement, "receipt.partial")) == "keep cancelled replacement", "Cancellation deleted foreign work");
+                    using (operations.Reserve(new[] { 700, 701 })) {} VerifyShareOriginals(batch);
+                }
+            });
             Test("manual Quick Share orders probe and full-decode checks before exclusive output and bound receipt", delegate {
                 using (var fixture = new Fixture()) { var batch = LunaBatch(fixture); var process = new FakeShareProcess(); var result = RunShare(fixture, batch, process); string output = ShareFile(batch);
                     Check(result.Created == 1 && result.Reused == 0 && result.PublishedCopies == 1 && result.PublishedReceipts == 1 && process.Encodes == 1 && process.Decodes == 1 && process.Probes == 2, "Validation/publication stages missing");

@@ -86,6 +86,7 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--completion-connections") { CompletionConnectionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake removal and owned disposable files only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--concurrent-storage") { ConcurrentStorageTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake eject, owned disposable files and hidden controls only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--automatic-admission") { AutomaticAdmissionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake storage evidence and disposable files only."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--share-directories") { DirectoryLeaseTests(); QuickShareEngineTests(); QuickShareProcessTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable directories, fake exports and contained synthetic child processes only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--ui-render") {
                 string output = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectWindowsPreview", "run-" + Guid.NewGuid().ToString("N").Substring(0, 16));
                 Directory.CreateDirectory(output); var state = State(); var defaults = new ImportDefaults(); var profile = defaults.NewProfile(state.Volumes[0], state.Disks[0]); profile.RelativeSource = "DCIM"; profile.Destination = @"D:\Travel backups";
@@ -693,7 +694,7 @@ namespace EasyEject {
             StartupTests();
             QuickShareRecipeTests();
             QuickShareProcessTests();
-            QuickShareEngineTests();
+            DirectoryLeaseTests(); QuickShareEngineTests();
             QuickShareDialogTests();
             QuickShareConfigurationTests();
             ManualQuickShareTests();

@@ -47,6 +47,13 @@ namespace EasyEject {
             return 93;
         }
         static void QuickShareProcessTests() {
+            Test("native Quick Share process refuses replaced working directory before creating logs or child", delegate {
+                using (var fixture = new Fixture()) {
+                    int checks = 0; string moved = fixture.Destination + "-moved";
+                    Throws<SafetyException>(() => RunShareHelper(fixture, "cwd", validate: () => { if (++checks == 2) { Directory.Move(fixture.Destination, moved); Directory.CreateDirectory(fixture.Destination); File.WriteAllText(Path.Combine(fixture.Destination, "foreign.keep"), "retain foreign working directory"); } }));
+                    Check(checks == 2 && Directory.Exists(moved) && Directory.GetFileSystemEntries(fixture.Destination).Length == 1 && File.ReadAllText(Path.Combine(fixture.Destination, "foreign.keep")) == "retain foreign working directory", "Native process/log creation or cleanup touched replacement work");
+                }
+            });
             Test("Quick Share direct argv preserves empty unicode quotes slashes and shell metacharacters", delegate {
                 using (var fixture = new Fixture()) {
                     string[] values = { "", "ordinary", "two words", "日本 vidéo", "a\"b", "\\", "path ends \\", "two\\\\\"quotes\"", "& | < > ^ %PATH% $(ignored) `ignored`", "line\nbreak", "tab\tvalue" };
