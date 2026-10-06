@@ -25,6 +25,10 @@ namespace EasyEject {
         [DllImport("kernel32.dll", SetLastError = true)] internal static extern bool GetFileInformationByHandle(SafeFileHandle handle, out FileInfo info);
         [DllImport("kernel32.dll", SetLastError = true)] internal static extern bool SetFileInformationByHandle(SafeFileHandle handle, int infoClass, IntPtr info, uint length);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] internal static extern bool CreateDirectory(string path, IntPtr security);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool GetDiskFreeSpaceEx(string path, out ulong available, out ulong total, out ulong free);
+        [DllImport("kernel32.dll", SetLastError = true)] static extern bool SetFileTime(SafeFileHandle handle, IntPtr created, IntPtr accessed, ref System.Runtime.InteropServices.ComTypes.FILETIME modified);
+        internal static ulong FreeSpace(string path) { ulong available, total, free; if (!GetDiskFreeSpaceEx(path, out available, out total, out free)) throw Error("Cannot check destination free space"); return available; }
+        internal static void PreserveModified(SafeFileHandle handle, FileInfo source) { if (!SetFileTime(handle, IntPtr.Zero, IntPtr.Zero, ref source.Modified)) throw Error("Cannot preserve camera modification time"); }
         [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)] internal static extern IntPtr SetupDiGetClassDevs(ref Guid guid, string enumerator, IntPtr parent, uint flags);
         [DllImport("setupapi.dll", SetLastError = true)] internal static extern bool SetupDiEnumDeviceInterfaces(IntPtr set, IntPtr device, ref Guid guid, uint index, ref InterfaceInfo info);
         [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)] internal static extern bool SetupDiGetDeviceInterfaceDetail(IntPtr set, ref InterfaceInfo info, IntPtr detail, int length, out int required, ref DeviceInfo device);

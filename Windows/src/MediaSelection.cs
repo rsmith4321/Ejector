@@ -8,8 +8,8 @@ using System.Text.RegularExpressions;
 namespace EasyEject {
     // Immutable options are resolved before an operation; editing defaults cannot alter a running copy.
     public sealed class MediaOptions {
-        public readonly bool VideosOnly, IncludePreviews;
-        public MediaOptions(bool videosOnly, bool includePreviews) { VideosOnly = videosOnly; IncludePreviews = includePreviews; }
+        public readonly bool VideosOnly, IncludePreviews, CleanLayout;
+        public MediaOptions(bool videosOnly, bool includePreviews, bool cleanLayout = false) { VideosOnly = videosOnly; IncludePreviews = includePreviews; CleanLayout = cleanLayout; }
     }
     public sealed class MediaPlan {
         public List<string> Media, Indexes;
@@ -57,6 +57,14 @@ namespace EasyEject {
             var videoStems = new HashSet<string>(chosen.Select(Stem)); var videoPaths = new HashSet<string>(chosen.Select(Key));
             var otherStems = new HashSet<string>(candidates.Where(x => !videos.Contains(Ext(x)) && !sidecars.Contains(Ext(x))).Select(Stem));
             return candidates.Where(x => chosen.Contains(x) || (sidecars.Contains(Ext(x)) && (videoPaths.Contains(Stem(x)) || (videoStems.Contains(Stem(x)) && !otherStems.Contains(Stem(x)))))).ToList();
+        }
+        public static HashSet<string> Recognized(List<string> files) {
+            var audio = Set("wav mp3 aac m4a");
+            var masters = files.Where(x => (videos.Contains(Ext(x)) || photos.Contains(Ext(x)) || audio.Contains(Ext(x))) && !Ext(x).Equals("lrv", StringComparison.OrdinalIgnoreCase)).ToList();
+            var masterKeys = new HashSet<string>(masters.Where(x => videos.Contains(Ext(x))).Select(MasterKey));
+            var media = new HashSet<string>(masters.Concat(files.Where(x => Ext(x).Equals("lrv", StringComparison.OrdinalIgnoreCase) && masterKeys.Contains(MasterKey(x)))));
+            var keys = new HashSet<string>(media.Select(Stem).Concat(media.Select(Key)));
+            return new HashSet<string>(files.Where(x => media.Contains(x) || (sidecars.Contains(Ext(x)) && keys.Contains(Stem(x)))));
         }
         public static MediaPlan Plan(List<string> scanned, string source, string root, MediaOptions options) {
             if (options == null) throw new ArgumentNullException("options");

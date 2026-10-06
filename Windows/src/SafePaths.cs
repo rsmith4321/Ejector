@@ -62,5 +62,13 @@ namespace EasyEject {
             if (h.IsInvalid) { h.Dispose(); throw Native.Error("Cannot create exclusive destination file"); }
             try { Native.Info(h); return new FileStream(h, FileAccess.ReadWrite, 1048576, false); } catch { h.Dispose(); throw; }
         }
+        internal static FileStream ExistingCopy(string path) {
+            var h = Native.CreateFile(path, 0xC0000000, 1, IntPtr.Zero, 3, 0x80200000, IntPtr.Zero);
+            if (h.IsInvalid) { h.Dispose(); throw Native.Error("Cannot open saved copy for verification and flush"); }
+            try {
+                var info = Native.Info(h); if ((info.Attributes & 0x10) != 0 || !Native.FinalPath(h).Equals(path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Saved copy is not a regular file at its expected path.");
+                return new FileStream(h, FileAccess.ReadWrite, 1048576, false);
+            } catch { h.Dispose(); throw; }
+        }
     }
 }
