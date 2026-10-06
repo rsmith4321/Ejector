@@ -5,7 +5,7 @@ if (!(Test-Path -LiteralPath $compiler)) { throw 'The installed .NET Framework x
 $output = Join-Path $env:LOCALAPPDATA 'EasyEject/PrototypeBuild'
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 $sources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Filter '*.cs' | ForEach-Object FullName)
-$references = @('/r:System.dll', '/r:System.Core.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Runtime.Serialization.dll')
+$references = @('/r:System.dll', '/r:System.Core.dll', '/r:System.Security.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Runtime.Serialization.dll')
 & $compiler /nologo /warn:4 /warnaserror+ /optimize+ /platform:x64 /target:winexe "/win32manifest:$PSScriptRoot/app.manifest" "/out:$output/EasyEject.Windows.exe" @references @sources
 if ($LASTEXITCODE -ne 0) { throw 'App compilation failed.' }
 $testSources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'tests') -Filter '*.cs' | ForEach-Object FullName)
