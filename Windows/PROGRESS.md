@@ -1,5 +1,7 @@
 # Windows progress · October 6, 2026
 
+Overnight checkpoint: at **08:00 America/New_York**, paused `easy-eject-overnight-windows-port` at its requested deadline. The separate user-requested **full-port finish goal remains active**. Current source passes **246 tests** with warnings as errors; all software milestones below are committed locally. Next independent work is the explicitly reviewed interrupted-recovery action/UI, then offline profiles/automatic import/startup/debug and full manual Quick Share. Physical-device/foreground/signing proof still gates completion. No publishing or real-media/device operations occurred.
+
 ## Full-port scope and latest software milestone
 
 ### Read-only verified interrupted-recovery review · goal continuation
