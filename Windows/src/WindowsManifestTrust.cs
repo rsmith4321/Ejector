@@ -11,6 +11,9 @@ namespace EasyEject {
     internal interface IWindowsManifestTrust {
         WindowsAuthenticatedManifest Verify(byte[] manifest, byte[] signature, ApprovedWindowsPublisher approved, WindowsSignerEvidence executable, CancellationToken cancel);
     }
+    internal interface IWindowsManifestEnvelopeTrust {
+        WindowsAuthenticatedManifest VerifyEnvelope(byte[] manifest, byte[] signature, ApprovedWindowsPublisher approved, CancellationToken cancel);
+    }
     internal sealed class WindowsAuthenticatedManifest {
         readonly byte[] body;
         internal readonly string BodyHash, SignatureHash;
@@ -28,14 +31,23 @@ namespace EasyEject {
     }
     // Authenticates the exact manifest bytes, not a reserialized interpretation.
     // A valid CMS signature alone does not establish Windows trust or publisher approval.
-    internal sealed class WindowsManifestTrust : IWindowsManifestTrust {
+    internal sealed class WindowsManifestTrust : IWindowsManifestTrust, IWindowsManifestEnvelopeTrust {
         internal const int MaximumManifest = 65536, MaximumSignature = 262144, MaximumCertificates = 12;
         readonly IWindowsCertificateTrust trust;
         internal WindowsManifestTrust() : this(new WindowsCertificateTrust()) { }
         internal WindowsManifestTrust(IWindowsCertificateTrust trust) { if (trust == null) throw new ArgumentNullException("trust"); this.trust = trust; }
         public WindowsAuthenticatedManifest Verify(byte[] manifest, byte[] signature, ApprovedWindowsPublisher approved, WindowsSignerEvidence executable, CancellationToken cancel) {
             if (approved == null) throw new SafetyException("No approved Windows publisher is configured for manifest validation.");
-            approved.Require(executable); cancel.ThrowIfCancellationRequested();
+            approved.Require(executable); return VerifyCore(manifest, signature, approved, executable, cancel);
+        }
+        // Archive preflight authenticates payload metadata only. It cannot verify an
+        // executable's Windows signature before the user manually extracts the package.
+        public WindowsAuthenticatedManifest VerifyEnvelope(byte[] manifest, byte[] signature, ApprovedWindowsPublisher approved, CancellationToken cancel) {
+            if (approved == null) throw new SafetyException("No approved Windows publisher is configured for manifest validation.");
+            return VerifyCore(manifest, signature, approved, null, cancel);
+        }
+        WindowsAuthenticatedManifest VerifyCore(byte[] manifest, byte[] signature, ApprovedWindowsPublisher approved, WindowsSignerEvidence executable, CancellationToken cancel) {
+            cancel.ThrowIfCancellationRequested();
             if (manifest == null || manifest.Length == 0 || manifest.Length > MaximumManifest || signature == null || signature.Length == 0 || signature.Length > MaximumSignature)
                 throw new SafetyException("Windows manifest/signature bytes are missing or exceed the supported bounds.");
             // Freeze caller-owned arrays before any decoding or trust callback.
@@ -58,7 +70,7 @@ namespace EasyEject {
                 cms.CheckSignature(true); cancel.ThrowIfCancellationRequested();
                 using (var leaf = new X509Certificate2(leafBytes)) {
                     WindowsSignerEvidence evidence = trust.Verify(leaf, certificates, digest); cancel.ThrowIfCancellationRequested(); approved.Require(evidence);
-                    if (evidence.CertificateHash != WindowsSignerEvidence.Hash(leaf.RawData) || evidence.SubjectHash != WindowsSignerEvidence.Hash(leaf.SubjectName.RawData) || evidence.DigestOid != digest || evidence.CertificateHash != executable.CertificateHash)
+                    if (evidence.CertificateHash != WindowsSignerEvidence.Hash(leaf.RawData) || evidence.SubjectHash != WindowsSignerEvidence.Hash(leaf.SubjectName.RawData) || evidence.DigestOid != digest || (executable != null && evidence.CertificateHash != executable.CertificateHash))
                         throw new SafetyException("The authenticated manifest and verified executable do not share the exact signing certificate.");
                     return new WindowsAuthenticatedManifest(body, encoded, evidence);
                 }
