@@ -67,15 +67,29 @@ namespace EasyEject {
         }
         // Rename the held, verified file itself; never replace an existing target.
         internal static void Rename(SafeFileHandle handle, string target) {
+            RenameFile(handle, target, 3, 0, "Cannot publish verified copy without overwriting");
+        }
+        // The caller holds its per-folder configuration writer and acquired the previous file
+        // exclusively before serialization. Release that validator only at this native boundary.
+        // Ordinary replacement respects external locks; no POSIX/forced-sharing flags are used.
+        internal static void ReplaceConfiguration(SafeFileHandle incoming, System.IO.FileStream previous, string target) {
+            var oldHandle = previous.SafeFileHandle; var old = Info(oldHandle);
+            if ((old.Attributes & 0x1015) != 0 || old.Links != 1 || !FinalPath(oldHandle).Equals(target, StringComparison.OrdinalIgnoreCase) || !System.IO.Path.GetExtension(target).Equals(".json", StringComparison.OrdinalIgnoreCase) || !System.IO.Path.GetDirectoryName(FinalPath(incoming)).Equals(System.IO.Path.GetDirectoryName(target), StringComparison.OrdinalIgnoreCase))
+                throw new SafetyException("Configuration replacement requires the exact exclusively held private file.");
+            previous.Dispose();
+            RenameFile(incoming, target, 3, 1, "Cannot atomically replace configuration. Existing choices and protections are kept");
+        }
+        static void RenameFile(SafeFileHandle handle, string target, int informationClass, uint flags, string operation) {
             byte[] name = Encoding.Unicode.GetBytes(target); int offset = IntPtr.Size == 8 ? 20 : 12; int rootOffset = IntPtr.Size == 8 ? 8 : 4;
             // The Win32 wrapper normalizes a NUL-terminated path before issuing the counted NT rename.
             int size = offset + name.Length + 2;
             IntPtr data = Marshal.AllocHGlobal(size);
             try {
                 Marshal.Copy(new byte[size], 0, data, size);
+                Marshal.WriteInt32(data, unchecked((int)flags));
                 Marshal.WriteIntPtr(data, rootOffset, IntPtr.Zero); Marshal.WriteInt32(data, offset - 4, name.Length);
                 Marshal.Copy(name, 0, IntPtr.Add(data, offset), name.Length);
-                if (!SetFileInformationByHandle(handle, 3, data, (uint)size)) throw Error("Cannot publish verified copy without overwriting");
+                if (!SetFileInformationByHandle(handle, informationClass, data, (uint)size)) { int code = Marshal.GetLastWin32Error(); throw new Win32Exception(code, operation + " (Windows error " + code + ")"); }
             } finally { Marshal.FreeHGlobal(data); }
         }
         internal static void DeleteOnClose(SafeFileHandle handle, string operation = "Cannot clean up this operation's private partial file") {

@@ -23,16 +23,7 @@ namespace EasyEject {
         internal string Display { get { return CanEdit ? ProfileName.Display(profile) : FileName + " — needs review"; } }
     }
     public static partial class Profiles {
-        internal static SafeFileHandle WriterGate(string root) {
-            string path = Path.Combine(root, ".profile-write.lock");
-            var handle = Native.CreateFile(path, 0x10080, 0, IntPtr.Zero, 4, 0x00200000, IntPtr.Zero);
-            if (handle.IsInvalid) { handle.Dispose(); throw Native.Error("Saved profiles are being changed. Close the other editor and retry"); }
-            try {
-                var info = Native.Info(handle);
-                if ((info.Attributes & 0x1015) != 0 || info.Links != 1 || !Native.FinalPath(handle).Equals(path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("The profile write lock is not a regular private configuration file.");
-                Native.DeleteOnClose(handle); return handle;
-            } catch { handle.Dispose(); throw; }
-        }
+        internal static ProfileWriter WriterGate(string root) { return new ProfileWriter(root); }
         internal static void ValidateName(string value, bool required) {
             if (value == null && !required) return;
             if (String.IsNullOrWhiteSpace(value) || value.Length > 120 || value.Any(Char.IsControl)) throw new SafetyException("Enter a recognizable device name of 1–120 characters without control characters.");
@@ -92,9 +83,9 @@ namespace EasyEject {
                 if (selectedDestination == null) throw new SafetyException("Choose and verify the destination again before changing its folder or identity.");
                 OfflineProfileDestination.Validate(draft, selectedDestination); draft.SavedDestination = selectedDestination.Copy();
             }
-            using (SafePaths.LockDirectories(root)) using (WriterGate(root)) {
+            using (SafePaths.LockDirectories(root)) using (var writer = WriterGate(root)) {
                 CheckSnapshot(expected, ReadSaved(root, expected.FileName));
-                WriteJson(draft, typeof(ImportProfile), root, expected.FileName);
+                WriteJson(draft, typeof(ImportProfile), root, expected.FileName, writer: writer);
             }
         }
         internal static void ForgetOffline(SavedProfile expected) { ForgetOffline(expected, Root); }

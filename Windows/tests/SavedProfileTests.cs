@@ -58,7 +58,7 @@ namespace EasyEject {
             Test("read-only profile protection survives refused offline save and forget", delegate { using (var f = new Fixture()) {
                 Profiles.Save(OfflineProfile(), f.Destination); var entry = Profiles.Catalog(f.Destination).Single(); string path = Path.Combine(f.Destination, entry.FileName); File.SetAttributes(path, File.GetAttributes(path) | FileAttributes.ReadOnly);
                 try {
-                    var draft = entry.Profile; draft.Name = "Cannot save"; Throws<UnauthorizedAccessException>(() => Profiles.SaveOffline(entry, draft, f.Destination)); Throws<SafetyException>(() => Profiles.ForgetOffline(entry, f.Destination));
+                    var draft = entry.Profile; draft.Name = "Cannot save"; Throws<SafetyException>(() => Profiles.SaveOffline(entry, draft, f.Destination)); Throws<SafetyException>(() => Profiles.ForgetOffline(entry, f.Destination));
                     Check(Profiles.Catalog(f.Destination).Single().Hash == entry.Hash && (File.GetAttributes(path) & FileAttributes.ReadOnly) != 0 && Directory.GetFiles(f.Destination).Length == 1, "Refusal altered protection or retained private work");
                 } finally { File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly); }
             } });

@@ -72,7 +72,7 @@ namespace EasyEject {
         }
         internal static QuickShareConfigurationSnapshot Save(QuickShareConfigurationSnapshot expected, string ffmpeg, string ffprobe, string lutSource, string root, CancellationToken cancel) {
             root = SafePaths.Normalize(root);
-            using (SafePaths.LockDirectories(root)) using (Profiles.WriterGate(root)) {
+            using (SafePaths.LockDirectories(root)) using (var writer = Profiles.WriterGate(root)) {
                 cancel.ThrowIfCancellationRequested(); CheckSnapshot(expected, Load(root));
                 var value = new QuickShareToolSettings { Ffmpeg = Capture(ffmpeg, cancel), Ffprobe = Capture(ffprobe, cancel) };
                 if (!String.IsNullOrWhiteSpace(lutSource)) {
@@ -92,7 +92,7 @@ namespace EasyEject {
                 value.Validate(root);
                 using (var held = new VerifiedQuickShareTools(value, cancel, false, QuickShareColor.Standard)) {
                     cancel.ThrowIfCancellationRequested();
-                    Profiles.WriteJson(value, typeof(QuickShareToolSettings), root, FileName);
+                    Profiles.WriteJson(value, typeof(QuickShareToolSettings), root, FileName, writer: writer);
                     // A late Cancel cannot pretend an already committed preference write did not happen.
                     return Load(root);
                 }

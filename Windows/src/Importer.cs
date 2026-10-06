@@ -323,19 +323,10 @@ namespace EasyEject {
             QuickShareProfile.Validate(profile);
             if (profile.SavedDestination != null) profile.SavedDestination.Validate();
             Directory.CreateDirectory(root);
-            using (SafePaths.LockDirectories(root)) using (WriterGate(root)) WriteJson(profile, typeof(ImportProfile), root, FileName(profile.VolumeId));
+            using (SafePaths.LockDirectories(root)) using (var writer = WriterGate(root)) WriteJson(profile, typeof(ImportProfile), root, FileName(profile.VolumeId), writer: writer);
         }
-        internal static void WriteJson(object value, Type type, string root, string name) {
-            Directory.CreateDirectory(root);
-            using (SafePaths.LockDirectories(root)) {
-                string temporary = Path.Combine(root, Guid.NewGuid().ToString("N") + ".tmp"), final = Path.Combine(root, name);
-                SafePaths.Normalize(final); if (!SafePaths.Within(final, root) || Path.GetFileName(final) != name) throw new SafetyException("Configuration filename escaped its folder.");
-                try {
-                    using (var stream = SafePaths.NewFile(temporary)) { new DataContractJsonSerializer(type).WriteObject(stream, value); stream.Flush(true); }
-                    if (File.Exists(final)) { using (var existing = SafePaths.ReadFile(final)) {} }
-                    if (File.Exists(final)) File.Replace(temporary, final, null); else File.Move(temporary, final);
-                } finally { if (File.Exists(temporary)) File.Delete(temporary); }
-            }
+        internal static void WriteJson(object value, Type type, string root, string name, Action<string, string> checkpoint = null, ProfileWriter writer = null) {
+            ConfigurationWriter.Write(value, type, root, name, checkpoint, writer);
         }
         public static ImportProfile Load(Volume volume, Disk disk) {
             return Load(volume, disk, Root);
