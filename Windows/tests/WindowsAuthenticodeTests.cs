@@ -136,7 +136,7 @@ namespace EasyEject {
             });
             Test("Windows real native trust refuses owned unsigned compiled candidate without execution", delegate {
                 using (var f = new Fixture()) { string path = Path.Combine(f.Source, "unsigned.exe"); File.Copy(typeof(Tests).Assembly.Location, path); string before = WindowsSignerEvidence.Hash(File.ReadAllBytes(path));
-                    using (var held = SafePaths.ReadFile(path)) { held.Position = 5; Check(Throws<SafetyException>(() => new WindowsAuthenticode().Verify(path, held)).Message.Contains("Windows signature trust could not be established"), "Unsigned native executable became trusted"); Check(held.Position == 5 && held.CanRead, "Native trust changed caller stream"); }
+                    using (var held = SafePaths.ReadFile(path)) { held.Position = 5; var refusal = Throws<SafetyException>(() => new WindowsAuthenticode().Verify(path, held)); Check(refusal.Message.Contains("Windows signature trust could not be established") && refusal.Message.Contains("0x800B0100"), "Unsigned native executable did not return TRUST_E_NOSIGNATURE: " + refusal.Message); Check(held.Position == 5 && held.CanRead, "Native trust changed caller stream"); }
                     Check(WindowsSignerEvidence.Hash(File.ReadAllBytes(path)) == before && Directory.GetFileSystemEntries(f.Source).Length == 1, "Native trust modified candidate or extracted files"); File.Move(path, path + ".released");
                 }
             });
