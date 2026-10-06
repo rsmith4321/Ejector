@@ -16,7 +16,7 @@ namespace EasyEject {
         public void SetVideosOnly(bool value) { if (!value && Snapshot().VideosOnly) { DeleteOriginals = false; RecoverTrash = false; } VideosOnly = value; }
         public ImportProfile NewProfile(Volume volume, Disk disk) {
             var options = Snapshot();
-            return new ImportProfile { VolumeId = volume.Id, VolumeSerial = volume.Serial, DiskInstance = disk.InstanceId,
+            return new ImportProfile { Name = ProfileName.ForDevice(volume.Display), VolumeId = volume.Id, VolumeSerial = volume.Serial, DiskInstance = disk.InstanceId,
                 RelativeSource = "", Destination = "", UsesImportDefaults = true, VideosOnly = options.VideosOnly, IncludePreviews = options.IncludePreviews, CleanLayout = options.CleanLayout, AskToEject = options.AskToEject, DeleteOriginals = options.DeleteOriginals, RecoverTrash = options.RecoverTrash };
         }
         public static ImportDefaults Load() { return Load(Profiles.Root); }

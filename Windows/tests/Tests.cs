@@ -86,6 +86,13 @@ namespace EasyEject {
                     dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "profile-defaults.png"));
                     dialog.UseCustom.Checked = true; dialog.Selection.Previews.Checked = false; Render(dialog, Path.Combine(output, "profile-custom.png"));
                 }
+                profile.Name = "Insta360 travel card";
+                using (var dialog = new ImportProfileDialog(profile, null, profile.Name + " (saved profile)", defaults, true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "profile-offline.png")); RenderAtBottom(dialog, Path.Combine(output, "profile-offline-bottom.png")); }
+                var previewProfiles = new[] { new SavedProfile(Profiles.FileName(profile.VolumeId), profile, new string('a', 64), new Native.FileInfo()), new SavedProfile(new string('B', 64) + ".json", "Saved profile device identity does not match its filename. Set up this device again.") };
+                using (var dialog = new SavedProfilesDialog(() => previewProfiles, () => defaults, (entry, draft) => { throw new Exception("Preview does not save profiles"); }, entry => { throw new Exception("Preview does not forget profiles"); })) {
+                    dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "saved-profiles.png")); dialog.ProfilesList.Items[0].Selected = true; dialog.UpdateSelection(); Render(dialog, Path.Combine(output, "saved-profiles-selected.png"));
+                }
+                using (var dialog = new SavedProfilesDialog(() => new SavedProfile[0], () => defaults, (entry, draft) => {}, entry => {})) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "saved-profiles-empty.png")); }
                 using (var dialog = new ImportDefaultsDialog(defaults)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "shared-defaults.png")); }
                 using (var dialog = new ImportDefaultsDialog(new ImportDefaults { DeleteOriginals = true })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "shared-removal.png")); }
                 using (var dialog = new OriginalRemovalConfirmationDialog("Applies to EVERY device using defaults, including future profiles.", true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "enable-removal.png")); }
@@ -616,6 +623,7 @@ namespace EasyEject {
             RemovalIntentTests();
             RemovalResumeTests();
             RemovalResumeActionTests();
+            SavedProfileTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {
@@ -637,13 +645,18 @@ namespace EasyEject {
                 int border = (form.Width - form.ClientSize.Width) / 2, left = border + body.Left, top = form.Height - form.ClientSize.Height - border + body.Top;
                 // A separate viewport bitmap bounds native drawing physically; negative child origins
                 // cannot overwrite the form's caption/footer even when a GDI paint ignores clipping.
-                using (var viewport = new System.Drawing.Bitmap(body.ClientSize.Width, body.ClientSize.Height)) using (var graphics = System.Drawing.Graphics.FromImage(viewport)) {
+                using (var frame = (System.Drawing.Bitmap)bitmap.Clone()) using (var viewport = new System.Drawing.Bitmap(body.ClientSize.Width, body.ClientSize.Height)) using (var graphics = System.Drawing.Graphics.FromImage(viewport)) {
                     graphics.Clear(body.BackColor);
                     foreach (System.Windows.Forms.Control child in body.Controls) using (var content = new System.Drawing.Bitmap(child.Width, child.Height)) {
                         child.DrawToBitmap(content, new System.Drawing.Rectangle(0, 0, content.Width, content.Height));
                         graphics.DrawImageUnscaled(content, child.Left, child.Top - offset);
                     }
-                    using (var target = System.Drawing.Graphics.FromImage(bitmap)) target.DrawImageUnscaled(viewport, left, top);
+                    // Some native children paint outside the bitmap requested by DrawToBitmap.
+                    // Restore the captured frame before adding only the bounded body region.
+                    using (var target = System.Drawing.Graphics.FromImage(bitmap)) {
+                        target.DrawImageUnscaled(frame, 0, 0);
+                        target.DrawImage(viewport, new System.Drawing.Rectangle(left, top, viewport.Width, viewport.Height), 0, 0, viewport.Width, viewport.Height, System.Drawing.GraphicsUnit.Pixel);
+                    }
                 }
                 bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
             }

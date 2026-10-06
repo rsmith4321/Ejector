@@ -253,6 +253,7 @@ namespace EasyEject {
     }
     public interface IConnectionGuard { bool Changed { get; } }
     [DataContract] public sealed class ImportProfile {
+        [DataMember] public string Name;
         [DataMember] public string VolumeId; [DataMember] public string VolumeSerial; [DataMember] public string DiskInstance;
         [DataMember] public string RelativeSource; [DataMember] public string Destination;
         [DataMember] public bool? UsesImportDefaults; [DataMember] public bool? VideosOnly; [DataMember] public bool? IncludePreviews; [DataMember] public bool? CleanLayout;
@@ -274,7 +275,7 @@ namespace EasyEject {
         public void SetVideosOnly(bool value) { if (!value && (VideosOnly ?? false)) { DeleteOriginals = false; RecoverTrash = false; } VideosOnly = value; }
         public ImportProfile Copy() { return (ImportProfile)MemberwiseClone(); }
     }
-    public static class Profiles {
+    public static partial class Profiles {
         internal static string Root {
             get {
                 string appData = SafePaths.Normalize(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
@@ -294,14 +295,16 @@ namespace EasyEject {
                 }
             }
         }
-        static string FileName(string volumeId) { using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(volumeId))).Replace("-", "") + ".json"; }
+        internal static string FileName(string volumeId) { using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(volumeId))).Replace("-", "") + ".json"; }
         public static void Save(ImportProfile profile) {
             Save(profile, Root);
         }
         internal static void Save(ImportProfile profile, string root) {
             if (profile == null || String.IsNullOrWhiteSpace(profile.VolumeId)) throw new SafetyException("Import profile has no volume identity.");
             if (profile.MacTrashUid != null && !DeviceTrash.ValidMacOwner(profile.MacTrashUid)) throw new SafetyException("Saved Mac Trash owner selection is invalid. Review this device's profile.");
-            WriteJson(profile, typeof(ImportProfile), root, FileName(profile.VolumeId));
+            ValidateName(profile.Name, false);
+            Directory.CreateDirectory(root);
+            using (SafePaths.LockDirectories(root)) using (WriterGate(root)) WriteJson(profile, typeof(ImportProfile), root, FileName(profile.VolumeId));
         }
         internal static void WriteJson(object value, Type type, string root, string name) {
             Directory.CreateDirectory(root);
@@ -325,13 +328,14 @@ namespace EasyEject {
                 var p = (ImportProfile)new DataContractJsonSerializer(typeof(ImportProfile)).ReadObject(stream);
                 if (p == null || p.VolumeId != volume.Id || p.VolumeSerial != volume.Serial || p.DiskInstance != disk.InstanceId) throw new SafetyException("Saved import profile no longer matches this card. Choose the folders again and save a new profile.");
                 if (p.RelativeSource == null || p.Destination == null) throw new SafetyException("Saved import folders are invalid. Choose the folders again.");
+                ValidateName(p.Name, false);
                 if (p.MacTrashUid != null && !DeviceTrash.ValidMacOwner(p.MacTrashUid)) throw new SafetyException("Saved Mac Trash owner selection is invalid. Review this device's profile.");
                 return p;
             }
         }
         public static void Remove(Volume volume, Disk disk) { Remove(volume, disk, Root); }
         internal static void Remove(Volume volume, Disk disk, string root) {
-            using (SafePaths.LockDirectories(root)) {
+            using (SafePaths.LockDirectories(root)) using (WriterGate(root)) {
                 if (Load(volume, disk, root) == null) return;
                 string path = Path.Combine(root, FileName(volume.Id));
                 using (var handle = Native.CreateFile(path, 0x10080, 0, IntPtr.Zero, 3, 0x00200000, IntPtr.Zero)) {

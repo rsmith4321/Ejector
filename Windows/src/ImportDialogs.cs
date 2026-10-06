@@ -53,7 +53,10 @@ namespace EasyEject {
     internal sealed class ImportProfileDialog : Form {
         internal readonly ImportProfile Draft; internal readonly SelectionControls Selection = new SelectionControls();
         internal readonly RadioButton UseDefaults = new RadioButton(), UseCustom = new RadioButton();
-        readonly TextBox source = new TextBox(), destination = new TextBox();
+        internal readonly TextBox DeviceName = new TextBox();
+        internal readonly TextBox SourceFolder = new TextBox(), DestinationFolder = new TextBox();
+        TextBox source { get { return SourceFolder; } } TextBox destination { get { return DestinationFolder; } }
+        internal readonly Button ChooseSource = new Button(), ChooseOwner = new Button();
         internal readonly Label MacTrashOwner = new Label { AutoSize = true, MaximumSize = new Size(580, 0) };
         readonly string root; ImportDefaults defaults; bool updating;
         internal ImportProfileDialog(ImportProfile profile, string sourceRoot, string deviceName, ImportDefaults defaults, bool existing) {
@@ -63,12 +66,15 @@ namespace EasyEject {
             var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(20), AutoScroll = true };
             var layout = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            var intro = new Label { AutoSize = true, MaximumSize = new Size(620, 0), Text = deviceName + "\nChoose a complete media folder and a destination on a different physical disk. Saving a profile never starts an import.", Margin = new Padding(0, 0, 0, 16) };
-            layout.Controls.Add(intro, 0, 0); layout.SetColumnSpan(intro, 2);
+            var intro = new Label { AutoSize = true, MaximumSize = new Size(620, 0), Text = deviceName + (root == null ? "\nEdit saved choices while this device is disconnected. Connect the original device to change its media folder or select a Mac Trash owner. Import checks its identity and both disks again. Saving starts no import." : "\nChoose a complete media folder and a destination on a different physical disk. Saving a profile never starts an import."), Margin = new Padding(0, 0, 0, 12) };
+            var header = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            header.Controls.Add(intro); header.Controls.Add(new Label { AutoSize = true, Text = "Device name (independent of the card's volume label)" });
+            DeviceName.Text = Draft.Name ?? ProfileName.ForDevice(deviceName); DeviceName.MaxLength = 120; DeviceName.Width = 550; header.Controls.Add(DeviceName);
+            layout.Controls.Add(header, 0, 0); layout.SetColumnSpan(header, 2);
             source.ReadOnly = true; destination.ReadOnly = true; source.Dock = destination.Dock = DockStyle.Fill;
-            source.Text = Path.Combine(root, Draft.RelativeSource ?? ""); destination.Text = Draft.Destination ?? "";
+            source.Text = root == null ? (String.IsNullOrEmpty(Draft.RelativeSource) ? "Whole device" : Draft.RelativeSource) : Path.Combine(root, Draft.RelativeSource ?? ""); destination.Text = Draft.Destination ?? "";
             layout.Controls.Add(new Label { AutoSize = true, Text = "Media folder", Margin = new Padding(0, 4, 0, 4) }, 0, 1);
-            layout.Controls.Add(source, 0, 2); var chooseSource = new Button { Text = "Choose…", AutoSize = true }; layout.Controls.Add(chooseSource, 1, 2);
+            layout.Controls.Add(source, 0, 2); var chooseSource = ChooseSource; chooseSource.Text = "Choose…"; chooseSource.AutoSize = true; chooseSource.Enabled = root != null; layout.Controls.Add(chooseSource, 1, 2);
             layout.Controls.Add(new Label { AutoSize = true, Text = "Save copies under", Margin = new Padding(0, 12, 0, 4) }, 0, 3);
             layout.Controls.Add(destination, 0, 4); var chooseDestination = new Button { Text = "Choose…", AutoSize = true }; layout.Controls.Add(chooseDestination, 1, 4);
             chooseSource.Click += delegate { Choose(source, "Choose a complete media folder on " + deviceName); };
@@ -84,7 +90,7 @@ namespace EasyEject {
             var trashOwner = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0, 12, 0, 8) };
             trashOwner.Controls.Add(new Label { AutoSize = true, Text = "Mac Trash owner (optional, only for this device)" }); trashOwner.Controls.Add(MacTrashOwner);
             var ownerButtons = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
-            var chooseOwner = new Button { AutoSize = true, Text = "Choose Mac Trash owner…" }; var clearOwner = new Button { AutoSize = true, Text = "Windows Trash only" }; ownerButtons.Controls.Add(chooseOwner); ownerButtons.Controls.Add(clearOwner); trashOwner.Controls.Add(ownerButtons);
+            var chooseOwner = ChooseOwner; chooseOwner.AutoSize = true; chooseOwner.Text = "Choose Mac Trash owner…"; chooseOwner.Enabled = root != null; var clearOwner = new Button { AutoSize = true, Text = "Windows Trash only" }; ownerButtons.Controls.Add(chooseOwner); ownerButtons.Controls.Add(clearOwner); trashOwner.Controls.Add(ownerButtons);
             chooseOwner.Click += delegate {
                 using (var dialog = new FolderBrowserDialog { Description = "Choose YOUR numeric owner folder under this device's .Trashes folder. Other owners are never inferred or swept.", SelectedPath = Path.Combine(root, ".Trashes"), ShowNewFolderButton = false }) {
                     if (dialog.ShowDialog(this) != DialogResult.OK) return;
@@ -112,16 +118,23 @@ namespace EasyEject {
             var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel, MinimumSize = new Size(100, 36) };
             save.Click += delegate {
                 try {
-                    string selected = SafePaths.Normalize(source.Text), target = SafePaths.Normalize(destination.Text);
-                    if (!SafePaths.Within(selected, root)) throw new SafetyException("Choose a media folder within the selected card.");
-                    SaveCustomSelection(); Draft.RelativeSource = selected.TrimEnd('\\').Equals(root.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) ? "" : SafePaths.Relative(selected, root);
-                    Draft.Destination = target; DialogResult = DialogResult.OK;
+                    ApplyEdits(); DialogResult = DialogResult.OK;
                 } catch (Exception ex) { MessageBox.Show(this, ex.Message, "Review import folders", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             };
             footer.Controls.Add(save); footer.Controls.Add(cancel);
             if (existing) { var forget = new Button { Text = "Forget profile", AutoSize = true, DialogResult = DialogResult.Retry, MinimumSize = new Size(130, 36) }; footer.Controls.Add(forget); }
             Controls.Add(footer); AcceptButton = save; CancelButton = cancel; UpdateSelection();
-            body.SizeChanged += delegate { int width = Math.Max(300, body.ClientSize.Width - 60); intro.MaximumSize = retained.MaximumSize = new Size(width, 0); Selection.SetTextWidth(width); };
+            body.SizeChanged += delegate { int width = Math.Max(300, body.ClientSize.Width - 60); intro.MaximumSize = retained.MaximumSize = new Size(width, 0); DeviceName.Width = width; Selection.SetTextWidth(width); };
+        }
+        internal void ApplyEdits() {
+            string name = DeviceName.Text.Trim(); Profiles.ValidateName(name, true);
+            string target = SafePaths.Normalize(destination.Text);
+            if (root != null) {
+                string selected = SafePaths.Normalize(source.Text);
+                if (!SafePaths.Within(selected, root)) throw new SafetyException("Choose a media folder within the selected card.");
+                Draft.RelativeSource = selected.TrimEnd('\\').Equals(root.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) ? "" : SafePaths.Relative(selected, root);
+            }
+            SaveCustomSelection(); Draft.Name = name; Draft.Destination = target;
         }
         void Choose(TextBox field, string description) {
             using (var dialog = new FolderBrowserDialog { Description = description, SelectedPath = field.Text, ShowNewFolderButton = false }) { if (dialog.ShowDialog(this) == DialogResult.OK) field.Text = dialog.SelectedPath; }
@@ -131,6 +144,7 @@ namespace EasyEject {
             var options = Selection.Snapshot(); Draft.SetVideosOnly(options.VideosOnly); Draft.IncludePreviews = options.IncludePreviews; Draft.CleanLayout = options.CleanLayout; Draft.AskToEject = options.AskToEject; Draft.DeleteOriginals = options.DeleteOriginals; Draft.RecoverTrash = options.RecoverTrash;
         }
         internal string ValidateMacOwner(string input) {
+            if (root == null) throw new SafetyException("Connect the original device before selecting a Mac Trash owner.");
             string path = SafePaths.Normalize(input), parent = SafePaths.Normalize(Path.Combine(root, ".Trashes"));
             if (!String.Equals(Path.GetDirectoryName(path), parent, StringComparison.OrdinalIgnoreCase) || !DeviceTrash.ValidMacOwner(Path.GetFileName(path))) throw new SafetyException("Choose one explicit numeric owner folder directly under this device's .Trashes folder.");
             return Path.GetFileName(path);

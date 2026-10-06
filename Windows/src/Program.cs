@@ -23,10 +23,11 @@ namespace EasyEject {
         readonly WindowsDiscovery discovery = new WindowsDiscovery(); readonly Operations operations = new Operations();
         readonly ImportCompletionRegistry completions = new ImportCompletionRegistry();
         AppSettings appSettings = new AppSettings(); AppIssue appIssue = new AppIssue(); ImportCompletionDialog activeCompletion;
-        ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu;
+        ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
         int cardCount;
         readonly Button resume = new Button();
+        readonly Button savedProfiles = new Button();
         readonly ListView list = new ListView(); readonly Label status = new Label(); readonly Button refresh = new Button(), eject = new Button(), cleanEject = new Button(), bulk = new Button(), import = new Button(), cancel = new Button(), profile = new Button(), defaults = new Button(), history = new Button(), pending = new Button(), settings = new Button(), issue = new Button();
         readonly NotifyIcon tray; readonly System.Windows.Forms.Timer debounce = new System.Windows.Forms.Timer();
         Inventory inventory; bool scanning, working, quit; CancellationTokenSource cancellation; IntPtr notification;
@@ -51,12 +52,14 @@ namespace EasyEject {
             refresh.Text = "Refresh"; eject.Text = "Safe eject…"; import.Text = "Verified import…"; cancel.Text = "Cancel operation"; profile.Text = "Import profile…"; defaults.Text = "Import defaults…"; history.Text = "Import history…";
             pending.Text = "Completed imports…"; settings.Text = "Settings…"; issue.Text = "View issue…"; bulk.Text = "Eject cards…"; cleanEject.Text = "Clean && eject…";
             resume.Text = "Resume interrupted import…";
-            foreach (var b in new[] { refresh, eject, cleanEject, bulk, import, resume, profile, defaults, history, pending, settings, issue, cancel }) { b.AutoSize = true; b.MinimumSize = new Size(135, 36); actions.Controls.Add(b); }
+            savedProfiles.Text = "Saved profiles…";
+            foreach (var b in new[] { refresh, eject, cleanEject, bulk, import, resume, profile, savedProfiles, defaults, history, pending, settings, issue, cancel }) { b.AutoSize = true; b.MinimumSize = new Size(135, 36); actions.Controls.Add(b); }
             cancel.Enabled = false;
             refresh.Click += async delegate { await RefreshDevices(); }; eject.Click += async delegate { await Eject(); }; import.Click += async delegate { await Import(); };
             bulk.Click += async delegate { await EjectCards(); };
             cleanEject.Click += async delegate { await Eject(true); };
             profile.Click += async delegate { await EditProfile(); }; defaults.Click += delegate { EditDefaults(); };
+            savedProfiles.Click += delegate { EditSavedProfiles(); };
             history.Click += async delegate { await ReviewHistory(); };
             resume.Click += async delegate { await ResumeImport(); };
             pending.Click += async delegate { await ReviewCompletions(); }; settings.Click += delegate { EditSettings(); }; issue.Click += delegate { ViewIssue(); };
@@ -68,6 +71,7 @@ namespace EasyEject {
             bulkMenu = new ToolStripMenuItem("Eject cards…", null, async delegate { await EjectCards(); }); menu.Items.Add(bulkMenu);
             pendingMenu = new ToolStripMenuItem("Completed imports…", null, async delegate { await ReviewCompletions(); }); menu.Items.Add(pendingMenu);
             settingsMenu = new ToolStripMenuItem("Settings…", null, delegate { EditSettings(); }); menu.Items.Add(settingsMenu);
+            savedProfilesMenu = new ToolStripMenuItem("Saved profiles…", null, delegate { EditSavedProfiles(); }); menu.Items.Add(savedProfilesMenu);
             issueMenu = new ToolStripMenuItem("View issue…", null, delegate { ViewIssue(); }); menu.Items.Add(issueMenu);
             debugMenu = new ToolStripMenuItem("View debug log…", null, delegate { ViewDebugLog(); }); menu.Items.Add(debugMenu);
             menu.Items.Add("Quit", null, delegate { if (working) { MessageBox.Show(this, "Wait for the operation to finish or cancel the import before quitting."); return; } quit = true; Close(); });
@@ -113,6 +117,7 @@ namespace EasyEject {
             var v = Selected; bool ready = v != null && inventory != null && !working && !scanning && inventory.Epoch == discovery.Epoch;
             eject.Enabled = cleanEject.Enabled = false; import.Enabled = false; profile.Enabled = false; defaults.Enabled = !working; history.Enabled = !working && !scanning; refresh.Enabled = !working && !scanning;
             resume.Enabled = false;
+            savedProfiles.Enabled = savedProfilesMenu.Enabled = !working && !scanning && !readOnly;
             settings.Enabled = pending.Enabled = issue.Enabled = !working && !scanning;
             pending.Enabled &= completions.Entries.Length > 0; issue.Enabled &= appIssue.HasIssue;
             pendingMenu.Enabled = pending.Enabled; issueMenu.Enabled = issue.Enabled; settingsMenu.Enabled = settings.Enabled; debugMenu.Visible = appSettings.DebugEnabled; debugMenu.Enabled = !working;
@@ -255,10 +260,11 @@ namespace EasyEject {
             await RefreshDevices();
         }
         async Task PresentImportResult(ImportResult result, ImportProfile stored, Volume v, VolumeImportGuard guard, string root, string destination, MediaOptions options) {
+            string deviceName = String.IsNullOrWhiteSpace(stored.Name) ? v.Display : stored.Name;
             string removalMessage = result.Receipt != null && !String.IsNullOrEmpty(result.Receipt.ResumedUtc) ? RemovalResumeChoice.Summary(result) : OriginalRemovalChoice.Summary(result.RemovedOriginals) + " " + DeviceTrashChoice.Summary(result.RecoveredTrashFiles, result.ClearedTrashFiles, result.ClearedTrashRecords);
             string historyNote = ""; bool historyFailed = false;
             if (result.HasSelectedMedia) {
-                try { await Task.Run(() => ImportHistory.Add(ImportHistory.Create(result, stored, v.Display, guard.DestinationIdentity))); historyNote = "\nExact verified files saved in Import history."; }
+                try { await Task.Run(() => ImportHistory.Add(ImportHistory.Create(result, stored, deviceName, guard.DestinationIdentity))); historyNote = "\nExact verified files saved in Import history."; }
                 catch (Exception ex) { historyFailed = true; historyNote = "\nImport verified, but history could not be saved: " + ex.Message + "\nCopies and the completion receipt remain available."; RecordIssue(historyNote.Trim()); }
             }
             string message = result.Files == 0 ? "No matching media or device indexes were found. No batch was created." : (result.HasSelectedMedia ? "Import complete. " : "No matching media. Device index backup only. ") + result.Files + " files verified (" + result.Bytes + " bytes; " + result.Reused + " reused).\n" + result.Folder;
@@ -267,7 +273,7 @@ namespace EasyEject {
             if (!historyFailed) ClearIssue();
             ImportCompletion completion = null;
             if (options.AskToEject && sourceUnchanged) {
-                completion = new ImportCompletion(guard.CompletionOrigin, v.Display, result.Files > 0 ? result.Folder : destination, destination, guard.DestinationIdentity, result.HasSelectedMedia, message);
+                completion = new ImportCompletion(guard.CompletionOrigin, deviceName, result.Files > 0 ? result.Folder : destination, destination, guard.DestinationIdentity, result.HasSelectedMedia, message);
                 completions.Insert(completion);
             }
             bool showChoice = CompletionPresentation.ShowChoice(options.AskToEject, ForegroundWindow, appSettings.NotificationsEnabled);
@@ -425,6 +431,25 @@ namespace EasyEject {
                 working = true; UpdateActions();
                 using (var dialog = new ImportDefaultsDialog(ReadDefaults())) {
                     if (dialog.ShowDialog(this) == DialogResult.OK) { ImportDefaults.Save(dialog.Value); status.Text = "Import defaults saved. They apply on the next import; no import started."; }
+                }
+            } catch (Exception ex) { ShowError(ex); }
+            finally { working = false; UpdateActions(); debounce.Start(); }
+        }
+        void EditSavedProfiles() {
+            if (working || scanning || readOnly) return;
+            try {
+                working = true; UpdateActions();
+                using (var dialog = new SavedProfilesDialog(() => Profiles.Catalog(), ReadDefaults, delegate(SavedProfile expected, ImportProfile draft) {
+                    if (!String.Equals(expected.Profile.Destination, draft.Destination, StringComparison.OrdinalIgnoreCase)) {
+                        using (SafePaths.LockDirectories(draft.Destination)) {
+                            string id = WindowsDiscovery.VolumeId(draft.Destination);
+                            OfflineProfileDestination.Validate(draft, DestinationIdentity.Capture(discovery.Scan(), id));
+                            Profiles.SaveOffline(expected, draft);
+                        }
+                    } else Profiles.SaveOffline(expected, draft);
+                }, entry => Profiles.ForgetOffline(entry))) {
+                    dialog.ShowDialog(this);
+                    if (dialog.Changed) status.Text = "Saved profiles updated. No import started. Device and destination validation still apply to each import.";
                 }
             } catch (Exception ex) { ShowError(ex); }
             finally { working = false; UpdateActions(); debounce.Start(); }
