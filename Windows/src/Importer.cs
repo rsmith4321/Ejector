@@ -93,17 +93,24 @@ namespace EasyEject {
             if (!SafePaths.Within(selectedFolder, sourceRoot) || SafePaths.Within(destination, sourceRoot) || SafePaths.Within(sourceRoot, destination)) throw new SafetyException("Source and destination folders overlap or the selection is outside the source volume.");
             if (new[] { "STREAM", "CLIP" }.Contains(Path.GetFileName(selectedFolder).ToUpperInvariant())) throw new SafetyException("Select the complete camera package or card, including audio and metadata, rather than a partial STREAM/CLIP folder.");
             using (operations.Reserve(guard.ProtectedDisks))
-            using (SafePaths.LockDirectories(sourceRoot, destination))
+            using (var directories = SafePaths.HoldDirectories(sourceRoot, destination))
             using (var mediaFolder = new ImportMediaFolder(sourceRoot, selectedFolder)) {
-                cancel.ThrowIfCancellationRequested(); guard.Validate();
+                // Attribute handles do not prevent every directory rename on Windows.
+                // Keep the original device guard/evidence, and validate captured roots
+                // before/after each callback rather than recapturing a replacement.
+                Action validate = () => { directories.Validate(); guard.Validate(); directories.Validate(); };
+                var originalReport = report; report = message => { directories.Validate(); originalReport(message); directories.Validate(); };
+                var originalProgress = progress; progress = originalProgress == null ? null : (Action<ImportWorkProgress>)(value => { directories.Validate(); originalProgress(value); directories.Validate(); });
+                Func<string, ulong> checkedCapacity = path => { directories.Validate(); ulong available = capacity(path); directories.Validate(); return available; };
+                cancel.ThrowIfCancellationRequested(); validate();
                 var work = new ImportWorkReporter(progress); work.Emit("Scanning", 0);
-                var plan = new ImportSourcePlan(sourceRoot, selectedFolder, options, cancel, guard, trashCatalog, mediaFolder);
+                var plan = new ImportSourcePlan(sourceRoot, selectedFolder, options, cancel, validate, trashCatalog, mediaFolder);
                 var manifest = plan.Files;
-                if (manifest.Count == 0) { cancel.ThrowIfCancellationRequested(); guard.Validate(); plan.CheckManifest(file => false, cancel, guard.Validate); work.Emit("No matching media", 1); return new ImportResult { Folder = destination, Files = 0 }; }
+                if (manifest.Count == 0) { cancel.ThrowIfCancellationRequested(); validate(); plan.CheckManifest(file => false, cancel, validate); work.Emit("No matching media", 1); return new ImportResult { Folder = destination, Files = 0 }; }
                 var stamps = new Dictionary<string, Native.FileInfo>(); var hashes = new Dictionary<string, string>();
                 int checkedFiles = 0;
                 foreach (string file in manifest) {
-                    cancel.ThrowIfCancellationRequested(); guard.Validate(); report("Checking " + plan.Label(file));
+                    cancel.ThrowIfCancellationRequested(); validate(); report("Checking " + plan.Label(file));
                     using (SafePaths.LockDirectories(Path.GetDirectoryName(file))) using (var input = SafePaths.ReadFile(file)) {
                         stamps[file] = Native.Info(input.SafeFileHandle); hashes[file] = Hash(input, cancel, fraction => work.Emit("Checking originals", 0.20 * (checkedFiles + fraction) / manifest.Count));
                         if (!SameStamp(stamps[file], Native.Info(input.SafeFileHandle))) throw new SafetyException("A source changed while planning import. Originals are kept.");
@@ -134,21 +141,22 @@ namespace EasyEject {
                     using (SafePaths.LockDirectories(record))
                     using (var auditStream = SafePaths.NewFile(Path.Combine(record, "import-audit.log")))
                     using (var audit = new StreamWriter(auditStream, new System.Text.UTF8Encoding(false), 4096, true)) {
-                    Action<string> log = line => { audit.WriteLine(DateTime.UtcNow.ToString("o") + " " + line); audit.Flush(); auditStream.Flush(true); auditCheck(line); };
+                    Action<string> log = line => { audit.WriteLine(DateTime.UtcNow.ToString("o") + " " + line); audit.Flush(); auditStream.Flush(true); directories.Validate(); auditCheck(line); directories.Validate(); };
                     log("Started import | source " + volumeId + " | " + selectedFolder + " -> " + batch);
                     try {
                     foreach (string file in manifest) {
-                        cancel.ThrowIfCancellationRequested(); guard.Validate();
+                        cancel.ThrowIfCancellationRequested(); validate();
                         string relative = plan.Label(file), target = targets[file];
                         originals[SafePaths.Relative(target, batch)] = file;
                         SafePaths.Normalize(target); if (!SafePaths.Within(target, batch)) throw new SafetyException("Destination path escaped batch folder.");
                         EnsureDirectories(Path.GetDirectoryName(target), batch);
-                        using (SafePaths.LockDirectories(Path.GetDirectoryName(file), Path.GetDirectoryName(target)))
+                        using (var fileDirectories = SafePaths.HoldDirectories(Path.GetDirectoryName(file), Path.GetDirectoryName(target)))
                         using (var input = SafePaths.ReadFile(file)) {
-                            Action<string, double> measured = (phase, fraction) => work.Emit(phase, 0.20 + 0.79 * (totalBytes == 0 ? (receipt.Files.Count + fraction) / manifest.Count : (bytes + input.Length * fraction) / totalBytes));
+                            fileDirectories.Validate();
+                            Action<string, double> measured = (phase, fraction) => { fileDirectories.Validate(); work.Emit(phase, 0.20 + 0.79 * (totalBytes == 0 ? (receipt.Files.Count + fraction) / manifest.Count : (bytes + input.Length * fraction) / totalBytes)); fileDirectories.Validate(); };
                             if (!SameStamp(Native.Info(input.SafeFileHandle), stamps[file])) throw new SafetyException("A source file changed after scanning. Originals are kept.");
                             if (File.Exists(target)) {
-                                report("Reusing verified " + relative);
+                                report("Reusing verified " + relative); fileDirectories.Validate();
                                 using (var saved = SafePaths.ExistingCopy(target)) {
                                     if (saved.Length != input.Length || Hash(saved, cancel, fraction => measured("Checking saved copy", fraction * 0.50)) != hashes[file] || Hash(input, cancel, fraction => measured("Checking originals", 0.50 + fraction * 0.50)) != hashes[file]) throw new SafetyException("Destination changed during import. Existing copies and originals are kept; import again.");
                                     saved.Flush(true);
@@ -156,7 +164,8 @@ namespace EasyEject {
                                 }
                                 measured("Verified copies", 0); log("Reused verified SHA256 " + hashes[file] + " | " + file + " -> " + target); continue;
                             }
-                            if (capacity(destination) <= (ulong)input.Length + 1073741824UL) throw new SafetyException("Not enough free space in the destination (file plus 1 GiB reserve required). Originals are kept.");
+                            ulong availableSpace = checkedCapacity(destination); fileDirectories.Validate();
+                            if (availableSpace <= (ulong)input.Length + 1073741824UL) throw new SafetyException("Not enough free space in the destination (file plus 1 GiB reserve required). Originals are kept.");
                             string pending = Path.Combine(Path.GetDirectoryName(target), ".easyeject-" + Guid.NewGuid().ToString("N") + ".partial");
                             bool published = false;
                             using (var output = SafePaths.NewFile(pending)) {
@@ -164,7 +173,7 @@ namespace EasyEject {
                                     report("Copying " + relative); var buffer = new byte[1048576]; long count = 0; int n;
                                     using (var sourceHash = SHA256.Create()) {
                                         while ((n = input.Read(buffer, 0, buffer.Length)) != 0) {
-                                            cancel.ThrowIfCancellationRequested(); if (discoveryChanged(guard)) guard.Validate();
+                                            cancel.ThrowIfCancellationRequested(); if (discoveryChanged(guard)) validate();
                                             output.Write(buffer, 0, n); sourceHash.TransformBlock(buffer, 0, n, null, 0); count += n; measured("Copying", input.Length == 0 ? 0.50 : 0.50 * count / input.Length);
                                         }
                                         sourceHash.TransformFinalBlock(new byte[0], 0, 0);
@@ -173,7 +182,7 @@ namespace EasyEject {
                                         // Reread the held, write/delete-denying source handle, not a path that can be swapped.
                                         input.Position = 0;
                                         if (copyHash != originalHash || originalHash != hashes[file] || Hash(input, cancel, fraction => measured("Checking originals", 0.65 + 0.20 * fraction)) != originalHash || input.Length != count) throw new SafetyException("SHA-256 verification failed. Originals are kept.");
-                                        cancel.ThrowIfCancellationRequested(); guard.Validate();
+                                        cancel.ThrowIfCancellationRequested(); validate(); fileDirectories.Validate();
                                         Native.Rename(output.SafeFileHandle, target); published = true; Native.PreserveModified(output.SafeFileHandle, stamps[file]); output.Flush(true);
                                         output.Position = 0;
                                         string publishedPath = Native.FinalPath(output.SafeFileHandle), publishedHash = Hash(output, cancel, fraction => measured("Checking published copy", 0.85 + 0.15 * fraction));
@@ -188,24 +197,24 @@ namespace EasyEject {
                             measured("Verified copies", 0); log("Copied verified SHA256 " + hashes[file] + " | " + file + " -> " + target);
                         }
                     }
-                    work.Emit("Final batch verification", 0.99); guard.Validate(); cancel.ThrowIfCancellationRequested();
-                    plan.CheckManifest(x => false, cancel, guard.Validate);
+                    work.Emit("Final batch verification", 0.99); validate(); cancel.ThrowIfCancellationRequested();
+                    plan.CheckManifest(x => false, cancel, validate);
                     // Recheck and hold every source and saved dependency until receipt publication.
                     using (var removal = new OriginalRemovalSession(batch, receipt, originals, stamps, plan.Deletable)) {
-                    removal.VerifyAll(cancel, guard.Validate);
-                    guard.Validate();
+                    removal.VerifyAll(cancel, validate);
+                    validate();
                     log("Batch verification complete | " + receipt.Files.Count + " files, " + bytes + " bytes, " + reused + " reused; " + (plan.Deletable.Count > 0 ? "removal/Trash clearing requested; source files still held" : "originals kept"));
-                    Action checkManifest = () => plan.CheckManifest(removal.WasRemoved, cancel, guard.Validate);
-                    using (var removalIntent = plan.Deletable.Count > 0 ? removal.CaptureIntent(plan, receipt, destination, batch, cancel, guard).Publish(record, cancel, guard.Validate, log) : null) {
-                    if (plan.Deletable.Count > 0) removal.Remove(cancel, guard.Validate, checkManifest, log, report);
+                    Action checkManifest = () => plan.CheckManifest(removal.WasRemoved, cancel, validate);
+                    using (var removalIntent = plan.Deletable.Count > 0 ? removal.CaptureIntent(plan, receipt, destination, batch, cancel, guard).Publish(record, cancel, validate, log) : null) {
+                    if (plan.Deletable.Count > 0) removal.Remove(cancel, validate, checkManifest, log, report);
                     int removedCount = receipt.Files.Count(e => e.RemovedSource && !e.FromTrash), clearedTrash = receipt.Files.Count(e => e.RemovedSource && e.FromTrash && !e.IsTrashRecord), clearedRecords = receipt.Files.Count(e => e.RemovedSource && e.IsTrashRecord);
                     receipt.OriginalsKept = removedCount == 0;
                     work.Emit("Publishing receipt", 0.99); report("Publishing verified import receipt. " + OriginalRemovalChoice.Summary(removedCount) + " Cleared " + clearedTrash + " verified Trash files and " + clearedRecords + " records.");
-                    cancel.ThrowIfCancellationRequested(); guard.Validate(); checkManifest(); removal.VerifyAll(cancel, guard.Validate);
+                    cancel.ThrowIfCancellationRequested(); validate(); checkManifest(); removal.VerifyAll(cancel, validate);
                     string receiptPath = Path.Combine(record, "verified-import.json");
                     using (var stream = SafePaths.NewFile(Path.Combine(record, ".receipt-" + Guid.NewGuid().ToString("N") + ".partial"))) {
                         bool complete = false;
-                        try { new DataContractJsonSerializer(typeof(ImportReceipt)).WriteObject(stream, receipt); stream.Flush(true); cancel.ThrowIfCancellationRequested(); guard.Validate(); Native.Rename(stream.SafeFileHandle, receiptPath); stream.Flush(true); complete = true; }
+                        try { new DataContractJsonSerializer(typeof(ImportReceipt)).WriteObject(stream, receipt); stream.Flush(true); cancel.ThrowIfCancellationRequested(); validate(); Native.Rename(stream.SafeFileHandle, receiptPath); stream.Flush(true); complete = true; }
                         finally { if (!complete) Native.DeleteOnClose(stream.SafeFileHandle); }
                     }
                     work.Complete();

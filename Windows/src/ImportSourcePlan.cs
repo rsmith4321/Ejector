@@ -14,7 +14,7 @@ namespace EasyEject {
         readonly Dictionary<string, TrashRecord> trashRecords = new Dictionary<string, TrashRecord>(StringComparer.OrdinalIgnoreCase);
         internal readonly List<string> Files; internal readonly HashSet<string> Deletable;
         internal bool HasMedia { get { return Ordinary.Media.Count != 0 || trashFiles.Count != 0; } }
-        internal ImportSourcePlan(string source, string selected, MediaOptions options, CancellationToken cancellation, IImportGuard guard, Func<string, string, CancellationToken, Action, DeviceTrashSnapshot> catalog, ImportMediaFolder mediaFolder) {
+        internal ImportSourcePlan(string source, string selected, MediaOptions options, CancellationToken cancellation, Action validate, Func<string, string, CancellationToken, Action, DeviceTrashSnapshot> catalog, ImportMediaFolder mediaFolder) {
             this.source = source; this.selected = selected; this.options = options;
             this.mediaFolder = mediaFolder;
             string relative = selected.TrimEnd('\\').Equals(source.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) ? "" : SafePaths.Relative(selected, source);
@@ -22,7 +22,7 @@ namespace EasyEject {
             Ordinary = MediaSelection.Plan(mediaFolder.Scan(cancellation), source, selected, options);
             Deletable = options.DeleteOriginals ? MediaSelection.Deletable(Ordinary, options) : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (options.RecoverTrash) {
-                Trash = catalog(source, options.MacTrashUid, cancellation, guard.Validate); TrashSelection = Trash.Select(options);
+                Trash = catalog(source, options.MacTrashUid, cancellation, validate); validate(); TrashSelection = Trash.Select(options);
                 if (Trash.SourceRoot != source || !SafePaths.Within(Trash.LogicalRoot, source)) throw new SafetyException("The recovery catalog belongs to another source.");
                 foreach (var file in TrashSelection.Files) {
                     if (!SafePaths.Within(file.ActualPath, source) || !SafePaths.Within(file.LogicalPath, Trash.LogicalRoot)) throw new SafetyException("A recovery source escaped the selected device.");

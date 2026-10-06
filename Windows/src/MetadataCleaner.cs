@@ -19,19 +19,19 @@ namespace EasyEject {
             validate();
             foreach (string input in roots) {
                 string root = SafePaths.Normalize(input); if (root.Substring(3).Split('\\').Any(Protected)) throw new SafetyException("Device Trash and system folders cannot be cleanup roots.");
-                using (SafePaths.LockDirectories(root)) { validate(); }
+                using (var directories = SafePaths.HoldDirectories(root)) { directories.Validate(); validate(); directories.Validate(); }
             }
         }
         internal static void Clean(string input, Action validate, CancellationToken cancellation, CleanupCounts counts, Action<string> report) {
             string root = SafePaths.Normalize(input);
             Preflight(new[] { root }, validate);
-            using (SafePaths.LockDirectories(root)) {
+            using (var directories = SafePaths.HoldDirectories(root)) {
                 using (var h = Open(root, false)) {
                     var rootInfo = Native.Info(h); CheckPath(h, root, rootInfo.VolumeSerial, true);
-                    Walk(root, rootInfo.VolumeSerial, validate, cancellation, counts, report);
+                    directories.Validate(); Walk(root, rootInfo.VolumeSerial, () => { directories.Validate(); validate(); directories.Validate(); }, cancellation, counts, report); directories.Validate();
                 }
+                cancellation.ThrowIfCancellationRequested(); directories.Validate(); validate(); directories.Validate();
             }
-            cancellation.ThrowIfCancellationRequested(); validate();
         }
         static SafeFileHandle Open(string path, bool remove) {
             var h = Native.CreateFile(path, remove ? 0x10080U : 0x80U, remove ? 0U : 1U, IntPtr.Zero, 3, 0x02300000, IntPtr.Zero);
@@ -46,11 +46,11 @@ namespace EasyEject {
         static Native.FileInfo Walk(string folder, uint serial, Action validate, CancellationToken cancellation, CleanupCounts counts, Action<string> report) {
             cancellation.ThrowIfCancellationRequested(); validate();
             Native.FileInfo identity;
-            using (SafePaths.LockDirectories(folder)) using (var h = Open(folder, false)) {
+            using (var directories = SafePaths.HoldDirectories(folder)) using (var h = Open(folder, false)) {
                 identity = CheckPath(h, folder, serial, true);
-                string[] entries = Directory.GetFileSystemEntries(folder).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
+                directories.Validate(); string[] entries = Directory.GetFileSystemEntries(folder).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray(); directories.Validate();
                 foreach (string input in entries) {
-                    cancellation.ThrowIfCancellationRequested(); validate(); string path = SafePaths.Normalize(input); string name = Path.GetFileName(path);
+                    cancellation.ThrowIfCancellationRequested(); directories.Validate(); validate(); directories.Validate(); string path = SafePaths.Normalize(input); string name = Path.GetFileName(path);
                     if (!SafePaths.Within(path, folder) || path == folder) throw new SafetyException("Cleanup entry escaped its folder.");
                     if (Protected(name)) { counts.Skipped++; continue; }
                     var attributes = File.GetAttributes(path);
@@ -63,12 +63,13 @@ namespace EasyEject {
                         using (var file = Open(path, true)) {
                             var info = CheckPath(file, path, serial, false);
                             if (info.Links != 1) { counts.Skipped++; continue; }
-                            cancellation.ThrowIfCancellationRequested(); validate(); CheckPath(file, path, serial, false);
+                            cancellation.ThrowIfCancellationRequested(); directories.Validate(); validate(); directories.Validate(); CheckPath(file, path, serial, false);
                             Native.DeleteOnClose(file, "Cannot remove selected metadata: " + name);
                         }
-                        counts.Files++; report("Removed metadata: " + name);
+                        counts.Files++; directories.Validate(); report("Removed metadata: " + name); directories.Validate();
                     }
                 }
+                directories.Validate();
             }
             return identity;
         }

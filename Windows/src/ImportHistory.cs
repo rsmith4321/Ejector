@@ -152,16 +152,29 @@ namespace EasyEject {
         internal static void Verify(CompletedBatch batch, DestinationIdentity current, IImportGuard guard, Operations operations, CancellationToken cancel, Action<string> report) {
             batch = Clone(batch); Validate(batch);
             if (!batch.Destination.Matches(current)) throw new SafetyException("The saved destination changed. Saved originals were not changed.");
-            using (operations.Reserve(guard.ProtectedDisks)) using (SafePaths.LockDirectories(batch.DestinationRoot, batch.Folder, Path.GetDirectoryName(batch.ReceiptPath))) {
-                cancel.ThrowIfCancellationRequested(); guard.Validate(); string hash; var receipt = ReadReceipt(batch.ReceiptPath, out hash);
+            using (operations.Reserve(guard.ProtectedDisks)) using (var directories = SafePaths.HoldDirectories(batch.DestinationRoot, batch.Folder, Path.GetDirectoryName(batch.ReceiptPath))) {
+                var parents = new Dictionary<string, SafePaths.DirectoryLease>(StringComparer.OrdinalIgnoreCase);
+                try {
+                // Capture every exact recorded parent before invoking device callbacks.
+                // Validate only the current parent per file, and all parents at the
+                // boundaries, avoiding a quadratic walk for large package histories.
+                foreach (string parent in batch.Originals.Select(original => Path.GetDirectoryName(original.Path)).Distinct(StringComparer.OrdinalIgnoreCase)) { cancel.ThrowIfCancellationRequested(); parents.Add(parent, SafePaths.HoldDirectories(parent)); }
+                Action validateParents = () => { foreach (var lease in parents.Values) lease.Validate(); };
+                cancel.ThrowIfCancellationRequested(); directories.Validate(); guard.Validate(); directories.Validate(); validateParents(); string hash; var receipt = ReadReceipt(batch.ReceiptPath, out hash); directories.Validate();
                 RequireExactReceipt(batch, receipt, hash);
                 foreach (var original in batch.Originals) {
-                    cancel.ThrowIfCancellationRequested(); guard.Validate(); report("Verifying saved " + SafePaths.Relative(original.Path, batch.Folder));
-                    using (SafePaths.LockDirectories(Path.GetDirectoryName(original.Path))) using (var stream = SafePaths.ReadFile(original.Path)) {
-                        if (stream.Length != original.Bytes || Hash(stream, cancel) != original.Sha256) throw new SafetyException("A saved original changed. Quick Share is refused; files were not changed.");
+                    var originalDirectories = parents[Path.GetDirectoryName(original.Path)];
+                    {
+                        cancel.ThrowIfCancellationRequested(); directories.Validate(); originalDirectories.Validate(); guard.Validate(); directories.Validate(); originalDirectories.Validate();
+                        report("Verifying saved " + SafePaths.Relative(original.Path, batch.Folder)); directories.Validate(); originalDirectories.Validate();
+                        using (var stream = SafePaths.ReadFile(original.Path)) {
+                            if (stream.Length != original.Bytes || Hash(stream, cancel) != original.Sha256) throw new SafetyException("A saved original changed. Quick Share is refused; files were not changed.");
+                            directories.Validate(); originalDirectories.Validate();
+                        }
                     }
                 }
-                guard.Validate(); cancel.ThrowIfCancellationRequested();
+                directories.Validate(); guard.Validate(); directories.Validate(); validateParents(); cancel.ThrowIfCancellationRequested();
+                } finally { foreach (var lease in parents.Values.Reverse()) lease.Dispose(); }
             }
         }
         internal static string Hash(Stream stream, CancellationToken cancel) {
