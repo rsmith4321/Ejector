@@ -9,8 +9,9 @@ namespace EasyEject {
         sealed class EvidenceGuard : IImportGuard, IImportDeviceEvidence {
             internal readonly DestinationIdentity SourceEvidence = new DestinationIdentity { VolumeId = "fixture-volume", VolumeSerial = "source-serial", DiskInstance = "fixture-source-disk", DiskSerial = "source-disk-serial" };
             internal readonly DestinationIdentity DestinationEvidence = HistoryIdentity();
+            internal Action OnValidate;
             public int[] ProtectedDisks { get { return new[] { 700, 701 }; } }
-            public void Validate() {}
+            public void Validate() { if (OnValidate != null) OnValidate(); }
             public DestinationIdentity SourceDevice { get { return SourceEvidence; } }
             public DestinationIdentity DestinationDevice { get { return DestinationEvidence; } }
         }

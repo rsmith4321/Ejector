@@ -79,6 +79,38 @@ namespace EasyEject {
                 Directory.Move(parent, moved); CreateJunction(f, parent, moved);
                 Throws<SafetyException>(() => ReviewInterrupted(f)); Check(File.Exists(record) && File.ReadAllText(Path.Combine(moved, "clip.mp4")) == "Fixture Trash original", "Redirected copy followed or changed");
             } });
+            Test("missing retained source index refuses interrupted review despite complete saved copies", delegate { using (var f = new Fixture()) {
+                string record = InterruptedRecovery(f); File.Delete(Path.Combine(f.Source, "fileinfo_list.list"));
+                Check(Throws<SafetyException>(() => ReviewInterrupted(f)).Message.Contains("retained source dependency is missing") && File.Exists(record), "Missing retained source dependency accepted");
+            } });
+            Test("byte-identical replacement saved copy with restored time refuses file identity reuse", delegate { using (var f = new Fixture()) {
+                string record = InterruptedRecovery(f); string copy = Directory.GetFiles(f.Destination, "clip.mp4", SearchOption.AllDirectories).Single(); DateTime time = File.GetLastWriteTimeUtc(copy); byte[] bytes = File.ReadAllBytes(copy);
+                File.Move(copy, Path.Combine(f.Root, "previous-saved-copy.mp4")); File.WriteAllBytes(copy, bytes); File.SetLastWriteTimeUtc(copy, time);
+                Check(Throws<SafetyException>(() => ReviewInterrupted(f)).Message.Contains("saved dependency changed") && File.Exists(record), "Different saved file identity accepted through equal bytes/time");
+            } });
+            Test("byte-identical replacement restoration record refuses original file identity reuse", delegate { using (var f = new Fixture()) {
+                string record = InterruptedRecovery(f); DateTime time = File.GetLastWriteTimeUtc(record); byte[] bytes = File.ReadAllBytes(record); File.Move(record, Path.Combine(f.Root, "previous-record.bin")); File.WriteAllBytes(record, bytes); File.SetLastWriteTimeUtc(record, time);
+                Check(Throws<SafetyException>(() => ReviewInterrupted(f)).Message.Contains("remaining source") && File.Exists(record), "Different restoration-record identity accepted");
+            } });
+            Test("new still pairing changes video eligibility and refuses interrupted Windows record review", delegate { using (var f = new Fixture()) {
+                string record = InterruptedRecovery(f); string photo = PutRecycle(f, "NEWPAIR", @"E:\DCIM\clip.JPG", "Fixture paired photo");
+                Throws<SafetyException>(() => ReviewInterrupted(f)); Check(File.Exists(photo) && File.Exists(record), "New ambiguous still/movie pair retained stale clearing eligibility");
+            } });
+            Test("missing or duplicate journal hash binding refuses interrupted review", delegate { using (var f = new Fixture()) {
+                string record = InterruptedRecovery(f); string audit = Path.Combine(Path.GetDirectoryName(IntentPath(f)), "import-audit.log"); string[] lines = File.ReadAllLines(audit); string binding = lines.Single(x => x.Contains("Durable removal intent | SHA256"));
+                File.AppendAllText(audit, binding + Environment.NewLine); Check(Throws<SafetyException>(() => ReviewInterrupted(f)).Message.Contains("exact journal hash"), "Duplicate binding accepted");
+                File.WriteAllLines(audit, lines.Where(x => !x.Contains("Durable removal intent | SHA256"))); Check(Throws<SafetyException>(() => ReviewInterrupted(f)).Message.Contains("exact journal hash") && File.Exists(record), "Missing binding accepted");
+            } });
+            Test("destination guard loss during resume review releases every held dependency and reservation", delegate { using (var f = new Fixture()) {
+                string record = InterruptedRecovery(f); var operations = new Operations(); var guard = new EvidenceGuard(); int checks = 0; guard.OnValidate = () => { if (++checks == 3) throw new SafetyException("Fixture lost destination during review"); };
+                Check(Throws<SafetyException>(() => ReviewInterrupted(f, guard, operations: operations)).Message.Contains("lost destination"), "Device loss did not stop review");
+                using (operations.Reserve(new[] { 700, 701 })) {} File.AppendAllText(record, "Fixture proves source handle released"); File.AppendAllText(IntentPath(f), " ");
+                Check(checks == 3, "Review continued after device loss"); NoRemovalCompletion(f);
+            } });
+            Test("busy source or destination reservation refuses interrupted review without clearing", delegate { using (var f = new Fixture()) {
+                string record = InterruptedRecovery(f); var operations = new Operations(); using (operations.Reserve(new[] { 701 })) { Throws<SafetyException>(() => ReviewInterrupted(f, operations: operations)); }
+                Check(File.Exists(record) && ReviewInterrupted(f, operations: operations).PendingWindowsRecords.Single() == record, "Busy refusal changed data or retained reservation");
+            } });
         }
     }
 }
