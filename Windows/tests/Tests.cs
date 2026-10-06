@@ -48,6 +48,8 @@ namespace EasyEject {
         static void Check(bool value, string message) { if (!value) throw new Exception(message); }
         static T Throws<T>(Action action) where T : Exception { try { action(); } catch (T ex) { return ex; } throw new Exception("Expected " + typeof(T).Name); }
         static string Saved(ImportResult result, string sourceRelative) { return Path.Combine(result.Folder, result.Receipt.Files.Single(x => x.SourceRelativePath == sourceRelative).RelativePath); }
+        static DestinationIdentity HistoryIdentity() { return new DestinationIdentity { VolumeId = "destination-fixture", VolumeSerial = "ABC", DiskInstance = "destination-disk", DiskSerial = "serial-destination" }; }
+        static CompletedBatch Batch(Fixture fixture, ImportResult result) { return ImportHistory.Create(result, new ImportProfile { VolumeId = result.Receipt.SourceVolume, Destination = fixture.Destination }, "Fixture camera", HistoryIdentity()); }
         static void Test(string name, Action action) { try { action(); passed++; Console.WriteLine("PASS " + name); } catch (Exception ex) { failed++; Console.WriteLine("FAIL " + name + ": " + ex); } }
         static Inventory State() {
             var state = new Inventory { Epoch = 1 };
@@ -83,6 +85,9 @@ namespace EasyEject {
                     dialog.UseCustom.Checked = true; dialog.Selection.Previews.Checked = false; Render(dialog, Path.Combine(output, "profile-custom.png"));
                 }
                 using (var dialog = new ImportDefaultsDialog(defaults)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "shared-defaults.png")); }
+                var previewBatch = new CompletedBatch { Id = Guid.NewGuid().ToString("N"), CompletedUtc = DateTime.UtcNow.ToString("o"), DeviceName = "Fixture Insta360 card", Folder = @"D:\Travel backups\2026-10-06", ReceiptPath = @"D:\Travel backups\2026-10-06\.easy-eject-receipts\fixture\verified-import.json", Originals = new List<VerifiedCopy> { new VerifiedCopy { Path = @"D:\Travel backups\2026-10-06\VID_20261006_001.mp4", Sha256 = new string('a', 64), Bytes = 1234567 } } };
+                using (var dialog = new ImportHistoryDialog(new[] { previewBatch })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history.png")); dialog.Batches.Items[0].Selected = true; Render(dialog, Path.Combine(output, "history-selected.png")); }
+                using (var dialog = new ImportHistoryDialog(new CompletedBatch[0])) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "history-empty.png")); }
                 using (var window = new DeviceWindow()) { window.Size = window.MinimumSize; Render(window, Path.Combine(output, "device-window.png")); }
                 Console.WriteLine("Hidden forms rendered at minimum size. No device operations: " + output); return 0;
             }
@@ -362,6 +367,80 @@ namespace EasyEject {
                     File.SetAttributes(saved, attributes | FileAttributes.ReadOnly); Throws<System.ComponentModel.Win32Exception>(() => f.Run(x => {}));
                     Check(File.ReadAllText(saved) == "original" && Directory.GetFiles(f.Destination, "verified-import.json", SearchOption.AllDirectories).Length == 1 && File.ReadAllText(Path.Combine(f.Source, "clip.mov")) == "original", "Unflushed reuse marked complete or data changed");
                 } finally { File.SetAttributes(saved, attributes); }
+            } });
+            Test("history survives source removal and verifies only exact receipt files", delegate { using (var f = new Fixture()) {
+                f.Put("clip.mov", "original"); f.Put("fileinfo_list.list", "device index"); var result = f.Run(x => {}); var batch = Batch(f, result); string root = Path.Combine(f.Root, "history");
+                ImportHistory.Add(batch, root); File.Delete(Path.Combine(f.Source, "clip.mov")); File.Delete(Path.Combine(f.Source, "fileinfo_list.list")); File.WriteAllText(Path.Combine(result.Folder, "unrelated.mov"), "do not scan");
+                var restored = ImportHistory.Load(root).Single(); int verified = 0;
+                ImportHistory.Verify(restored, HistoryIdentity(), new FakeGuard(), new Operations(), CancellationToken.None, x => verified++);
+                Check(restored.Id == result.Receipt.Id && restored.Originals.Count == 1 && restored.Originals.Single().Path == Saved(result, "clip.mov") && verified == 1 && File.ReadAllText(Path.Combine(result.Folder, "unrelated.mov")) == "do not scan", "History lost exact membership, depended on source or scanned extra files");
+                string json = File.ReadAllText(Path.Combine(root, "completed-imports.json")); Check(!json.Contains("\"Epoch\"") && !json.Contains("\"DevInst\"") && !json.Contains("\"EjectPlan\"") && !json.Contains("\"ProtectedDisks\"") && !json.Contains("\"TargetId\""), "History persisted connection-bound authority");
+            } });
+            Test("history stores newest twenty batches without deleting copies or receipts", delegate { using (var f = new Fixture()) {
+                string root = Path.Combine(f.Root, "history"); var retained = new List<ImportResult>();
+                for (int i = 0; i < 22; i++) { f.Put("clip.mov", "recording-" + i); var result = f.Run(x => {}); retained.Add(result); ImportHistory.Add(Batch(f, result), root); }
+                var values = ImportHistory.Load(root); Check(values.Count == 20 && values[0].Id == retained[21].Receipt.Id && values[19].Id == retained[2].Receipt.Id && retained.All(x => File.Exists(x.ReceiptPath) && File.Exists(Saved(x, "clip.mov"))), "History retention altered copies/receipts or ordering");
+            } });
+            Test("history refuses a changed destination before opening saved files", delegate { using (var f = new Fixture()) {
+                f.Put("clip.mov", "original"); var batch = Batch(f, f.Run(x => {})); var wrong = HistoryIdentity(); wrong.VolumeSerial = "formatted"; int reads = 0;
+                Check(Throws<SafetyException>(() => ImportHistory.Verify(batch, wrong, new FakeGuard(), new Operations(), CancellationToken.None, x => reads++)).Message.Contains("destination changed") && reads == 0 && File.ReadAllText(batch.Originals.Single().Path) == "original", "Changed destination reached saved media");
+            } });
+            Test("persistent destination identity survives disk renumbering but rejects substitution", delegate {
+                var state = State(); var identity = DestinationIdentity.Capture(state, "volume-a"); state.Disks[0].Number = 99; state.Disks[0].DevInst = 999; state.Volumes[0].Disks[0] = 99;
+                Check(identity.Matches(DestinationIdentity.Capture(state, "volume-a")), "History identity depended on transient disk/devnode");
+                state.Disks[0].Serial = "substitution"; Check(!identity.Matches(DestinationIdentity.Capture(state, "volume-a")), "Replacement disk accepted");
+                state.Complete = false; Throws<SafetyException>(() => DestinationIdentity.Capture(state, "volume-a"));
+            });
+            Test("history refuses changed receipt and changed saved original", delegate { using (var f = new Fixture()) {
+                f.Put("clip.mov", "original"); var batch = Batch(f, f.Run(x => {})); string receipt = File.ReadAllText(batch.ReceiptPath); File.AppendAllText(batch.ReceiptPath, " ");
+                Check(Throws<SafetyException>(() => ImportHistory.Verify(batch, HistoryIdentity(), new FakeGuard(), new Operations(), CancellationToken.None, x => {})).Message.Contains("receipt changed"), "Edited receipt accepted");
+                File.WriteAllText(batch.ReceiptPath, receipt); string original = batch.Originals.Single().Path; File.WriteAllText(original, "ORIGINAL");
+                Check(Throws<SafetyException>(() => ImportHistory.Verify(batch, HistoryIdentity(), new FakeGuard(), new Operations(), CancellationToken.None, x => {})).Message.Contains("original changed") && File.ReadAllText(original) == "ORIGINAL", "Changed saved original accepted or restored");
+            } });
+            Test("metadata-only and failed imports cannot enter completed history", delegate { using (var f = new Fixture()) {
+                f.Put("fileinfo_list.list", "index"); var result = f.Run(x => {}); string root = Path.Combine(f.Root, "history"); ImportHistory.Add(Batch(f, result), root);
+                Check(!Directory.Exists(root), "Index-only run created sharing history");
+                f.Put("clip.mov", "original"); var source = new CancellationTokenSource(); source.Cancel(); Throws<OperationCanceledException>(() => new VerifiedImporter(new Operations()).Run(f.Source, f.Source, f.Destination, "fixture", new FakeGuard(), source.Token, x => {}));
+                Check(!Directory.Exists(root), "Cancelled import persisted completion history"); source.Dispose();
+            } });
+            Test("history rejects corrupt, duplicate and escaping records without replacing saved state", delegate { using (var f = new Fixture()) {
+                f.Put("clip.mov", "original"); var batch = Batch(f, f.Run(x => {})); string root = Path.Combine(f.Root, "history"); ImportHistory.Add(batch, root); string path = Path.Combine(root, "completed-imports.json"), saved = File.ReadAllText(path);
+                batch.Originals[0].Path = Path.Combine(f.Source, "clip.mov"); Throws<SafetyException>(() => ImportHistory.Add(batch, root)); Check(File.ReadAllText(path) == saved, "Invalid entry replaced history");
+                File.WriteAllText(path, "null"); Throws<SafetyException>(() => ImportHistory.Load(root)); File.WriteAllText(path, "invalid"); Throws<System.Runtime.Serialization.SerializationException>(() => ImportHistory.Load(root));
+                File.WriteAllText(path, saved); var good = ImportHistory.Load(root).Single(); Throws<SafetyException>(() => ImportHistory.Add(good, root));
+                Profiles.WriteJson(new List<CompletedBatch> { good, good }, typeof(List<CompletedBatch>), root, "completed-imports.json"); Throws<SafetyException>(() => ImportHistory.Load(root));
+                File.WriteAllText(path, new string(' ', 16777217)); Throws<SafetyException>(() => ImportHistory.Load(root));
+            } });
+            Test("history verification rejects path substitution and releases reservations after cancellation", delegate { using (var f = new Fixture()) {
+                f.Put(@"DCIM\clip.mov", "original"); var batch = Batch(f, f.Run(x => {})); string parent = Path.GetDirectoryName(batch.Originals.Single().Path), moved = Path.Combine(f.Root, "moved-copy"); Directory.Move(parent, moved); CreateJunction(f, parent, moved);
+                Throws<SafetyException>(() => ImportHistory.Verify(batch, HistoryIdentity(), new FakeGuard(), new Operations(), CancellationToken.None, x => {})); Directory.Delete(parent, false); Directory.Move(moved, parent);
+                var operations = new Operations(); using (var cancellation = new CancellationTokenSource()) { cancellation.Cancel(); Throws<OperationCanceledException>(() => ImportHistory.Verify(batch, HistoryIdentity(), new FakeGuard(), operations, cancellation.Token, x => {})); }
+                ImportHistory.Verify(batch, HistoryIdentity(), new FakeGuard(), operations, CancellationToken.None, x => {}); Check(File.ReadAllText(batch.Originals.Single().Path) == "original", "Cancelled verification altered copies or retained reservations");
+            } });
+            Test("history store snapshots callers and refuses fabricated extra membership", delegate { using (var f = new Fixture()) {
+                f.Put("clip.mov", "original"); var result = f.Run(x => {}); var batch = Batch(f, result); string root = Path.Combine(f.Root, "history"); ImportHistory.Add(batch, root);
+                batch.DeviceName = "Changed caller"; batch.Destination.VolumeSerial = "changed"; batch.Originals.Clear(); var restored = ImportHistory.Load(root).Single(); Check(restored.DeviceName == "Fixture camera" && restored.Destination.VolumeSerial == "ABC" && restored.Originals.Count == 1, "Saved snapshot was mutable through caller");
+                string extra = Path.Combine(result.Folder, "extra.mov"); File.WriteAllText(extra, "extra"); restored.Originals.Add(new VerifiedCopy { Path = extra, Sha256 = new string('a', 64), Bytes = 5 });
+                Check(Throws<SafetyException>(() => ImportHistory.Verify(restored, HistoryIdentity(), new FakeGuard(), new Operations(), CancellationToken.None, x => {})).Message.Contains("exact receipt"), "Fabricated membership reached saved files");
+            } });
+            Test("history verification detects disconnect and respects shared disk reservations", delegate { using (var f = new Fixture()) {
+                f.Put("a.mov", "first"); f.Put("b.mov", "second"); var batch = Batch(f, f.Run(x => {})); var operations = new Operations();
+                Check(Throws<SafetyException>(() => ImportHistory.Verify(batch, HistoryIdentity(), new FakeGuard { FailAt = 3 }, operations, CancellationToken.None, x => {})).Message.Contains("disconnected"), "Destination loss accepted");
+                using (operations.Reserve(new[] { 701 })) Check(Throws<SafetyException>(() => ImportHistory.Verify(batch, HistoryIdentity(), new FakeGuard(), operations, CancellationToken.None, x => {})).Message.Contains("busy"), "Verification ignored destination reservation");
+                ImportHistory.Verify(batch, HistoryIdentity(), new FakeGuard(), operations, CancellationToken.None, x => {}); Check(File.ReadAllText(batch.Originals[0].Path) == "first", "Failure changed saved files or retained reservations");
+            } });
+            Test("history capture refuses a receipt changed after import completion", delegate { using (var f = new Fixture()) {
+                f.Put("clip.mov", "original"); var result = f.Run(x => {}); File.AppendAllText(result.ReceiptPath, " ");
+                Check(Throws<SafetyException>(() => Batch(f, result)).Message.Contains("does not match this operation") && File.ReadAllText(Saved(result, "clip.mov")) == "original", "Changed receipt became the trusted import snapshot");
+            } });
+            Test("history dialog displays exact membership through an isolated snapshot", delegate { using (var f = new Fixture()) {
+                f.Put("clip.mov", "original"); var batch = Batch(f, f.Run(x => {}));
+                using (var dialog = new ImportHistoryDialog(new[] { batch })) {
+                    IntPtr handle = dialog.Handle; CreateRenderHandles(dialog); dialog.Batches.Items[0].Selected = true;
+                    batch.DeviceName = "Edited outside"; batch.Originals.Clear(); var selected = dialog.SelectedBatch;
+                    Check(handle != IntPtr.Zero && !dialog.Visible && selected != null && selected.DeviceName == "Fixture camera" && selected.Originals.Count == 1 && dialog.Details.Text.Contains("clip.mov"), "History UI depended on mutable caller or lost membership");
+                    selected.Originals.Clear(); Check(dialog.SelectedBatch.Originals.Count == 1, "UI selection exposed stored entries for mutation");
+                }
             } });
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }

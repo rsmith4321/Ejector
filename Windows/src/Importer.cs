@@ -12,6 +12,8 @@ namespace EasyEject {
     public sealed class VolumeImportGuard : IImportGuard, IConnectionGuard {
         readonly IDiscovery discovery; readonly string sourceId, destinationId, fingerprint; readonly long epoch;
         readonly string source, destination; readonly int[] disks;
+        readonly DestinationIdentity destinationIdentity;
+        public DestinationIdentity DestinationIdentity { get { return destinationIdentity.Copy(); } }
         public int[] ProtectedDisks { get { return disks; } }
         public bool Changed { get { return discovery.Epoch != epoch; } }
         public VolumeImportGuard(IDiscovery discovery, string source, string destination, Volume expectedVolume, Disk expectedDisk, long selectionEpoch) {
@@ -22,7 +24,7 @@ namespace EasyEject {
             var currentSource = Resolve(state, sourceId);
             if (epoch != selectionEpoch || currentSource.Fingerprint != expectedVolume.Fingerprint || state.Disks.Single(d => d.Number == currentSource.Disks[0]).Fingerprint != expectedDisk.Fingerprint)
                 throw new SafetyException("The selected card connection changed while choosing folders. Refresh and choose the device again.");
-            disks = PlanProtection(state, sourceId, destinationId); fingerprint = Fingerprint(state);
+            disks = PlanProtection(state, sourceId, destinationId); fingerprint = Fingerprint(state); destinationIdentity = DestinationIdentity.Capture(state, destinationId);
         }
         public static int[] PlanProtection(Inventory state, string sourceId, string destinationId) {
             var s = Resolve(state, sourceId); var d = Resolve(state, destinationId);

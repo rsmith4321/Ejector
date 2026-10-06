@@ -20,7 +20,7 @@ namespace EasyEject {
     }
     internal sealed class DeviceWindow : Form {
         readonly WindowsDiscovery discovery = new WindowsDiscovery(); readonly Operations operations = new Operations();
-        readonly ListView list = new ListView(); readonly Label status = new Label(); readonly Button refresh = new Button(), eject = new Button(), import = new Button(), cancel = new Button(), profile = new Button(), defaults = new Button();
+        readonly ListView list = new ListView(); readonly Label status = new Label(); readonly Button refresh = new Button(), eject = new Button(), import = new Button(), cancel = new Button(), profile = new Button(), defaults = new Button(), history = new Button();
         readonly NotifyIcon tray; readonly System.Windows.Forms.Timer debounce = new System.Windows.Forms.Timer();
         Inventory inventory; bool scanning, working, quit; CancellationTokenSource cancellation; IntPtr notification;
         [StructLayout(LayoutKind.Sequential)] struct BroadcastInterface { public int Size, Type, Reserved; public Guid ClassGuid; public short Name; }
@@ -36,11 +36,12 @@ namespace EasyEject {
             list.Columns.Add("Volume / mount", 245); list.Columns.Add("Classification", 360); list.Columns.Add("Physical disk", 130); list.Columns.Add("Status", 190);
             list.SelectedIndexChanged += delegate { UpdateActions(); };
             var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 12, 0, 8) };
-            refresh.Text = "Refresh"; eject.Text = "Safe eject…"; import.Text = "Verified import…"; cancel.Text = "Cancel import"; profile.Text = "Import profile…"; defaults.Text = "Import defaults…";
-            foreach (var b in new[] { refresh, eject, import, profile, defaults, cancel }) { b.AutoSize = true; b.MinimumSize = new Size(135, 36); actions.Controls.Add(b); }
+            refresh.Text = "Refresh"; eject.Text = "Safe eject…"; import.Text = "Verified import…"; cancel.Text = "Cancel operation"; profile.Text = "Import profile…"; defaults.Text = "Import defaults…"; history.Text = "Import history…";
+            foreach (var b in new[] { refresh, eject, import, profile, defaults, history, cancel }) { b.AutoSize = true; b.MinimumSize = new Size(135, 36); actions.Controls.Add(b); }
             cancel.Enabled = false;
             refresh.Click += async delegate { await RefreshDevices(); }; eject.Click += async delegate { await Eject(); }; import.Click += async delegate { await Import(); };
             profile.Click += async delegate { await EditProfile(); }; defaults.Click += delegate { EditDefaults(); };
+            history.Click += async delegate { await ReviewHistory(); };
             cancel.Click += delegate { if (cancellation != null) { cancellation.Cancel(); status.Text = "Stopping after the current file check. Originals kept."; } };
             status.AutoSize = true; status.MaximumSize = new Size(940, 0); status.Text = "Reading connected devices…";
             layout.Controls.Add(intro); layout.Controls.Add(list); layout.Controls.Add(actions); layout.Controls.Add(status); Controls.Add(layout);
@@ -75,7 +76,7 @@ namespace EasyEject {
         Volume Selected { get { return list.SelectedItems.Count == 0 ? null : list.SelectedItems[0].Tag as Volume; } }
         void UpdateActions() {
             var v = Selected; bool ready = v != null && inventory != null && !working && !scanning && inventory.Epoch == discovery.Epoch;
-            eject.Enabled = false; import.Enabled = false; profile.Enabled = false; defaults.Enabled = !working; refresh.Enabled = !working && !scanning;
+            eject.Enabled = false; import.Enabled = false; profile.Enabled = false; defaults.Enabled = !working; history.Enabled = !working && !scanning; refresh.Enabled = !working && !scanning;
             if (!ready) return;
             try { EjectService.Plan(inventory, v.Id); eject.Enabled = true; } catch (SafetyException) {}
             import.Enabled = inventory.Complete && v.Error == "" && !v.System && v.Disks.Count == 1 && v.Mounts.Any(x => x.Length >= 3 && x[1] == ':') && v.Classification != "Internal / fixed storage";
@@ -132,7 +133,12 @@ namespace EasyEject {
                 var result = await Task.Run(() => new VerifiedImporter(operations).Run(root, source, destination, v.Id, guard, cancellation.Token, message => {
                     if (!IsDisposed) BeginInvoke(new Action(() => status.Text = message));
                 }, options));
-                MessageBox.Show(this, result.Files == 0 ? "No matching media or device indexes were found. No batch was created. Device remains connected." : (result.HasSelectedMedia ? "Import complete. " : "No matching media. Device index backup only. ") + result.Files + " files verified (" + result.Bytes + " bytes; " + result.Reused + " existing copies reused).\n" + result.Folder + "\n\nOriginals kept. Device remains connected.", result.HasSelectedMedia ? "Import complete" : "No matching media");
+                string historyNote = "";
+                if (result.HasSelectedMedia) {
+                    try { await Task.Run(() => ImportHistory.Add(ImportHistory.Create(result, stored, v.Display, guard.DestinationIdentity))); historyNote = "\nExact verified files saved in Import history."; }
+                    catch (Exception ex) { historyNote = "\nImport verified, but history could not be saved: " + ex.Message + "\nCopies and the completion receipt remain available."; }
+                }
+                MessageBox.Show(this, result.Files == 0 ? "No matching media or device indexes were found. No batch was created. Device remains connected." : (result.HasSelectedMedia ? "Import complete. " : "No matching media. Device index backup only. ") + result.Files + " files verified (" + result.Bytes + " bytes; " + result.Reused + " existing copies reused).\n" + result.Folder + historyNote + "\n\nOriginals kept. Device remains connected.", result.HasSelectedMedia ? "Import complete" : "No matching media");
             } catch (OperationCanceledException) { status.Text = "Import cancelled. All originals and completed copies kept. No completion receipt was written."; MessageBox.Show(this, status.Text, "Import cancelled"); }
             catch (Exception ex) { ShowError(ex); }
             finally { working = false; cancel.Enabled = false; if (cancellation != null) { cancellation.Dispose(); cancellation = null; } UpdateActions(); debounce.Start(); }
@@ -140,6 +146,26 @@ namespace EasyEject {
         }
         static bool ConfigurationError(Exception ex) {
             return ex is SafetyException || ex is System.Runtime.Serialization.SerializationException || ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception;
+        }
+        async Task ReviewHistory() {
+            if (working || scanning) return;
+            try {
+                working = true; UpdateActions();
+                var values = await Task.Run(() => ImportHistory.Load());
+                CompletedBatch batch;
+                using (var dialog = new ImportHistoryDialog(values)) { if (dialog.ShowDialog(this) != DialogResult.OK) return; batch = dialog.SelectedBatch; }
+                cancellation = new CancellationTokenSource(); cancel.Enabled = true;
+                await Task.Run(() => {
+                    using (SafePaths.LockDirectories(batch.DestinationRoot)) {
+                        var guard = new WindowsDestinationGuard(discovery, batch.DestinationRoot, batch.Destination);
+                        ImportHistory.Verify(batch, batch.Destination, guard, operations, cancellation.Token, message => { if (!IsDisposed) BeginInvoke(new Action(() => status.Text = message)); });
+                    }
+                });
+                status.Text = "Verified all " + batch.Originals.Count + " exact saved files. Originals unchanged.";
+                MessageBox.Show(this, status.Text + "\n" + batch.Folder, "Saved batch verified", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            } catch (OperationCanceledException) { status.Text = "Saved-file verification cancelled. Files unchanged."; }
+            catch (Exception ex) { ShowError(ex); }
+            finally { working = false; cancel.Enabled = false; if (cancellation != null) { cancellation.Dispose(); cancellation = null; } UpdateActions(); debounce.Start(); }
         }
         ImportDefaults ReadDefaults() {
             try { return ImportDefaults.Load(); }
