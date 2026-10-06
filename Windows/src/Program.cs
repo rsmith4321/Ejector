@@ -30,6 +30,9 @@ namespace EasyEject {
         ManualQuickShareService manualSharing;
         readonly ToolStripMenuItem storageMenu = new ToolStripMenuItem("Connected storage");
         readonly ToolStripMenuItem activityMenu = new ToolStripMenuItem { Enabled = false };
+        readonly ToolStripMenuItem releaseStatusMenu = new ToolStripMenuItem { Enabled = false };
+        readonly WindowsUpdateCoordinator releaseChecks;
+        readonly System.Windows.Forms.Timer releaseTimer = new System.Windows.Forms.Timer(); string releaseStatus;
         readonly TrayActivity trayActivity = new TrayActivity(); readonly TrayBusyIcons trayBusyIcons = new TrayBusyIcons();
         ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu, helpMenu, aboutMenu, installationMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
@@ -52,6 +55,7 @@ namespace EasyEject {
             startupPresentation = new StartupPresentation(startInTray);
             try { appSettings = AppSettings.Load(); appIssue = AppIssue.Load(); } catch (Exception ex) { appIssue.Record("Saved application state could not be read: " + ex.Message); }
             if (readOnly) appSettings = new AppSettings();
+            releaseChecks = WindowsReleaseChecks.Create(readOnly, appSettings.AutomaticUpdatesEnabled);
             Text = "Easy Eject · Windows prototype"; ClientSize = new Size(1000, 600); MinimumSize = new Size(800, 500); StartPosition = FormStartPosition.CenterScreen; AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Segoe UI", 10);
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(16) };
@@ -92,6 +96,7 @@ namespace EasyEject {
             helpMenu = new ToolStripMenuItem("Help && Instructions…", null, delegate { ViewInformation(false); }); menu.Items.Add(helpMenu);
             aboutMenu = new ToolStripMenuItem("About Easy Eject…", null, delegate { ViewInformation(true); }); menu.Items.Add(aboutMenu);
             installationMenu = new ToolStripMenuItem("Windows updates && installation…", null, delegate { ViewInstallation(); }); menu.Items.Add(installationMenu);
+            menu.Items.Add(releaseStatusMenu);
             menu.Items.Add("Quit", null, delegate { if (Busy) { MessageBox.Show(this, "Wait for the operation to finish or cancel the import before quitting."); return; } quit = true; Close(); });
             tray = new NotifyIcon { Icon = SystemIcons.Information, Text = "Easy Eject Windows prototype", Visible = true, ContextMenuStrip = menu };
             status.TextChanged += delegate { UpdateTrayPresentation(); };
@@ -100,6 +105,8 @@ namespace EasyEject {
             tray.BalloonTipClicked += delegate { Show(); WindowState = FormWindowState.Normal; Activate(); };
             menu.Opening += delegate { UpdateActions(); UpdateTrayStorageMenu(); };
             debounce.Interval = 800; debounce.Tick += async delegate { debounce.Stop(); await RefreshDevices(); };
+            releaseTimer.Interval = 1000; releaseTimer.Tick += async delegate { await PulseReleaseChecks(); };
+            EnabledChanged += delegate { if (!IsDisposed && !Disposing) UpdateActions(); };
             Shown += delegate { StartMonitoring(); };
             FormClosing += delegate(object sender, FormClosingEventArgs e) {
                 if (!quit && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); return; }
@@ -107,7 +114,7 @@ namespace EasyEject {
             };
             UpdateActions();
         }
-        async void StartMonitoring() { if (monitoringStarted) return; monitoringStarted = true; await RefreshDevices(); }
+        async void StartMonitoring() { if (monitoringStarted) return; monitoringStarted = true; releaseChecks.Start(); if (!readOnly) releaseTimer.Start(); await RefreshDevices(); }
         protected override void SetVisibleCore(bool value) {
             if (value && startupPresentation != null && !startupPresentation.AllowShow(() => { IntPtr handle = Handle; }, () => BeginInvoke(new Action(StartMonitoring)))) { base.SetVisibleCore(false); return; }
             base.SetVisibleCore(value);
@@ -139,6 +146,9 @@ namespace EasyEject {
         Volume Selected { get { return list.SelectedItems.Count == 0 ? null : list.SelectedItems[0].Tag as Volume; } }
         static string GroupLabel(StorageGroup group) { switch (group) { case StorageGroup.Camera: return "Camera cards (candidates)"; case StorageGroup.Emulator: return "Emulator cards (candidates)"; case StorageGroup.External: return "Other external volumes"; case StorageGroup.Internal: return "Internal storage"; case StorageGroup.Protected: return "Windows storage (protected)"; default: return "Unknown mapping"; } }
         void UpdateActions() {
+            if (IsDisposed || Disposing) return;
+            if (releaseChecks != null) releaseChecks.PublishIdle(!readOnly && CanReviewInstallation);
+            releaseStatusMenu.Text = releaseChecks == null || !releaseChecks.Configured ? "Windows releases: channel unavailable" : releaseChecks.Checking ? "Windows releases: checking metadata…" : releaseStatus == null ? "Windows releases: ready for check" : "Windows releases: review check result";
             var v = Selected; bool ready = v != null && inventory != null && !scanning && !concurrentStorage.Busy && inventory.Epoch == discovery.Epoch;
             eject.Enabled = cleanEject.Enabled = false; import.Enabled = false; profile.Enabled = false; defaults.Enabled = !Busy; history.Enabled = !Busy && !scanning; refresh.Enabled = !Busy && !scanning;
             refresh.Enabled = !scanning && !concurrentStorage.Busy && (!working || concurrentStorage.HasPrimary);
@@ -505,6 +515,17 @@ namespace EasyEject {
             finally { FinishOperation(); }
         }
         bool CanReviewInstallation { get { return WindowsUpdateSafety.CanReview(Busy, scanning, !Enabled || OwnedForms.Any(form => form.Visible && form.Modal)); } }
+        async Task PulseReleaseChecks() {
+            if (IsDisposed || Disposing || !monitoringStarted || readOnly) return;
+            try {
+                UpdateActions(); var pendingCheck = releaseChecks.PulseAsync(); UpdateActions(); var result = await pendingCheck;
+                if (IsDisposed || Disposing) return; UpdateActions(); if (!releaseChecks.TryPresent(result)) return;
+                releaseStatus = result.Message; releaseStatusMenu.ToolTipText = result.Message;
+                if (result.Outcome == WindowsUpdateCheckOutcome.Accepted && result.Offer.Release.Compare(ApplicationInformation.Version) == WindowsReleaseComparison.NewerAvailable)
+                    Notify("Windows release available", "Signed Windows release " + result.Offer.Release.Version + " is available for review. Finish active work and open Windows updates and installation. Download and installation remain manual.", ToolTipIcon.Info);
+            } catch (Exception ex) { if (!IsDisposed && !Disposing) { releaseStatus = "Check unavailable: " + ex.Message; releaseStatusMenu.ToolTipText = releaseStatus; } }
+            finally { if (!IsDisposed && !Disposing) UpdateActions(); }
+        }
         void ViewInstallation() {
             if (!CanReviewInstallation) return;
             working = true; UpdateActions();
@@ -523,11 +544,12 @@ namespace EasyEject {
                 using (var dialog = new AppSettingsDialog(appSettings, hotkey.Status, snapshot, readOnly ? (Action)null : () => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:startupapps") { UseShellExecute = true }), readOnly ? (Action)null : () => {
                     try { using (var setup = new QuickShareSetupDialog(QuickShareConfiguration.Load(), Profiles.Root)) if (setup.ShowDialog(Form.ActiveForm ?? this) == DialogResult.OK) { status.Text = "Quick Share setup saved. No export started."; Log(status.Text); } }
                     catch (Exception ex) { ShowError(ex); }
-                })) if (dialog.ShowDialog(this) == DialogResult.OK) {
+                }, releaseStatus ?? releaseChecks.Status)) if (dialog.ShowDialog(this) == DialogResult.OK) {
                 if (AppSettings.NeedsCleanupConfirmation(appSettings, dialog.Value) && MessageBox.Show(this,
                     "Enable permanent macOS metadata cleanup before manual camera/emulator card ejection?\n\nOnly ._*, .DS_Store, .apdisk and empty __MACOSX folders are removed. Photos, recordings and device Trash are kept. Each eject confirmation lists the cleanup roots. Saving never starts cleanup.",
                     "Enable metadata cleanup", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
                 AppSettings.Save(dialog.Value); appSettings = dialog.Value;
+                releaseChecks.SetAutomatic(appSettings.AutomaticUpdatesEnabled);
                 bool registered = readOnly || !IsHandleCreated || hotkey.Configure(Handle, appSettings.ShortcutEnabled, appSettings.ShortcutKey);
                 string loginStatus = "";
                 if (dialog.LoginChange.HasValue && registration != null) {
@@ -748,6 +770,6 @@ namespace EasyEject {
             }
         }
         void ShowError(Exception ex) { RecordIssue(ex.Message); Notify("Easy Eject needs attention", ex.Message, ToolTipIcon.Warning); if (ForegroundWindow) ShowMessage(ex.Message, "Easy Eject", MessageBoxIcon.Warning); }
-        protected override void Dispose(bool disposing) { if (disposing) { hotkey.Dispose(); discovery.Instances.Dispose(); tray.Dispose(); trayBusyIcons.Dispose(); debounce.Dispose(); } base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { releaseTimer.Dispose(); if (releaseChecks != null) releaseChecks.Dispose(); hotkey.Dispose(); discovery.Instances.Dispose(); tray.Dispose(); trayBusyIcons.Dispose(); debounce.Dispose(); } base.Dispose(disposing); }
     }
 }

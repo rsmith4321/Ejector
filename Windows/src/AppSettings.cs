@@ -10,12 +10,14 @@ namespace EasyEject {
         [DataMember] internal bool? EnableShortcut;
         [DataMember] internal string ShortcutLetter;
         [DataMember] internal bool? CleanCardsOnEject, WarnOtherStorage;
+        [DataMember] internal bool? AutomaticUpdateChecks;
         internal bool NotificationsEnabled { get { return ShowNotifications ?? true; } }
         internal bool DebugEnabled { get { return DebugLogging ?? false; } }
         internal bool ShortcutEnabled { get { return EnableShortcut ?? false; } }
         internal string ShortcutKey { get { return ShortcutLetter ?? "E"; } }
         internal bool CleanupCardsEnabled { get { return CleanCardsOnEject ?? false; } }
         internal bool WarnOtherEnabled { get { return WarnOtherStorage ?? true; } }
+        internal bool AutomaticUpdatesEnabled { get { return AutomaticUpdateChecks ?? true; } }
         internal static bool NeedsCleanupConfirmation(AppSettings before, AppSettings after) { return !before.CleanupCardsEnabled && after.CleanupCardsEnabled; }
         internal static AppSettings Load() { return Load(Profiles.Root); }
         internal static AppSettings Load(string root) { var value = Configuration.Read<AppSettings>(root, "app-settings.json") ?? new AppSettings(); value.Validate(); return value; }
