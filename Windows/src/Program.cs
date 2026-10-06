@@ -391,7 +391,10 @@ namespace EasyEject {
             try {
                 var registration = readOnly ? null : new StartupRegistration(new WindowsStartupStore(), Application.ExecutablePath);
                 var snapshot = registration == null ? null : registration.Inspect();
-                using (var dialog = new AppSettingsDialog(appSettings, hotkey.Status, snapshot, readOnly ? (Action)null : () => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:startupapps") { UseShellExecute = true }))) if (dialog.ShowDialog(this) == DialogResult.OK) {
+                using (var dialog = new AppSettingsDialog(appSettings, hotkey.Status, snapshot, readOnly ? (Action)null : () => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:startupapps") { UseShellExecute = true }), readOnly ? (Action)null : () => {
+                    try { using (var setup = new QuickShareSetupDialog(QuickShareConfiguration.Load(), Profiles.Root)) if (setup.ShowDialog(Form.ActiveForm ?? this) == DialogResult.OK) { status.Text = "Quick Share setup saved. No export started."; Log(status.Text); } }
+                    catch (Exception ex) { ShowError(ex); }
+                })) if (dialog.ShowDialog(this) == DialogResult.OK) {
                 if (AppSettings.NeedsCleanupConfirmation(appSettings, dialog.Value) && MessageBox.Show(this,
                     "Enable permanent macOS metadata cleanup before manual camera/emulator card ejection?\n\nOnly ._*, .DS_Store, .apdisk and empty __MACOSX folders are removed. Photos, recordings and device Trash are kept. Each eject confirmation lists the cleanup roots. Saving never starts cleanup.",
                     "Enable metadata cleanup", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;

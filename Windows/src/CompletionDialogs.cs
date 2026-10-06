@@ -55,9 +55,10 @@ namespace EasyEject {
         internal readonly ComboBox ShortcutLetter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 80 };
         internal readonly CheckBox Login = new CheckBox(); internal readonly Button UseThisCopy = new Button();
         internal readonly Label LoginStatus = new Label(); readonly StartupSnapshot startup; bool retarget;
+        internal readonly Button ShareTools = new Button();
         internal bool? LoginChange { get { if (startup == null || !startup.Available || startup.Conflict) return null; if (retarget && Login.Checked) return true; return Login.Checked == startup.Owned ? (bool?)null : Login.Checked; } }
         internal AppSettings Value { get { return new AppSettings { ShowNotifications = Notifications.Checked, DebugLogging = Debug.Checked, EnableShortcut = Shortcut.Checked, ShortcutLetter = ShortcutLetter.SelectedItem as string, CleanCardsOnEject = Cleanup.Checked, WarnOtherStorage = WarnOther.Checked }; } }
-        internal AppSettingsDialog(AppSettings settings, string shortcutStatus = null, StartupSnapshot startup = null, Action reviewStartup = null) {
+        internal AppSettingsDialog(AppSettings settings, string shortcutStatus = null, StartupSnapshot startup = null, Action reviewStartup = null, Action configureShareTools = null) {
             this.startup = startup;
             Text = "Easy Eject settings"; Font = new Font("Segoe UI", 10); Size = new Size(650, 400); MinimumSize = new Size(600, 360); AutoScaleMode = AutoScaleMode.Dpi; StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
             var body = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(24) };
@@ -78,6 +79,7 @@ namespace EasyEject {
             Shortcut.CheckedChanged += delegate { ShortcutLetter.Enabled = Shortcut.Checked; }; shortcutRow.Controls.Add(ShortcutLetter); body.Controls.Add(shortcutRow);
             if (shortcutStatus != null) body.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(500, 0), Text = shortcutStatus, Margin = new Padding(0, 8, 0, 8) });
             var info = new Label { AutoSize = true, MaximumSize = new Size(540, 0), Text = "Login launches Easy Eject in the tray, without opening its device window. It does not enable automatic import: that remains a separate profile/default choice. An enabled import may run when the app launches. Saving login registration starts no app or import. If you move this copy, explicitly update its registration.\n\nThe shortcut opens the same confirmation as Eject cards. It stays off until enabled. A shortcut already used by another app is reported unavailable; no other key is registered.\n\nWindows notification and quiet-hour settings may hide alerts; completed imports remain available in the app. Debug logs can contain device names and file paths. They stay in local app-data and are never sent automatically." }; body.Controls.Add(info);
+            ShareTools.Text = "Quick Share tools…"; ShareTools.AutoSize = true; ShareTools.Enabled = configureShareTools != null; ShareTools.Margin = new Padding(0, 16, 0, 8); ShareTools.Click += delegate { if (configureShareTools != null) configureShareTools(); }; body.Controls.Add(ShareTools);
             body.SizeChanged += delegate { info.MaximumSize = LoginStatus.MaximumSize = new Size(Math.Max(250, body.ClientSize.Width - 60), 0); };
             var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(16), FlowDirection = FlowDirection.RightToLeft };
             var save = new Button { Text = "Save settings", AutoSize = true, MinimumSize = new Size(130, 36), DialogResult = DialogResult.OK };

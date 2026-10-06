@@ -87,6 +87,7 @@ namespace EasyEject {
                 var shareProfile = profile.Copy(); shareProfile.Name = "Fixture Luna travel card"; shareProfile.SharingPreset = QuickShareProfile.Uhd; shareProfile.SharingColor = QuickShareProfile.Standard;
                 using (var dialog = new ImportProfileDialog(shareProfile, null, shareProfile.Name, defaults, true)) { dialog.Size = dialog.MinimumSize; RenderAtBottom(dialog, Path.Combine(output, "profile-quick-share-bottom.png")); }
                 using (var dialog = new QuickSharePromptDialog(shareProfile.Name, @"D:\Travel backups\2026-10-06\Fixture Luna travel card", shareProfile)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "quick-share-prompt.png")); RenderAtBottom(dialog, Path.Combine(output, "quick-share-prompt-bottom.png")); }
+                using (var dialog = new QuickShareSetupDialog(new QuickShareConfigurationSnapshot(), Profiles.Root)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "quick-share-setup.png")); RenderAtBottom(dialog, Path.Combine(output, "quick-share-setup-bottom.png")); }
                 using (var dialog = new ImportProfileDialog(profile, @"E:\", "Fixture Insta360 card · E:\\", defaults, true)) {
                     dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "profile-defaults.png"));
                     dialog.UseCustom.Checked = true; dialog.Selection.Previews.Checked = false; Render(dialog, Path.Combine(output, "profile-custom.png"));
@@ -650,6 +651,7 @@ namespace EasyEject {
             QuickShareProcessTests();
             QuickShareEngineTests();
             QuickShareDialogTests();
+            QuickShareConfigurationTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {
