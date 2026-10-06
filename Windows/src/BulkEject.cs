@@ -12,11 +12,14 @@ namespace EasyEject {
     }
     internal sealed class BulkTarget {
         internal readonly string Id, Fingerprint, Connection; internal readonly uint Node;
-        internal readonly int[] Disks; internal readonly string[] Affected, Volumes, Instances;
+        internal readonly int[] Disks; internal readonly string[] Affected, Volumes, Instances, Roots, DiskInstances;
         internal BulkTarget(Inventory inventory, EjectPlan plan) {
             Id = plan.TargetId; Node = plan.TargetDevInst; Fingerprint = plan.Fingerprint; Connection = inventory.ConnectionStamp(Id);
             Disks = (int[])plan.Disks.Clone(); Affected = (string[])plan.Affected.Clone();
             Volumes = inventory.Volumes.Where(v => v.Disks.Any(Disks.Contains)).Select(v => v.Id).ToArray();
+            Roots = inventory.Volumes.Where(v => v.Disks.Any(Disks.Contains)).SelectMany(v => v.Mounts)
+                .Where(m => !String.IsNullOrWhiteSpace(m)).Select(m => m.TrimEnd('\\', '/')).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            DiskInstances = inventory.Disks.Where(d => Disks.Contains(d.Number)).Select(d => d.InstanceId).Where(id => !String.IsNullOrEmpty(id)).ToArray();
             Instances = WindowsDiscovery.GroupInstances(inventory, Id);
         }
     }
@@ -74,40 +77,71 @@ namespace EasyEject {
             foreach (var target in remaining) if (connections.Stamp(target.Instances) != target.Connection)
                 throw new SafetyException("A confirmed device disconnected, restarted or lost connection tracking. Review remaining cards before another request.");
         }
+        static bool IsAbsent(Inventory state, BulkTarget target) {
+            return !state.Disks.Any(d => String.Equals(d.TargetId, target.Id, StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(d.InstanceId, target.Id, StringComparison.OrdinalIgnoreCase) ||
+                d.Ancestors.Contains(target.Id, StringComparer.OrdinalIgnoreCase) || target.DiskInstances.Contains(d.InstanceId, StringComparer.OrdinalIgnoreCase)) &&
+                !state.Volumes.Any(v => target.Volumes.Contains(v.Id, StringComparer.OrdinalIgnoreCase) ||
+                    v.Mounts.Any(m => !String.IsNullOrWhiteSpace(m) && target.Roots.Contains(m.TrimEnd('\\', '/'), StringComparer.OrdinalIgnoreCase)));
+        }
+        static void RefuseFinal(BulkEjectResult result, string detail) {
+            result.Success = false; result.Detail += (result.Detail == "" ? "" : "\r\n") + detail;
+        }
+        void ReconcileFinal(BulkEjectResult result, List<BulkTarget> verified, CancellationToken cancellation) {
+            // Earlier absence is provisional until one final complete inventory covers every removed target.
+            result.Confirmed = 0; result.SafeDevices.Clear();
+            try {
+                var state = discovery.Scan();
+                if (state == null || !state.Complete || state.Epoch != discovery.Epoch)
+                    throw new SafetyException("Final device inventory changed or is incomplete. No device is reported safe to unplug.");
+                var absent = verified.Where(t => IsAbsent(state, t)).ToArray();
+                if (state.Epoch != discovery.Epoch)
+                    throw new SafetyException("Final device inventory changed during verification. No device is reported safe to unplug.");
+                result.Confirmed = absent.Length;
+                result.SafeDevices.AddRange(absent.Select(t => String.Join("; ", t.Affected)));
+                if (absent.Length != verified.Count)
+                    RefuseFinal(result, "A previously removed device or its mounted location changed or reappeared. Only devices still verified absent are reported safe to unplug.");
+                if (cancellation.IsCancellationRequested) RefuseFinal(result, "Removal was cancelled. No further request was made.");
+            } catch (Exception ex) { RefuseFinal(result, "Final verification failed: " + ex.Message); }
+        }
         internal BulkEjectResult Execute(BulkEjectPlan plan) {
             return Execute(plan, state => {}, (target, validate) => {});
         }
         internal BulkEjectResult Execute(BulkEjectPlan plan, Action<Inventory> prepare, Action<BulkTarget, Func<Inventory>> beforeRequest, CancellationToken cancellation = default(CancellationToken)) {
-            var result = new BulkEjectResult { Requested = plan.Targets.Length };
+            var result = new BulkEjectResult { Requested = plan.Targets.Length }; var verified = new List<BulkTarget>();
             try {
                 cancellation.ThrowIfCancellationRequested();
                 using (operations.Reserve(plan.Targets.SelectMany(t => t.Disks))) {
-                    var initial = discovery.Scan();
-                    if (initial.Epoch != plan.Epoch || discovery.Epoch != plan.Epoch) throw new SafetyException("Connections changed after confirmation. Refresh and review the cards.");
-                    BulkEjectPolicy.Validate(initial, plan.Targets); ValidateConnections(plan.Targets);
-                    prepare(initial);
-                    for (int index = 0; index < plan.Targets.Length; index++) {
-                        var remaining = plan.Targets.Skip(index).ToArray(); var current = discovery.Scan();
-                        BulkEjectPolicy.Validate(current, remaining); ValidateConnections(remaining);
-                        var target = plan.Targets[index];
-                        cancellation.ThrowIfCancellationRequested();
-                        beforeRequest(target, () => { var fresh = discovery.Scan(); BulkEjectPolicy.Validate(fresh, remaining); ValidateConnections(remaining); return fresh; });
-                        BulkEjectPolicy.Validate(discovery.Scan(), remaining); ValidateConnections(remaining);
-                        var accepted = api(() => { cancellation.ThrowIfCancellationRequested(); ValidateConnections(remaining); }).Request(target.Node, target.Id);
-                        if (!accepted.Success) throw new SafetyException(accepted.Message);
-                        bool absent = false;
-                        for (int attempt = 0; attempt < checks; attempt++) {
-                            var after = discovery.Scan();
-                            if (after.Complete && after.GroupFingerprint(target.Id) == "" && !after.Volumes.Any(v => target.Volumes.Contains(v.Id))) { absent = true; break; }
-                            wait();
+                    try {
+                        var initial = discovery.Scan();
+                        if (initial.Epoch != plan.Epoch || discovery.Epoch != plan.Epoch) throw new SafetyException("Connections changed after confirmation. Refresh and review the cards.");
+                        BulkEjectPolicy.Validate(initial, plan.Targets); ValidateConnections(plan.Targets);
+                        if (plan.Targets.Length == 0) { result.Success = true; return result; }
+                        prepare(initial);
+                        for (int index = 0; index < plan.Targets.Length; index++) {
+                            var remaining = plan.Targets.Skip(index).ToArray(); var current = discovery.Scan();
+                            BulkEjectPolicy.Validate(current, remaining); ValidateConnections(remaining);
+                            var target = plan.Targets[index];
+                            cancellation.ThrowIfCancellationRequested();
+                            beforeRequest(target, () => { var fresh = discovery.Scan(); BulkEjectPolicy.Validate(fresh, remaining); ValidateConnections(remaining); return fresh; });
+                            BulkEjectPolicy.Validate(discovery.Scan(), remaining); ValidateConnections(remaining);
+                            var accepted = api(() => { cancellation.ThrowIfCancellationRequested(); ValidateConnections(remaining); }).Request(target.Node, target.Id);
+                            if (!accepted.Success) throw new SafetyException(accepted.Message);
+                            bool absent = false;
+                            for (int attempt = 0; attempt < checks; attempt++) {
+                                var after = discovery.Scan();
+                                if (after.Complete && after.Epoch == discovery.Epoch && IsAbsent(after, target)) { absent = true; break; }
+                                wait();
+                            }
+                            if (!absent) throw new SafetyException("Windows accepted removal, but the confirmed volumes could not be verified absent. Check Windows Safely Remove Hardware before unplugging that device.");
+                            verified.Add(target);
                         }
-                        if (!absent) throw new SafetyException("Windows accepted removal, but the confirmed volumes could not be verified absent. Check Windows Safely Remove Hardware before unplugging that device.");
-                        result.Confirmed++; result.SafeDevices.Add(String.Join("; ", target.Affected));
-                        // A later card failure cannot conceal earlier confirmed removals.
-                    }
-                    result.Success = true;
+                        cancellation.ThrowIfCancellationRequested();
+                        result.Success = true;
+                    } catch (Exception ex) { result.Success = false; result.Detail = ex.Message; }
+                    finally { if (verified.Count > 0) ReconcileFinal(result, verified, cancellation); }
                 }
-            } catch (Exception ex) { result.Detail = ex.Message; }
+            } catch (Exception ex) { result.Success = false; result.Detail = ex.Message; }
             return result;
         }
     }

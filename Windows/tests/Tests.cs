@@ -94,6 +94,7 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--windows-update-coordinator") { WindowsUpdateCoordinatorTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned fake checks, disposable settings/replay and hidden native controls only; no production channel request."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-release-review") { WindowsReleaseReviewTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Read-only disposable ZIP/package review and fake positive native trust only; no real download, extraction, execution or installation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--path-ownership") { PathOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned disposable directory replacement only; no real device operation."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--bulk-final") { BulkFinalTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake removal and inventory only; no real eject."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-replay") { WindowsChannelReplayTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable replay files, native CurrentUser protection and fake positive publisher trust only; no real network or cached installation authority."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-discovery") { WindowsChannelDiscoveryTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake HTTP operations, owned disposable signed records and fake positive native trust only; no real network request."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-channels") { WindowsChannelTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable signed channel fixtures and fake positive native trust only; no endpoint network request or production channel configured."); return failed == 0 ? 0 : 1; }
@@ -722,7 +723,7 @@ namespace EasyEject {
             StartupTests();
             QuickShareRecipeTests();
             QuickShareProcessTests();
-            PathOwnershipTests(); WindowsReleaseReviewTests(); WindowsUpdateCoordinatorTests(); WindowsChannelReplayTests(); WindowsChannelDiscoveryTests(); WindowsChannelTests(); WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
+            BulkFinalTests(); PathOwnershipTests(); WindowsReleaseReviewTests(); WindowsUpdateCoordinatorTests(); WindowsChannelReplayTests(); WindowsChannelDiscoveryTests(); WindowsChannelTests(); WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
             QuickShareDialogTests();
             QuickShareConfigurationTests();
             ManualQuickShareTests();
