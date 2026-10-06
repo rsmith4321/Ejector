@@ -155,7 +155,12 @@ namespace EasyEject {
                     Check(!hotkey.Registered, "Read-only smoke registered a global key");
                     Check(state.Complete && state.Volumes.Any(v => v.System), "Read-only UI inventory incomplete");
                     foreach (var v in state.Volumes.Where(v => v.System)) Throws<SafetyException>(() => EjectService.Plan(state, v.Id));
-                    Console.WriteLine("PASS hidden device window initializes, disk and per-instance notifications register, read-only inventory maps " + state.Volumes.Count + " volumes, system eject is blocked, and no global key is registered.");
+                    var menuState = TrayState(); menuState.Epoch = discovery.Epoch; window.PresentInventory(menuState); window.UpdateTrayStorageMenu();
+                    var storageMenu = (System.Windows.Forms.ToolStripMenuItem)typeof(DeviceWindow).GetField("storageMenu", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(window);
+                    var menuActions = TrayActions(storageMenu.DropDownItems.Cast<System.Windows.Forms.ToolStripItem>()).ToArray();
+                    Check(menuActions.Length == 4 && menuActions.All(item => !item.Enabled), "Read-only native window exposes tray removal"); foreach (var action in menuActions) action.PerformClick();
+                    Check(!hotkey.Registered, "Read-only tray inspection registered a shortcut");
+                    Console.WriteLine("PASS hidden device window initializes, disk and per-instance notifications register, read-only inventory maps " + state.Volumes.Count + " volumes, system eject is blocked, no global key is registered, and fake tray storage actions remain disabled in the real read-only window.");
                     return 0;
                 }
             }
@@ -659,6 +664,7 @@ namespace EasyEject {
             QuickShareDialogTests();
             QuickShareConfigurationTests();
             ManualQuickShareTests();
+            TrayStorageMenuTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {

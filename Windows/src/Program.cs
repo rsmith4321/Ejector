@@ -28,6 +28,7 @@ namespace EasyEject {
         readonly StartupPresentation startupPresentation; bool monitoringStarted;
         AppSettings appSettings = new AppSettings(); AppIssue appIssue = new AppIssue(); ImportCompletionDialog activeCompletion;
         ManualQuickShareService manualSharing;
+        readonly ToolStripMenuItem storageMenu = new ToolStripMenuItem("Connected storage");
         ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
         int cardCount;
@@ -76,6 +77,7 @@ namespace EasyEject {
             layout.SizeChanged += delegate { int width = Math.Max(350, layout.ClientSize.Width - layout.Padding.Horizontal - 8); intro.MaximumSize = status.MaximumSize = new Size(width, 0); };
             var menu = new ContextMenuStrip(); menu.Items.Add("Show devices", null, delegate { Show(); WindowState = FormWindowState.Normal; Activate(); });
             menu.Items.Add("Refresh", null, async delegate { await RefreshDevices(); });
+            menu.Items.Add(storageMenu);
             bulkMenu = new ToolStripMenuItem("Eject cards…", null, async delegate { await EjectCards(); }); menu.Items.Add(bulkMenu);
             pendingMenu = new ToolStripMenuItem("Completed imports…", null, async delegate { await ReviewCompletions(); }); menu.Items.Add(pendingMenu);
             settingsMenu = new ToolStripMenuItem("Settings…", null, delegate { EditSettings(); }); menu.Items.Add(settingsMenu);
@@ -87,7 +89,7 @@ namespace EasyEject {
             tray.DoubleClick += delegate { Show(); WindowState = FormWindowState.Normal; Activate(); };
             // Balloon clicks carry no device token. They only reveal the app for a fresh review.
             tray.BalloonTipClicked += delegate { Show(); WindowState = FormWindowState.Normal; Activate(); };
-            menu.Opening += delegate { UpdateActions(); };
+            menu.Opening += delegate { UpdateActions(); UpdateTrayStorageMenu(); };
             debounce.Interval = 800; debounce.Tick += async delegate { debounce.Stop(); await RefreshDevices(); };
             Shown += delegate { StartMonitoring(); };
             FormClosing += delegate(object sender, FormClosingEventArgs e) {
@@ -230,10 +232,19 @@ namespace EasyEject {
             await RefreshDevices();
         }
         void ReportCleanup(string message) { BeginInvoke(new Action(() => status.Text = message)); }
-        async Task Eject(bool forceClean = false) {
-            var v = Selected; if (v == null || working || scanning || readOnly) return;
+        internal void UpdateTrayStorageMenu() {
+            foreach (var item in storageMenu.DropDownItems.Cast<ToolStripItem>().ToArray()) item.Dispose(); storageMenu.DropDownItems.Clear();
+            storageMenu.DropDownItems.AddRange(TrayStorageMenu.Build(inventory, discovery.Epoch, working || scanning, readOnly, appSettings.CleanupCardsEnabled, async (choice, clean) => {
+                if (working || scanning || readOnly) return;
+                ShowDevices(); foreach (ListViewItem row in list.Items) row.Selected = ((Volume)row.Tag).Id == choice.VolumeId;
+                await Eject(clean, choice);
+            }));
+        }
+        async Task Eject(bool forceClean = false, TrayStorageChoice selection = null) {
+            if (working || scanning || readOnly || selection == null && Selected == null) return;
             try {
                 working = true; UpdateActions();
+                var v = selection == null ? Selected : selection.Resolve(inventory, discovery.Epoch);
                 var plan = EjectService.Plan(inventory, v.Id);
                 bool clean = forceClean || (v.IsCard && appSettings.CleanupCardsEnabled); var cleanup = clean ? MetadataCleanupPlan.Single(inventory, plan, v.Id) : null;
                 string warning = !v.IsCard && appSettings.WarnOtherEnabled ? "\n\nThis storage is not recognized as a camera or emulator card. Review other data and every affected partition before ejecting." : "";
