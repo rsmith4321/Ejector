@@ -2,6 +2,18 @@
 
 ## Full-port scope and latest software milestone
 
+### Persistent exact batch history · goal continuation
+
+Implementation commit: `01933cebfb27db2276a6bedad81105ba93c3825d`. Prior layout/reuse/audit milestone: `5f03d41`.
+
+Completed media imports now save the newest 20 batches to `completed-imports.json` in the app's configuration folder. Each record includes the device/profile, completion date, exact verified saved paths/bytes/SHA-256, exact immutable receipt and its hash, destination root, volume GUID/filesystem serial and disk PnP/serial identity. Retention trims only history entries; it never deletes copies or receipts. Metadata-only/failed/cancelled imports do not enter history. A history persistence failure is reported separately while the verified import and its receipt remain available.
+
+**Import history…** lists these batches even when the source is absent. Its explicit **Verify saved originals…** action obtains a fresh destination connection guard and shared disk reservations, pins paths, verifies receipt membership and hashes only the exact recorded files. It never scans the shared date folder for candidates or restores eject authority. Changed destination, receipt, saved original, fabricated membership or path redirection fails safely. Disk numbers/devnodes are not persisted as destination identity; new connections receive new guards. Quick Share itself is still pending.
+
+Validation commands: `./Windows/build.ps1 -Test`, then `EasyEject.Tests.exe --ui-smoke` and `EasyEject.Tests.exe --ui-render` from `%LOCALAPPDATA%\EasyEject\PrototypeBuild`. **80 passed; zero failed**, warnings as errors. Twelve added tests cover source absence/exact membership, newest-20 retention, destination substitution and transient renumbering, receipt/copy tampering, index-only/cancelled exclusion, corrupt/oversized/duplicate/escaping history, snapshot isolation, redirected paths, cancellation/disconnect/reservation release and native history selection. A receipt changed after engine completion is refused before history capture. Hidden read-only smoke passes. Minimum-size selected/empty history and device-window renderings were inspected under `%USERPROFILE%\.codex\EasyEjectWindowsPreview\run-63d804c272f646f8`; source/destination profile TextBox painting remains a hidden-renderer limitation, and foreground/DPI acceptance remains pending.
+
+The full-port goal remains active. Next: completion actions/notifications/settings/hotkey, remaining shared options and offline profiles, safe optional cleanup/removal and full manual Quick Share. Physical disposable-device and trusted-signing evidence are still required. No real-device import/removal/cleanup, security/power changes, startup registration, push or publishing occurred. Builds and fixtures stay outside OneDrive.
+
 ### Date layouts, verified reuse and durable audit · goal continuation
 
 Imports now share a `YYYY-MM-DD` destination folder. Clean layout is a third frozen profile/default choice, enabled for new/default profiles; earlier custom profiles retain their original tree behavior. Ordinary media groups flatten with filenames unchanged. Colliding filenames or recording associations move the whole group into a stable `Additional media/<fingerprint>` folder. Structured packages and unfamiliar files retain their selected folder/tree under `Camera originals/<fingerprint>`. Device indexes remain separate. Unicode/case aliases are rejected before destination creation.
