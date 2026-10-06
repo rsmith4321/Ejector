@@ -78,6 +78,7 @@ namespace EasyEject {
             }
         }
         [STAThread] public static int Main(string[] args) {
+            if (args.Length >= 2 && args[0] == "--share-process-fixture") return ShareProcessFixture(args);
             System.Windows.Forms.Application.EnableVisualStyles(); System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
             if (args.Length == 1 && args[0] == "--ui-render") {
                 string output = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectWindowsPreview", "run-" + Guid.NewGuid().ToString("N").Substring(0, 16));
@@ -642,6 +643,7 @@ namespace EasyEject {
             AutomaticImportTests();
             StartupTests();
             QuickShareRecipeTests();
+            QuickShareProcessTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {
