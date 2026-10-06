@@ -14,8 +14,9 @@ namespace EasyEject {
         readonly long originalEpoch; long checkedEpoch;
         readonly int[] disks; readonly string fingerprint; readonly Group[] groups; readonly bool scoped;
         internal bool Scoped { get { return scoped; } }
+        internal bool ProtectedConnectionChanged { get { return Scoped && groups.Any(group => connections.Stamp(group.Instances) != group.Stamp); } }
         internal bool Changed {
-            get { return discovery.Epoch != Interlocked.Read(ref checkedEpoch) || Scoped && groups.Any(group => connections.Stamp(group.Instances) != group.Stamp); }
+            get { return discovery.Epoch != Interlocked.Read(ref checkedEpoch) || ProtectedConnectionChanged; }
         }
         internal StorageConnectionProof(IDiscovery discovery, Inventory state, IEnumerable<int> protectedDisks) {
             this.discovery = discovery; connections = discovery as IScopedConnectionDiscovery;

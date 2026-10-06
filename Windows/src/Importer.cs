@@ -35,7 +35,7 @@ namespace EasyEject {
             disks = PlanProtection(state, sourceId, destinationId); connection = new StorageConnectionProof(discovery, state, disks); destinationIdentity = DestinationIdentity.Capture(state, destinationId); sourceIdentity = DestinationIdentity.Capture(state, sourceId);
             string root = currentSource.Mounts.Where(x => SafePaths.Within(source, SafePaths.Normalize(x))).OrderByDescending(x => x.Length).FirstOrDefault();
             if (root == null) throw new SafetyException("The selected import source root is unavailable.");
-            CompletionOrigin = new ImportCompletionOrigin(state, sourceId, root);
+            CompletionOrigin = new ImportCompletionOrigin(state, sourceId, root, discovery);
         }
         public static int[] PlanProtection(Inventory state, string sourceId, string destinationId) {
             var s = Resolve(state, sourceId); var d = Resolve(state, destinationId);

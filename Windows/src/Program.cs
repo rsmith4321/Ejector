@@ -126,7 +126,7 @@ namespace EasyEject {
             }
             if (m.Msg == 0x219 && (m.WParam.ToInt64() == 7 || m.WParam.ToInt64() == 0x8000 || m.WParam.ToInt64() == 0x8003 || m.WParam.ToInt64() == 0x8004)) {
                 discovery.ConnectionChanged(); eject.Enabled = false; import.Enabled = false; debounce.Stop(); debounce.Start();
-                ExpireCompletions();
+                ExpireNotifiedCompletions();
                 UpdateActions();
             }
             if (m.Msg == 0x11 && working) { m.Result = IntPtr.Zero; return; }
@@ -157,6 +157,7 @@ namespace EasyEject {
             if (scanning || working) return; scanning = true; UpdateActions();
             try {
                 var next = await Task.Run(() => discovery.Scan()); PresentInventory(next); automatic.Observe(next);
+                completions.Reconcile(next, WindowsDiscovery.VolumeId); ExpireMissingCompletionDialog();
                 status.Text = next.Complete ? "Read-only inventory: " + next.Volumes.Count + " volumes on " + next.Disks.Count + " disks. Closing this window keeps the tray app running." : "Incomplete inventory; actions blocked. " + String.Join(" ", next.Errors);
             } catch (Exception ex) { inventory = null; status.Text = ex.Message; }
             finally { scanning = false; UpdateActions(); }
@@ -224,7 +225,7 @@ namespace EasyEject {
                 if (plan.Targets.Length == 0) { status.Text = "No camera or emulator cards are connected."; return; }
                 bool clean = appSettings.CleanupCardsEnabled; var cleanPlans = clean ? plan.Targets.Select(t => MetadataCleanupPlan.Bulk(state, t)).ToArray() : new MetadataCleanupPlan[0];
                 using (var dialog = new BulkEjectDialog(plan, String.Join("\r\n\r\n", cleanPlans.Select(p => p.Description)))) if (dialog.ShowDialog(this) != DialogResult.Yes) return;
-                completions.InvalidateAll(); status.Text = "Requesting and verifying grouped card removal…"; Log("User confirmed grouped card removal | " + plan.Description);
+                ExpireCompletionDisks(plan.Targets.SelectMany(target => target.Disks)); status.Text = "Requesting and verifying grouped card removal…"; Log("User confirmed grouped card removal | " + plan.Description);
                 var activity = BeginActivity(TrayOperationKind.Eject, "Camera/emulator cards", "Requesting grouped removal");
                 var service = new BulkEjectService(discovery, new WindowsBulkConnections(discovery), operations, validate => new WindowsEjectApi(validate));
                 var counts = new CleanupCounts(); if (clean) { cancellation = new CancellationTokenSource(); cancel.Enabled = true; }
@@ -256,7 +257,7 @@ namespace EasyEject {
                 string warning = !v.IsCard && appSettings.WarnOtherEnabled ? "\n\nThis storage is not recognized as a camera or emulator card. Review other data and every affected partition before ejecting." : "";
                 string text = "Windows will remove this device and all affected volumes:\n\n" + String.Join("\n", plan.Affected) + warning + (cleanup == null ? "" : "\n\n" + cleanup.Description) + "\n\nFinish all transfers first. Request safe removal?";
                 if (MessageBox.Show(this, text, "Safe eject", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
-                completions.InvalidateAll(); Log("User requested manual safe removal | " + String.Join(", ", plan.Affected));
+                ExpireCompletionDisks(plan.Disks); Log("User requested manual safe removal | " + String.Join(", ", plan.Affected));
                 working = true; UpdateActions(); status.Text = "Requesting safe removal…";
                 var activity = BeginActivity(TrayOperationKind.Eject, v.Display, clean ? "Cleaning before safe removal" : "Requesting safe removal");
                 var counts = new CleanupCounts(); if (clean) { cancellation = new CancellationTokenSource(); cancel.Enabled = true; }
@@ -351,7 +352,10 @@ namespace EasyEject {
                 catch (Exception ex) { historyFailed = true; historyNote = "\nImport verified, but history could not be saved: " + ex.Message + "\nCopies and the completion receipt remain available."; RecordIssue(historyNote.Trim()); }
             }
             string message = result.Files == 0 ? "No matching media or device indexes were found. No batch was created." : (result.HasSelectedMedia ? "Import complete. " : "No matching media. Device index backup only. ") + result.Files + " files verified (" + result.Bytes + " bytes; " + result.Reused + " reused).\n" + result.Folder;
-            bool sourceUnchanged = guard.CompletionOrigin.Epoch == discovery.Epoch;
+            bool sourceUnchanged = await Task.Run(() => {
+                try { var state = discovery.Scan(); return state.Epoch == discovery.Epoch && guard.CompletionOrigin.SourceCurrent(state, WindowsDiscovery.VolumeId(root), root); }
+                catch (Exception ex) { if (!ConfigurationError(ex)) throw; return false; }
+            });
             message += historyNote + "\n\n" + removalMessage + " " + (sourceUnchanged ? "Device remains connected." : "The source connection changed after copying. Refresh and review the device."); status.Text = message; Log(message);
             if (!historyFailed) ClearIssue();
             ImportCompletion completion = null;
@@ -400,6 +404,9 @@ namespace EasyEject {
         Action<string> ActivityReporter(TrayOperation token) { return message => QueueActivityProgress(token, message); }
         Action<ImportWorkProgress> ImportReporter(TrayOperation token) { return measured => QueueActivityProgress(token, null, measured); }
         void ExpireCompletions() { completions.InvalidateAll(); if (activeCompletion != null && !activeCompletion.IsDisposed) activeCompletion.ExpireEject(); }
+        void ExpireNotifiedCompletions() { completions.InvalidateNotifications(); ExpireMissingCompletionDialog(); }
+        void ExpireCompletionDisks(System.Collections.Generic.IEnumerable<int> disks) { completions.InvalidateDisks(disks); ExpireMissingCompletionDialog(); }
+        void ExpireMissingCompletionDialog() { if (activeCompletion != null && !activeCompletion.IsDisposed && completions.Get(activeCompletion.CompletionId) == null) activeCompletion.ExpireEject(); }
         void ShowDevices() { Show(); WindowState = FormWindowState.Normal; Activate(); }
         void Notify(string title, string text, ToolTipIcon icon) {
             if (!appSettings.NotificationsEnabled) return;
@@ -512,13 +519,13 @@ namespace EasyEject {
                     Log("User requested post-import eject | " + entry.DeviceName);
                     var activity = BeginActivity(TrayOperationKind.Eject, entry.DeviceName, cleanup == null ? "Requesting safe removal" : "Cleaning before safe removal");
                     var counts = new CleanupCounts(); if (cleanup != null) { cancellation = new CancellationTokenSource(); cancel.Enabled = true; }
-                    var result = await Task.Run(() => new CompletedEjectService(completions, discovery, new WindowsEjectApi(discovery, entry.Origin.Epoch, cleanup == null ? CancellationToken.None : cancellation.Token), operations, WindowsDiscovery.VolumeId).Execute(id, initial => {
+                    var result = await Task.Run(() => new CompletedEjectService(completions, discovery, validate => new WindowsEjectApi(validate), operations, WindowsDiscovery.VolumeId).ExecuteReviewed(id, (initial, validate) => {
                         if (cleanup == null) return; cleanup.Preflight(initial, WindowsDiscovery.VolumeId);
-                        cleanup.Clean(() => { var fresh = discovery.Scan(); EjectService.Validate(discovery, fresh, entry.Origin.Plan); return fresh; }, WindowsDiscovery.VolumeId, cancellation.Token, counts, ActivityReporter(activity));
+                        cleanup.Clean(validate, WindowsDiscovery.VolumeId, cancellation.Token, counts, ActivityReporter(activity));
                     }, cleanup == null ? CancellationToken.None : cancellation.Token));
                     if (cleanup != null) result.CleanupMessage = counts.Message;
                     status.Text = result.Message; FinishActivity(status.Text); Log(result.Message);
-                    if (result.Success) { completions.InvalidateAll(); ClearIssue(); } else RecordIssue(result.Message);
+                    if (result.Success) { ExpireCompletionDisks(entry.Origin.Plan.Disks); ClearIssue(); } else RecordIssue(result.Message);
                     Notify(result.Success ? "Safe removal accepted" : "Device still connected", result.Message, result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
                     MessageBox.Show(this, result.Message, result.Success ? "Safe removal accepted" : "Device still connected", MessageBoxButtons.OK, result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
                     break;

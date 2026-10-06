@@ -7,8 +7,10 @@ namespace EasyEject {
     internal sealed class ImportCompletionDialog : Form {
         internal readonly Button Keep = new Button(), Eject = new Button(), OpenFolder = new Button(), Share = new Button();
         internal readonly Label Explanation = new Label();
+        internal readonly string CompletionId;
         bool expired;
         internal ImportCompletionDialog(ImportCompletion entry, bool canEject, string cleanupText = "", bool canShare = false, string shareMessage = "") {
+            CompletionId = entry.Id;
             Text = entry.HasMedia ? "Import complete. Eject now?" : "No matching media. Eject now?";
             Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi; Size = new Size(740, 500); MinimumSize = new Size(680, 440); StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
             var body = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(24) };
