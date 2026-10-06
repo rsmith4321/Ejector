@@ -14,13 +14,16 @@ namespace EasyEject {
             readonly RSA key; internal readonly X509Certificate2 Certificate;
             internal readonly byte[] Body = Encoding.UTF8.GetBytes("{\"platform\":\"windows-x64\",\"fixture\":true}");
             internal ManifestSigningFixture(bool expired = false) {
-                // CreateEphemeralKey plus PersistKeyInCsp=false: no key file, account or trust-store import.
-                var rsa = new RSACryptoServiceProvider(2048, new CspParameters { Flags = CspProviderFlags.CreateEphemeralKey }); rsa.PersistKeyInCsp = false; key = rsa;
-                var request = new CertificateRequest("CN=Easy Eject Disposable Manifest Fixture", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-                request.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
-                request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
-                request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(new OidCollection { new Oid(WindowsCertificateTrust.CodeSigningOid) }, false));
-                Certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddHours(-2), expired ? DateTimeOffset.UtcNow.AddHours(-1) : DateTimeOffset.UtcNow.AddHours(1));
+                // Explicit built-in software provider, no prompts or persistent key/container/store.
+                var rsa = new RSACryptoServiceProvider(2048, new CspParameters(24, "Microsoft Enhanced RSA and AES Cryptographic Provider") { Flags = CspProviderFlags.CreateEphemeralKey | CspProviderFlags.NoPrompt }); key = rsa;
+                try {
+                    rsa.PersistKeyInCsp = false;
+                    var request = new CertificateRequest("CN=Easy Eject Disposable Manifest Fixture", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                    request.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
+                    request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
+                    request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(new OidCollection { new Oid(WindowsCertificateTrust.CodeSigningOid) }, false));
+                    Certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddHours(-2), expired ? DateTimeOffset.UtcNow.AddHours(-1) : DateTimeOffset.UtcNow.AddHours(1));
+                } catch { key.Dispose(); throw; }
             }
             internal byte[] Sign(byte[] body = null, bool detached = true, string digest = FixtureSha256Oid, bool includeCertificate = true, ManifestSigningFixture other = null) {
                 var cms = new SignedCms(new ContentInfo(body ?? Body), detached);
@@ -30,7 +33,7 @@ namespace EasyEject {
             }
             internal WindowsSignerEvidence Evidence(string digest = FixtureSha256Oid) { return new WindowsSignerEvidence(WindowsSignerEvidence.Hash(Certificate.RawData), WindowsSignerEvidence.Hash(Certificate.SubjectName.RawData), new string('c', 64), digest); }
             internal ApprovedWindowsPublisher Publisher() { return new ApprovedWindowsPublisher(Evidence().SubjectHash, Evidence().IssuerCertificateHash); }
-            public void Dispose() { Certificate.Dispose(); key.Dispose(); }
+            public void Dispose() { try { Certificate.Dispose(); } finally { key.Dispose(); } }
         }
         sealed class FakeManifestCertificateTrust : IWindowsCertificateTrust {
             internal int Calls; internal Action During; internal WindowsSignerEvidence Evidence; internal bool Throw;
