@@ -88,6 +88,7 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--automatic-admission") { AutomaticAdmissionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake storage evidence and disposable files only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--share-directories") { DirectoryLeaseTests(); QuickShareEngineTests(); QuickShareProcessTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable directories, fake exports and contained synthetic child processes only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--configuration-writer") { ConfigurationWriterTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable native configuration files only."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--manual-installation") { ManualInstallationTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable directories, fake folder viewers and hidden native controls only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--ui-render") {
                 string output = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectWindowsPreview", "run-" + Guid.NewGuid().ToString("N").Substring(0, 16));
                 Directory.CreateDirectory(output); var state = State(); var defaults = new ImportDefaults(); var profile = defaults.NewProfile(state.Volumes[0], state.Disks[0]); profile.RelativeSource = "DCIM"; profile.Destination = @"D:\Travel backups";
@@ -96,6 +97,12 @@ namespace EasyEject {
                     dialog.Complete("Windows refused removal (fixture veto: OutstandingOpen). Finish the other program's transfer, then review this device again.\r\n\r\nRemoved 3 metadata files. Photos, recordings and device Trash are kept.\r\n\r\nThe other import retains its own progress and cancellation controls. No automatic retry."); Render(dialog, Path.Combine(output, "manual-storage-result.png"));
                 }
                 var shareProfile = profile.Copy(); shareProfile.Name = "Fixture Luna travel card"; shareProfile.SharingPreset = QuickShareProfile.Uhd; shareProfile.SharingColor = QuickShareProfile.Standard;
+                using (var folders = new InstallationFolders(output, output, _ => {})) using (var dialog = new ManualInstallationDialog(ApplicationInformation.Version, folders)) {
+                    dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "manual-installation-top.png"));
+                    string complete = dialog.Content.Text; dialog.Content.Text = complete.Substring(complete.IndexOf("Manual rollback", StringComparison.Ordinal));
+                    Render(dialog, Path.Combine(output, "manual-installation-bottom-preview.png")); dialog.Content.Text = complete;
+                    Console.WriteLine("Installation end-content preview uses the same hidden control; it is not proof of native foreground scrolling.");
+                }
                 using (var dialog = new ImportProfileDialog(shareProfile, null, shareProfile.Name, defaults, true)) { dialog.Size = dialog.MinimumSize; RenderAtBottom(dialog, Path.Combine(output, "profile-quick-share-bottom.png")); }
                 using (var dialog = new QuickSharePromptDialog(shareProfile.Name, @"D:\Travel backups\2026-10-06\Fixture Luna travel card", shareProfile)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "quick-share-prompt.png")); RenderAtBottom(dialog, Path.Combine(output, "quick-share-prompt-bottom.png")); }
                 using (var dialog = new QuickShareSetupDialog(new QuickShareConfigurationSnapshot(), Profiles.Root)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "quick-share-setup.png")); RenderAtBottom(dialog, Path.Combine(output, "quick-share-setup-bottom.png")); }
@@ -695,7 +702,7 @@ namespace EasyEject {
             StartupTests();
             QuickShareRecipeTests();
             QuickShareProcessTests();
-            ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
+            ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
             QuickShareDialogTests();
             QuickShareConfigurationTests();
             ManualQuickShareTests();

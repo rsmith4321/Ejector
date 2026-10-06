@@ -31,7 +31,7 @@ namespace EasyEject {
         readonly ToolStripMenuItem storageMenu = new ToolStripMenuItem("Connected storage");
         readonly ToolStripMenuItem activityMenu = new ToolStripMenuItem { Enabled = false };
         readonly TrayActivity trayActivity = new TrayActivity(); readonly TrayBusyIcons trayBusyIcons = new TrayBusyIcons();
-        ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu, helpMenu, aboutMenu;
+        ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu, helpMenu, aboutMenu, installationMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
         int cardCount;
         readonly Button resume = new Button();
@@ -91,6 +91,7 @@ namespace EasyEject {
             debugMenu = new ToolStripMenuItem("View debug log…", null, delegate { ViewDebugLog(); }); menu.Items.Add(debugMenu);
             helpMenu = new ToolStripMenuItem("Help && Instructions…", null, delegate { ViewInformation(false); }); menu.Items.Add(helpMenu);
             aboutMenu = new ToolStripMenuItem("About Easy Eject…", null, delegate { ViewInformation(true); }); menu.Items.Add(aboutMenu);
+            installationMenu = new ToolStripMenuItem("Windows updates && installation…", null, delegate { ViewInstallation(); }); menu.Items.Add(installationMenu);
             menu.Items.Add("Quit", null, delegate { if (Busy) { MessageBox.Show(this, "Wait for the operation to finish or cancel the import before quitting."); return; } quit = true; Close(); });
             tray = new NotifyIcon { Icon = SystemIcons.Information, Text = "Easy Eject Windows prototype", Visible = true, ContextMenuStrip = menu };
             status.TextChanged += delegate { UpdateTrayPresentation(); };
@@ -147,6 +148,7 @@ namespace EasyEject {
             pending.Enabled &= completions.Entries.Length > 0; issue.Enabled &= appIssue.HasIssue;
             pendingMenu.Enabled = pending.Enabled; issueMenu.Enabled = issue.Enabled; settingsMenu.Enabled = settings.Enabled; debugMenu.Visible = appSettings.DebugEnabled; debugMenu.Enabled = !Busy && !scanning;
             helpMenu.Enabled = aboutMenu.Enabled = !Busy && !scanning;
+            installationMenu.Enabled = CanReviewInstallation;
             UpdateTrayPresentation();
             bulk.Enabled = !readOnly && !Busy && !scanning && inventory != null && inventory.Epoch == discovery.Epoch && inventory.Volumes.Any(x => x.IsCard);
             bulkMenu.Enabled = bulk.Enabled;
@@ -500,6 +502,16 @@ namespace EasyEject {
             if (Busy || scanning) return;
             working = true; UpdateActions();
             try { using (var dialog = new InformationDialog(about)) dialog.ShowDialog(this); }
+            finally { FinishOperation(); }
+        }
+        bool CanReviewInstallation { get { return WindowsUpdateSafety.CanReview(Busy, scanning, !Enabled || OwnedForms.Any(form => form.Visible && form.Modal)); } }
+        void ViewInstallation() {
+            if (!CanReviewInstallation) return;
+            working = true; UpdateActions();
+            try {
+                using (var folders = new InstallationFolders(System.IO.Path.GetDirectoryName(Application.ExecutablePath), Profiles.Root))
+                using (var dialog = new ManualInstallationDialog(ApplicationInformation.Version, folders)) dialog.ShowDialog(this);
+            } catch (Exception ex) { ShowError(ex); }
             finally { FinishOperation(); }
         }
         void EditSettings() {
