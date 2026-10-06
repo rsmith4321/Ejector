@@ -131,15 +131,22 @@ namespace EasyEject {
             if (value.Originals.Select(x => x.Path.Normalize(NormalizationForm.FormC)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != value.Originals.Count) throw new SafetyException("Saved batch contains duplicate file paths.");
         }
         static void Canonical(string path) { if (path == null || !String.Equals(path, SafePaths.Normalize(path), StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Saved batch path is ambiguous."); }
-        static bool ValidHash(string hash) { return hash != null && hash.Length == 64 && hash.All(x => (x >= '0' && x <= '9') || (x >= 'a' && x <= 'f')); }
+        internal static bool ValidHash(string hash) { return hash != null && hash.Length == 64 && hash.All(x => (x >= '0' && x <= '9') || (x >= 'a' && x <= 'f')); }
         internal static ImportReceipt ReadReceipt(string path, out string hash) {
-            using (var stream = SafePaths.ReadFile(path)) {
-                if (stream.Length > MaximumJson) throw new SafetyException("Completed receipt is too large to read.");
-                hash = Hash(stream, CancellationToken.None); stream.Position = 0;
-                var receipt = (ImportReceipt)new DataContractJsonSerializer(typeof(ImportReceipt)).ReadObject(stream);
-                if (receipt == null || receipt.Files == null || receipt.Files.Any(x => x == null || x.RelativePath == null || !ValidHash(x.Sha256) || x.Bytes < 0)) throw new SafetyException("Completed receipt is invalid.");
-                return receipt;
-            }
+            using (var stream = SafePaths.ReadFile(path)) return ReadReceipt(stream, CancellationToken.None, out hash);
+        }
+        internal static ImportReceipt ReadReceipt(FileStream stream, CancellationToken cancel, out string hash) {
+            stream.Position = 0;
+            if (stream.Length > MaximumJson) throw new SafetyException("Completed receipt is too large to read.");
+            hash = Hash(stream, cancel); stream.Position = 0;
+            var receipt = (ImportReceipt)new DataContractJsonSerializer(typeof(ImportReceipt)).ReadObject(stream);
+            if (receipt == null || receipt.Files == null || receipt.Files.Any(x => x == null || x.RelativePath == null || !ValidHash(x.Sha256) || x.Bytes < 0)) throw new SafetyException("Completed receipt is invalid.");
+            return receipt;
+        }
+        internal static void RequireExactReceipt(CompletedBatch batch, ImportReceipt receipt, string hash) {
+            if (hash != batch.ReceiptSha256 || receipt.Id != batch.Id || receipt.SourceVolume != batch.ProfileId || !receipt.HasSelectedMedia) throw new SafetyException("The completed receipt changed. Saved originals were not changed.");
+            var recorded = receipt.Files.Where(x => x.IsMedia).Select(x => new VerifiedCopy { Path = Path.Combine(batch.Folder, x.RelativePath), Sha256 = x.Sha256, Bytes = x.Bytes }).ToArray();
+            if (recorded.Length != batch.Originals.Count || recorded.Where((x, i) => x.Path != batch.Originals[i].Path || x.Sha256 != batch.Originals[i].Sha256 || x.Bytes != batch.Originals[i].Bytes).Any()) throw new SafetyException("Saved batch no longer matches its exact receipt.");
         }
         // Operates only on exact recorded paths. Never scans the date folder for candidates.
         internal static void Verify(CompletedBatch batch, DestinationIdentity current, IImportGuard guard, Operations operations, CancellationToken cancel, Action<string> report) {
@@ -147,9 +154,7 @@ namespace EasyEject {
             if (!batch.Destination.Matches(current)) throw new SafetyException("The saved destination changed. Saved originals were not changed.");
             using (operations.Reserve(guard.ProtectedDisks)) using (SafePaths.LockDirectories(batch.DestinationRoot, batch.Folder, Path.GetDirectoryName(batch.ReceiptPath))) {
                 cancel.ThrowIfCancellationRequested(); guard.Validate(); string hash; var receipt = ReadReceipt(batch.ReceiptPath, out hash);
-                if (hash != batch.ReceiptSha256 || receipt.Id != batch.Id || receipt.SourceVolume != batch.ProfileId || !receipt.HasSelectedMedia) throw new SafetyException("The completed receipt changed. Saved originals were not changed.");
-                var recorded = receipt.Files.Where(x => x.IsMedia).Select(x => new VerifiedCopy { Path = Path.Combine(batch.Folder, x.RelativePath), Sha256 = x.Sha256, Bytes = x.Bytes }).ToArray();
-                if (recorded.Length != batch.Originals.Count || recorded.Where((x, i) => x.Path != batch.Originals[i].Path || x.Sha256 != batch.Originals[i].Sha256 || x.Bytes != batch.Originals[i].Bytes).Any()) throw new SafetyException("Saved batch no longer matches its exact receipt.");
+                RequireExactReceipt(batch, receipt, hash);
                 foreach (var original in batch.Originals) {
                     cancel.ThrowIfCancellationRequested(); guard.Validate(); report("Verifying saved " + SafePaths.Relative(original.Path, batch.Folder));
                     using (SafePaths.LockDirectories(Path.GetDirectoryName(original.Path))) using (var stream = SafePaths.ReadFile(original.Path)) {

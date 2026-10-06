@@ -60,7 +60,7 @@ namespace EasyEject {
         [DataMember(Name = "channels")] internal int? Channels { get; set; }
         [DataMember(Name = "side_data_list")] internal List<QuickShareSideData> SideData { get; set; }
     }
-    [DataContract] internal sealed class QuickShareFormat { [DataMember(Name = "duration")] internal string Duration { get; set; } }
+    [DataContract] internal sealed class QuickShareFormat { [DataMember(Name = "duration")] internal string Duration { get; set; } [DataMember(Name = "format_name")] internal string Name { get; set; } }
     [DataContract] internal sealed class QuickShareProbe {
         [DataMember(Name = "streams")] internal List<QuickShareStream> Streams { get; set; }
         [DataMember(Name = "format")] internal QuickShareFormat Format { get; set; }
@@ -130,7 +130,8 @@ namespace EasyEject {
         internal static string[] DecodeArguments(string path) { return new[] { "-nostdin", "-v", "error", "-xerror", "-i", SafePaths.Normalize(path), "-map", "0:v:0", "-map", "0:a:0?", "-f", "null", "-" }; }
         internal void ValidateOutput(QuickShareProbe output) {
             var video = output == null ? null : output.Video; string ignored; double rate = 0; if (video != null) ParseRate(video.FrameRate, out rate, out ignored);
-            if (video == null || video.Codec != "h264" || video.Width != Width || video.Height != Height || Math.Abs(output.Seconds - Seconds) >= 0.25 || output.Seconds <= 0
+            if (video == null || output.Streams == null || output.Streams.Count != (HasAudio ? 2 : 1) || output.Streams.Count(x => x != null && x.Type == "video") != 1 || output.Streams.Count(x => x != null && x.Type == "audio") != (HasAudio ? 1 : 0)
+                || output.Format == null || output.Format.Name == null || !output.Format.Name.Split(',').Contains("mp4") || video.Codec != "h264" || video.Width != Width || video.Height != Height || Math.Abs(output.Seconds - Seconds) >= 0.25 || output.Seconds <= 0
                 || video.Primaries != "bt709" || video.Transfer != "bt709" || video.ColorSpace != "bt709" || video.Range != "tv" || video.PixelFormat != "yuv420p"
                 || rate <= 0 || rate > 30 || Math.Abs(rate - FrameRate) > 0.001
                 || video.SideData != null && video.SideData.Any(x => x != null && (x.Rotation.GetValueOrDefault() % 360 != 0 || x.Type != null && x.Type.IndexOf("DOVI", StringComparison.OrdinalIgnoreCase) >= 0))
