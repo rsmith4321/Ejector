@@ -6,6 +6,7 @@ using System.Threading;
 namespace EasyEject {
     // A live instance stamp is required before a global event may be treated as unrelated.
     internal interface IScopedConnectionDiscovery { string Stamp(string[] instances); }
+    internal interface IConcurrentStorageGuard : IImportGuard { bool AllowsUnrelatedOperations { get; } }
     internal sealed class StorageConnectionProof {
         sealed class Group {
             internal string Id, Stamp, Fingerprint; internal string[] Instances;

@@ -43,6 +43,7 @@ namespace EasyEject {
     // One shared coordinator reserves both source and destination disks throughout an operation.
     public sealed class Operations {
         readonly object gate = new object(); readonly HashSet<int> busy = new HashSet<int>();
+        internal bool Available(IEnumerable<int> disks) { lock (gate) return !disks.Any(busy.Contains); }
         public IDisposable Reserve(IEnumerable<int> disks) {
             int[] keys = disks.Distinct().ToArray();
             lock (gate) { if (keys.Any(busy.Contains)) throw new SafetyException("This disk is busy with another Easy Eject operation."); foreach (int key in keys) busy.Add(key); }

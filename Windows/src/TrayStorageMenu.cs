@@ -36,7 +36,7 @@ namespace EasyEject {
                 .OrderBy(v => v.Group).ThenBy(v => v.Display, StringComparer.CurrentCultureIgnoreCase).Select(v => new TrayStorageChoice(state, v, currentEpoch)).ToArray();
         }
         static string Caption(string value) { return new string(value.Where(c => !Char.IsControl(c)).Take(180).ToArray()).Replace("&", "&&"); }
-        internal static ToolStripItem[] Build(Inventory state, long currentEpoch, bool busy, bool readOnly, bool cleanCards, Action<TrayStorageChoice, bool> review) {
+        internal static ToolStripItem[] Build(Inventory state, long currentEpoch, bool busy, bool readOnly, bool cleanCards, Action<TrayStorageChoice, bool> review, Func<TrayStorageChoice, string> additionalRefusal = null) {
             var choices = Choices(state, currentEpoch); var result = new List<ToolStripItem>();
             foreach (var group in new[] { StorageGroup.Camera, StorageGroup.Emulator, StorageGroup.External }) {
                 var values = choices.Where(x => group == StorageGroup.External ? x.Group == StorageGroup.External || x.Group == StorageGroup.Unknown : x.Group == group).ToArray();
@@ -44,6 +44,7 @@ namespace EasyEject {
                 var heading = new ToolStripMenuItem(group == StorageGroup.Camera ? "Camera cards" : group == StorageGroup.Emulator ? "Emulator cards" : "Other external storage");
                 foreach (var choice in values) {
                     string unavailable = readOnly ? "Unavailable in this read-only window." : busy ? "Wait for the current operation or open dialog to finish." : choice.Error;
+                    if (unavailable == null && additionalRefusal != null) unavailable = additionalRefusal(choice);
                     if (group != StorageGroup.External) {
                         var item = ActionItem((cleanCards ? "Clean && eject " : "Eject ") + Caption(choice.Display) + "…", choice, cleanCards, unavailable, review); heading.DropDownItems.Add(item);
                     } else {

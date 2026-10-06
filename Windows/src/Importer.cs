@@ -10,7 +10,7 @@ using System.Threading;
 namespace EasyEject {
     public interface IImportGuard { int[] ProtectedDisks { get; } void Validate(); }
     internal interface IImportDeviceEvidence { DestinationIdentity SourceDevice { get; } DestinationIdentity DestinationDevice { get; } }
-    public sealed class VolumeImportGuard : IImportGuard, IConnectionGuard, IImportDeviceEvidence {
+    public sealed class VolumeImportGuard : IImportGuard, IConnectionGuard, IImportDeviceEvidence, IConcurrentStorageGuard {
         readonly IDiscovery discovery; readonly string sourceId, destinationId; readonly Func<string, string> volumeId;
         readonly StorageConnectionProof connection;
         readonly string source, destination; readonly int[] disks;
@@ -22,6 +22,7 @@ namespace EasyEject {
         DestinationIdentity IImportDeviceEvidence.DestinationDevice { get { return destinationIdentity.Copy(); } }
         public int[] ProtectedDisks { get { return (int[])disks.Clone(); } }
         public bool Changed { get { return connection.Changed; } }
+        bool IConcurrentStorageGuard.AllowsUnrelatedOperations { get { return connection.Scoped && !connection.ProtectedConnectionChanged; } }
         public VolumeImportGuard(IDiscovery discovery, string source, string destination, Volume expectedVolume, Disk expectedDisk, long selectionEpoch)
             : this(discovery, source, destination, expectedVolume, expectedDisk, selectionEpoch, WindowsDiscovery.VolumeId) {}
         internal VolumeImportGuard(IDiscovery discovery, string source, string destination, Volume expectedVolume, Disk expectedDisk, long selectionEpoch, Func<string, string> volumeId) {

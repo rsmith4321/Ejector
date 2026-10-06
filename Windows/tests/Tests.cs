@@ -84,9 +84,14 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--media-parity") { MediaParityTests(); MediaMatrixTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable files and native read-only path resolution only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--storage-connections") { StorageConnectionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake notifications, fake eject and disposable files only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--completion-connections") { CompletionConnectionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake removal and owned disposable files only."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--concurrent-storage") { ConcurrentStorageTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake eject, owned disposable files and hidden controls only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--ui-render") {
                 string output = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectWindowsPreview", "run-" + Guid.NewGuid().ToString("N").Substring(0, 16));
                 Directory.CreateDirectory(output); var state = State(); var defaults = new ImportDefaults(); var profile = defaults.NewProfile(state.Volumes[0], state.Disks[0]); profile.RelativeSource = "DCIM"; profile.Destination = @"D:\Travel backups";
+                using (var manualCancel = new CancellationTokenSource()) using (var dialog = new ManualStorageDialog("Fixture other camera card", manualCancel)) {
+                    dialog.Size = dialog.MinimumSize; dialog.Status.Text = "Removing owned metadata from the reviewed card…\r\n\r\nThe import continues on separate source and destination disks. Its Cancel button controls only that import."; Render(dialog, Path.Combine(output, "manual-storage-progress.png"));
+                    dialog.Complete("Windows refused removal (fixture veto: OutstandingOpen). Finish the other program's transfer, then review this device again.\r\n\r\nRemoved 3 metadata files. Photos, recordings and device Trash are kept.\r\n\r\nThe other import retains its own progress and cancellation controls. No automatic retry."); Render(dialog, Path.Combine(output, "manual-storage-result.png"));
+                }
                 var shareProfile = profile.Copy(); shareProfile.Name = "Fixture Luna travel card"; shareProfile.SharingPreset = QuickShareProfile.Uhd; shareProfile.SharingColor = QuickShareProfile.Standard;
                 using (var dialog = new ImportProfileDialog(shareProfile, null, shareProfile.Name, defaults, true)) { dialog.Size = dialog.MinimumSize; RenderAtBottom(dialog, Path.Combine(output, "profile-quick-share-bottom.png")); }
                 using (var dialog = new QuickSharePromptDialog(shareProfile.Name, @"D:\Travel backups\2026-10-06\Fixture Luna travel card", shareProfile)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "quick-share-prompt.png")); RenderAtBottom(dialog, Path.Combine(output, "quick-share-prompt-bottom.png")); }
@@ -699,6 +704,7 @@ namespace EasyEject {
             MediaMatrixTests();
             StorageConnectionTests();
             CompletionConnectionTests();
+            ConcurrentStorageTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {

@@ -39,6 +39,8 @@ namespace EasyEject {
         readonly ListView list = new ListView(); readonly TextBox status = new TextBox(); readonly Button refresh = new Button(), eject = new Button(), cleanEject = new Button(), bulk = new Button(), import = new Button(), cancel = new Button(), profile = new Button(), defaults = new Button(), history = new Button(), pending = new Button(), settings = new Button(), issue = new Button();
         readonly NotifyIcon tray; readonly System.Windows.Forms.Timer debounce = new System.Windows.Forms.Timer();
         Inventory inventory; bool scanning, working, quit; CancellationTokenSource cancellation; IntPtr notification;
+        readonly ConcurrentStorageState concurrentStorage; bool preserveConcurrentIssue; volatile TrayOperation storageOwner;
+        bool Busy { get { return working || concurrentStorage != null && concurrentStorage.Busy; } }
         [StructLayout(LayoutKind.Sequential)] struct BroadcastInterface { public int Size, Type, Reserved; public Guid ClassGuid; public short Name; }
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr RegisterDeviceNotification(IntPtr recipient, ref BroadcastInterface filter, uint flags);
         [DllImport("user32.dll")] static extern bool UnregisterDeviceNotification(IntPtr handle);
@@ -46,6 +48,7 @@ namespace EasyEject {
         internal DeviceWindow(bool readOnly) : this(readOnly, false) {}
         internal DeviceWindow(bool readOnly, bool startInTray) {
             this.readOnly = readOnly;
+            concurrentStorage = new ConcurrentStorageState(operations);
             startupPresentation = new StartupPresentation(startInTray);
             try { appSettings = AppSettings.Load(); appIssue = AppIssue.Load(); } catch (Exception ex) { appIssue.Record("Saved application state could not be read: " + ex.Message); }
             if (readOnly) appSettings = new AppSettings();
@@ -88,7 +91,7 @@ namespace EasyEject {
             debugMenu = new ToolStripMenuItem("View debug log…", null, delegate { ViewDebugLog(); }); menu.Items.Add(debugMenu);
             helpMenu = new ToolStripMenuItem("Help && Instructions…", null, delegate { ViewInformation(false); }); menu.Items.Add(helpMenu);
             aboutMenu = new ToolStripMenuItem("About Easy Eject…", null, delegate { ViewInformation(true); }); menu.Items.Add(aboutMenu);
-            menu.Items.Add("Quit", null, delegate { if (working) { MessageBox.Show(this, "Wait for the operation to finish or cancel the import before quitting."); return; } quit = true; Close(); });
+            menu.Items.Add("Quit", null, delegate { if (Busy) { MessageBox.Show(this, "Wait for the operation to finish or cancel the import before quitting."); return; } quit = true; Close(); });
             tray = new NotifyIcon { Icon = SystemIcons.Information, Text = "Easy Eject Windows prototype", Visible = true, ContextMenuStrip = menu };
             status.TextChanged += delegate { UpdateTrayPresentation(); };
             tray.DoubleClick += delegate { Show(); WindowState = FormWindowState.Normal; Activate(); };
@@ -99,7 +102,7 @@ namespace EasyEject {
             Shown += delegate { StartMonitoring(); };
             FormClosing += delegate(object sender, FormClosingEventArgs e) {
                 if (!quit && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); return; }
-                if (working) { e.Cancel = true; status.Text = "Wait for completion or cancel the import before closing."; return; }
+                if (Busy) { e.Cancel = true; status.Text = "Wait for completion or cancel the import before closing."; return; }
             };
             UpdateActions();
         }
@@ -120,33 +123,39 @@ namespace EasyEject {
         }
         protected override void OnHandleDestroyed(EventArgs e) { hotkey.Stop(); hotkey.WindowDestroyed(); discovery.Instances.Stop(); discovery.NotificationsAvailable = false; discovery.ConnectionChanged(); ExpireCompletions(); if (notification != IntPtr.Zero) { UnregisterDeviceNotification(notification); notification = IntPtr.Zero; } base.OnHandleDestroyed(e); }
         protected override void WndProc(ref Message m) {
-            if (m.Msg == 0x312 && hotkey.Matches(m.WParam, m.LParam, working || scanning || readOnly)) {
+            if (m.Msg == 0x312 && hotkey.Matches(m.WParam, m.LParam, Busy || scanning || readOnly)) {
                 IntPtr triggerId = m.WParam, triggerKeys = m.LParam;
-                BeginInvoke(new Action(async delegate { if (hotkey.Matches(triggerId, triggerKeys, working || scanning || readOnly)) await EjectCards(); })); m.Result = IntPtr.Zero; return;
+                BeginInvoke(new Action(async delegate { if (hotkey.Matches(triggerId, triggerKeys, Busy || scanning || readOnly)) await EjectCards(); })); m.Result = IntPtr.Zero; return;
             }
             if (m.Msg == 0x219 && (m.WParam.ToInt64() == 7 || m.WParam.ToInt64() == 0x8000 || m.WParam.ToInt64() == 0x8003 || m.WParam.ToInt64() == 0x8004)) {
                 discovery.ConnectionChanged(); eject.Enabled = false; import.Enabled = false; debounce.Stop(); debounce.Start();
                 ExpireNotifiedCompletions();
                 UpdateActions();
             }
-            if (m.Msg == 0x11 && working) { m.Result = IntPtr.Zero; return; }
+            if (m.Msg == 0x11 && Busy) { m.Result = IntPtr.Zero; return; }
             base.WndProc(ref m);
         }
         Volume Selected { get { return list.SelectedItems.Count == 0 ? null : list.SelectedItems[0].Tag as Volume; } }
         static string GroupLabel(StorageGroup group) { switch (group) { case StorageGroup.Camera: return "Camera cards (candidates)"; case StorageGroup.Emulator: return "Emulator cards (candidates)"; case StorageGroup.External: return "Other external volumes"; case StorageGroup.Internal: return "Internal storage"; case StorageGroup.Protected: return "Windows storage (protected)"; default: return "Unknown mapping"; } }
         void UpdateActions() {
-            var v = Selected; bool ready = v != null && inventory != null && !working && !scanning && inventory.Epoch == discovery.Epoch;
-            eject.Enabled = cleanEject.Enabled = false; import.Enabled = false; profile.Enabled = false; defaults.Enabled = !working; history.Enabled = !working && !scanning; refresh.Enabled = !working && !scanning;
+            var v = Selected; bool ready = v != null && inventory != null && !scanning && !concurrentStorage.Busy && inventory.Epoch == discovery.Epoch;
+            eject.Enabled = cleanEject.Enabled = false; import.Enabled = false; profile.Enabled = false; defaults.Enabled = !Busy; history.Enabled = !Busy && !scanning; refresh.Enabled = !Busy && !scanning;
+            refresh.Enabled = !scanning && !concurrentStorage.Busy && (!working || concurrentStorage.HasPrimary);
             resume.Enabled = false;
-            savedProfiles.Enabled = savedProfilesMenu.Enabled = !working && !scanning && !readOnly;
-            settings.Enabled = pending.Enabled = issue.Enabled = !working && !scanning;
+            savedProfiles.Enabled = savedProfilesMenu.Enabled = !Busy && !scanning && !readOnly;
+            settings.Enabled = pending.Enabled = issue.Enabled = !Busy && !scanning;
             pending.Enabled &= completions.Entries.Length > 0; issue.Enabled &= appIssue.HasIssue;
-            pendingMenu.Enabled = pending.Enabled; issueMenu.Enabled = issue.Enabled; settingsMenu.Enabled = settings.Enabled; debugMenu.Visible = appSettings.DebugEnabled; debugMenu.Enabled = !working && !scanning;
-            helpMenu.Enabled = aboutMenu.Enabled = !working && !scanning;
+            pendingMenu.Enabled = pending.Enabled; issueMenu.Enabled = issue.Enabled; settingsMenu.Enabled = settings.Enabled; debugMenu.Visible = appSettings.DebugEnabled; debugMenu.Enabled = !Busy && !scanning;
+            helpMenu.Enabled = aboutMenu.Enabled = !Busy && !scanning;
             UpdateTrayPresentation();
-            bulk.Enabled = !readOnly && !working && !scanning && inventory != null && inventory.Epoch == discovery.Epoch && inventory.Volumes.Any(x => x.IsCard);
+            bulk.Enabled = !readOnly && !Busy && !scanning && inventory != null && inventory.Epoch == discovery.Epoch && inventory.Volumes.Any(x => x.IsCard);
             bulkMenu.Enabled = bulk.Enabled;
             if (!ready) return;
+            if (working) {
+                eject.Enabled = cleanEject.Enabled = !readOnly && concurrentStorage.Unavailable(inventory, discovery.Epoch, v.Id) == null;
+                if (cleanEject.Enabled) try { MetadataCleanupPlan.Single(inventory, EjectService.Plan(inventory, v.Id), v.Id); } catch (SafetyException) { cleanEject.Enabled = false; }
+                return;
+            }
             try { EjectService.Plan(inventory, v.Id); eject.Enabled = true; } catch (SafetyException) {}
             if (eject.Enabled) try { MetadataCleanupPlan.Single(inventory, EjectService.Plan(inventory, v.Id), v.Id); cleanEject.Enabled = !readOnly; } catch (SafetyException) {}
             import.Enabled = !readOnly && inventory.Complete && v.Error == "" && !v.System && v.Disks.Count == 1 && v.Mounts.Any(x => x.Length >= 3 && x[1] == ':') && v.Classification != "Internal / fixed storage";
@@ -154,20 +163,20 @@ namespace EasyEject {
             resume.Enabled = import.Enabled && !readOnly;
         }
         async Task RefreshDevices() {
-            if (scanning || working) return; scanning = true; UpdateActions();
+            if (scanning || concurrentStorage.Busy || working && !concurrentStorage.HasPrimary) return; scanning = true; UpdateActions();
             try {
                 var next = await Task.Run(() => discovery.Scan()); PresentInventory(next); automatic.Observe(next);
                 completions.Reconcile(next, WindowsDiscovery.VolumeId); ExpireMissingCompletionDialog();
-                status.Text = next.Complete ? "Read-only inventory: " + next.Volumes.Count + " volumes on " + next.Disks.Count + " disks. Closing this window keeps the tray app running." : "Incomplete inventory; actions blocked. " + String.Join(" ", next.Errors);
-            } catch (Exception ex) { inventory = null; status.Text = ex.Message; }
+                if (!working) status.Text = next.Complete ? "Read-only inventory: " + next.Volumes.Count + " volumes on " + next.Disks.Count + " disks. Closing this window keeps the tray app running." : "Incomplete inventory; actions blocked. " + String.Join(" ", next.Errors);
+            } catch (Exception ex) { inventory = null; if (!working) status.Text = ex.Message; }
             finally { scanning = false; UpdateActions(); }
             await PumpAutomaticImports();
         }
         async Task PumpAutomaticImports() {
-            if (automaticPumping || readOnly || working || scanning || inventory == null || inventory.Epoch != discovery.Epoch) return;
+            if (automaticPumping || readOnly || Busy || scanning || inventory == null || inventory.Epoch != discovery.Epoch) return;
             automaticPumping = true;
             try {
-                while (!readOnly && !working && !scanning && inventory != null && inventory.Complete && inventory.Epoch == discovery.Epoch) {
+                while (!readOnly && !Busy && !scanning && inventory != null && inventory.Complete && inventory.Epoch == discovery.Epoch) {
                     ImportDefaults choices; SavedProfile[] entries;
                     try { choices = ImportDefaults.Load(); entries = Profiles.Catalog(); }
                     catch (Exception ex) {
@@ -177,7 +186,7 @@ namespace EasyEject {
                     if (entries.Any(e => !e.CanEdit && inventory.Volumes.Any(v => Profiles.FileName(v.Id) == e.FileName)) && automaticConfigIssueEpoch != inventory.Epoch) {
                         automaticConfigIssueEpoch = inventory.Epoch; ShowError(new SafetyException("A connected device's saved profile could not be read and was left intact. Review Saved profiles or set up the connected device again. No automatic import starts from that invalid record."));
                     }
-                    var request = automatic.Take(inventory, entries.Where(x => x.CanEdit).Select(x => x.Profile), choices, working || scanning);
+                    var request = automatic.Take(inventory, entries.Where(x => x.CanEdit).Select(x => x.Profile), choices, Busy || scanning);
                     if (request == null) break;
                     await RunAutomaticImport(request);
                     await RefreshDevices();
@@ -200,6 +209,7 @@ namespace EasyEject {
                 request.ValidateAdmission(inventory, guard.DestinationIdentity); guard.Validate();
                 completions.InvalidateSource(connection.Root); Log("Automatic connection import | " + ProfileName.Display(stored) + " | " + source + " -> " + destination);
                 engineStarted = true;
+                AttachStorageWork(activity, guard);
                 var result = await Task.Run(() => new VerifiedImporter(operations).Run(connection.Root, source, destination, stored.VolumeId, guard, cancellation.Token, ActivityReporter(activity), request.Options, ImportReporter(activity)));
                 await PresentImportResult(result, stored, connection.Volume, guard, connection.Root, destination, request.Options);
             } catch (OperationCanceledException) {
@@ -218,7 +228,7 @@ namespace EasyEject {
             cardCount = next.Disks.Where(d => next.Volumes.Any(v => v.IsCard && v.Disks.Contains(d.Number))).Select(d => d.TargetId == "" ? "disk:" + d.Number : d.TargetId).Distinct(StringComparer.OrdinalIgnoreCase).Count();
         }
         async Task EjectCards() {
-            if (working || scanning || readOnly) return;
+            if (Busy || scanning || readOnly) return;
             working = true; UpdateActions();
             try {
                 var state = await Task.Run(() => discovery.Scan()); var plan = BulkEjectPolicy.Plan(state);
@@ -241,14 +251,15 @@ namespace EasyEject {
         }
         internal void UpdateTrayStorageMenu() {
             foreach (var item in storageMenu.DropDownItems.Cast<ToolStripItem>().ToArray()) item.Dispose(); storageMenu.DropDownItems.Clear();
-            storageMenu.DropDownItems.AddRange(TrayStorageMenu.Build(inventory, discovery.Epoch, working || scanning, readOnly, appSettings.CleanupCardsEnabled, async (choice, clean) => {
-                if (working || scanning || readOnly) return;
+            storageMenu.DropDownItems.AddRange(TrayStorageMenu.Build(inventory, discovery.Epoch, concurrentStorage.Busy || scanning || working && !concurrentStorage.HasPrimary, readOnly, appSettings.CleanupCardsEnabled, async (choice, clean) => {
+                if (concurrentStorage.Busy || scanning || readOnly) return;
                 ShowDevices(); foreach (ListViewItem row in list.Items) row.Selected = ((Volume)row.Tag).Id == choice.VolumeId;
                 await Eject(clean, choice);
-            }));
+            }, working ? (Func<TrayStorageChoice, string>)(choice => concurrentStorage.Unavailable(inventory, discovery.Epoch, choice.VolumeId)) : null));
         }
         async Task Eject(bool forceClean = false, TrayStorageChoice selection = null) {
-            if (working || scanning || readOnly || selection == null && Selected == null) return;
+            if (concurrentStorage.Busy || scanning || readOnly || selection == null && Selected == null) return;
+            if (working) { await EjectAlongsideWork(forceClean, selection); return; }
             try {
                 working = true; UpdateActions();
                 var v = selection == null ? Selected : selection.Resolve(inventory, discovery.Epoch);
@@ -276,8 +287,49 @@ namespace EasyEject {
             finally { FinishOperation(); }
             await RefreshDevices();
         }
+        async Task EjectAlongsideWork(bool forceClean, TrayStorageChoice selection) {
+            ManualStorageSession session = null; ManualStorageDialog progress = null; CancellationTokenSource manualCancel = null; var counts = new CleanupCounts();
+            try {
+                var volume = selection == null ? Selected : selection.Resolve(inventory, discovery.Epoch); if (volume == null) return;
+                session = concurrentStorage.Begin(inventory, discovery.Epoch, volume.Id); UpdateActions();
+                var plan = session.Plan; bool clean = forceClean || volume.IsCard && appSettings.CleanupCardsEnabled;
+                var cleanup = clean ? MetadataCleanupPlan.Single(inventory, plan, volume.Id) : null;
+                string warning = !volume.IsCard && appSettings.WarnOtherEnabled ? "\n\nThis storage is not recognized as a camera or emulator card. Review every affected partition and other data." : "";
+                string review = "Another transfer continues on separate disks. Windows will remove this device and all affected storage:\n\n" + String.Join("\n", plan.Affected) + warning + (cleanup == null ? "" : "\n\n" + cleanup.Description) + "\n\nFinish other programs' transfers on this device first. Request safe removal?";
+                if (MessageBox.Show(this, review, "Safe eject of another device", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+                session.Confirm();
+                ExpireCompletionDisks(plan.Disks);
+                manualCancel = new CancellationTokenSource(); progress = new ManualStorageDialog(session.Display, manualCancel); progress.Show(this);
+                var result = await Task.Run(() => new ConcurrentEjectService(discovery, operations, validate => new WindowsEjectApi(validate), WindowsDiscovery.VolumeId).Execute(session, cleanup, manualCancel.Token, counts, progress.PostProgress));
+                string outcome = result.Message; if (!result.Success) outcome += RecordConcurrentIssue(result.Message);
+                progress.Complete(outcome); NotifyConcurrent(result.Success ? "Safe removal accepted" : "Device still connected", outcome, result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
+            } catch (OperationCanceledException) {
+                string outcome = "Manual storage action cancelled before its removal request. Other transfers keep their own cancellation state. " + counts.Message;
+                if (progress != null && !progress.IsDisposed) progress.Complete(outcome);
+                NotifyConcurrent("Manual storage action cancelled", outcome, ToolTipIcon.Info);
+            } catch (Exception ex) {
+                string outcome = "Manual storage action stopped. No automatic retry. " + ex.Message + "\n" + counts.Message; outcome += RecordConcurrentIssue(outcome);
+                if (progress != null && !progress.IsDisposed) progress.Complete(outcome);
+                NotifyConcurrent("Manual storage action needs attention", outcome, ToolTipIcon.Warning);
+            } finally {
+                if (manualCancel != null) manualCancel.Dispose();
+                if (session != null) concurrentStorage.Finish(session);
+                UpdateActions(); debounce.Start();
+            }
+        }
+        internal string RecordConcurrentIssue(string message) {
+            if (appIssue.NeedsAttention) message = "Another storage action: " + message.Substring(0, Math.Min(1800, message.Length)) + "\n\nEarlier issue: " + appIssue.Message.Substring(0, Math.Min(1800, appIssue.Message.Length));
+            appIssue.Record(message); if (working) preserveConcurrentIssue = true; string warning = "";
+            try { if (!readOnly) AppIssue.Save(appIssue); } catch (Exception ex) { warning = "\nThe issue could not be saved: " + ex.Message; }
+            if (!IsDisposed) UpdateTrayPresentation(); return warning;
+        }
+        void NotifyConcurrent(string title, string message, ToolTipIcon icon) {
+            if (!appSettings.NotificationsEnabled || IsDisposed) return;
+            try { tray.ShowBalloonTip(5000, title.Length > 63 ? title.Substring(0, 63) : title, message.Length > 255 ? message.Substring(0, 255) : message, icon); }
+            catch (Exception ex) { RecordConcurrentIssue("Manual storage notification unavailable: " + ex.Message); }
+        }
         async Task Import() {
-            var v = Selected; if (v == null || working || scanning || readOnly) return;
+            var v = Selected; if (v == null || Busy || scanning || readOnly) return;
             automatic.MarkManual(inventory, v);
             try {
                 var disk = inventory.Disks.Single(d => d.Number == v.Disks.Single());
@@ -301,6 +353,7 @@ namespace EasyEject {
                 completions.InvalidateSource(root); Log("User started import | " + source + " -> " + destination);
                 working = true; cancellation = new CancellationTokenSource(); cancel.Enabled = true; UpdateActions();
                 var activity = BeginActivity(TrayOperationKind.Import, ProfileName.Display(stored), "Preparing import");
+                AttachStorageWork(activity, guard);
                 var result = await Task.Run(() => new VerifiedImporter(operations).Run(root, source, destination, v.Id, guard, cancellation.Token, ActivityReporter(activity), options, ImportReporter(activity)));
                 await PresentImportResult(result, stored, v, guard, root, destination, options);
             } catch (OperationCanceledException) { status.Text = "Import cancelled. All originals and completed copies kept. No completion receipt was written."; FinishActivity(status.Text); Log(status.Text); Notify("Import cancelled", status.Text, ToolTipIcon.Info); if (ForegroundWindow) MessageBox.Show(this, status.Text, "Import cancelled"); }
@@ -309,7 +362,7 @@ namespace EasyEject {
             await RefreshDevices();
         }
         async Task ResumeImport() {
-            var volume = Selected; if (volume == null || working || scanning || readOnly) return;
+            var volume = Selected; if (volume == null || Busy || scanning || readOnly) return;
             try {
                 var disk = inventory.Disks.Single(x => x.Number == volume.Disks.Single()); long epoch = inventory.Epoch;
                 working = true; UpdateActions();
@@ -332,6 +385,7 @@ namespace EasyEject {
                 cancellation.Token.ThrowIfCancellationRequested();
                 guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, volume, disk, epoch));
                 completions.InvalidateSource(root); Log("User explicitly resumed verified import | " + reviewed.ImportId);
+                AttachStorageWork(activity, guard);
                 var result = await Task.Run(() => RemovalResumeEvidence.Resume(reviewed, intentPath, root, source, destination, sid, guard, operations, cancellation.Token, ActivityReporter(activity)));
                 await PresentImportResult(result, stored, volume, guard, root, destination, options);
             } catch (OperationCanceledException) {
@@ -342,6 +396,7 @@ namespace EasyEject {
             await RefreshDevices();
         }
         async Task PresentImportResult(ImportResult result, ImportProfile stored, Volume v, VolumeImportGuard guard, string root, string destination, MediaOptions options) {
+            await concurrentStorage.WaitForManual;
             BeginActivity(TrayOperationKind.Import, ProfileName.Display(stored), "Finishing import and saving history");
             string deviceName = String.IsNullOrWhiteSpace(stored.Name) ? v.Display : stored.Name;
             string removalMessage = result.Receipt != null && !String.IsNullOrEmpty(result.Receipt.ResumedUtc) ? RemovalResumeChoice.Summary(result) : OriginalRemovalChoice.Summary(result.RemovedOriginals) + " " + DeviceTrashChoice.Summary(result.RecoveredTrashFiles, result.ClearedTrashFiles, result.ClearedTrashRecords);
@@ -374,15 +429,15 @@ namespace EasyEject {
         static bool ConfigurationError(Exception ex) {
             return ex is SafetyException || ex is System.Runtime.Serialization.SerializationException || ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception;
         }
-        bool ForegroundWindow { get { return Visible && WindowState != FormWindowState.Minimized && (ContainsFocus || Form.ActiveForm == this); } }
+        bool ForegroundWindow { get { return !concurrentStorage.Busy && Visible && WindowState != FormWindowState.Minimized && (ContainsFocus || Form.ActiveForm == this); } }
         void ShowMessage(string message, string title, MessageBoxIcon icon) {
             bool previous = working; working = true; UpdateActions();
             try { MessageBox.Show(this, message, title, MessageBoxButtons.OK, icon); }
             finally { working = previous; UpdateActions(); }
         }
-        void FinishOperation() { FinishActivity(status.Text); working = false; cancel.Enabled = false; if (cancellation != null) { cancellation.Dispose(); cancellation = null; } UpdateActions(); debounce.Start(); }
+        void FinishOperation() { FinishActivity(status.Text); working = false; preserveConcurrentIssue = false; cancel.Enabled = false; if (cancellation != null) { cancellation.Dispose(); cancellation = null; } UpdateActions(); debounce.Start(); }
         void UpdateTrayPresentation() {
-            var view = TrayPresentation.Create(trayActivity, working, scanning, cardCount, appIssue.NeedsAttention);
+            var view = TrayPresentation.Create(trayActivity, Busy, scanning, cardCount, appIssue.NeedsAttention);
             tray.Text = view.Tooltip; tray.Icon = view.Busy ? view.Attention ? trayBusyIcons.Attention : trayBusyIcons.Busy : view.Attention ? SystemIcons.Warning : SystemIcons.Information;
             activityMenu.Text = view.Heading;
         }
@@ -390,8 +445,13 @@ namespace EasyEject {
             if (cancellation == null || trayActivity.Current == null) return;
             trayActivity.RequestStop(); cancellation.Cancel(); status.Text = "Stopping after the current check. Verified copies and remaining source data are kept."; UpdateTrayPresentation();
         }
-        TrayOperation BeginActivity(TrayOperationKind kind, string name, string phase) { var token = trayActivity.Begin(kind, name, phase); UpdateTrayPresentation(); return token; }
-        void FinishActivity(string outcome) { if (trayActivity.Current != null || trayActivity.AwaitingOutcome) { trayActivity.End(outcome); cancel.Enabled = false; } UpdateTrayPresentation(); }
+        TrayOperation BeginActivity(TrayOperationKind kind, string name, string phase) { concurrentStorage.ClearPrimary(); var token = trayActivity.Begin(kind, name, phase); storageOwner = token; UpdateTrayPresentation(); return token; }
+        void FinishActivity(string outcome) { concurrentStorage.ClearPrimary(); storageOwner = null; if (trayActivity.Current != null || trayActivity.AwaitingOutcome) { trayActivity.End(outcome); cancel.Enabled = false; } UpdateTrayPresentation(); }
+        internal void AttachStorageWork(TrayOperation token, IImportGuard guard) { if (token == null || !working || !Object.ReferenceEquals(token, trayActivity.Current)) return; concurrentStorage.Attach(token, guard); UpdateActions(); debounce.Start(); }
+        void QueueStorageWork(TrayOperation token, IImportGuard guard) {
+            if (IsDisposed || !IsHandleCreated) return;
+            try { BeginInvoke(new Action(() => { if (!IsDisposed) AttachStorageWork(token, guard); })); } catch (InvalidOperationException) {}
+        }
         internal void ApplyActivityProgress(TrayOperation token, string message, ImportWorkProgress measured = null) {
             if (IsDisposed || !trayActivity.Report(token, message, measured)) return;
             if (message != null) status.Text = message; UpdateTrayPresentation();
@@ -419,16 +479,16 @@ namespace EasyEject {
             catch (Exception ex) { status.Text += " Debug logging unavailable: " + ex.Message; }
         }
         void SaveIssue() { try { AppIssue.Save(appIssue); } catch (Exception ex) { status.Text += " Issue could not be saved: " + ex.Message; } }
-        void RecordIssue(string message) { trayActivity.End(message); cancel.Enabled = false; appIssue.Record(message); status.Text = message; SaveIssue(); Log("Needs attention | " + message); UpdateActions(); }
-        void ClearIssue() { if (!appIssue.HasIssue) return; appIssue.Clear(); SaveIssue(); UpdateActions(); }
+        void RecordIssue(string message) { concurrentStorage.ClearPrimary(); storageOwner = null; trayActivity.End(message); cancel.Enabled = false; appIssue.Record(message); status.Text = message; SaveIssue(); Log("Needs attention | " + message); UpdateActions(); }
+        void ClearIssue() { if (preserveConcurrentIssue || !appIssue.HasIssue) return; appIssue.Clear(); SaveIssue(); UpdateActions(); }
         void ViewIssue() {
-            if (working || !appIssue.HasIssue) return;
+            if (Busy || !appIssue.HasIssue) return;
             working = true; UpdateActions();
             try { using (var dialog = new IssueDialog(appIssue)) if (dialog.ShowDialog(this) == DialogResult.Yes) { appIssue.Dismiss(); SaveIssue(); status.Text = "Issue acknowledged. No operation was retried."; } }
             finally { FinishOperation(); }
         }
         void ViewDebugLog() {
-            if (working || scanning || !appSettings.DebugEnabled) return;
+            if (Busy || scanning || !appSettings.DebugEnabled) return;
             working = true; UpdateActions();
             try {
                 string root = Profiles.Root;
@@ -438,13 +498,13 @@ namespace EasyEject {
             finally { FinishOperation(); }
         }
         void ViewInformation(bool about) {
-            if (working || scanning) return;
+            if (Busy || scanning) return;
             working = true; UpdateActions();
             try { using (var dialog = new InformationDialog(about)) dialog.ShowDialog(this); }
             finally { FinishOperation(); }
         }
         void EditSettings() {
-            if (working || scanning) return;
+            if (Busy || scanning) return;
             working = true; UpdateActions();
             try {
                 var registration = readOnly ? null : new StartupRegistration(new WindowsStartupStore(), Application.ExecutablePath);
@@ -469,14 +529,14 @@ namespace EasyEject {
             finally { FinishOperation(); }
         }
         async Task ReviewCompletions() {
-            if (working || scanning) return;
+            if (Busy || scanning) return;
             string id = null; working = true; UpdateActions();
             try { using (var dialog = new PendingCompletionsDialog(completions.Entries)) if (dialog.ShowDialog(this) == DialogResult.OK) id = dialog.SelectedId; }
             finally { FinishOperation(); }
             if (id != null) await ReviewCompletion(id);
         }
         async Task ReviewCompletion(string id) {
-            if (working || scanning) return;
+            if (Busy || scanning) return;
             var entry = completions.Get(id); if (entry == null) { ShowError(new SafetyException("This import choice expired. Refresh and review the connected device.")); return; }
             working = true; UpdateActions(); ShowDevices();
             try {
@@ -534,7 +594,7 @@ namespace EasyEject {
             finally { activeCompletion = null; FinishOperation(); }
         }
         async Task ReviewHistory() {
-            if (working || scanning) return;
+            if (Busy || scanning) return;
             try {
                 working = true; UpdateActions();
                 var values = await Task.Run(() => ImportHistory.Load());
@@ -549,9 +609,11 @@ namespace EasyEject {
                 await Task.Run(() => {
                     using (SafePaths.LockDirectories(batch.DestinationRoot)) {
                         var guard = new WindowsDestinationGuard(discovery, batch.DestinationRoot, batch.Destination);
+                        QueueStorageWork(activity, guard);
                         ImportHistory.Verify(batch, batch.Destination, guard, operations, cancellation.Token, ActivityReporter(activity));
                     }
                 });
+                await concurrentStorage.WaitForManual;
                 status.Text = "Verified all " + batch.Originals.Count + " exact saved files. Originals unchanged.";
                 FinishActivity(status.Text);
                 MessageBox.Show(this, status.Text + "\n" + batch.Folder, "Saved batch verified", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -560,7 +622,7 @@ namespace EasyEject {
             finally { FinishOperation(); }
         }
         ManualQuickShareService SharingService {
-            get { if (manualSharing == null) manualSharing = new ManualQuickShareService(Profiles.Root, operations, new WindowsQuickShareProcess(), batch => new WindowsDestinationGuard(discovery, batch.DestinationRoot, batch.Destination)); return manualSharing; }
+            get { if (manualSharing == null) manualSharing = new ManualQuickShareService(Profiles.Root, operations, new WindowsQuickShareProcess(), batch => { var token = storageOwner; var guard = new WindowsDestinationGuard(discovery, batch.DestinationRoot, batch.Destination); QueueStorageWork(token, guard); return guard; }); return manualSharing; }
         }
         void StopSharingCancellation(CancellationTokenSource active) {
             if (active == null || !Object.ReferenceEquals(cancellation, active)) return;
@@ -581,6 +643,7 @@ namespace EasyEject {
                 var activity = BeginActivity(TrayOperationKind.Share, expected.DeviceName, "Checking saved originals");
                 status.Text = "Creating sharing copies from the exact verified saved originals…"; Log("User requested Quick Share | " + expected.DeviceName + " | " + request.Preset + " | " + request.Color);
                 var result = await Task.Run(() => SharingService.Run(request, active.Token, ActivityReporter(activity)));
+                await concurrentStorage.WaitForManual;
                 StopSharingCancellation(active);
                 string messageText = QuickSharePresentation.Success(request.Batch, request.Preset, result);
                 if (result.CleanupWarnings.Count != 0) RecordIssue(messageText); else { ClearIssue(); status.Text = messageText; Log(messageText); }
@@ -618,7 +681,7 @@ namespace EasyEject {
             }
         }
         void EditDefaults() {
-            if (working) return;
+            if (Busy) return;
             try {
                 working = true; UpdateActions();
                 using (var dialog = new ImportDefaultsDialog(ReadDefaults())) {
@@ -628,7 +691,7 @@ namespace EasyEject {
             finally { working = false; UpdateActions(); debounce.Start(); }
         }
         void EditSavedProfiles() {
-            if (working || scanning || readOnly) return;
+            if (Busy || scanning || readOnly) return;
             try {
                 working = true; UpdateActions();
                 using (var dialog = new SavedProfilesDialog(() => Profiles.Catalog(), ReadDefaults, delegate(SavedProfile expected, ImportProfile draft, bool chosen) {
@@ -647,7 +710,7 @@ namespace EasyEject {
             finally { working = false; UpdateActions(); debounce.Start(); }
         }
         async Task EditProfile() {
-            var volume = Selected; if (volume == null || working) return;
+            var volume = Selected; if (volume == null || Busy) return;
             try {
                 var disk = inventory.Disks.Single(d => d.Number == volume.Disks.Single()); long epoch = inventory.Epoch;
                 working = true; UpdateActions();

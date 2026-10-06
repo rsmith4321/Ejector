@@ -32,11 +32,12 @@ namespace EasyEject {
             result.Validate(); return result;
         }
     }
-    internal sealed class WindowsDestinationGuard : IImportGuard, IConnectionGuard {
+    internal sealed class WindowsDestinationGuard : IImportGuard, IConnectionGuard, IConcurrentStorageGuard {
         readonly IDiscovery discovery; readonly string root; readonly DestinationIdentity expected; readonly int[] disks;
         readonly Func<string, string> volumeId; readonly StorageConnectionProof connection;
         public int[] ProtectedDisks { get { return (int[])disks.Clone(); } }
         public bool Changed { get { return connection.Changed; } }
+        public bool AllowsUnrelatedOperations { get { return connection.Scoped && !connection.ProtectedConnectionChanged; } }
         internal WindowsDestinationGuard(IDiscovery discovery, string root, DestinationIdentity expected, Func<string, string> volumeId = null) {
             this.discovery = discovery; this.root = SafePaths.Normalize(root); this.expected = expected.Copy(); this.volumeId = volumeId ?? WindowsDiscovery.VolumeId;
             var state = discovery.Scan(); CheckIdentity(state);
