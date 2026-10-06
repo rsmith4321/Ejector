@@ -10,12 +10,13 @@ using System.Windows.Forms;
 
 namespace EasyEject {
     internal static class Program {
-        [STAThread] static void Main() {
+        [STAThread] static void Main(string[] args) {
+            bool startup; try { startup = StartupLaunch.Parse(args); } catch (Exception ex) { MessageBox.Show(ex.Message, "Easy Eject"); return; }
             bool created;
             using (var mutex = new Mutex(true, @"Local\EasyEject.Windows.Prototype", out created)) {
-                if (!created) { MessageBox.Show("Easy Eject is already running in this session."); return; }
+                if (!created) { if (!startup) MessageBox.Show("Easy Eject is already running in this session."); return; }
                 Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new DeviceWindow());
+                Application.Run(new DeviceWindow(false, startup));
             }
         }
     }
@@ -24,6 +25,7 @@ namespace EasyEject {
         readonly ImportCompletionRegistry completions = new ImportCompletionRegistry();
         readonly AutomaticImportScheduler automatic = new AutomaticImportScheduler();
         bool automaticPumping, createdBefore; long automaticConfigIssueEpoch = -1;
+        readonly StartupPresentation startupPresentation; bool monitoringStarted;
         AppSettings appSettings = new AppSettings(); AppIssue appIssue = new AppIssue(); ImportCompletionDialog activeCompletion;
         ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
@@ -37,8 +39,10 @@ namespace EasyEject {
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr RegisterDeviceNotification(IntPtr recipient, ref BroadcastInterface filter, uint flags);
         [DllImport("user32.dll")] static extern bool UnregisterDeviceNotification(IntPtr handle);
         public DeviceWindow() : this(false) {}
-        internal DeviceWindow(bool readOnly) {
+        internal DeviceWindow(bool readOnly) : this(readOnly, false) {}
+        internal DeviceWindow(bool readOnly, bool startInTray) {
             this.readOnly = readOnly;
+            startupPresentation = new StartupPresentation(startInTray);
             try { appSettings = AppSettings.Load(); appIssue = AppIssue.Load(); } catch (Exception ex) { appIssue.Record("Saved application state could not be read: " + ex.Message); }
             if (readOnly) appSettings = new AppSettings();
             Text = "Easy Eject · Windows prototype"; ClientSize = new Size(1000, 600); MinimumSize = new Size(800, 500); StartPosition = FormStartPosition.CenterScreen; AutoScaleMode = AutoScaleMode.Dpi;
@@ -84,12 +88,17 @@ namespace EasyEject {
             tray.BalloonTipClicked += delegate { Show(); WindowState = FormWindowState.Normal; Activate(); };
             menu.Opening += delegate { UpdateActions(); };
             debounce.Interval = 800; debounce.Tick += async delegate { debounce.Stop(); await RefreshDevices(); };
-            Shown += async delegate { await RefreshDevices(); };
+            Shown += delegate { StartMonitoring(); };
             FormClosing += delegate(object sender, FormClosingEventArgs e) {
                 if (!quit && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); return; }
                 if (working) { e.Cancel = true; status.Text = "Wait for completion or cancel the import before closing."; return; }
             };
             UpdateActions();
+        }
+        async void StartMonitoring() { if (monitoringStarted) return; monitoringStarted = true; await RefreshDevices(); }
+        protected override void SetVisibleCore(bool value) {
+            if (value && startupPresentation != null && !startupPresentation.AllowShow(() => { IntPtr handle = Handle; }, () => BeginInvoke(new Action(StartMonitoring)))) { base.SetVisibleCore(false); return; }
+            base.SetVisibleCore(value);
         }
         protected override void OnHandleCreated(EventArgs e) {
             base.OnHandleCreated(e);
@@ -379,13 +388,21 @@ namespace EasyEject {
         void EditSettings() {
             if (working || scanning) return;
             working = true; UpdateActions();
-            try { using (var dialog = new AppSettingsDialog(appSettings, hotkey.Status)) if (dialog.ShowDialog(this) == DialogResult.OK) {
+            try {
+                var registration = readOnly ? null : new StartupRegistration(new WindowsStartupStore(), Application.ExecutablePath);
+                var snapshot = registration == null ? null : registration.Inspect();
+                using (var dialog = new AppSettingsDialog(appSettings, hotkey.Status, snapshot, readOnly ? (Action)null : () => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:startupapps") { UseShellExecute = true }))) if (dialog.ShowDialog(this) == DialogResult.OK) {
                 if (AppSettings.NeedsCleanupConfirmation(appSettings, dialog.Value) && MessageBox.Show(this,
                     "Enable permanent macOS metadata cleanup before manual camera/emulator card ejection?\n\nOnly ._*, .DS_Store, .apdisk and empty __MACOSX folders are removed. Photos, recordings and device Trash are kept. Each eject confirmation lists the cleanup roots. Saving never starts cleanup.",
                     "Enable metadata cleanup", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
                 AppSettings.Save(dialog.Value); appSettings = dialog.Value;
                 bool registered = readOnly || !IsHandleCreated || hotkey.Configure(Handle, appSettings.ShortcutEnabled, appSettings.ShortcutKey);
-                status.Text = "Application settings saved. " + hotkey.Status; if (!registered) RecordIssue(hotkey.Status); Log(status.Text);
+                string loginStatus = "";
+                if (dialog.LoginChange.HasValue && registration != null) {
+                    try { loginStatus = registration.Apply(snapshot, dialog.LoginChange.Value).Message; }
+                    catch (Exception ex) { throw new SafetyException("Other application settings were saved, but login registration needs review. " + ex.Message); }
+                }
+                status.Text = "Application settings saved. " + hotkey.Status + (loginStatus == "" ? "" : "\n" + loginStatus); if (!registered) RecordIssue(hotkey.Status); Log(status.Text);
             } }
             catch (Exception ex) { ShowError(ex); }
             finally { FinishOperation(); }

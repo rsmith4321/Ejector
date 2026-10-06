@@ -53,10 +53,19 @@ namespace EasyEject {
     internal sealed class AppSettingsDialog : Form {
         internal readonly CheckBox Notifications = new CheckBox(), Debug = new CheckBox(), Shortcut = new CheckBox(), Cleanup = new CheckBox(), WarnOther = new CheckBox();
         internal readonly ComboBox ShortcutLetter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 80 };
+        internal readonly CheckBox Login = new CheckBox(); internal readonly Button UseThisCopy = new Button();
+        internal readonly Label LoginStatus = new Label(); readonly StartupSnapshot startup; bool retarget;
+        internal bool? LoginChange { get { if (startup == null || !startup.Available || startup.Conflict) return null; if (retarget && Login.Checked) return true; return Login.Checked == startup.Owned ? (bool?)null : Login.Checked; } }
         internal AppSettings Value { get { return new AppSettings { ShowNotifications = Notifications.Checked, DebugLogging = Debug.Checked, EnableShortcut = Shortcut.Checked, ShortcutLetter = ShortcutLetter.SelectedItem as string, CleanCardsOnEject = Cleanup.Checked, WarnOtherStorage = WarnOther.Checked }; } }
-        internal AppSettingsDialog(AppSettings settings, string shortcutStatus = null) {
+        internal AppSettingsDialog(AppSettings settings, string shortcutStatus = null, StartupSnapshot startup = null, Action reviewStartup = null) {
+            this.startup = startup;
             Text = "Easy Eject settings"; Font = new Font("Segoe UI", 10); Size = new Size(650, 400); MinimumSize = new Size(600, 360); AutoScaleMode = AutoScaleMode.Dpi; StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
             var body = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(24) };
+            Login.Text = "Launch at login (register for this Windows user)"; Login.AutoSize = true; Login.Checked = startup != null && startup.Owned; Login.Enabled = startup != null && startup.Available && !startup.Conflict; Login.Margin = new Padding(0, 4, 0, 10); body.Controls.Add(Login);
+            LoginStatus.AutoSize = true; LoginStatus.MaximumSize = new Size(520, 0); LoginStatus.Text = startup == null ? "Login registration is not checked in this read-only/test window." : startup.Message; LoginStatus.Margin = new Padding(0, 0, 0, 10); body.Controls.Add(LoginStatus);
+            var loginActions = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 16) };
+            var review = new Button { Text = "Windows Startup apps…", AutoSize = true, Enabled = reviewStartup != null }; review.Click += delegate { try { if (reviewStartup != null) reviewStartup(); } catch (Exception ex) { LoginStatus.Text = "Windows Startup apps could not be opened. " + ex.Message; } }; loginActions.Controls.Add(review);
+            UseThisCopy.Text = "Use this copy at login"; UseThisCopy.AutoSize = true; UseThisCopy.Visible = startup != null && startup.Owned && !startup.Here; UseThisCopy.Click += delegate { RetargetLogin(); }; loginActions.Controls.Add(UseThisCopy); body.Controls.Add(loginActions);
             Notifications.Text = "Show operation notifications"; Notifications.Checked = settings.NotificationsEnabled;
             Debug.Text = "Enable debug logging"; Debug.Checked = settings.DebugEnabled;
             Shortcut.Text = "Enable global card-removal shortcut"; Shortcut.Checked = settings.ShortcutEnabled;
@@ -68,13 +77,14 @@ namespace EasyEject {
             ShortcutLetter.Items.AddRange(GlobalHotkey.Letters); ShortcutLetter.SelectedItem = settings.ShortcutKey; ShortcutLetter.Enabled = Shortcut.Checked;
             Shortcut.CheckedChanged += delegate { ShortcutLetter.Enabled = Shortcut.Checked; }; shortcutRow.Controls.Add(ShortcutLetter); body.Controls.Add(shortcutRow);
             if (shortcutStatus != null) body.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(500, 0), Text = shortcutStatus, Margin = new Padding(0, 8, 0, 8) });
-            var info = new Label { AutoSize = true, MaximumSize = new Size(540, 0), Text = "The shortcut opens the same confirmation as Eject cards. It stays off until enabled. A shortcut already used by another app is reported unavailable; no other key is registered.\n\nWindows notification and quiet-hour settings may hide alerts; completed imports remain available in the app. Debug logs can contain device names and file paths. They stay in local app-data and are never sent automatically." }; body.Controls.Add(info);
-            body.SizeChanged += delegate { info.MaximumSize = new Size(Math.Max(250, body.ClientSize.Width - 60), 0); };
+            var info = new Label { AutoSize = true, MaximumSize = new Size(540, 0), Text = "Login launches Easy Eject in the tray, without opening its device window. It does not enable automatic import: that remains a separate profile/default choice. An enabled import may run when the app launches. Saving login registration starts no app or import. If you move this copy, explicitly update its registration.\n\nThe shortcut opens the same confirmation as Eject cards. It stays off until enabled. A shortcut already used by another app is reported unavailable; no other key is registered.\n\nWindows notification and quiet-hour settings may hide alerts; completed imports remain available in the app. Debug logs can contain device names and file paths. They stay in local app-data and are never sent automatically." }; body.Controls.Add(info);
+            body.SizeChanged += delegate { info.MaximumSize = LoginStatus.MaximumSize = new Size(Math.Max(250, body.ClientSize.Width - 60), 0); };
             var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(16), FlowDirection = FlowDirection.RightToLeft };
             var save = new Button { Text = "Save settings", AutoSize = true, MinimumSize = new Size(130, 36), DialogResult = DialogResult.OK };
             var cancel = new Button { Text = "Cancel", AutoSize = true, MinimumSize = new Size(100, 36), DialogResult = DialogResult.Cancel }; footer.Controls.Add(save); footer.Controls.Add(cancel);
             Controls.Add(body); Controls.Add(footer); AcceptButton = save; CancelButton = cancel;
         }
+        internal void RetargetLogin() { if (startup == null || !startup.Owned || startup.Here) return; retarget = true; Login.Checked = true; LoginStatus.Text = "Save settings to register this copy. The other copy's registration is replaced only after a fresh status check."; }
     }
     internal sealed class IssueDialog : Form {
         internal IssueDialog(AppIssue issue) {

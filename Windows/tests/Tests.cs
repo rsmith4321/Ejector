@@ -116,6 +116,11 @@ namespace EasyEject {
                     using (var dialog = new ImportCompletionDialog(Completion(state, fixture, false), true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "completion-no-media.png")); }
                     using (var dialog = new PendingCompletionsDialog(new[] { completion })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "completed-imports.png")); }
                     using (var dialog = new AppSettingsDialog(new AppSettings(), "Global eject shortcut is off.")) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "app-settings.png")); dialog.Shortcut.Checked = true; dialog.ShortcutLetter.SelectedItem = "R"; Render(dialog, Path.Combine(output, "app-settings-shortcut.png")); }
+                    var startupCommand = StartupRegistration.Command(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EasyEject.Windows.exe"));
+                    using (var dialog = new AppSettingsDialog(new AppSettings(), "Shortcut off", new StartupSnapshot(StartupValue.Missing(), startupCommand), () => {})) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "startup-off.png")); RenderAtBottom(dialog, Path.Combine(output, "startup-off-bottom.png")); }
+                    using (var dialog = new AppSettingsDialog(new AppSettings(), "Shortcut off", new StartupSnapshot(new StartupValue(true, Microsoft.Win32.RegistryValueKind.String, startupCommand), startupCommand), () => {})) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "startup-registered.png")); }
+                    using (var dialog = new AppSettingsDialog(new AppSettings(), "Shortcut off", new StartupSnapshot(new StartupValue(true, Microsoft.Win32.RegistryValueKind.String, StartupRegistration.Command(@"D:\Old copy\EasyEject.Windows.exe")), startupCommand), () => {})) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "startup-relocated.png")); }
+                    using (var dialog = new AppSettingsDialog(new AppSettings(), "Shortcut off", new StartupSnapshot(new StartupValue(true, Microsoft.Win32.RegistryValueKind.String, "Unrecognized fixture command"), startupCommand), () => {})) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "startup-conflict.png")); }
                     var issue = new AppIssue(); issue.Record("Fixture open-file veto. Finish transfers and close programs using the device, then review a fresh safe-removal choice.");
                     using (var dialog = new IssueDialog(issue)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "issue.png")); }
                 }
@@ -141,6 +146,13 @@ namespace EasyEject {
                     Console.WriteLine("PASS hidden device window initializes, disk and per-instance notifications register, read-only inventory maps " + state.Volumes.Count + " volumes, system eject is blocked, and no global key is registered.");
                     return 0;
                 }
+            }
+            if (args.Length == 1 && args[0] == "--startup-inspect") {
+                var store = new WindowsStartupStore(); var before = store.Read();
+                string executable = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EasyEject.Windows.exe");
+                var status = new StartupRegistration(store, executable).Inspect();
+                Check(status.Available && store.Read().Same(before), "Read-only startup inspection failed or observed a concurrent change");
+                Console.WriteLine("PASS read-only per-user login entry inspected; " + (status.Conflict ? "unrecognized entry retained" : status.Owned ? "existing registration retained" : "no registration exists") + ". No startup value was written."); return 0;
             }
             if (args.Length == 1 && args[0] == "--inventory") {
                 var inventory = new WindowsDiscovery().Scan(); // Read-only mode: no notification window, hence no actions permitted.
@@ -628,6 +640,7 @@ namespace EasyEject {
             RemovalResumeActionTests();
             SavedProfileTests();
             AutomaticImportTests();
+            StartupTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {
