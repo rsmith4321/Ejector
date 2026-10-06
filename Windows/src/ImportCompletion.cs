@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace EasyEject {
     // Process-only authority, captured before copying. Never serialized or restored from history.
     internal sealed class ImportCompletionOrigin {
         internal readonly string VolumeId, SourceRoot, VolumeFingerprint, DiskFingerprint, BlockedReason;
         internal readonly long Epoch;
+        internal readonly bool SourceIsCard;
         readonly EjectPlan plan;
         internal EjectPlan Plan { get { return CopyPlan(plan); } }
         internal ImportCompletionOrigin(Inventory state, string volumeId, string sourceRoot) {
@@ -17,7 +19,7 @@ namespace EasyEject {
             if (disk == null || disk.Error != "" || disk.InstanceId == "") throw new SafetyException("Import source physical identity is unavailable.");
             SourceRoot = SafePaths.Normalize(sourceRoot);
             if (!volume.Mounts.Any(x => SafePaths.Normalize(x).Equals(SourceRoot, StringComparison.OrdinalIgnoreCase))) throw new SafetyException("Completion source is not the selected volume root.");
-            Epoch = state.Epoch; VolumeId = volumeId; VolumeFingerprint = volume.Fingerprint; DiskFingerprint = disk.Fingerprint;
+            Epoch = state.Epoch; SourceIsCard = volume.IsCard; VolumeId = volumeId; VolumeFingerprint = volume.Fingerprint; DiskFingerprint = disk.Fingerprint;
             try { plan = CopyPlan(EjectService.Plan(state, volumeId)); BlockedReason = ""; }
             catch (SafetyException ex) { BlockedReason = ex.Message; }
         }
@@ -62,9 +64,12 @@ namespace EasyEject {
             this.registry = registry; this.discovery = discovery; this.api = api; this.operations = operations; this.resolveVolume = resolveVolume;
         }
         internal EjectResult Execute(string id) {
+            return Execute(id, state => {});
+        }
+        internal EjectResult Execute(string id, Action<Inventory> beforeRequest, CancellationToken cancellation = default(CancellationToken)) {
             var entry = registry.Get(id);
             if (entry == null || entry.Origin.Plan == null) throw new SafetyException("No current import eject choice exists. Review the connected device.");
-            return new EjectService(discovery, api, operations).Execute(entry.Origin.Plan, state => registry.Consume(id, state, resolveVolume(entry.Origin.SourceRoot), entry.Origin.SourceRoot));
+            return new EjectService(discovery, api, operations).Execute(entry.Origin.Plan, state => { registry.Consume(id, state, resolveVolume(entry.Origin.SourceRoot), entry.Origin.SourceRoot); beforeRequest(state); }, cancellation);
         }
     }
     internal static class CompletionFolder {

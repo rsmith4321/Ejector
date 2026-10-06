@@ -8,7 +8,7 @@ namespace EasyEject {
         internal readonly Button Keep = new Button(), Eject = new Button(), OpenFolder = new Button();
         internal readonly Label Explanation = new Label();
         bool expired;
-        internal ImportCompletionDialog(ImportCompletion entry, bool canEject) {
+        internal ImportCompletionDialog(ImportCompletion entry, bool canEject, string cleanupText = "") {
             Text = entry.HasMedia ? "Import complete. Eject now?" : "No matching media. Eject now?";
             Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi; Size = new Size(740, 500); MinimumSize = new Size(680, 440); StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
             var body = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(24) };
@@ -18,10 +18,11 @@ namespace EasyEject {
                 + (entry.HasMedia ? "" : "\n\nPhotos, skipped previews or other files may still be on the device.")
                 + "\n\nChoose Keep Connected for Lightroom or other transfers. Eject Now requests Windows safe removal of this device and all affected partitions/storage sources."
                 + (plan == null ? "\n\n" + entry.Origin.BlockedReason : "\n\nAffected storage:\n" + String.Join("\n", plan.Affected))
+                + (cleanupText == "" ? "" : "\n\n" + cleanupText)
                 + "\n\nSaved folder:\n" + entry.Folder;
             body.Controls.Add(Explanation); body.SizeChanged += delegate { Explanation.MaximumSize = new Size(Math.Max(250, body.ClientSize.Width - 60), 0); };
             Keep.Text = "Keep Connected"; Keep.DialogResult = DialogResult.Cancel;
-            Eject.Text = plan != null && plan.Affected.Length > 1 ? "Eject Device" : "Eject Now"; Eject.DialogResult = DialogResult.Yes; Eject.Enabled = canEject;
+            Eject.Text = cleanupText == "" ? plan != null && plan.Affected.Length > 1 ? "Eject Device" : "Eject Now" : "Clean && Eject"; Eject.DialogResult = DialogResult.Yes; Eject.Enabled = canEject;
             OpenFolder.Text = "Open Import Folder"; OpenFolder.DialogResult = DialogResult.Ignore;
             var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(16), FlowDirection = FlowDirection.RightToLeft };
             foreach (var button in new[] { Keep, Eject, OpenFolder }) { button.AutoSize = true; button.MinimumSize = new Size(150, 36); footer.Controls.Add(button); }
@@ -50,16 +51,18 @@ namespace EasyEject {
         }
     }
     internal sealed class AppSettingsDialog : Form {
-        internal readonly CheckBox Notifications = new CheckBox(), Debug = new CheckBox(), Shortcut = new CheckBox();
+        internal readonly CheckBox Notifications = new CheckBox(), Debug = new CheckBox(), Shortcut = new CheckBox(), Cleanup = new CheckBox(), WarnOther = new CheckBox();
         internal readonly ComboBox ShortcutLetter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 80 };
-        internal AppSettings Value { get { return new AppSettings { ShowNotifications = Notifications.Checked, DebugLogging = Debug.Checked, EnableShortcut = Shortcut.Checked, ShortcutLetter = ShortcutLetter.SelectedItem as string }; } }
+        internal AppSettings Value { get { return new AppSettings { ShowNotifications = Notifications.Checked, DebugLogging = Debug.Checked, EnableShortcut = Shortcut.Checked, ShortcutLetter = ShortcutLetter.SelectedItem as string, CleanCardsOnEject = Cleanup.Checked, WarnOtherStorage = WarnOther.Checked }; } }
         internal AppSettingsDialog(AppSettings settings, string shortcutStatus = null) {
             Text = "Easy Eject settings"; Font = new Font("Segoe UI", 10); Size = new Size(650, 400); MinimumSize = new Size(600, 360); AutoScaleMode = AutoScaleMode.Dpi; StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
             var body = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(24) };
             Notifications.Text = "Show operation notifications"; Notifications.Checked = settings.NotificationsEnabled;
             Debug.Text = "Enable debug logging"; Debug.Checked = settings.DebugEnabled;
             Shortcut.Text = "Enable global card-removal shortcut"; Shortcut.Checked = settings.ShortcutEnabled;
-            foreach (var box in new[] { Notifications, Debug, Shortcut }) { box.AutoSize = true; box.Margin = new Padding(0, 4, 0, 14); body.Controls.Add(box); }
+            Cleanup.Text = "Clean macOS metadata from cards before ejecting"; Cleanup.Checked = settings.CleanupCardsEnabled;
+            WarnOther.Text = "Warn when ejecting other external storage"; WarnOther.Checked = settings.WarnOtherEnabled;
+            foreach (var box in new[] { Notifications, Cleanup, WarnOther, Debug, Shortcut }) { box.AutoSize = true; box.Margin = new Padding(0, 4, 0, 14); body.Controls.Add(box); }
             var shortcutRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
             shortcutRow.Controls.Add(new Label { Text = "Ctrl + Alt + Shift +", AutoSize = true, Padding = new Padding(0, 4, 0, 0) });
             ShortcutLetter.Items.AddRange(GlobalHotkey.Letters); ShortcutLetter.SelectedItem = settings.ShortcutKey; ShortcutLetter.Enabled = Shortcut.Checked;

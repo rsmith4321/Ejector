@@ -104,7 +104,7 @@ namespace EasyEject {
             });
             Test("bulk waits through transient notification inventory before verifying disappearance", delegate {
                 var d = new CardDiscovery(); var api = new CardApi { OnRequest = id => { if (id == "usb-b") d.Remove(id); return new EjectResult { Success = true }; } };
-                d.BeforeScan = number => { if (number == 3) d.State.Complete = false; if (number == 4) { d.State.Complete = true; d.Remove("usb-a"); } };
+                d.BeforeScan = number => { if (number == 4) d.State.Complete = false; if (number == 5) { d.State.Complete = true; d.Remove("usb-a"); } };
                 var result = ExecuteCards(d, BulkEjectPolicy.Plan(d.State), api, new Operations()); Check(result.Success && result.Confirmed == 2 && api.Calls.Count == 2, "Transient callback scan prevented verified sequence");
             });
             Test("bulk stops on identical reconnect of a later card", delegate {

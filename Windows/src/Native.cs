@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using Microsoft.Win32.SafeHandles;
 
 namespace EasyEject {
@@ -77,15 +78,15 @@ namespace EasyEject {
                 if (!SetFileInformationByHandle(handle, 3, data, (uint)size)) throw Error("Cannot publish verified copy without overwriting");
             } finally { Marshal.FreeHGlobal(data); }
         }
-        internal static void DeleteOnClose(SafeFileHandle handle) {
+        internal static void DeleteOnClose(SafeFileHandle handle, string operation = "Cannot clean up this operation's private partial file") {
             IntPtr data = Marshal.AllocHGlobal(1);
-            try { Marshal.WriteByte(data, 1); if (!SetFileInformationByHandle(handle, 4, data, 1)) throw Error("Cannot clean up this operation's private partial file"); }
+            try { Marshal.WriteByte(data, 1); if (!SetFileInformationByHandle(handle, 4, data, 1)) throw Error(operation); }
             finally { Marshal.FreeHGlobal(data); }
         }
     }
     public sealed class WindowsEjectApi : IEjectApi {
         readonly Action validate;
-        public WindowsEjectApi(IDiscovery discovery, long epoch) : this(delegate { if (discovery.Epoch != epoch) throw new SafetyException("Connection changed before the Windows removal request. Nothing was ejected."); }) {}
+        public WindowsEjectApi(IDiscovery discovery, long epoch, CancellationToken cancellation = default(CancellationToken)) : this(delegate { cancellation.ThrowIfCancellationRequested(); if (discovery.Epoch != epoch) throw new SafetyException("Connection changed before the Windows removal request. Nothing was ejected."); }) {}
         internal WindowsEjectApi(Action validate) { this.validate = validate; }
         public EjectResult Request(uint devInst, string instanceId) {
             uint located;

@@ -35,7 +35,8 @@ namespace EasyEject {
     public interface IDiscovery { Inventory Scan(); long Epoch { get; } }
     public sealed class EjectResult {
         public bool Success; public uint Code; public int Veto; public string Name = "";
-        public string Message { get { return Success ? "Windows accepted safe removal. The device may now be unplugged." : "Windows refused removal (CONFIGRET 0x" + Code.ToString("X") + ", veto " + ((VetoReason)Veto) + "). " + Name + " Finish transfers and close programs using this device, then refresh and try again."; } }
+        internal string CleanupMessage = "";
+        public string Message { get { return (Success ? "Windows accepted safe removal. The device may now be unplugged." : "Windows refused removal (CONFIGRET 0x" + Code.ToString("X") + ", veto " + ((VetoReason)Veto) + "). " + Name + " Finish transfers and close programs using this device, then refresh and try again.") + (CleanupMessage == "" ? "" : "\r\n" + CleanupMessage); } }
     }
     public enum VetoReason { Unknown, LegacyDevice, PendingClose, WindowsApp, WindowsService, OutstandingOpen, Device, Driver, IllegalRequest, InsufficientPower, NonDisableable, LegacyDriver, InsufficientRights }
     public interface IEjectApi { EjectResult Request(uint devInst, string instanceId); }
@@ -72,14 +73,20 @@ namespace EasyEject {
         public EjectResult Execute(EjectPlan plan) {
             return Execute(plan, state => {});
         }
-        internal EjectResult Execute(EjectPlan plan, Action<Inventory> beforeRequest) {
+        internal EjectResult Execute(EjectPlan plan, Action<Inventory> beforeRequest, CancellationToken cancellation = default(CancellationToken)) {
+            cancellation.ThrowIfCancellationRequested();
             using (operations.Reserve(plan.Disks)) {
                 var current = discovery.Scan();
-                if (!current.Complete || current.Epoch != plan.Epoch || discovery.Epoch != plan.Epoch || current.GroupFingerprint(plan.TargetId) != plan.Fingerprint)
-                    throw new SafetyException("The device connection or volumes changed. Refresh and review a new eject confirmation.");
+                Validate(discovery, current, plan);
                 beforeRequest(current);
+                Validate(discovery, discovery.Scan(), plan);
+                cancellation.ThrowIfCancellationRequested();
                 return api.Request(plan.TargetDevInst, plan.TargetId);
             }
+        }
+        internal static void Validate(IDiscovery discovery, Inventory current, EjectPlan plan) {
+            if (!current.Complete || current.Epoch != plan.Epoch || discovery.Epoch != plan.Epoch || current.GroupFingerprint(plan.TargetId) != plan.Fingerprint)
+                throw new SafetyException("The device connection or volumes changed. Refresh and review a new eject confirmation.");
         }
     }
     public static class Classifier {

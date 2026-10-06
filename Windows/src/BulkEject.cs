@@ -52,14 +52,14 @@ namespace EasyEject {
         }
     }
     internal sealed class BulkEjectResult {
-        internal int Requested, Confirmed; internal bool Success; internal string Detail = "";
+        internal int Requested, Confirmed; internal bool Success; internal string Detail = "", CleanupMessage = "";
         internal readonly List<string> SafeDevices = new List<string>();
         internal string Summary { get { return (Success ? "Finished. " : "Stopped; remaining devices were not reported safe. ") + Confirmed + " of " + Requested + " confirmed devices safely removed."; } }
         internal string Message { get {
             if (Requested == 0 && Success) return "No camera or emulator cards are connected.";
             string text = Summary;
             if (SafeDevices.Count > 0) text += "\r\n\r\nSafe to unplug:\r\n" + String.Join("\r\n", SafeDevices);
-            return text + "\r\n\r\n" + (Success ? "All confirmed card volumes are absent." : "Reason: " + Detail);
+            return text + "\r\n\r\n" + (Success ? "All confirmed card volumes are absent." : "Reason: " + Detail) + (CleanupMessage == "" ? "" : "\r\n\r\n" + CleanupMessage);
         } }
     }
     internal sealed class BulkEjectService {
@@ -75,17 +75,25 @@ namespace EasyEject {
                 throw new SafetyException("A confirmed device disconnected, restarted or lost connection tracking. Review remaining cards before another request.");
         }
         internal BulkEjectResult Execute(BulkEjectPlan plan) {
+            return Execute(plan, state => {}, (target, validate) => {});
+        }
+        internal BulkEjectResult Execute(BulkEjectPlan plan, Action<Inventory> prepare, Action<BulkTarget, Func<Inventory>> beforeRequest, CancellationToken cancellation = default(CancellationToken)) {
             var result = new BulkEjectResult { Requested = plan.Targets.Length };
             try {
+                cancellation.ThrowIfCancellationRequested();
                 using (operations.Reserve(plan.Targets.SelectMany(t => t.Disks))) {
                     var initial = discovery.Scan();
                     if (initial.Epoch != plan.Epoch || discovery.Epoch != plan.Epoch) throw new SafetyException("Connections changed after confirmation. Refresh and review the cards.");
                     BulkEjectPolicy.Validate(initial, plan.Targets); ValidateConnections(plan.Targets);
+                    prepare(initial);
                     for (int index = 0; index < plan.Targets.Length; index++) {
                         var remaining = plan.Targets.Skip(index).ToArray(); var current = discovery.Scan();
                         BulkEjectPolicy.Validate(current, remaining); ValidateConnections(remaining);
                         var target = plan.Targets[index];
-                        var accepted = api(() => ValidateConnections(remaining)).Request(target.Node, target.Id);
+                        cancellation.ThrowIfCancellationRequested();
+                        beforeRequest(target, () => { var fresh = discovery.Scan(); BulkEjectPolicy.Validate(fresh, remaining); ValidateConnections(remaining); return fresh; });
+                        BulkEjectPolicy.Validate(discovery.Scan(), remaining); ValidateConnections(remaining);
+                        var accepted = api(() => { cancellation.ThrowIfCancellationRequested(); ValidateConnections(remaining); }).Request(target.Node, target.Id);
                         if (!accepted.Success) throw new SafetyException(accepted.Message);
                         bool absent = false;
                         for (int attempt = 0; attempt < checks; attempt++) {

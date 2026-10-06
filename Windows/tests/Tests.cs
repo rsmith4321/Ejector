@@ -93,13 +93,16 @@ namespace EasyEject {
                 using (var fixture = new Fixture()) {
                     var completion = Completion(state, fixture, true);
                     using (var dialog = new ImportCompletionDialog(completion, true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "completion.png")); dialog.ExpireEject(); Render(dialog, Path.Combine(output, "completion-expired.png")); }
+                    using (var dialog = new ImportCompletionDialog(completion, true, "Permanently remove macOS metadata from E:\\ before safe removal. Photos, recordings and device Trash are kept. Cleanup failure stops ejection.")) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "completion-cleanup.png")); }
                     using (var dialog = new ImportCompletionDialog(Completion(state, fixture, false), true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "completion-no-media.png")); }
                     using (var dialog = new PendingCompletionsDialog(new[] { completion })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "completed-imports.png")); }
                     using (var dialog = new AppSettingsDialog(new AppSettings(), "Global eject shortcut is off.")) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "app-settings.png")); dialog.Shortcut.Checked = true; dialog.ShortcutLetter.SelectedItem = "R"; Render(dialog, Path.Combine(output, "app-settings-shortcut.png")); }
                     var issue = new AppIssue(); issue.Record("Fixture open-file veto. Finish transfers and close programs using the device, then review a fresh safe-removal choice.");
                     using (var dialog = new IssueDialog(issue)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "issue.png")); }
                 }
-                using (var dialog = new BulkEjectDialog(BulkEjectPolicy.Plan(CardState()))) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "bulk-eject.png")); }
+                var cleanupState = CardState(); var cleanupBulk = BulkEjectPolicy.Plan(cleanupState);
+                using (var dialog = new BulkEjectDialog(cleanupBulk)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "bulk-eject.png")); }
+                using (var dialog = new BulkEjectDialog(cleanupBulk, String.Join("\r\n\r\n", cleanupBulk.Targets.Select(t => MetadataCleanupPlan.Bulk(cleanupState, t).Description)))) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "bulk-cleanup.png")); }
                 var bulkResult = new BulkEjectResult { Requested = 2, Confirmed = 1, Detail = "Fixture open-file veto. Close the editor before reviewing the remaining card." }; bulkResult.SafeDevices.Add(@"Fixture camera [E:\]");
                 using (var dialog = new BulkEjectResultDialog(bulkResult)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "bulk-partial-result.png")); }
                 using (var window = new DeviceWindow(true)) { window.Size = window.MinimumSize; window.PresentInventory(CardState()); Render(window, Path.Combine(output, "device-window.png")); }
@@ -597,6 +600,7 @@ namespace EasyEject {
                 var issue = new AppIssue(); issue.Record("Failure still needs attention"); Throws<SafetyException>(() => AppIssue.Save(issue, root)); Check(issue.NeedsAttention && Directory.GetFileSystemEntries(target).Length == 0, "Rejected storage concealed issue or wrote through a link");
             } });
             BulkTests();
+            CleanupTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {
