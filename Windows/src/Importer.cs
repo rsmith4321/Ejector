@@ -9,12 +9,16 @@ using System.Threading;
 
 namespace EasyEject {
     public interface IImportGuard { int[] ProtectedDisks { get; } void Validate(); }
-    public sealed class VolumeImportGuard : IImportGuard, IConnectionGuard {
+    internal interface IImportDeviceEvidence { DestinationIdentity SourceDevice { get; } DestinationIdentity DestinationDevice { get; } }
+    public sealed class VolumeImportGuard : IImportGuard, IConnectionGuard, IImportDeviceEvidence {
         readonly IDiscovery discovery; readonly string sourceId, destinationId, fingerprint; readonly long epoch;
         readonly string source, destination; readonly int[] disks;
         readonly DestinationIdentity destinationIdentity;
+        readonly DestinationIdentity sourceIdentity;
         internal readonly ImportCompletionOrigin CompletionOrigin;
         public DestinationIdentity DestinationIdentity { get { return destinationIdentity.Copy(); } }
+        DestinationIdentity IImportDeviceEvidence.SourceDevice { get { return sourceIdentity.Copy(); } }
+        DestinationIdentity IImportDeviceEvidence.DestinationDevice { get { return destinationIdentity.Copy(); } }
         public int[] ProtectedDisks { get { return disks; } }
         public bool Changed { get { return discovery.Epoch != epoch; } }
         public VolumeImportGuard(IDiscovery discovery, string source, string destination, Volume expectedVolume, Disk expectedDisk, long selectionEpoch) {
@@ -25,7 +29,7 @@ namespace EasyEject {
             var currentSource = Resolve(state, sourceId);
             if (epoch != selectionEpoch || currentSource.Fingerprint != expectedVolume.Fingerprint || state.Disks.Single(d => d.Number == currentSource.Disks[0]).Fingerprint != expectedDisk.Fingerprint)
                 throw new SafetyException("The selected card connection changed while choosing folders. Refresh and choose the device again.");
-            disks = PlanProtection(state, sourceId, destinationId); fingerprint = Fingerprint(state); destinationIdentity = DestinationIdentity.Capture(state, destinationId);
+            disks = PlanProtection(state, sourceId, destinationId); fingerprint = Fingerprint(state); destinationIdentity = DestinationIdentity.Capture(state, destinationId); sourceIdentity = DestinationIdentity.Capture(state, sourceId);
             string root = currentSource.Mounts.Where(x => SafePaths.Within(source, SafePaths.Normalize(x))).OrderByDescending(x => x.Length).FirstOrDefault();
             if (root == null) throw new SafetyException("The selected import source root is unavailable.");
             CompletionOrigin = new ImportCompletionOrigin(state, sourceId, root);
@@ -181,6 +185,7 @@ namespace EasyEject {
                     guard.Validate();
                     log("Batch verification complete | " + receipt.Files.Count + " files, " + bytes + " bytes, " + reused + " reused; " + (plan.Deletable.Count > 0 ? "removal/Trash clearing requested; source files still held" : "originals kept"));
                     Action checkManifest = () => plan.CheckManifest(removal.WasRemoved, cancel, guard.Validate);
+                    using (var removalIntent = plan.Deletable.Count > 0 ? removal.CaptureIntent(plan, receipt, destination, batch, cancel, guard).Publish(record, cancel, guard.Validate, log) : null) {
                     if (plan.Deletable.Count > 0) removal.Remove(cancel, guard.Validate, checkManifest, log, report);
                     int removedCount = receipt.Files.Count(e => e.RemovedSource && !e.FromTrash), clearedTrash = receipt.Files.Count(e => e.RemovedSource && e.FromTrash && !e.IsTrashRecord), clearedRecords = receipt.Files.Count(e => e.RemovedSource && e.IsTrashRecord);
                     receipt.OriginalsKept = removedCount == 0;
@@ -193,6 +198,7 @@ namespace EasyEject {
                         finally { if (!complete) Native.DeleteOnClose(stream.SafeFileHandle); }
                     }
                     return new ImportResult { Folder = batch, ReceiptPath = receiptPath, Receipt = receipt, Files = receipt.Files.Count, Reused = reused, RemovedOriginals = removedCount, RecoveredTrashFiles = receipt.Files.Count(e => e.FromTrash && !e.IsTrashRecord), ClearedTrashFiles = clearedTrash, ClearedTrashRecords = clearedRecords, Bytes = bytes, HasSelectedMedia = receipt.HasSelectedMedia };
+                    }
                     }
                     } catch (Exception ex) {
                         int removedCount = receipt.Files.Count(e => e.RemovedSource && !e.FromTrash), clearedTrash = receipt.Files.Count(e => e.RemovedSource && e.FromTrash && !e.IsTrashRecord), clearedRecords = receipt.Files.Count(e => e.RemovedSource && e.IsTrashRecord);

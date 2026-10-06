@@ -39,6 +39,19 @@ namespace EasyEject {
             item.Copy.Position = 0; if (VerifiedImporter.Hash(item.Copy, cancellation) != item.Entry.Sha256) throw new SafetyException("An earlier saved copy changed before batch completion/removal.");
         }
         internal void VerifyAll(CancellationToken cancellation, Action validate) { foreach (var item in held) { cancellation.ThrowIfCancellationRequested(); validate(); Verify(item, cancellation); } }
+        internal RemovalIntent CaptureIntent(ImportSourcePlan plan, ImportReceipt receipt, string destination, string batch, CancellationToken cancellation, IImportGuard guard) {
+            VerifyAll(cancellation, guard.Validate);
+            var intent = plan.NewRemovalIntent(receipt, destination, batch);
+            var evidence = guard as IImportDeviceEvidence;
+            if (evidence != null) { intent.SourceDevice = evidence.SourceDevice.Copy(); intent.DestinationDevice = evidence.DestinationDevice.Copy(); intent.SourceDevice.Validate(); intent.DestinationDevice.Validate(); }
+            foreach (var item in held) {
+                var entry = new RemovalIntentFile { SourcePath = item.Source, SavedRelativePath = item.Entry.RelativePath, SourceLabel = item.Entry.SourceRelativePath,
+                    Sha256 = item.Entry.Sha256, Bytes = item.Entry.Bytes, Eligible = item.Eligible, FromTrash = item.Entry.FromTrash, IsTrashRecord = item.Entry.IsTrashRecord,
+                    SourceIdentity = RemovalFileIdentity.Capture(Native.Info(item.Input.SafeFileHandle)), SavedIdentity = RemovalFileIdentity.Capture(Native.Info(item.Copy.SafeFileHandle)) };
+                plan.LinkRemovalIntent(entry); intent.Files.Add(entry);
+            }
+            return intent;
+        }
         internal void Remove(CancellationToken cancellation, Action validate, Action checkManifest, Action<string> audit, Action<string> report) {
             checkManifest(); VerifyAll(cancellation, validate);
             audit("Complete selected batch and all saved dependencies verified before original removal");

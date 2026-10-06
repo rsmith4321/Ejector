@@ -38,6 +38,18 @@ namespace EasyEject {
             if (trashRecords.ContainsKey(path)) return "Device Trash record\\" + Path.GetFileName(path);
             return SafePaths.Relative(path, selected);
         }
+        internal RemovalIntent NewRemovalIntent(ImportReceipt receipt, string destination, string batch) {
+            return new RemovalIntent { ImportId = receipt.Id, CreatedUtc = DateTime.UtcNow.ToString("o"), SourceVolume = receipt.SourceVolume,
+                SourceRoot = source, SelectedFolder = selected, DestinationRoot = destination, BatchFolder = batch,
+                WindowsTrashSid = Trash == null ? null : Trash.WindowsSid, MacTrashUid = options.MacTrashUid,
+                VideosOnly = options.VideosOnly, IncludePreviews = options.IncludePreviews, CleanLayout = options.CleanLayout,
+                DeleteOriginals = options.DeleteOriginals, RecoverTrash = options.RecoverTrash };
+        }
+        internal void LinkRemovalIntent(RemovalIntentFile entry) {
+            TrashSourceFile file; TrashRecord record;
+            if (trashFiles.TryGetValue(entry.SourcePath, out file)) entry.TrashRecordPath = file.RecordPath;
+            if (trashRecords.TryGetValue(entry.SourcePath, out record)) { entry.TrashRecordPath = record.MetadataPath; entry.TrashPayloadPath = record.PayloadRoot; }
+        }
         internal ReceiptEntry Entry(string file, string savedRelative, string hash, long bytes, bool reused) {
             return new ReceiptEntry { RelativePath = savedRelative, SourceRelativePath = Label(file), Sha256 = hash, Bytes = bytes, Reused = reused,
                 IsMedia = Ordinary.Media.Contains(file) || trashFiles.ContainsKey(file), FromTrash = trashFiles.ContainsKey(file) || trashRecords.ContainsKey(file), IsTrashRecord = trashRecords.ContainsKey(file) };
