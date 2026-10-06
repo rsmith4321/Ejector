@@ -78,9 +78,9 @@ namespace EasyEject {
         readonly Func<bool> allowed; readonly WindowsChannelHighWater highWater; int checking;
         // The activity/lifetime callback must be thread safe. Foreground integration
         // must publish an owned scope, rather than reading Form properties off-thread.
-        internal WindowsChannelDiscovery(ApprovedWindowsChannel channel, IWindowsChannelTransport transport, IWindowsManifestEnvelopeTrust trust, Func<DateTime> clock, Func<bool> allowed) {
+        internal WindowsChannelDiscovery(ApprovedWindowsChannel channel, IWindowsChannelTransport transport, IWindowsManifestEnvelopeTrust trust, Func<DateTime> clock, Func<bool> allowed, IWindowsChannelReplayStore replay = null) {
             if (transport == null || trust == null || clock == null || allowed == null) throw new ArgumentNullException("discovery dependencies");
-            this.channel = channel; this.transport = transport; this.trust = trust; this.clock = clock; this.allowed = allowed; if (channel != null) highWater = new WindowsChannelHighWater(channel);
+            this.channel = channel; this.transport = transport; this.trust = trust; this.clock = clock; this.allowed = allowed; if (channel != null) highWater = new WindowsChannelHighWater(channel, replay);
         }
         internal bool Configured { get { return channel != null; } }
         void Guard(CancellationToken cancel) { cancel.ThrowIfCancellationRequested(); if (!Configured) throw new SafetyException(WindowsUpdateSafety.ChannelStatus); if (!allowed()) throw new SafetyException("Finish the active import, eject, scan or other dialog before checking Windows releases; a closed review cannot accept results."); }

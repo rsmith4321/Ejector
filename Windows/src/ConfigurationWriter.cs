@@ -23,7 +23,7 @@ namespace EasyEject {
     }
     // Configuration-only replacement. Media publication continues to use exclusive, nonreplace rename.
     internal static class ConfigurationWriter {
-        internal static void Write(object value, Type type, string root, string name, Action<string, string> checkpoint, ProfileWriter writer) {
+        internal static void Write(object value, Type type, string root, string name, Action<string, string> checkpoint, ProfileWriter writer, Action<FileStream> validatePrevious = null) {
             if (value == null) throw new ArgumentNullException("value"); if (type == null) throw new ArgumentNullException("type");
             root = SafePaths.Normalize(root); string final = FinalPath(root, name);
             checkpoint = checkpoint ?? ((stage, path) => {});
@@ -33,6 +33,9 @@ namespace EasyEject {
                 using (var ownedWriter = writer == null ? Profiles.WriterGate(root) : null) {
                     writer = writer ?? ownedWriter; writer.Validate(root);
                     using (var previous = OpenPrevious(final)) {
+                        // Optional compare against a previously reviewed snapshot while
+                        // this exact prior file is exclusively held through publication.
+                        if (validatePrevious != null) validatePrevious(previous);
                         directories.Validate(); checkpoint("Before temporary creation", root); directories.Validate(); writer.Validate(root);
                         string temporary = SafePaths.Normalize(Path.Combine(root, Guid.NewGuid().ToString("N") + ".tmp"));
                         using (var stream = SafePaths.NewFile(temporary)) {
@@ -69,7 +72,7 @@ namespace EasyEject {
             if (!SafePaths.Within(path, root) || Path.GetFileName(path) != name) throw new SafetyException("Configuration filename escaped its folder.");
             return path;
         }
-        static SafePaths.DirectoryLease CreateRoot(string root) {
+        internal static SafePaths.DirectoryLease CreateRoot(string root) {
             string ancestor = root;
             for (;;) {
                 try { if ((File.GetAttributes(ancestor) & FileAttributes.Directory) == 0) throw new SafetyException("Configuration storage is not a directory."); break; }

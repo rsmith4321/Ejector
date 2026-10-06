@@ -78,11 +78,11 @@ namespace EasyEject {
         }
         internal void VerifyExtracted(WindowsArchiveReview archive, WindowsPackageReview package, CancellationToken cancel) { VerifyArchive(archive, cancel); archive.VerifyExtractedPackage(package, cancel); Revalidate(cancel); }
     }
-    // Process-only replay/high-water protection. Durable restart protection is separate
-    // remaining configuration work; no discovery result is installed or launched here.
+    // Process high water, optionally composed with guarded persistent replay state.
+    // Neither state grants installation, launch or cached release approval.
     internal sealed class WindowsChannelHighWater {
-        readonly ApprovedWindowsChannel channel; readonly object sync = new object(); WindowsChannelOffer highest;
-        internal WindowsChannelHighWater(ApprovedWindowsChannel channel) { if (channel == null) throw new ArgumentNullException("channel"); this.channel = channel; }
+        readonly ApprovedWindowsChannel channel; readonly IWindowsChannelReplayStore replay; readonly object sync = new object(); WindowsChannelOffer highest;
+        internal WindowsChannelHighWater(ApprovedWindowsChannel channel, IWindowsChannelReplayStore replay = null) { if (channel == null) throw new ArgumentNullException("channel"); this.channel = channel; this.replay = replay; }
         internal void Accept(WindowsChannelOffer offer, CancellationToken cancel, Func<bool> stillAllowed = null) {
             if (offer == null) throw new ArgumentNullException("offer"); cancel.ThrowIfCancellationRequested(); if (!offer.IsFor(channel)) throw new SafetyException("A Windows discovery result belongs to a different approved channel policy."); offer.Revalidate(cancel);
             lock (sync) {
@@ -91,7 +91,10 @@ namespace EasyEject {
                     if (offer.IssuedUtc < highest.IssuedUtc || offer.IssuedUtc == highest.IssuedUtc && offer.Authenticated.BodyHash != highest.Authenticated.BodyHash || new Version(offer.Release.Version).CompareTo(new Version(highest.Release.Version)) < 0 || offer.Release.Version == highest.Release.Version && !offer.Release.SameRelease(highest.Release)) throw new SafetyException("The signed Windows channel rolled back or changed an already observed release/version.");
                 }
                 if (stillAllowed != null && !stillAllowed()) throw new SafetyException("The Windows release check's activity/lifetime scope changed before discovery commit.");
-                cancel.ThrowIfCancellationRequested(); highest = offer;
+                cancel.ThrowIfCancellationRequested(); if (replay != null) replay.Accept(channel, offer, cancel, stillAllowed);
+                // Persistence may have committed just before cancellation/activity changes.
+                // Keep our restrictive process floor aligned; discovery checks return scope.
+                highest = offer;
             }
         }
     }
