@@ -8,16 +8,18 @@ using System.Threading;
 namespace EasyEject {
     internal sealed class ImportSourcePlan {
         readonly string source, selected; readonly MediaOptions options;
+        readonly ImportMediaFolder mediaFolder;
         internal readonly MediaPlan Ordinary; internal readonly DeviceTrashSnapshot Trash; internal readonly DeviceTrashSelection TrashSelection;
         readonly Dictionary<string, TrashSourceFile> trashFiles = new Dictionary<string, TrashSourceFile>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, TrashRecord> trashRecords = new Dictionary<string, TrashRecord>(StringComparer.OrdinalIgnoreCase);
         internal readonly List<string> Files; internal readonly HashSet<string> Deletable;
         internal bool HasMedia { get { return Ordinary.Media.Count != 0 || trashFiles.Count != 0; } }
-        internal ImportSourcePlan(string source, string selected, MediaOptions options, CancellationToken cancellation, IImportGuard guard, Func<string, string, CancellationToken, Action, DeviceTrashSnapshot> catalog) {
+        internal ImportSourcePlan(string source, string selected, MediaOptions options, CancellationToken cancellation, IImportGuard guard, Func<string, string, CancellationToken, Action, DeviceTrashSnapshot> catalog, ImportMediaFolder mediaFolder) {
             this.source = source; this.selected = selected; this.options = options;
+            this.mediaFolder = mediaFolder;
             string relative = selected.TrimEnd('\\').Equals(source.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) ? "" : SafePaths.Relative(selected, source);
             if (relative.Split('\\').Any(x => x.Equals(".Trashes", StringComparison.OrdinalIgnoreCase) || x.Equals("$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase) || x.Equals("System Volume Information", StringComparison.OrdinalIgnoreCase))) throw new SafetyException("Choose an ordinary complete media folder or card. Device Trash requires the separate owner-aware recovery option.");
-            Ordinary = MediaSelection.Plan(VerifiedImporter.Scan(selected, cancellation), source, selected, options);
+            Ordinary = MediaSelection.Plan(mediaFolder.Scan(cancellation), source, selected, options);
             Deletable = options.DeleteOriginals ? MediaSelection.Deletable(Ordinary, options) : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (options.RecoverTrash) {
                 Trash = catalog(source, options.MacTrashUid, cancellation, guard.Validate); TrashSelection = Trash.Select(options);
@@ -73,7 +75,7 @@ namespace EasyEject {
             return targets;
         }
         internal void CheckManifest(Func<string, bool> removed, CancellationToken cancellation, Action validate) {
-            var scanned = VerifiedImporter.Scan(selected, cancellation);
+            var scanned = mediaFolder.Scan(cancellation);
             if (scanned.Any(removed)) throw new SafetyException("A new file appeared at a removed original's path. It is kept; review the device before retrying.");
             var virtualFiles = scanned.Concat(Ordinary.Files.Where(removed)).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList();
             var current = MediaSelection.Plan(virtualFiles, source, selected, options).Files.Where(f => !removed(f));

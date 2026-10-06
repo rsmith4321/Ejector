@@ -81,6 +81,7 @@ namespace EasyEject {
             if (args.Length >= 2 && args[0] == "--share-process-fixture") return ShareProcessFixture(args);
             if (AppDomain.CurrentDomain.FriendlyName == "EasyEject.ShareFixture.exe") return ShareToolFixture(args);
             System.Windows.Forms.Application.EnableVisualStyles(); System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
+            if (args.Length == 1 && args[0] == "--media-parity") { MediaParityTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable files and native read-only path resolution only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--ui-render") {
                 string output = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectWindowsPreview", "run-" + Guid.NewGuid().ToString("N").Substring(0, 16));
                 Directory.CreateDirectory(output); var state = State(); var defaults = new ImportDefaults(); var profile = defaults.NewProfile(state.Volumes[0], state.Disks[0]); profile.RelativeSource = "DCIM"; profile.Destination = @"D:\Travel backups";
@@ -690,6 +691,7 @@ namespace EasyEject {
             StatusLayoutTests();
             InformationDiagnosticsTests();
             TrayActivityTests();
+            MediaParityTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {

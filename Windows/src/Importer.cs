@@ -91,12 +91,13 @@ namespace EasyEject {
             if (!SafePaths.Within(selectedFolder, sourceRoot) || SafePaths.Within(destination, sourceRoot) || SafePaths.Within(sourceRoot, destination)) throw new SafetyException("Source and destination folders overlap or the selection is outside the source volume.");
             if (new[] { "STREAM", "CLIP" }.Contains(Path.GetFileName(selectedFolder).ToUpperInvariant())) throw new SafetyException("Select the complete camera package or card, including audio and metadata, rather than a partial STREAM/CLIP folder.");
             using (operations.Reserve(guard.ProtectedDisks))
-            using (SafePaths.LockDirectories(selectedFolder, destination)) {
+            using (SafePaths.LockDirectories(sourceRoot, destination))
+            using (var mediaFolder = new ImportMediaFolder(sourceRoot, selectedFolder)) {
                 cancel.ThrowIfCancellationRequested(); guard.Validate();
                 var work = new ImportWorkReporter(progress); work.Emit("Scanning", 0);
-                var plan = new ImportSourcePlan(sourceRoot, selectedFolder, options, cancel, guard, trashCatalog);
+                var plan = new ImportSourcePlan(sourceRoot, selectedFolder, options, cancel, guard, trashCatalog, mediaFolder);
                 var manifest = plan.Files;
-                if (manifest.Count == 0) { work.Emit("No matching media", 1); return new ImportResult { Folder = destination, Files = 0 }; }
+                if (manifest.Count == 0) { cancel.ThrowIfCancellationRequested(); guard.Validate(); plan.CheckManifest(file => false, cancel, guard.Validate); work.Emit("No matching media", 1); return new ImportResult { Folder = destination, Files = 0 }; }
                 var stamps = new Dictionary<string, Native.FileInfo>(); var hashes = new Dictionary<string, string>();
                 int checkedFiles = 0;
                 foreach (string file in manifest) {

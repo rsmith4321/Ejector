@@ -34,7 +34,8 @@ namespace EasyEject {
                         var pieces = new List<string> { root }; foreach (string part in path.Substring(root.Length).Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries)) { current = Path.Combine(current, part); pieces.Add(current); }
                         foreach (string piece in pieces) {
                             if (!seen.Add(piece)) continue;
-                            // Deny write/delete sharing on directories to pin the path and prevent reparse/rename races.
+                            // Hold directory attributes without write/delete sharing. Empty directories can
+                            // still be renamed on Windows; users of a long-lived path must recheck identity.
                             var h = Native.CreateFile(piece, 0x80, 1, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero);
                             if (h.IsInvalid) { h.Dispose(); throw Native.Error("Cannot lock import directory: " + piece); }
                             handles.Add(h); var info = Native.Info(h);
