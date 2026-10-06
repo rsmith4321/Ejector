@@ -256,11 +256,14 @@ namespace EasyEject {
         [DataMember] public string Name;
         [DataMember] public string VolumeId; [DataMember] public string VolumeSerial; [DataMember] public string DiskInstance;
         [DataMember] public string RelativeSource; [DataMember] public string Destination;
+        [DataMember] public DestinationIdentity SavedDestination;
+        [DataMember] public bool? AutomaticImport;
         [DataMember] public bool? UsesImportDefaults; [DataMember] public bool? VideosOnly; [DataMember] public bool? IncludePreviews; [DataMember] public bool? CleanLayout;
         [DataMember] public bool? AskToEject;
         [DataMember] public bool? DeleteOriginals;
         [DataMember] public bool? RecoverTrash; [DataMember] public string MacTrashUid;
         public bool FollowsDefaults { get { return UsesImportDefaults == true; } }
+        public bool AutomaticEnabled(ImportDefaults defaults) { if (defaults == null) throw new ArgumentNullException("defaults"); return FollowsDefaults ? defaults.AutomaticEnabled : AutomaticImport ?? false; }
         public MediaOptions Resolve(ImportDefaults defaults) {
             if (defaults == null) throw new ArgumentNullException("defaults");
             // Prototype profiles without option fields used all-media with previews. Preserve that.
@@ -269,11 +272,12 @@ namespace EasyEject {
             return new MediaOptions(choices.VideosOnly, choices.IncludePreviews, choices.CleanLayout, choices.AskToEject, choices.DeleteOriginals, choices.RecoverTrash, MacTrashUid);
         }
         public void SetCustom(bool custom, ImportDefaults defaults) {
+            bool automatic = FollowsDefaults || !custom ? defaults.AutomaticEnabled : AutomaticImport ?? false;
             MediaOptions options = FollowsDefaults || !custom ? defaults.Snapshot() : Resolve(defaults);
-            VideosOnly = options.VideosOnly; IncludePreviews = options.IncludePreviews; CleanLayout = options.CleanLayout; AskToEject = options.AskToEject; DeleteOriginals = options.DeleteOriginals; RecoverTrash = options.RecoverTrash; UsesImportDefaults = !custom;
+            VideosOnly = options.VideosOnly; IncludePreviews = options.IncludePreviews; CleanLayout = options.CleanLayout; AskToEject = options.AskToEject; DeleteOriginals = options.DeleteOriginals; RecoverTrash = options.RecoverTrash; AutomaticImport = automatic; UsesImportDefaults = !custom;
         }
         public void SetVideosOnly(bool value) { if (!value && (VideosOnly ?? false)) { DeleteOriginals = false; RecoverTrash = false; } VideosOnly = value; }
-        public ImportProfile Copy() { return (ImportProfile)MemberwiseClone(); }
+        public ImportProfile Copy() { var value = (ImportProfile)MemberwiseClone(); if (SavedDestination != null) value.SavedDestination = SavedDestination.Copy(); return value; }
     }
     public static partial class Profiles {
         internal static string Root {
@@ -303,6 +307,7 @@ namespace EasyEject {
             if (profile == null || String.IsNullOrWhiteSpace(profile.VolumeId)) throw new SafetyException("Import profile has no volume identity.");
             if (profile.MacTrashUid != null && !DeviceTrash.ValidMacOwner(profile.MacTrashUid)) throw new SafetyException("Saved Mac Trash owner selection is invalid. Review this device's profile.");
             ValidateName(profile.Name, false);
+            if (profile.SavedDestination != null) profile.SavedDestination.Validate();
             Directory.CreateDirectory(root);
             using (SafePaths.LockDirectories(root)) using (WriterGate(root)) WriteJson(profile, typeof(ImportProfile), root, FileName(profile.VolumeId));
         }
@@ -329,6 +334,7 @@ namespace EasyEject {
                 if (p == null || p.VolumeId != volume.Id || p.VolumeSerial != volume.Serial || p.DiskInstance != disk.InstanceId) throw new SafetyException("Saved import profile no longer matches this card. Choose the folders again and save a new profile.");
                 if (p.RelativeSource == null || p.Destination == null) throw new SafetyException("Saved import folders are invalid. Choose the folders again.");
                 ValidateName(p.Name, false);
+                if (p.SavedDestination != null) p.SavedDestination.Validate();
                 if (p.MacTrashUid != null && !DeviceTrash.ValidMacOwner(p.MacTrashUid)) throw new SafetyException("Saved Mac Trash owner selection is invalid. Review this device's profile.");
                 return p;
             }

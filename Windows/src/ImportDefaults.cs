@@ -4,20 +4,21 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 
 namespace EasyEject {
-    // Supported media/preview/layout/removal/Trash and manual completion choices. Automatic options are added
-    // alongside their engine implementation rather than stored as inert flags.
+    // Shared choices are resolved once, before the operation starts.
     [DataContract] public sealed class ImportDefaults {
         [DataMember] public bool? VideosOnly;
         [DataMember] public bool? IncludePreviews; [DataMember] public bool? CleanLayout;
         [DataMember] public bool? AskToEject;
         [DataMember] public bool? DeleteOriginals;
         [DataMember] public bool? RecoverTrash;
+        [DataMember] public bool? AutomaticImport;
+        public bool AutomaticEnabled { get { return AutomaticImport ?? false; } }
         public MediaOptions Snapshot() { return new MediaOptions(VideosOnly ?? true, IncludePreviews ?? true, CleanLayout ?? true, AskToEject ?? false, DeleteOriginals ?? false, RecoverTrash ?? false); }
         public void SetVideosOnly(bool value) { if (!value && Snapshot().VideosOnly) { DeleteOriginals = false; RecoverTrash = false; } VideosOnly = value; }
         public ImportProfile NewProfile(Volume volume, Disk disk) {
             var options = Snapshot();
             return new ImportProfile { Name = ProfileName.ForDevice(volume.Display), VolumeId = volume.Id, VolumeSerial = volume.Serial, DiskInstance = disk.InstanceId,
-                RelativeSource = "", Destination = "", UsesImportDefaults = true, VideosOnly = options.VideosOnly, IncludePreviews = options.IncludePreviews, CleanLayout = options.CleanLayout, AskToEject = options.AskToEject, DeleteOriginals = options.DeleteOriginals, RecoverTrash = options.RecoverTrash };
+                RelativeSource = "", Destination = "", UsesImportDefaults = true, AutomaticImport = AutomaticEnabled, VideosOnly = options.VideosOnly, IncludePreviews = options.IncludePreviews, CleanLayout = options.CleanLayout, AskToEject = options.AskToEject, DeleteOriginals = options.DeleteOriginals, RecoverTrash = options.RecoverTrash };
         }
         public static ImportDefaults Load() { return Load(Profiles.Root); }
         internal static ImportDefaults Load(string root) {

@@ -35,6 +35,7 @@ namespace EasyEject {
                 foreach (string target in inventory.Disks.Where(d => d.TargetId != "").Select(d => d.TargetId).Distinct(StringComparer.OrdinalIgnoreCase)) {
                     inventory.GroupConnections[target] = Instances.Versions.Stamp(GroupInstances(inventory, target));
                 }
+                foreach (var disk in inventory.Disks.Where(d => d.TargetId == "" && Classifier.External(d))) inventory.GroupConnections[disk.InstanceId] = Instances.Versions.Stamp(disk.Ancestors.Concat(new[] { disk.InstanceId }));
                 string fingerprint = String.Join("\n", inventory.Disks.Select(d => d.Fingerprint).Concat(inventory.Volumes.Select(v => v.Fingerprint)).OrderBy(x => x));
                 if (start != Epoch) { inventory.Complete = false; inventory.Errors.Add("Connection changed while scanning; refresh again."); }
                 if (!NotificationsAvailable) { inventory.Complete = false; inventory.Errors.Add("Connection notifications unavailable; operations are blocked."); }

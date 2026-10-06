@@ -22,6 +22,8 @@ namespace EasyEject {
     internal sealed class DeviceWindow : Form {
         readonly WindowsDiscovery discovery = new WindowsDiscovery(); readonly Operations operations = new Operations();
         readonly ImportCompletionRegistry completions = new ImportCompletionRegistry();
+        readonly AutomaticImportScheduler automatic = new AutomaticImportScheduler();
+        bool automaticPumping, createdBefore; long automaticConfigIssueEpoch = -1;
         AppSettings appSettings = new AppSettings(); AppIssue appIssue = new AppIssue(); ImportCompletionDialog activeCompletion;
         ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
@@ -43,7 +45,7 @@ namespace EasyEject {
             Font = new Font("Segoe UI", 10);
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(16) };
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            var intro = new Label { AutoSize = true, MaximumSize = new Size(940, 0), Text = "Review connected storage before ejecting. Imports retain originals by default and verify SHA-256.\nConnection events refresh the list. Import and eject start only when you choose them.", Margin = new Padding(0, 0, 0, 12) };
+            var intro = new Label { AutoSize = true, MaximumSize = new Size(940, 0), Text = "Review connected storage before ejecting. Imports retain originals by default and verify SHA-256.\nAutomatic import starts off. Enable it in a profile or shared defaults. Eject and sharing require a manual choice.", Margin = new Padding(0, 0, 0, 12) };
             list.Dock = DockStyle.Fill; list.View = View.Details; list.FullRowSelect = true; list.MultiSelect = false; list.HideSelection = false;
             list.Columns.Add("Volume / mount", 245); list.Columns.Add("Classification", 360); list.Columns.Add("Physical disk", 130); list.Columns.Add("Status", 190);
             foreach (StorageGroup group in Enum.GetValues(typeof(StorageGroup))) list.Groups.Add(new ListViewGroup(group.ToString(), GroupLabel(group)));
@@ -66,6 +68,7 @@ namespace EasyEject {
             cancel.Click += delegate { if (cancellation != null) { cancellation.Cancel(); status.Text = "Stopping after the current check. Verified copies and remaining source data are kept."; } };
             status.AutoSize = true; status.MaximumSize = new Size(940, 0); status.Text = "Reading connected devices…";
             layout.Controls.Add(intro); layout.Controls.Add(list); layout.Controls.Add(actions); layout.Controls.Add(status); Controls.Add(layout);
+            layout.SizeChanged += delegate { int width = Math.Max(350, layout.ClientSize.Width - layout.Padding.Horizontal - 8); intro.MaximumSize = status.MaximumSize = new Size(width, 0); };
             var menu = new ContextMenuStrip(); menu.Items.Add("Show devices", null, delegate { Show(); WindowState = FormWindowState.Normal; Activate(); });
             menu.Items.Add("Refresh", null, async delegate { await RefreshDevices(); });
             bulkMenu = new ToolStripMenuItem("Eject cards…", null, async delegate { await EjectCards(); }); menu.Items.Add(bulkMenu);
@@ -94,6 +97,7 @@ namespace EasyEject {
             notification = RegisterDeviceNotification(Handle, ref filter, 0);
             discovery.NotificationsAvailable = notification != IntPtr.Zero;
             discovery.Instances.Start();
+            if (createdBefore) automatic.SettingsSaved(); createdBefore = true;
             if (!readOnly && !hotkey.Configure(Handle, appSettings.ShortcutEnabled, appSettings.ShortcutKey)) appIssue.Record(hotkey.Status);
             if (notification == IntPtr.Zero) { status.Text = "Disk notifications unavailable. Refresh before every action."; discovery.ConnectionChanged(); }
         }
@@ -128,17 +132,63 @@ namespace EasyEject {
             if (!ready) return;
             try { EjectService.Plan(inventory, v.Id); eject.Enabled = true; } catch (SafetyException) {}
             if (eject.Enabled) try { MetadataCleanupPlan.Single(inventory, EjectService.Plan(inventory, v.Id), v.Id); cleanEject.Enabled = !readOnly; } catch (SafetyException) {}
-            import.Enabled = inventory.Complete && v.Error == "" && !v.System && v.Disks.Count == 1 && v.Mounts.Any(x => x.Length >= 3 && x[1] == ':') && v.Classification != "Internal / fixed storage";
+            import.Enabled = !readOnly && inventory.Complete && v.Error == "" && !v.System && v.Disks.Count == 1 && v.Mounts.Any(x => x.Length >= 3 && x[1] == ':') && v.Classification != "Internal / fixed storage";
             profile.Enabled = import.Enabled;
             resume.Enabled = import.Enabled && !readOnly;
         }
         async Task RefreshDevices() {
             if (scanning || working) return; scanning = true; UpdateActions();
             try {
-                var next = await Task.Run(() => discovery.Scan()); PresentInventory(next);
+                var next = await Task.Run(() => discovery.Scan()); PresentInventory(next); automatic.Observe(next);
                 status.Text = next.Complete ? "Read-only inventory: " + next.Volumes.Count + " volumes on " + next.Disks.Count + " disks. Closing this window keeps the tray app running." : "Incomplete inventory; actions blocked. " + String.Join(" ", next.Errors);
             } catch (Exception ex) { inventory = null; status.Text = ex.Message; }
             finally { scanning = false; UpdateActions(); }
+            await PumpAutomaticImports();
+        }
+        async Task PumpAutomaticImports() {
+            if (automaticPumping || readOnly || working || scanning || inventory == null || inventory.Epoch != discovery.Epoch) return;
+            automaticPumping = true;
+            try {
+                while (!readOnly && !working && !scanning && inventory != null && inventory.Complete && inventory.Epoch == discovery.Epoch) {
+                    ImportDefaults choices; SavedProfile[] entries;
+                    try { choices = ImportDefaults.Load(); entries = Profiles.Catalog(); }
+                    catch (Exception ex) {
+                        if (automaticConfigIssueEpoch != inventory.Epoch) { automaticConfigIssueEpoch = inventory.Epoch; ShowError(new SafetyException("Automatic import could not read saved choices. No import started. " + ex.Message)); }
+                        break;
+                    }
+                    if (entries.Any(e => !e.CanEdit && inventory.Volumes.Any(v => Profiles.FileName(v.Id) == e.FileName)) && automaticConfigIssueEpoch != inventory.Epoch) {
+                        automaticConfigIssueEpoch = inventory.Epoch; ShowError(new SafetyException("A connected device's saved profile could not be read and was left intact. Review Saved profiles or set up the connected device again. No automatic import starts from that invalid record."));
+                    }
+                    var request = automatic.Take(inventory, entries.Where(x => x.CanEdit).Select(x => x.Profile), choices, working || scanning);
+                    if (request == null) break;
+                    await RunAutomaticImport(request);
+                    await RefreshDevices();
+                }
+            } finally { automaticPumping = false; }
+        }
+        async Task RunAutomaticImport(AutomaticImportRequest request) {
+            bool engineStarted = false;
+            try {
+                working = true; UpdateActions();
+                var connection = request.Connection; var stored = request.Profile;
+                request.Connection.RequireCurrent(inventory);
+                if (stored.VolumeId != connection.Volume.Id || stored.VolumeSerial != connection.Volume.Serial || stored.DiskInstance != connection.Disk.InstanceId) throw new SafetyException("The automatic profile no longer matches this card. Connect the original card or enroll the formatted device again. No import started.");
+                Profiles.ValidateStoredFolders(stored);
+                string source = SafePaths.Normalize(Path.Combine(connection.Root, stored.RelativeSource)), destination = SafePaths.Normalize(stored.Destination);
+                if (!SafePaths.Within(source, connection.Root)) throw new SafetyException("The saved automatic media folder is outside this device.");
+                cancellation = new CancellationTokenSource(); cancel.Enabled = true; status.Text = "Preparing automatic import for " + ProfileName.Display(stored) + "…";
+                var guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, connection.Volume, connection.Disk, connection.Epoch));
+                request.ValidateAdmission(inventory, guard.DestinationIdentity); guard.Validate();
+                completions.InvalidateSource(connection.Root); Log("Automatic connection import | " + ProfileName.Display(stored) + " | " + source + " -> " + destination);
+                engineStarted = true;
+                var result = await Task.Run(() => new VerifiedImporter(operations).Run(connection.Root, source, destination, stored.VolumeId, guard, cancellation.Token, text => { if (!IsDisposed) BeginInvoke(new Action(() => status.Text = text)); }, request.Options));
+                await PresentImportResult(result, stored, connection.Volume, guard, connection.Root, destination, request.Options);
+            } catch (OperationCanceledException) {
+                status.Text = "Automatic import cancelled. Remaining originals/Trash data and verified copies are kept. No automatic retry occurs on this connection."; Log(status.Text); Notify("Automatic import cancelled", status.Text, ToolTipIcon.Info);
+            } catch (Exception ex) {
+                if (!engineStarted) automatic.PreflightWaiting(request);
+                ShowError(ex);
+            } finally { FinishOperation(); }
         }
         internal void PresentInventory(Inventory next) {
             inventory = next; list.Items.Clear();
@@ -197,7 +247,8 @@ namespace EasyEject {
             await RefreshDevices();
         }
         async Task Import() {
-            var v = Selected; if (v == null || working) return;
+            var v = Selected; if (v == null || working || scanning || readOnly) return;
+            automatic.MarkManual(inventory, v);
             try {
                 var disk = inventory.Disks.Single(d => d.Number == v.Disks.Single());
                 long selectionEpoch = inventory.Epoch; working = true; UpdateActions();
@@ -213,8 +264,10 @@ namespace EasyEject {
                 string source = SafePaths.Normalize(Path.Combine(root, stored.RelativeSource)), destination = SafePaths.Normalize(stored.Destination);
                 if (!SafePaths.Within(source, root)) throw new SafetyException("Choose a folder within the selected device volume.");
                 var guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, v, disk, selectionEpoch));
+                ProfileDestination.Require(stored, guard.DestinationIdentity, false);
                 string text = (options.VideosOnly ? "Copy selected videos and their required companions under:\n" : "Copy all media and sidecars under:\n") + source + "\n\nTo a date folder under:\n" + destination + "\n\n" + (options.IncludePreviews ? "Camera previews included." : "Optional previews stay on the device; required package files are included.") + "\n" + (options.CleanLayout ? "Ordinary media uses a clean layout; packages and unfamiliar media keep their tree." : "Media folder paths are retained.") + "\nOriginal filenames are kept. SHA-256 verifies new and reused copies.\n\n" + OriginalRemovalChoice.BeforeImport(options) + "\n\n" + DeviceTrashChoice.BeforeImport(options) + "\n\nThe device remains connected. Start this manual import?";
                 using (var review = new VerifiedImportConfirmationDialog(text)) if (review.ShowDialog(this) != DialogResult.Yes) return;
+                if (stored.SavedDestination == null) { guard.Validate(); stored.SavedDestination = guard.DestinationIdentity; Profiles.Save(stored); }
                 completions.InvalidateSource(root); Log("User started import | " + source + " -> " + destination);
                 working = true; cancellation = new CancellationTokenSource(); cancel.Enabled = true; UpdateActions();
                 var result = await Task.Run(() => new VerifiedImporter(operations).Run(root, source, destination, v.Id, guard, cancellation.Token, progressText => {
@@ -243,6 +296,7 @@ namespace EasyEject {
                 string sid; using (var identity = WindowsIdentity.GetCurrent()) { if (identity.User == null) throw new SafetyException("The current Windows Trash owner is unavailable."); sid = identity.User.Value; }
                 cancellation = new CancellationTokenSource(); cancel.Enabled = true; status.Text = "Reviewing the exact interrupted batch, owners, devices and complete saved copies…";
                 var guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, volume, disk, epoch));
+                ProfileDestination.Require(stored, guard.DestinationIdentity, false); automatic.MarkManual(inventory, volume);
                 var reviewed = await Task.Run(() => RemovalResumeEvidence.Review(intentPath, root, source, destination, sid, guard, operations, cancellation.Token));
                 using (var dialog = new RemovalResumeConfirmationDialog(RemovalResumeChoice.Explanation(reviewed, volume.Display, source, destination))) if (dialog.ShowDialog(this) != DialogResult.Yes) return;
                 cancellation.Token.ThrowIfCancellationRequested();
@@ -430,7 +484,7 @@ namespace EasyEject {
             try {
                 working = true; UpdateActions();
                 using (var dialog = new ImportDefaultsDialog(ReadDefaults())) {
-                    if (dialog.ShowDialog(this) == DialogResult.OK) { ImportDefaults.Save(dialog.Value); status.Text = "Import defaults saved. They apply on the next import; no import started."; }
+                    if (dialog.ShowDialog(this) == DialogResult.OK) { ImportDefaults.Save(dialog.Value); automatic.SettingsSaved(); status.Text = "Import defaults saved. They apply on the next manual import or source connection; no import started."; }
                 }
             } catch (Exception ex) { ShowError(ex); }
             finally { working = false; UpdateActions(); debounce.Start(); }
@@ -439,15 +493,15 @@ namespace EasyEject {
             if (working || scanning || readOnly) return;
             try {
                 working = true; UpdateActions();
-                using (var dialog = new SavedProfilesDialog(() => Profiles.Catalog(), ReadDefaults, delegate(SavedProfile expected, ImportProfile draft) {
-                    if (!String.Equals(expected.Profile.Destination, draft.Destination, StringComparison.OrdinalIgnoreCase)) {
+                using (var dialog = new SavedProfilesDialog(() => Profiles.Catalog(), ReadDefaults, delegate(SavedProfile expected, ImportProfile draft, bool chosen) {
+                    if (chosen || !String.Equals(expected.Profile.Destination, draft.Destination, StringComparison.OrdinalIgnoreCase)) {
                         using (SafePaths.LockDirectories(draft.Destination)) {
                             string id = WindowsDiscovery.VolumeId(draft.Destination);
-                            OfflineProfileDestination.Validate(draft, DestinationIdentity.Capture(discovery.Scan(), id));
-                            Profiles.SaveOffline(expected, draft);
+                            var identity = DestinationIdentity.Capture(discovery.Scan(), id); OfflineProfileDestination.Validate(draft, identity);
+                            Profiles.SaveOffline(expected, draft, Profiles.Root, identity);
                         }
                     } else Profiles.SaveOffline(expected, draft);
-                }, entry => Profiles.ForgetOffline(entry))) {
+                }, entry => Profiles.ForgetOffline(entry), automatic.SettingsSaved)) {
                     dialog.ShowDialog(this);
                     if (dialog.Changed) status.Text = "Saved profiles updated. No import started. Device and destination validation still apply to each import.";
                 }
@@ -465,19 +519,19 @@ namespace EasyEject {
             finally { working = false; UpdateActions(); debounce.Start(); }
         }
         async Task<ImportProfile> SetUpProfile(Volume volume, Disk disk, string root, long epoch, ImportDefaults choices, ImportProfile stored) {
-            using (var dialog = new ImportProfileDialog(stored ?? choices.NewProfile(volume, disk), root, volume.Display, choices, stored != null)) {
+            using (var dialog = new ImportProfileDialog(stored ?? choices.NewProfile(volume, disk), root, volume.Display, choices, stored != null, automatic.SettingsSaved)) {
                 DialogResult result = dialog.ShowDialog(this);
                 if (result == DialogResult.Retry) {
                     if (MessageBox.Show(this, "Forget this device's saved folders and import choices? Files and originals stay intact.", "Forget import profile", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes) {
-                        Profiles.Remove(volume, disk); status.Text = "Import profile forgotten. No files were imported or removed.";
+                        Profiles.Remove(volume, disk); automatic.SettingsSaved(); status.Text = "Import profile forgotten. No files were imported or removed.";
                     }
                     return null;
                 }
                 if (result != DialogResult.OK) return null;
                 ImportProfile draft = dialog.Draft;
                 string source = SafePaths.Normalize(Path.Combine(root, draft.RelativeSource));
-                await Task.Run(() => { using (SafePaths.LockDirectories(source, draft.Destination)) { var guard = new VolumeImportGuard(discovery, source, draft.Destination, volume, disk, epoch); guard.Validate(); } });
-                Profiles.Save(draft); status.Text = "Import profile saved. No import started. Choose Verified import when ready.";
+                await Task.Run(() => { using (SafePaths.LockDirectories(source, draft.Destination)) { var guard = new VolumeImportGuard(discovery, source, draft.Destination, volume, disk, epoch); if (!dialog.DestinationWasChosen) ProfileDestination.Require(draft, guard.DestinationIdentity, false); guard.Validate(); draft.SavedDestination = guard.DestinationIdentity; } });
+                Profiles.Save(draft); automatic.SettingsSaved(); status.Text = "Import profile saved. No import started. Choose Verified import or reconnect for enabled automatic import.";
                 return draft;
             }
         }

@@ -54,6 +54,7 @@ namespace EasyEject {
                 var value = (ImportProfile)new DataContractJsonSerializer(typeof(ImportProfile)).ReadObject(stream);
                 if (value == null || String.IsNullOrWhiteSpace(value.VolumeId) || value.VolumeSerial == null || String.IsNullOrWhiteSpace(value.DiskInstance) || FileName(value.VolumeId) != name) throw new SafetyException("Saved profile filename or device identity is invalid.");
                 ValidateName(value.Name, false); ValidateStoredFolders(value);
+                if (value.SavedDestination != null) value.SavedDestination.Validate();
                 if (value.MacTrashUid != null && !DeviceTrash.ValidMacOwner(value.MacTrashUid)) throw new SafetyException("Saved Mac Trash owner is invalid.");
                 return new SavedProfile(name, value, hash, stamp);
             }
@@ -79,11 +80,16 @@ namespace EasyEject {
             if (expected == null || !expected.CanEdit || !current.CanEdit || expected.Hash != current.Hash || !VerifiedImporter.SameStamp(expected.Stamp, current.Stamp)) throw new SafetyException("This profile changed while its editor was open. Refresh saved profiles and review the new choices.");
         }
         internal static void SaveOffline(SavedProfile expected, ImportProfile draft) { SaveOffline(expected, draft, Root); }
-        internal static void SaveOffline(SavedProfile expected, ImportProfile draft, string root) {
+        internal static void SaveOffline(SavedProfile expected, ImportProfile draft, string root, DestinationIdentity selectedDestination = null) {
             if (expected == null || draft == null || !expected.CanEdit) throw new SafetyException("Choose a valid saved profile.");
             var original = expected.Profile;
             if (draft.VolumeId != original.VolumeId || draft.VolumeSerial != original.VolumeSerial || draft.DiskInstance != original.DiskInstance || draft.RelativeSource != original.RelativeSource || draft.MacTrashUid != original.MacTrashUid && draft.MacTrashUid != null) throw new SafetyException("Connect the original device to change its identity, media folder or Mac Trash owner.");
             ValidateName(draft.Name, true); ValidateStoredFolders(draft); SafePaths.Normalize(draft.Destination);
+            bool changedDestination = !String.Equals(original.Destination, draft.Destination, StringComparison.OrdinalIgnoreCase) || !ProfileDestination.Same(original.SavedDestination, draft.SavedDestination);
+            if (changedDestination || selectedDestination != null) {
+                if (selectedDestination == null) throw new SafetyException("Choose and verify the destination again before changing its folder or identity.");
+                OfflineProfileDestination.Validate(draft, selectedDestination); draft.SavedDestination = selectedDestination.Copy();
+            }
             using (SafePaths.LockDirectories(root)) using (WriterGate(root)) {
                 CheckSnapshot(expected, ReadSaved(root, expected.FileName));
                 WriteJson(draft, typeof(ImportProfile), root, expected.FileName);

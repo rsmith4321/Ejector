@@ -94,6 +94,9 @@ namespace EasyEject {
                 }
                 using (var dialog = new SavedProfilesDialog(() => new SavedProfile[0], () => defaults, (entry, draft) => {}, entry => {})) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "saved-profiles-empty.png")); }
                 using (var dialog = new ImportDefaultsDialog(defaults)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "shared-defaults.png")); }
+                var automaticDefaults = new ImportDefaults { AutomaticImport = true }; var automaticProfile = automaticDefaults.NewProfile(state.Volumes[0], state.Disks[0]); automaticProfile.Name = "Fixture automatic Insta360 card"; automaticProfile.RelativeSource = "DCIM"; automaticProfile.Destination = @"D:\Travel backups"; automaticProfile.SavedDestination = HistoryIdentity();
+                using (var dialog = new ImportProfileDialog(automaticProfile, null, automaticProfile.Name, automaticDefaults, true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "profile-automatic.png")); RenderAtBottom(dialog, Path.Combine(output, "profile-automatic-bottom.png")); }
+                using (var dialog = new ImportDefaultsDialog(automaticDefaults)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "shared-automatic.png")); RenderAtBottom(dialog, Path.Combine(output, "shared-automatic-bottom.png")); }
                 using (var dialog = new ImportDefaultsDialog(new ImportDefaults { DeleteOriginals = true })) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "shared-removal.png")); }
                 using (var dialog = new OriginalRemovalConfirmationDialog("Applies to EVERY device using defaults, including future profiles.", true)) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "enable-removal.png")); }
                 using (var dialog = new VerifiedImportConfirmationDialog("Copy selected videos and their required companions under:\nE:\\DCIM\n\nTo a date folder under:\nD:\\Travel backups\n\nOriginal filenames are kept. SHA-256 verifies new and reused copies.\n\n" + OriginalRemovalChoice.BeforeImport(RemoveOptions()) + "\n\nDevice remains connected. Start this manual import?")) { dialog.Size = dialog.MinimumSize; Render(dialog, Path.Combine(output, "manual-removal.png")); }
@@ -624,6 +627,7 @@ namespace EasyEject {
             RemovalResumeTests();
             RemovalResumeActionTests();
             SavedProfileTests();
+            AutomaticImportTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
         }
         static void Render(System.Windows.Forms.Form form, string path) {

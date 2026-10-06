@@ -10,12 +10,16 @@ namespace EasyEject {
         internal readonly TextBox Detail = new TextBox();
         readonly Func<SavedProfile[]> read;
         readonly Func<ImportDefaults> defaults;
-        readonly Action<SavedProfile, ImportProfile> save;
+        readonly Action<SavedProfile, ImportProfile, bool> save;
         readonly Action<SavedProfile> forget;
+        readonly Action settingsSaved;
         internal bool Changed { get; private set; }
         SavedProfile Selected { get { return ProfilesList.SelectedItems.Count == 1 ? (SavedProfile)ProfilesList.SelectedItems[0].Tag : null; } }
-        internal SavedProfilesDialog(Func<SavedProfile[]> read, Func<ImportDefaults> defaults, Action<SavedProfile, ImportProfile> save, Action<SavedProfile> forget) {
+        internal SavedProfilesDialog(Func<SavedProfile[]> read, Func<ImportDefaults> defaults, Action<SavedProfile, ImportProfile> save, Action<SavedProfile> forget)
+            : this(read, defaults, (entry, draft, chosen) => save(entry, draft), forget, null) {}
+        internal SavedProfilesDialog(Func<SavedProfile[]> read, Func<ImportDefaults> defaults, Action<SavedProfile, ImportProfile, bool> save, Action<SavedProfile> forget, Action settingsSaved) {
             this.read = read; this.defaults = defaults; this.save = save; this.forget = forget;
+            this.settingsSaved = settingsSaved;
             Text = "Saved import profiles"; Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(810, 570); MinimumSize = new Size(700, 490); StartPosition = FormStartPosition.CenterParent;
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18), ColumnCount = 1, RowCount = 3 };
@@ -40,7 +44,7 @@ namespace EasyEject {
             var entries = read(); ProfilesList.Items.Clear();
             foreach (var entry in entries) {
                 var row = new ListViewItem(entry.Display) { Tag = entry };
-                row.SubItems.Add(entry.CanEdit ? (entry.Profile.FollowsDefaults ? "Uses defaults" : "Custom") : "Needs review");
+                row.SubItems.Add(entry.CanEdit ? (entry.Profile.FollowsDefaults ? "Uses defaults" : "Custom") + " · " + (entry.Profile.AutomaticEnabled(defaults()) ? "Automatic" : "Manual") : "Needs review");
                 row.SubItems.Add(entry.CanEdit ? entry.Profile.Destination : "Saved record could not be used"); ProfilesList.Items.Add(row);
             }
             UpdateSelection();
@@ -51,14 +55,14 @@ namespace EasyEject {
             if (selected == null) { Detail.Text = ProfilesList.Items.Count == 0 ? "No saved devices. Connect a device to create an import profile." : "Select a saved profile to review its folders, owner scope and device identity. This list gives no permission to import or eject."; return; }
             if (!selected.CanEdit) { Detail.Text = "This record could not be used and was left intact:\r\n" + selected.FileName + "\r\n\r\n" + selected.Error + "\r\n\r\nConnect the original device and set up its profile again. No device identity is guessed."; return; }
             var p = selected.Profile; var choices = p.Resolve(defaults());
-            Detail.Text = selected.Display + "\r\nMedia folder: " + (String.IsNullOrEmpty(p.RelativeSource) ? "Whole device" : p.RelativeSource) + "\r\nDestination: " + p.Destination + "\r\n\r\n" + (choices.VideosOnly ? "Videos only" : "All media") + " · " + (choices.IncludePreviews ? "Includes previews" : "Skips optional previews") + " · " + (choices.CleanLayout ? "Clean layout" : "Preserved folders") + "\r\n" + (choices.AskToEject ? "Asks to eject after import" : "No post-import eject prompt") + "\r\n" + OriginalRemovalChoice.BeforeImport(choices) + "\r\n" + (choices.RecoverTrash ? "Device Trash recovery is on." : "Device Trash recovery is off.") + "\r\n" + DeviceTrashChoice.Scope(p.MacTrashUid) + "\r\n\r\nSaved volume: " + p.VolumeId + "\r\nVolume serial: " + p.VolumeSerial + "\r\nPhysical disk: " + p.DiskInstance + "\r\n\r\nThe original device and destination are checked again before each import. Formatting requires enrollment again.";
+            Detail.Text = selected.Display + "\r\nMedia folder: " + (String.IsNullOrEmpty(p.RelativeSource) ? "Whole device" : p.RelativeSource) + "\r\nDestination: " + p.Destination + "\r\n\r\n" + (p.AutomaticEnabled(defaults()) ? "Automatic import on the next connection (and app launch)" : "Manual import only") + "\r\n" + (choices.VideosOnly ? "Videos only" : "All media") + " · " + (choices.IncludePreviews ? "Includes previews" : "Skips optional previews") + " · " + (choices.CleanLayout ? "Clean layout" : "Preserved folders") + "\r\n" + (choices.AskToEject ? "Asks to eject after import" : "No post-import eject prompt") + "\r\n" + OriginalRemovalChoice.BeforeImport(choices) + "\r\n" + (choices.RecoverTrash ? "Device Trash recovery is on." : "Device Trash recovery is off.") + "\r\n" + DeviceTrashChoice.Scope(p.MacTrashUid) + "\r\n\r\nSaved volume: " + p.VolumeId + "\r\nVolume serial: " + p.VolumeSerial + "\r\nPhysical disk: " + p.DiskInstance + "\r\nDestination identity: " + (p.SavedDestination == null ? "Older profile — choose the destination again before automatic import" : p.SavedDestination.VolumeId + " / " + p.SavedDestination.DiskInstance) + "\r\n\r\nThe original device and destination are checked again before each import. Formatting requires enrollment again.";
         }
         void EditSelected() {
             var entry = Selected; if (entry == null || !entry.CanEdit) return;
             try {
-                using (var dialog = new ImportProfileDialog(entry.Profile, null, entry.Display, defaults(), true)) {
+                using (var dialog = new ImportProfileDialog(entry.Profile, null, entry.Display, defaults(), true, settingsSaved)) {
                     var result = dialog.ShowDialog(this);
-                    if (result == DialogResult.OK) { save(entry, dialog.Draft); Changed = true; RefreshProfiles(); }
+                    if (result == DialogResult.OK) { save(entry, dialog.Draft, dialog.DestinationWasChosen); Changed = true; if (settingsSaved != null) settingsSaved(); RefreshProfiles(); }
                     else if (result == DialogResult.Retry) ForgetEntry(entry);
                 }
             } catch (Exception ex) { MessageBox.Show(this, ex.Message + "\n\nNo new import started. Refresh profiles before trying again.", "Saved profile needs review", MessageBoxButtons.OK, MessageBoxIcon.Warning); TryRefresh(); }
@@ -66,7 +70,7 @@ namespace EasyEject {
         void ForgetSelected() { var entry = Selected; if (entry == null || !entry.CanEdit) return; try { ForgetEntry(entry); } catch (Exception ex) { MessageBox.Show(this, ex.Message, "Profile could not be forgotten", MessageBoxButtons.OK, MessageBoxIcon.Warning); TryRefresh(); } }
         void ForgetEntry(SavedProfile entry) {
             if (MessageBox.Show(this, "Forget " + entry.Display + " and its saved folders/import choices?\n\nOriginals, saved copies, import history and shared defaults stay intact. The device must be enrolled again to import.", "Forget saved profile", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
-            forget(entry); Changed = true; RefreshProfiles();
+            forget(entry); Changed = true; if (settingsSaved != null) settingsSaved(); RefreshProfiles();
         }
     }
     internal static class OfflineProfileDestination {
