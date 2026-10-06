@@ -1,6 +1,6 @@
 # Easy Eject for Windows · prototype 0.1
 
-Native C# / Windows Forms source for Windows 11 x64, using .NET Framework 4.8 and supported Windows storage/PnP APIs. This implementation is isolated from the Mac targets and website. The current prototype passes 541 fixture/policy tests, native read-only enumeration, and a hidden-window notification smoke check. Real card/removal compatibility and foreground/DPI acceptance are pending. See [PROGRESS.md](PROGRESS.md) for exact evidence and [PARITY.md](PARITY.md) for the full-project parity scope and direct-download plan. The exact camera model, reader and destination remain to be confirmed; this is not a complete port yet. [SOURCE_AUDIT.md](SOURCE_AUDIT.md) records remaining functional and validation gaps found against the exact Mac contracts.
+Native C# / Windows Forms source for Windows 11 x64, using .NET Framework 4.8 and supported Windows storage/PnP APIs. This implementation is isolated from the Mac targets and website. The current prototype passes 565 fixture/policy tests, native read-only enumeration, and a hidden-window notification smoke check. Real card/removal compatibility and foreground/DPI acceptance are pending. See [PROGRESS.md](PROGRESS.md) for exact evidence and [PARITY.md](PARITY.md) for the full-project parity scope and direct-download plan. The exact camera model, reader and destination remain to be confirmed; this is not a complete port yet. [SOURCE_AUDIT.md](SOURCE_AUDIT.md) records remaining functional and validation gaps found against the exact Mac contracts.
 
 ## Build and run
 
