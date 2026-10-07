@@ -61,7 +61,7 @@ namespace EasyEject {
             var stamp = Native.Info(stream.SafeFileHandle);
             if (stream.Length > 16384 || stamp.Links != 1 || (stamp.Attributes & 0x1000) != 0) throw new SafetyException("Quick Share setup is oversized, offline or hard-linked.");
             string hash = ImportHistory.Hash(stream, CancellationToken.None); stream.Position = 0;
-            var value = (QuickShareToolSettings)new DataContractJsonSerializer(typeof(QuickShareToolSettings)).ReadObject(stream);
+            var value = JsonDocuments.Read<QuickShareToolSettings>(stream, 16384);
             if (value == null) throw new SafetyException("Quick Share setup is invalid."); value.Validate(root); return new QuickShareConfigurationSnapshot(value, hash, stamp);
         }
         static void CheckSnapshot(QuickShareConfigurationSnapshot expected, QuickShareConfigurationSnapshot current) {

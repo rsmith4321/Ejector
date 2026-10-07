@@ -44,7 +44,7 @@ namespace EasyEject {
             var stamp = Native.Info(stream.SafeFileHandle);
             if (stream.Length > 65536 || stamp.Links != 1 || (stamp.Attributes & 0x1000) != 0) throw new SafetyException("Saved profile is oversized, offline or hard-linked.");
             string hash = VerifiedImporter.Hash(stream, CancellationToken.None); stream.Position = 0;
-            var value = (ImportProfile)new DataContractJsonSerializer(typeof(ImportProfile)).ReadObject(stream);
+            var value = JsonDocuments.Read<ImportProfile>(stream, 65536);
             ValidateProfileRecord(value, name);
             return new SavedProfile(name, value, hash, stamp);
         }

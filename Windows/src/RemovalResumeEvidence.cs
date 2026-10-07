@@ -58,7 +58,7 @@ namespace EasyEject {
                 // Its complete dependency parents must already be captured when that callback runs.
                 cancellation.ThrowIfCancellationRequested(); directories.Validate(); Require(intentStream.Length <= 16777216, "The journal is too large.");
                 string hash = VerifiedImporter.Hash(intentStream, cancellation); intentStream.Position = 0;
-                var intent = (RemovalIntent)new DataContractJsonSerializer(typeof(RemovalIntent)).ReadObject(intentStream);
+                var intent = JsonDocuments.Read<RemovalIntent>(intentStream, 16777216);
                 Require(intent != null && intent.Version == 1 && !intent.IsCompletionReceipt && (intent.RecoverTrash || intent.DeleteOriginals), "This is not a supported interrupted verified source-removal operation.");
                 Require(confirmed == null || (confirmed.ImportId == intent.ImportId && confirmed.IntentSha256 == hash), "The journal differs from the reviewed batch.");
                 Require(intent.SourceDevice != null && intent.DestinationDevice != null && intent.SourceDevice.Matches(device.SourceDevice) && intent.DestinationDevice.Matches(device.DestinationDevice), "The source or destination device changed.");

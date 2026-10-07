@@ -157,7 +157,7 @@ namespace EasyEject {
             var held = new Choice { Path = path }; bool accepted = false;
             try {
                 held.Receipt = SafePaths.ReadFile(record); if (held.Receipt.Length >= 32000) return null;
-                var value = (QuickShareReceipt)new DataContractJsonSerializer(typeof(QuickShareReceipt)).ReadObject(held.Receipt);
+                var value = JsonDocuments.Read<QuickShareReceipt>(held.Receipt, 31999);
                 if (value == null || !value.Matches(plan, original.Sha256)) return null;
                 held.Copy = SafePaths.ExistingCopy(path); var stamp = Native.Info(held.Copy.SafeFileHandle);
                 if (held.Copy.Length != value.Bytes || ImportHistory.Hash(held.Copy, cancel) != value.OutputSha256 || !VerifiedImporter.SameStamp(stamp, Native.Info(held.Copy.SafeFileHandle))) return null;

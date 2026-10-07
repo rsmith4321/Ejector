@@ -36,7 +36,7 @@ namespace EasyEject {
                 if (exists) {
                     using (var stream = SafePaths.ReadFile(path)) {
                         CheckRecord(stream, maximumBytes);
-                        value = (T)new DataContractJsonSerializer(typeof(T)).ReadObject(stream);
+                        value = JsonDocuments.Read<T>(stream, maximumBytes);
                         if (value == null) throw new SafetyException("Saved application settings are invalid.");
                         if (checkpoint != null) checkpoint("After record decode");
                         CheckRecord(stream, maximumBytes);

@@ -73,7 +73,7 @@ namespace EasyEject {
             if (json == null || json.Length == 0 || json.Length >= 4000000) throw new SafetyException("Quick Share received invalid or excessive probe output.");
             try {
                 using (var data = new MemoryStream(json)) {
-                    var value = (QuickShareProbe)new DataContractJsonSerializer(typeof(QuickShareProbe)).ReadObject(data);
+                    var value = JsonDocuments.Read<QuickShareProbe>(data, 3999999);
                     if (value == null || value.Streams == null || value.Streams.Any(x => x == null || x.SideData != null && x.SideData.Any(s => s == null))) throw new SafetyException("Quick Share probe streams are invalid.");
                     return value;
                 }

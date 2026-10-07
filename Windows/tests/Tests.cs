@@ -78,6 +78,7 @@ namespace EasyEject {
             }
         }
         [STAThread] public static int Main(string[] args) {
+            if (args.Length == 1 && args[0] == "--json-documents") { JsonDocumentTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated records/probes only; fake media tools, no real settings/media/device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length >= 2 && args[0] == "--share-process-fixture") return ShareProcessFixture(args);
             if (AppDomain.CurrentDomain.FriendlyName == "EasyEject.ShareFixture.exe") return ShareToolFixture(args);
             System.Windows.Forms.Application.EnableVisualStyles(); System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
@@ -751,7 +752,7 @@ namespace EasyEject {
             StartupTests();
             QuickShareRecipeTests();
             QuickShareProcessTests();
-            ConnectedReviewTests(); ConnectedForgetTests(); ConfigurationValidationTests(); ProfilePublicationTests(); QuickShareConfigurationOwnershipTests(); ImportConfigurationReadTests(); ConfigurationReadTests(); HistoryPublicationTests(); WindowsReplayRecoveryTests(); WindowsReplayBackupTests(); ProfileCatalogOwnershipTests(); OriginalOwnershipTests(); ResumeOwnershipTests(); TrashOwnershipTests(); QuickShareContractTests(); DefaultsContractTests(); BulkFinalTests(); PathOwnershipTests(); WindowsReleaseReviewTests(); WindowsUpdateCoordinatorTests(); WindowsChannelReplayTests(); WindowsChannelDiscoveryTests(); WindowsChannelTests(); WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
+            JsonDocumentTests(); ConnectedReviewTests(); ConnectedForgetTests(); ConfigurationValidationTests(); ProfilePublicationTests(); QuickShareConfigurationOwnershipTests(); ImportConfigurationReadTests(); ConfigurationReadTests(); HistoryPublicationTests(); WindowsReplayRecoveryTests(); WindowsReplayBackupTests(); ProfileCatalogOwnershipTests(); OriginalOwnershipTests(); ResumeOwnershipTests(); TrashOwnershipTests(); QuickShareContractTests(); DefaultsContractTests(); BulkFinalTests(); PathOwnershipTests(); WindowsReleaseReviewTests(); WindowsUpdateCoordinatorTests(); WindowsChannelReplayTests(); WindowsChannelDiscoveryTests(); WindowsChannelTests(); WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
             QuickShareDialogTests();
             QuickShareConfigurationTests();
             ManualQuickShareTests();

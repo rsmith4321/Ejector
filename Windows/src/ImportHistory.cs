@@ -97,7 +97,7 @@ namespace EasyEject {
             using (var stream = SafePaths.ReadFile(path)) {
                 if (stream.Length > MaximumJson) throw new SafetyException("Saved import history is too large to read.");
                 var stamp = Native.Info(stream.SafeFileHandle);
-                var values = (List<CompletedBatch>)new DataContractJsonSerializer(typeof(List<CompletedBatch>)).ReadObject(stream);
+                var values = JsonDocuments.Read<List<CompletedBatch>>(stream, (int)MaximumJson);
                 if (values == null) throw new SafetyException("Saved import history is invalid.");
                 // Validate even older excess records before retaining the last 20.
                 foreach (var value in values) Validate(value);
@@ -160,7 +160,7 @@ namespace EasyEject {
             stream.Position = 0;
             if (stream.Length > MaximumJson) throw new SafetyException("Completed receipt is too large to read.");
             hash = Hash(stream, cancel); stream.Position = 0;
-            var receipt = (ImportReceipt)new DataContractJsonSerializer(typeof(ImportReceipt)).ReadObject(stream);
+            var receipt = JsonDocuments.Read<ImportReceipt>(stream, (int)MaximumJson);
             if (receipt == null || receipt.Files == null || receipt.Files.Any(x => x == null || x.RelativePath == null || !ValidHash(x.Sha256) || x.Bytes < 0)) throw new SafetyException("Completed receipt is invalid.");
             return receipt;
         }

@@ -38,7 +38,7 @@ namespace EasyEject {
                     string hash = VerifiedImporter.Hash(stream, CancellationToken.None); stream.Position = 0;
                     ImportProfile profile = null; string error = null;
                     try {
-                        profile = (ImportProfile)new DataContractJsonSerializer(typeof(ImportProfile)).ReadObject(stream);
+                        profile = JsonDocuments.Read<ImportProfile>(stream, 65536);
                         ValidateProfileRecord(profile, empty.FileName); RequireConnectedIdentity(profile, volume, disk);
                     } catch (Exception ex) {
                         if (!(ex is SerializationException || ex is SafetyException || ex is ArgumentException)) throw;
