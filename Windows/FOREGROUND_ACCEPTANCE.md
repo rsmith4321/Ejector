@@ -2,6 +2,21 @@
 
 This records actual foreground observations separately from hidden renders and fixture tests. The full scope remains [PARITY.md](PARITY.md), against Mac baseline `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c`. The Windows port is not complete.
 
+## Modern live storage selection and lifecycle · October 7, 09:55–09:56 EDT
+
+Source `c9d838e22b863e2db93831489e934e0d45c212a3`, isolated `ModernStorageBuild`, own **PID 4008**, start **09:55:53.8874251 EDT**, HWND **5964670**. The access task reserved this input slot and received explicit release afterward. The previous idle defaults-preview PID 9856 was stopped only after fresh idle accessibility observation and exact path/start/payload hash checks. This is engineering replacement, not tray Quit acceptance. Other apps/classic preview remained untouched.
+
+Actual screenshot and accessibility show complete five-volume/one-internal-disk inventory and disabled Safe eject/Clean & eject with no selection. Selecting MYASUS changes the explanation to “No safe removable device node was identified. Use Windows Safely Remove Hardware.” Both actions remain disabled. No action button/confirmation/cleanup was invoked. Alt+F4 hides the window after its animation; fresh enumeration returns no own window while the original process remains alive. Ordinary launch restores the same HWND/PID/start time; fresh state is visible and idle with internal-storage refusal retained. No duplicate modern process remains.
+
+| Inspected payload | SHA-256 |
+|---|---|
+| `ModernStorageBuild/.../EasyEject.Modern.dll` | `a6940d742bd365f0fcc01765ecff1cee2d2a195edbb3346998a0a3c43f8d5bbb` |
+| Runtime DLL beside it | `5278072917203182d2b06b70a0c6d27ab967563cf71d8f385971de51b20ab44b` |
+
+`modern-storage-verified.log`, terminal **79073** exit **0**, contains both warning-free builds and **42/0** selected .NET 10 cases. The initial asynchronous-context failure/stopped owned fixture is retained in `modern-storage-build-test.log`; PROGRESS.md records diagnosis/fix. Explicit `--monitor-native` exits zero and `modern-storage-native-monitor.log` reports scoped notifications, complete internal inventory and post-disposal refusal. Neither smoke test proves physical notification delivery. Exact final shared source also compiles classic app/tests with warnings as errors; full classic **1214/0** was not rerun or counted as modern full regression.
+
+No actual import/eject/cleanup/media deletion, preference Save, system/security/power/display changes, startup installation, other-app/login input or publishing occurred. Active-work/modal close/Quit/session shutdown, actual notification/tray menu/Quit, physical arrival/removal, modern import/profile/default adoption and remaining dialogs, supplied tools/official LUT, explicitly identified disposable hardware/filesystems/travel and trusted direct-distribution evidence remain open. Goal active; expired heartbeat paused.
+
 ## Modern shared defaults page · October 7
 
 Source `cd0445285a6ae4d059651bb4c6d345b6a02c1eef`, own preview **PID 9856**, started **09:35:41.2643529 EDT**, HWND **33882540**, under the private `ModernDefaultsBuild` output. The access task granted this brief input slot; it was explicitly released afterward. Older read-only font-preview replacement was guarded by its exact path/start time/managed payload hash, with no modal/operation. This is engineering cleanup, not tray Quit evidence.
