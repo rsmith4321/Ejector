@@ -8,6 +8,8 @@ Evidence keys refer to Windows test files: **Q** = `QuickShareContractTests.cs`,
 
 ## EasyShare named assertions
 
+Saved-parent callback ownership follow-up: source `85f44663416ed48eec2fa71049ad179cb3d38a85`, `ShareBatchOwnershipTests.cs`. Final fixtures against committed pre-change `58fe34b` reproduce **1/5**; current focused **6/0**, full **1142/0**, terminal 41622 exit zero. Captures typed roots/all original parents before manual guard construction/batch validation; checks around callbacks and after reporting before media opens, with captured-current-parent checks during opening and all-parent boundaries. Native byte-identical parent replacement at five early/current/future boundaries refuses before fake probe/encode/decode; moved/replacement/source/receipt/foreign data are retained and fresh explicit review retries after resources release. Ordinary folder content/timestamp changes and unrecorded Luna-marked clip exclusion remain valid. Logs: `share-batch-ownership-before.log`, `share-batch-ownership-targeted.log`, `share-batch-ownership-final-test.log`; baseline/final comparison retained at `run-9b1e00c1c5be4e66`. This supplements exact selected-original/admission/refusal properties; real codec/official LUT, foreground/full app restart, hardware/filesystem and signing evidence remains Partial/pending.
+
 | Baseline line / property | Windows assertion evidence | Status and remaining proof |
 | --- | --- | --- |
 | 36 · actual Luna original identified from embedded camera identity | R checks strict VID MP4, Ultra/Pro identity, bounded tail and boundary/refusal cases | Partial: injected identity only; actual supplied Luna sample/camera remains pending |
