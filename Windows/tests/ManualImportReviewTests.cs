@@ -105,6 +105,16 @@ namespace EasyEject {
                 Check(current.Value.SavedDestination.Matches(DestinationIdentity.Capture(d.State, "destination-volume")) && profile.Value.SavedDestination == null && Directory.GetFiles(profile.Root, "*.partial").Length == 0 && Directory.GetFiles(f.Destination, "*", SearchOption.AllDirectories).Length == 0, "Late publication lost exact choices or began media work");
                 CheckManualLeasesReleased(f.Source, Path.Combine(f.Source, "recordings"), f.Destination); using (var fresh = ReviewManualFixture(f, d)) fresh.Validate();
             } });
+            Test("manual review folder ownership spans worker construction binding copying and caller disposal", () => { using (var f = new Fixture()) {
+                var d = new ScopedDiscovery(f); ImportProfile draft; var profile = SelectionProfile(f, d, out draft, true); f.Put(@"recordings\clip.mp4", "fresh generated selected clip"); var operations = new Operations();
+                int caller = Thread.CurrentThread.ManagedThreadId, construction = caller, binding = caller; bool workerProgress = false; ImportResult result;
+                using (var review = System.Threading.Tasks.Task.Run(() => ReviewManualFixture(f, d, _ => construction = Thread.CurrentThread.ManagedThreadId)).GetAwaiter().GetResult()) {
+                    var bound = System.Threading.Tasks.Task.Run(() => review.BindLegacy(profile, _ => binding = Thread.CurrentThread.ManagedThreadId)).GetAwaiter().GetResult();
+                    Check(bound.SavedDestination.Matches(review.Guard.DestinationIdentity), "Worker binding changed the selected destination");
+                    result = System.Threading.Tasks.Task.Run(() => RunManualFixture(review, operations, progress: value => { Check(Thread.CurrentThread.ManagedThreadId != caller, "Storage progress ran on the caller thread"); workerProgress = true; })).GetAwaiter().GetResult();
+                }
+                Check(construction != caller && binding != caller && workerProgress, "Worker stages were not observed"); CheckManualCopy(f, result, operations); CheckManualLeasesReleased(f.Source, Path.Combine(f.Source, "recordings"), f.Destination);
+            } });
         }
     }
 }

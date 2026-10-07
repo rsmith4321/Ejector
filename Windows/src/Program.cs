@@ -365,7 +365,7 @@ namespace EasyEject {
                     ProfileDestination.Require(stored, guard.DestinationIdentity, false);
                     string text = (options.VideosOnly ? "Copy selected videos and their required companions under:\n" : "Copy all media and sidecars under:\n") + source + "\n\nTo a date folder under:\n" + destination + "\n\n" + (options.IncludePreviews ? "Camera previews included." : "Optional previews stay on the device; required package files are included.") + "\n" + (options.CleanLayout ? "Ordinary media uses a clean layout; packages and unfamiliar media keep their tree." : "Media folder paths are retained.") + "\nOriginal filenames are kept. SHA-256 verifies new and reused copies.\n\n" + OriginalRemovalChoice.BeforeImport(options) + "\n\n" + DeviceTrashChoice.BeforeImport(options) + "\n\nThe device remains connected. Start this manual import?";
                     using (var review = new VerifiedImportConfirmationDialog(text)) if (review.ShowDialog(this) != DialogResult.Yes) return;
-                    if (stored.SavedDestination == null) stored = selection.BindLegacy(profileReview);
+                    if (stored.SavedDestination == null) stored = await Task.Run(() => selection.BindLegacy(profileReview));
                     completions.InvalidateSource(root); Log("User started import | " + source + " -> " + destination);
                     working = true; cancellation = new CancellationTokenSource(); cancel.Enabled = true; UpdateActions();
                     var activity = BeginActivity(TrayOperationKind.Import, ProfileName.Display(stored), "Preparing import");
