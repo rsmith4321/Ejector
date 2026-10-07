@@ -22,6 +22,7 @@ nonisolated struct DroneProfile: Codable, Identifiable, Equatable, Sendable {
     // Legacy sharing settings remain compatible; older profiles and new cards start off.
     var sharingPreset: EasySharePreset? = nil
     var sharingColor: EasyShareColor? = nil
+    var sharingCamera: EasyShareCamera? = nil
 
     var followsImportDefaults: Bool { usesImportDefaults == true }
 }

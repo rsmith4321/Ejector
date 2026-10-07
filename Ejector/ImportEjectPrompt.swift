@@ -2,7 +2,7 @@ import AppKit
 
 /// A successful scan offers a choice; only the second button authorizes ejection.
 @MainActor enum ImportEjectPrompt {
-    static func make(hasMedia: Bool, deviceName: String, sourceName: String? = nil, storageSources: [String] = [], quickShare: Bool = false) -> NSAlert {
+    static func make(hasMedia: Bool, deviceName: String, sourceName: String? = nil, storageSources: [String] = [], quickShare: Bool = false, gyroflowFirst: Bool = false) -> NSAlert {
         let alert = NSAlert()
         alert.messageText = hasMedia ? "Import complete. Eject now?" : "No media found. Eject now?"
         alert.informativeText = (hasMedia
@@ -18,8 +18,10 @@ import AppKit
         alert.addButton(withTitle: "Keep Connected").keyEquivalent = "\r"
         alert.addButton(withTitle: storageSources.isEmpty ? "Eject Now" : "Eject Camera").keyEquivalent = ""
         if quickShare {
-            alert.informativeText += "\n\nQuick Share makes smaller copies from the saved originals. Choose the size and whether to apply the Luna LUT. You can also do this later in Device Media Imports."
-            alert.addButton(withTitle: "Quick Share…").keyEquivalent = ""
+            alert.informativeText += gyroflowFirst
+                ? "\n\nOpen the verified originals in Gyroflow first. After exporting stabilized videos, make LUT sharing copies from Device Media Imports."
+                : "\n\nQuick Share makes smaller copies from the saved originals. Choose the size and the LUT for this device. You can also do this later in Device Media Imports."
+            alert.addButton(withTitle: gyroflowFirst ? "Open in Gyroflow" : "Quick Share…").keyEquivalent = ""
         }
         return alert
     }

@@ -352,9 +352,12 @@ import UserNotifications
     private func showEjectPrompt(_ entry: ImportCompletion) {
         guard completions.entries[entry.id] != nil else { return }
         #if !APP_STORE
-        let offersQuickShare = quickShareProfile(for: entry.id) != nil
+        let shareProfile = quickShareProfile(for: entry.id)
+        let offersQuickShare = shareProfile != nil
+        let gyroflowFirst = shareProfile?.sharingCamera == .djiO4Pro
         #else
         let offersQuickShare = false
+        let gyroflowFirst = false
         #endif
         if !ImportVolumes.otherStorageSources(entry.source).isEmpty {
             do {
@@ -367,41 +370,83 @@ import UserNotifications
                 }
                 let alert = ImportEjectPrompt.make(hasMedia: entry.hasMedia,
                     deviceName: entry.deviceName, sourceName: entry.source.lastPathComponent,
-                    storageSources: plan.members.map { $0.url.lastPathComponent }, quickShare: offersQuickShare)
+                    storageSources: plan.members.map { $0.url.lastPathComponent }, quickShare: offersQuickShare, gyroflowFirst: gyroflowFirst)
                 NSApp.activate()
                 let choice = alert.runModal()
                 if choice == .alertSecondButtonReturn {
                     ejectCameraStorage(entry, plan: plan, expectedConnections: expectedConnections)
                 }
                 #if !APP_STORE
-                if choice == .alertThirdButtonReturn { quickShareCompletedImport(entry.id, returnToEject: true) }
+                if choice == .alertThirdButtonReturn {
+                    if gyroflowFirst { openInGyroflow(entry.id) }
+                    else { quickShareCompletedImport(entry.id, returnToEject: true) }
+                }
                 #endif
             } catch { recordOperationFailure(error) }
             return
         }
-        let alert = ImportEjectPrompt.make(hasMedia: entry.hasMedia, deviceName: entry.deviceName, quickShare: offersQuickShare)
+        let alert = ImportEjectPrompt.make(hasMedia: entry.hasMedia, deviceName: entry.deviceName, quickShare: offersQuickShare, gyroflowFirst: gyroflowFirst)
         NSApp.activate()
         let choice = alert.runModal()
         if choice == .alertSecondButtonReturn { ejectCompletedImport(entry.id) }
         #if !APP_STORE
-        if choice == .alertThirdButtonReturn { quickShareCompletedImport(entry.id, returnToEject: true) }
+        if choice == .alertThirdButtonReturn {
+            if gyroflowFirst { openInGyroflow(entry.id) }
+            else { quickShareCompletedImport(entry.id, returnToEject: true) }
+        }
         #endif
     }
 
     #if !APP_STORE
+    func openInGyroflow(_ id: String) {
+        guard !busy, let batch = completedImports.first(where: { $0.id == id }),
+              quickShareProfile(for: id)?.sharingCamera == .djiO4Pro else { return }
+        let originals = batch.originals.map(\.url).filter {
+            $0.deletingPathExtension().lastPathComponent.range(of: #"^DJI_\d{14}_\d{4}_D$"#, options: .regularExpression) != nil
+        }
+        guard !originals.isEmpty else {
+            message = "No DJI O4 Pro originals were found in this completed import."
+            return
+        }
+        let app = URL(fileURLWithPath: "/Applications/Gyroflow.app")
+        guard FileManager.default.fileExists(atPath: app.path) else {
+            message = "Install Gyroflow to stabilize O4 Pro originals before Quick Share."
+            return
+        }
+        NSWorkspace.shared.open(originals, withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+            if let error { DispatchQueue.main.async { self.message = "Could not open Gyroflow: \(error.localizedDescription)" } }
+        }
+        message = "Opened O4 Pro originals in Gyroflow. Export stabilized MP4s beside them, then choose Quick Share."
+    }
+
     func quickShareCompletedImport(_ id: String, returnToEject: Bool = false) {
         guard !busy, let batch = completedImports.first(where: { $0.id == id }),
               let profile = quickShareProfile(for: id) else { return }
         NSApp.activate()
+        let camera = profile.sharingCamera ?? .luna
+        if camera == .djiO4Pro {
+            let masters = batch.originals.map(\.url).filter {
+                $0.deletingPathExtension().lastPathComponent.range(of: #"^DJI_\d{14}_\d{4}_D$"#, options: .regularExpression) != nil
+            }
+            let missing = masters.filter { master in
+                let output = master.deletingLastPathComponent().appendingPathComponent(master.deletingPathExtension().lastPathComponent + "_stabilized.mp4")
+                return !FileManager.default.fileExists(atPath: output.path)
+            }
+            if !missing.isEmpty {
+                message = "Finish these O4 Pro videos in Gyroflow first: \(missing.map(\.lastPathComponent).joined(separator: ", ")). Export beside the originals with the default _stabilized.mp4 name, then choose Quick Share."
+                return
+            }
+        }
         guard let choice = QuickSharePrompt.choose(deviceName: batch.deviceName,
-            preset: profile.sharingPreset ?? .hd, color: profile.sharingColor ?? .lunaILog) else { return }
+            preset: profile.sharingPreset ?? .hd, color: profile.sharingColor ?? camera.logColor, camera: camera) else { return }
         createQuickShare(batch, preset: choice.preset, color: choice.color, returnToEject: returnToEject)
     }
 
     /// Called only after a manual Quick Share choice. Never invoked by start/refresh/importNow.
     func createQuickShare(_ batch: QuickShareImport, preset: EasySharePreset, color: EasyShareColor,
                           returnToEject: Bool = false) {
-        guard !busy, completedImports.contains(batch), quickShareProfile(for: batch.id) != nil else { return }
+        guard !busy, completedImports.contains(batch), let profile = quickShareProfile(for: batch.id) else { return }
+        let camera = profile.sharingCamera ?? .luna
         do {
             var stale = false
             let destination = try URL(resolvingBookmarkData: batch.destinationBookmark,
@@ -420,6 +465,10 @@ import UserNotifications
                 }
                 guard !manualOperations.contains(key) else { throw ImportFailure("The import destination is being ejected. Reconnect it before making Quick Share copies.") }
                 let tools = try EasyShareTools.installed()
+                let stabilized: [URL] = camera == .djiO4Pro ? batch.originals.map(\.url).compactMap { master in
+                    let output = master.deletingLastPathComponent().appendingPathComponent(master.deletingPathExtension().lastPathComponent + "_stabilized.mp4")
+                    return FileManager.default.fileExists(atPath: output.path) ? output : nil
+                } : []
                 let token = ImportCancellation()
                 busy = true; hasError = false; activeName = batch.deviceName; cancellation = token
                 destinationRoot = volume; sourceRoot = nil; protectedPhysicalIDs = [key]
@@ -445,12 +494,13 @@ import UserNotifications
                     }
                     do {
                         try audit("User requested Quick Share | \(batch.deviceName) | \(preset.rawValue) | \(color.rawValue)")
-                        let engine = EasyShareEngine(tools: tools, preset: preset, color: color, cancellation: token,
+                        let engine = EasyShareEngine(tools: tools, preset: preset, color: color,
+                            camera: camera, cancellation: token,
                             validate: validate, report: { value in DispatchQueue.main.async { self.progress = value } }, audit: audit)
-                        let result = try engine.run(originals: batch.originals, folder: batch.folder)
+                        let result = try engine.run(originals: batch.originals, folder: batch.folder, stabilized: stabilized)
                         let total = result.created + result.reused
                         let note = total > 0 ? "\(batch.deviceName): \(total) \(preset.rawValue) Quick Share copies ready in Sharing Copies. Imported originals are unchanged."
-                            : "\(batch.deviceName): no supported Luna master videos in this completed import."
+                            : "\(batch.deviceName): no supported \(camera.rawValue) master videos in this completed import."
                         DispatchQueue.main.async {
                             if accessed { destination.stopAccessingSecurityScopedResource() }
                             self.finish(error: nil, message: note, refreshDevices: false)

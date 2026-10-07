@@ -12,7 +12,14 @@ nonisolated enum EasySharePreset: String, Codable, CaseIterable, Sendable {
 
 nonisolated enum EasyShareColor: String, Codable, CaseIterable, Sendable {
     case lunaILog = "Luna I-Log → standard color"
+    case djiO4DLogM = "DJI O4 Pro D-Log M → standard color"
     case standard = "Standard color (no LUT)"
+}
+
+nonisolated enum EasyShareCamera: String, Codable, CaseIterable, Sendable {
+    case luna = "Insta360 Luna"
+    case djiO4Pro = "DJI O4 Pro"
+    var logColor: EasyShareColor { self == .luna ? .lunaILog : .djiO4DLogM }
 }
 
 // A personal Website-edition experiment. No executable or manufacturer LUT is bundled.
@@ -21,8 +28,14 @@ nonisolated struct EasyShareTools {
     let ffmpeg: URL
     let ffprobe: URL
     let lut: URL
+    let djiLUT: URL?
+    init(ffmpeg: URL, ffprobe: URL, lut: URL, djiLUT: URL? = nil) {
+        self.ffmpeg = ffmpeg; self.ffprobe = ffprobe; self.lut = lut; self.djiLUT = djiLUT
+    }
     static let lutName = "Luna_I-Log_to_Rec709_BT1886_s33_v2.cube"
     static let officialLUTSHA = "e3e5c3ab4ca7c166f3ebb740b45ed8cbce649b0c18dca9d5661754c53b9ee17d"
+    static let djiLUTName = "DJI O4 Air Unit Series D-Log M to Rec.709 V1.cube"
+    static let djiLUTSHA = "b18162854ab47702068410c33afa98a8cb6eef159fc5a04ce0e65fad0fd8947e"
     static var folder: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Easy Eject/Easy Share", isDirectory: true)
@@ -35,23 +48,29 @@ nonisolated struct EasyShareTools {
             }
             throw ImportFailure("Easy Share needs FFmpeg installed on this Mac.")
         }
-        return try Self(ffmpeg: executable("ffmpeg"), ffprobe: executable("ffprobe"), lut: folder.appendingPathComponent(lutName))
+        return try Self(ffmpeg: executable("ffmpeg"), ffprobe: executable("ffprobe"), lut: folder.appendingPathComponent(lutName),
+                        djiLUT: folder.appendingPathComponent(djiLUTName))
     }
-    static func validateLUT(_ url: URL) throws -> Data {
+    func lutURL(for color: EasyShareColor) -> URL { color == .djiO4DLogM ? (djiLUT ?? Self.folder.appendingPathComponent(Self.djiLUTName)) : lut }
+    static func lutSHA(for color: EasyShareColor) -> String? {
+        switch color { case .lunaILog: officialLUTSHA; case .djiO4DLogM: djiLUTSHA; case .standard: nil }
+    }
+    static func validateLUT(_ url: URL, color: EasyShareColor = .lunaILog) throws -> Data {
+        guard let expected = lutSHA(for: color) else { throw ImportFailure("Standard color does not need a LUT.") }
         try MediaImportEngine.checkPath(url)
         let stamp = try MediaImportEngine.stamp(url)
-        guard stamp.size > 0, stamp.size < 2_000_000 else { throw ImportFailure("Choose the official Luna Rec.709 s33 v2 LUT.") }
+        guard stamp.size > 0, stamp.size < 2_000_000 else { throw ImportFailure("Choose the official \(color == .lunaILog ? "Luna" : "DJI O4 Air Unit Series") Rec.709 LUT.") }
         let data = try Data(contentsOf: url)
-        guard SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == officialLUTSHA else {
-            throw ImportFailure("Choose Luna_I-Log_to_Rec709_BT1886_s33_v2.cube from Insta360’s Luna LUT download.")
+        guard SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == expected else {
+            throw ImportFailure("Choose the official \(color == .lunaILog ? "Luna I-Log" : "DJI O4 Air Unit Series D-Log M") to Rec.709 LUT for this camera.")
         }
         return data
     }
-    static func installLUT(from url: URL) throws {
-        let data = try validateLUT(url)
+    static func installLUT(from url: URL, color: EasyShareColor = .lunaILog) throws {
+        let data = try validateLUT(url, color: color)
         try MediaImportEngine.checkPath(folder)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let target = folder.appendingPathComponent(lutName)
+        let target = folder.appendingPathComponent(color == .lunaILog ? lutName : djiLUTName)
         try MediaImportEngine.checkPath(target)
         try data.write(to: target, options: .atomic)
     }
@@ -62,11 +81,19 @@ nonisolated struct EasyShareEngine {
     let tools: EasyShareTools
     let preset: EasySharePreset
     let color: EasyShareColor
+    let camera: EasyShareCamera
     let cancellation: ImportCancellation
     let validate: () throws -> Void
     let report: (ImportProgress) -> Void
     let audit: (String) throws -> Void
     static let recipe = "luna-share-v1-h264-30fps-aac160"
+    var recipe: String { camera == .luna ? Self.recipe : "dji-o4-share-v1-h264-30fps-aac160" }
+    init(tools: EasyShareTools, preset: EasySharePreset, color: EasyShareColor, camera: EasyShareCamera = .luna,
+         cancellation: ImportCancellation, validate: @escaping () throws -> Void,
+         report: @escaping (ImportProgress) -> Void, audit: @escaping (String) throws -> Void) {
+        self.tools = tools; self.preset = preset; self.color = color; self.camera = camera
+        self.cancellation = cancellation; self.validate = validate; self.report = report; self.audit = audit
+    }
 
     struct Result { var created = 0; var reused = 0; var skipped = 0; var folder: URL }
     struct Receipt: Codable {
@@ -80,7 +107,10 @@ nonisolated struct EasyShareEngine {
     struct Probe: Decodable {
         let streams: [Stream]
         let format: Format
-        struct Format: Decodable { let duration: String? }
+        struct Format: Decodable {
+            let duration: String?
+            let tags: [String: String]?
+        }
         struct Stream: Decodable {
             let codec_type: String?
             let codec_name: String?
@@ -117,14 +147,43 @@ nonisolated struct EasyShareEngine {
         return tail.range(of: Data("Insta360 Luna Ultra".utf8)) != nil || tail.range(of: Data("Insta360 Luna Pro".utf8)) != nil
     }
 
-    func run(originals: [MediaImportEngine.VerifiedMedia], folder: URL) throws -> Result {
+    func isDJIO4ProMaster(_ url: URL) throws -> Bool {
+        guard url.pathExtension.lowercased() == "mp4",
+              url.deletingPathExtension().lastPathComponent.range(of: #"^DJI_\d{14}_\d{4}_D$"#, options: .regularExpression) != nil else { return false }
+        return try probe(url).format.tags?["encoder"] == "DJI O4P"
+    }
+
+    func run(originals: [MediaImportEngine.VerifiedMedia], folder: URL,
+             stabilized: [URL] = []) throws -> Result {
         try check()
         let sharing = folder.appendingPathComponent("Sharing Copies", isDirectory: true)
         var result = Result(folder: sharing)
-        let candidates = try originals.filter { try Self.isLunaMaster($0.url) }
+        guard color == .standard || color == camera.logColor else {
+            throw ImportFailure("The selected LUT does not match this device’s camera.")
+        }
+        let candidates: [MediaImportEngine.VerifiedMedia]
+        if camera == .luna {
+            candidates = try originals.filter { try Self.isLunaMaster($0.url) }
+        } else {
+            let masters = try originals.filter { try isDJIO4ProMaster($0.url) }
+            candidates = try stabilized.map { export in
+                guard export.pathExtension.lowercased() == "mp4",
+                      export.deletingPathExtension().lastPathComponent.hasSuffix("_stabilized"),
+                      masters.contains(where: { export.deletingPathExtension().lastPathComponent ==
+                          $0.url.deletingPathExtension().lastPathComponent + "_stabilized" }),
+                      MediaImportEngine.isWithin(export, folder),
+                      !MediaImportEngine.isWithin(export, sharing) else {
+                    throw ImportFailure("Choose a Gyroflow export matching a verified DJI O4 Pro original in this import.")
+                }
+                try MediaImportEngine.checkPath(export)
+                return .init(url: export, sha256: try MediaImportEngine.hash(export, cancellation: cancellation, progress: { _ in }))
+            }
+            guard !candidates.isEmpty else { throw ImportFailure("Stabilize the O4 Pro originals in Gyroflow, then choose their _stabilized.mp4 exports.") }
+        }
         result.skipped = originals.filter { $0.url.pathExtension.lowercased() == "mp4" }.count - candidates.count
         guard !candidates.isEmpty else { return result }
-        let lutData = color == .lunaILog ? try EasyShareTools.validateLUT(tools.lut) : nil
+        let lutData = color == .standard ? nil : try EasyShareTools.validateLUT(tools.lutURL(for: color), color: color)
+        let lutSHA = EasyShareTools.lutSHA(for: color)
         try MediaImportEngine.checkPath(sharing)
         try FileManager.default.createDirectory(at: sharing, withIntermediateDirectories: true)
         for (index, original) in candidates.enumerated() {
@@ -138,14 +197,22 @@ nonisolated struct EasyShareEngine {
                 throw ImportFailure("A saved original changed before Easy Share. Import it again.")
             }
             let input = try probe(original.url)
+            if camera == .djiO4Pro {
+                let masterName = original.url.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "_stabilized", with: "") + ".MP4"
+                guard let master = originals.first(where: { $0.url.lastPathComponent.caseInsensitiveCompare(masterName) == .orderedSame }),
+                      try MediaImportEngine.hash(master.url, cancellation: cancellation, progress: { _ in }) == master.sha256,
+                      abs(try probe(master.url).seconds - input.seconds) < 0.5 else {
+                    throw ImportFailure("The Gyroflow export or its O4 Pro original changed or does not match.")
+                }
+            }
             guard let video = input.video, let width = video.width, let height = video.height,
                   width > 0, height > 0, input.seconds.isFinite, input.seconds > 0 else {
-                throw ImportFailure("Easy Share could not read the Luna video’s duration or dimensions.")
+                throw ImportFailure("Quick Share could not read the camera video’s duration or dimensions.")
             }
             // HDR and Dolby Vision need a different conversion; never run the I-Log LUT on them.
             guard video.color_transfer != "smpte2084", video.color_transfer != "arib-std-b67",
                   !(video.side_data_list?.contains { $0.side_data_type?.contains("DOVI") == true } ?? false) else {
-                throw ImportFailure("Easy Share currently supports Luna I-Log and standard SDR clips. This clip is HDR.")
+                throw ImportFailure("Quick Share supports D-Log M, I-Log, and standard SDR clips. This clip is HDR.")
             }
             let rotation = abs(video.side_data_list?.compactMap(\.rotation).first ?? 0) % 180
             let displayWidth = rotation == 90 ? height : width
@@ -160,7 +227,7 @@ nonisolated struct EasyShareEngine {
             let fps = rate.isFinite && rate > 0 && rate <= 30 ? rateString : "30"
             let basename = original.url.deletingPathExtension().lastPathComponent + "-sharing-" + preset.rawValue
             let destination = sharing.appendingPathComponent(basename + ".mp4")
-            let output = try chooseOutput(destination, original: original, lutSHA: lutData == nil ? nil : EasyShareTools.officialLUTSHA)
+            let output = try chooseOutput(destination, original: original, lutSHA: lutSHA)
             if output.reused {
                 result.reused += 1
                 try audit("Easy Share reused verified \(preset.rawValue) copy | \(output.url.path)")
@@ -171,9 +238,9 @@ nonisolated struct EasyShareEngine {
             try FileManager.default.createDirectory(at: work, withIntermediateDirectories: false)
             defer { try? FileManager.default.removeItem(at: work) }
             let temporary = work.appendingPathComponent("output.mp4")
-            if let lutData { try lutData.write(to: work.appendingPathComponent("luna.cube"), options: .withoutOverwriting) }
+            if let lutData { try lutData.write(to: work.appendingPathComponent("camera.cube"), options: .withoutOverwriting) }
             var filters = ["fps=\(fps)", "scale=\(outputWidth):\(outputHeight):flags=lanczos"]
-            if lutData != nil { filters += ["format=gbrpf32le", "lut3d=file=luna.cube:interp=tetrahedral"] }
+            if lutData != nil { filters += ["format=gbrpf32le", "lut3d=file=camera.cube:interp=tetrahedral"] }
             filters += ["scale=in_range=auto:out_range=tv:out_color_matrix=bt709", "format=yuv420p", "setsar=1",
                         "setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709"]
             let args = ["-nostdin", "-hide_banner", "-v", "error", "-xerror", "-nostats", "-stats_period", "0.5", "-progress", "pipe:1",
@@ -216,7 +283,7 @@ nonisolated struct EasyShareEngine {
             // Exclusive rename also supports destinations without hard links (such as exFAT).
             guard renamex_np(temporary.path, output.url.path, UInt32(RENAME_EXCL)) == 0 else { throw ImportFailure("The sharing filename is now occupied or cannot be saved. Existing files were kept.") }
             try MediaImportEngine.flushSavedCopy(output.url)
-            let receipt = Receipt(recipe: Self.recipe, sourceSHA256: original.sha256, lutSHA256: lutData == nil ? nil : EasyShareTools.officialLUTSHA,
+            let receipt = Receipt(recipe: recipe, sourceSHA256: original.sha256, lutSHA256: lutSHA,
                                   preset: preset, color: color, outputSHA256: outputSHA)
             let receiptURL = Self.receiptURL(output.url)
             try MediaImportEngine.checkPath(receiptURL)
@@ -240,7 +307,7 @@ nonisolated struct EasyShareEngine {
             if !FileManager.default.fileExists(atPath: url.path) && !FileManager.default.fileExists(atPath: receiptURL.path) { return (url, false) }
             if let receiptStamp = try? MediaImportEngine.stamp(receiptURL), receiptStamp.size < 32_000,
                let data = try? Data(contentsOf: receiptURL), let receipt = try? JSONDecoder().decode(Receipt.self, from: data),
-               receipt.recipe == Self.recipe, receipt.sourceSHA256 == original.sha256, receipt.lutSHA256 == lutSHA,
+               receipt.recipe == recipe, receipt.sourceSHA256 == original.sha256, receipt.lutSHA256 == lutSHA,
                receipt.preset == preset, receipt.color == color, (try? MediaImportEngine.stamp(url)) != nil,
                try MediaImportEngine.hash(url, cancellation: cancellation, progress: { _ in }) == receipt.outputSHA256 {
                 return (url, true)
