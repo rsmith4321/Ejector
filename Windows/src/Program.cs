@@ -611,10 +611,7 @@ namespace EasyEject {
                     }
                     if (choice == DialogResult.Ignore) {
                         await Task.Run(() => {
-                            using (SafePaths.LockDirectories(entry.DestinationRoot)) {
-                                var guard = new WindowsDestinationGuard(discovery, entry.DestinationRoot, entry.Destination);
-                                CompletionFolder.Open(entry, entry.Destination, guard, operations, folder => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "explorer.exe", Arguments = "\"" + folder + "\"", UseShellExecute = false }));
-                            }
+                            CompletionFolder.Open(entry, entry.Destination, () => new WindowsDestinationGuard(discovery, entry.DestinationRoot, entry.Destination), operations, folder => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "explorer.exe", Arguments = "\"" + folder + "\"", UseShellExecute = false }));
                         });
                         continue;
                     }
@@ -650,11 +647,7 @@ namespace EasyEject {
                 cancellation = new CancellationTokenSource(); cancel.Enabled = true;
                 var activity = BeginActivity(TrayOperationKind.Verify, batch.DeviceName, "Checking saved files");
                 await Task.Run(() => {
-                    using (SafePaths.LockDirectories(batch.DestinationRoot)) {
-                        var guard = new WindowsDestinationGuard(discovery, batch.DestinationRoot, batch.Destination);
-                        QueueStorageWork(activity, guard);
-                        ImportHistory.Verify(batch, batch.Destination, guard, operations, cancellation.Token, ActivityReporter(activity));
-                    }
+                    ImportHistory.Verify(batch, batch.Destination, selected => new WindowsDestinationGuard(discovery, selected.DestinationRoot, selected.Destination), operations, cancellation.Token, ActivityReporter(activity), guard => QueueStorageWork(activity, guard));
                 });
                 await concurrentStorage.WaitForManual;
                 status.Text = "Verified all " + batch.Originals.Count + " exact saved files. Originals unchanged.";

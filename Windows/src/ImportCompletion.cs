@@ -119,10 +119,20 @@ namespace EasyEject {
         }
     }
     internal static class CompletionFolder {
+        internal static void Open(ImportCompletion entry, DestinationIdentity current, Func<IImportGuard> makeGuard, Operations operations, Action<string> open) {
+            if (!entry.Destination.Matches(current)) throw new SafetyException("The import destination changed. The folder was not opened.");
+            current = current.Copy();
+            using (var directories = SafePaths.HoldDirectories(entry.DestinationRoot, entry.Folder)) {
+                directories.Validate(); var guard = makeGuard(); directories.Validate();
+                Open(entry, current, guard, operations, open);
+            }
+        }
         internal static void Open(ImportCompletion entry, DestinationIdentity current, IImportGuard guard, Operations operations, Action<string> open) {
             if (!entry.Destination.Matches(current)) throw new SafetyException("The import destination changed. The folder was not opened.");
-            using (operations.Reserve(guard.ProtectedDisks)) using (var directories = SafePaths.HoldDirectories(entry.DestinationRoot, entry.Folder)) {
-                directories.Validate(); guard.Validate(); directories.Validate(); open(entry.Folder);
+            using (var directories = SafePaths.HoldDirectories(entry.DestinationRoot, entry.Folder)) {
+                directories.Validate(); using (operations.Reserve(guard.ProtectedDisks)) {
+                    directories.Validate(); guard.Validate(); directories.Validate(); open(entry.Folder);
+                }
             }
         }
     }
