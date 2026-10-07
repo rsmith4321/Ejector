@@ -143,6 +143,7 @@ namespace EasyEject.Modern {
             try {
                 var list = new ListView { ItemsSource = values.Select(v => v.DeviceName + " · " + v.Message).ToArray(), SelectionMode = ListViewSelectionMode.Single, MaxHeight = 300 };
                 confirmation = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Completed imports", Content = list, PrimaryButtonText = "Review import", CloseButtonText = "Close", DefaultButton = ContentDialogButton.Close, IsPrimaryButtonEnabled = false };
+                await EnsureVisible();
                 list.SelectionChanged += delegate { confirmation.IsPrimaryButtonEnabled = list.SelectedIndex >= 0; };
                 UpdateActions(); if (await confirmation.ShowAsync() == ContentDialogResult.Primary && list.SelectedIndex >= 0) selected = values[list.SelectedIndex].Id;
             } catch (Exception ex) { Summary.Text = "Completion list unavailable. " + ex.Message; }
@@ -156,6 +157,7 @@ namespace EasyEject.Modern {
             try {
                 string shareMessage = "";
                 while (true) {
+                await EnsureVisible();
                     var freshSettings = await Task.Run(() => AppSettings.Load()); MetadataCleanupPlan cleanup = null;
                     bool canShare = false; string sharingNote = "";
                     if (entry.Batch != null) {

@@ -232,6 +232,7 @@ namespace EasyEject.Modern {
                 if (terminal != null) Summary.Text = terminal.Message + " Completion message unavailable: " + ex.Message;
                 else {
                     Summary.Text = "Removal stopped. Refresh and review the device again.";
+                await EnsureVisible();
                     try { confirmation = MessageDialog("Device still connected", ex.Message, null); await confirmation.ShowAsync(); }
                     catch (Exception displayError) { Summary.Text = "Removal stopped. Message unavailable: " + displayError.Message; }
                     finally { confirmation = null; }

@@ -31,6 +31,7 @@ namespace EasyEject.Modern {
             if (!BeginSavedReview()) return;
             string verified = null;
             try {
+                await EnsureVisible();
                 var batches = await Task.Run(() => ImportHistory.Load()); SavedProfile[] profiles = null; string profileWarning = "";
                 try { profiles = await Task.Run(() => Profiles.Catalog()); }
                 catch (Exception ex) { profileWarning = "Sharing choices could not be read. Saved-file verification remains available. " + ex.Message; }
@@ -69,6 +70,7 @@ namespace EasyEject.Modern {
         async Task<bool> PerformQuickShare(CompletedBatch expected) {
             QuickShareResult terminal = null; ManualQuickShareRequest request = null; ManualQuickShareReview review = null; string success = null;
             try {
+                await EnsureVisible();
                 var token = activity.Begin(TrayOperationKind.Share, expected.DeviceName, "Reviewing saved batch and sharing choices");
                 var offer = await Task.Run(() => SharingService.Prepare(expected)); review = new ManualQuickShareReview(offer);
                 var size = new ComboBox { ItemsSource = new[] { "1080p · smaller files", "4K · more detail" }, SelectedIndex = review.Preset == QuickSharePreset.Uhd ? 1 : 0, HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -106,6 +108,7 @@ namespace EasyEject.Modern {
         async void OpenQuickShareTools() {
             if (!BeginSavedReview()) return;
             try {
+                await EnsureVisible();
                 var snapshot = await Task.Run(() => QuickShareConfiguration.Load()); var value = snapshot.Value;
                 var body = new StackPanel { Spacing = 12 };
                 body.Children.Add(Wrapped("Choose FFmpeg and FFprobe executables you supplied. Saving checks their paths and hashes without running them. Changed tools require a fresh selection. Easy Eject does not download or install tools; export is a separate manual action."));

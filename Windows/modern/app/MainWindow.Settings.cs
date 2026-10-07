@@ -38,6 +38,7 @@ namespace EasyEject.Modern {
             working = true; UpdateActions(); BulkEjectResult terminal = null; var counts = new CleanupCounts();
             var token = activity.Begin(TrayOperationKind.Eject, "Camera/emulator cards", "Reviewing grouped removal");
             try {
+                await EnsureVisible();
                 var owner = await Task.Run(() => new GroupedEjectReview(discovery.Scan(), AppSettings.Load(), discovery, operations,
                     new WindowsBulkConnections(discovery), validate => new WindowsEjectApi(validate), WindowsDiscovery.VolumeId));
                 groupedReview = owner;

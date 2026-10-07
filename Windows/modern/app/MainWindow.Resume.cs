@@ -18,6 +18,7 @@ namespace EasyEject.Modern {
             ResumeOperationReview owner = null; ImportedOutcome outcome = null;
             var token = activity.Begin(TrayOperationKind.Resume, connection.Volume.Display, "Choosing interrupted batch"); UpdateActions();
             try {
+                await EnsureVisible();
                 var saved = await Task.Run(() => Tuple.Create(Profiles.ReviewConnected(connection.Volume, connection.Disk), ImportDefaults.Load()));
                 if (saved.Item1.Value == null) throw new SafetyException("Set up this device with its original media folder and destination first. Saving a profile starts no import; then choose Resume interrupted import.");
                 Summary.Text = "Choose this destination's removal-intent.json beside the interrupted batch's import audit. Nothing resumes until you review and confirm it.";
