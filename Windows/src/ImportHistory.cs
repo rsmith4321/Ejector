@@ -65,6 +65,10 @@ namespace EasyEject {
     internal static class ImportHistory {
         const int Limit = 20; const long MaximumJson = 16777216;
         static readonly object gate = new object();
+        sealed class HistorySnapshot {
+            internal List<CompletedBatch> Values = new List<CompletedBatch>();
+            internal bool Exists; internal string Hash; internal Native.FileInfo Stamp;
+        }
         internal static CompletedBatch Create(ImportResult result, ImportProfile profile, string deviceName, DestinationIdentity destination) {
             if (!result.HasSelectedMedia) return null;
             destination.Validate();
@@ -82,30 +86,47 @@ namespace EasyEject {
         }
         internal static List<CompletedBatch> Load() { return Load(Profiles.Root); }
         internal static List<CompletedBatch> Load(string root) {
-            lock (gate) using (SafePaths.LockDirectories(root)) {
-                string path = Path.Combine(root, "completed-imports.json");
-                if (!File.Exists(path)) return new List<CompletedBatch>();
-                using (var stream = SafePaths.ReadFile(path)) {
-                    if (stream.Length > MaximumJson) throw new SafetyException("Saved import history is too large to read.");
-                    var values = (List<CompletedBatch>)new DataContractJsonSerializer(typeof(List<CompletedBatch>)).ReadObject(stream);
-                    if (values == null) throw new SafetyException("Saved import history is invalid.");
-                    // Validate even older excess records before retaining the last 20.
-                    foreach (var value in values) Validate(value);
-                    if (values.Select(x => x.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != values.Count) throw new SafetyException("Saved history contains duplicate batch identities.");
-                    return values.Take(Limit).ToList();
-                }
+            lock (gate) using (var directories = SafePaths.HoldDirectories(root)) {
+                var snapshot = ReadHistory(root); directories.Validate(); return snapshot.Values;
             }
         }
+        static HistorySnapshot ReadHistory(string root) {
+            string path = Path.Combine(root, "completed-imports.json");
+            try { if ((File.GetAttributes(path) & FileAttributes.Directory) != 0) throw new SafetyException("Saved import history is a directory, not an ordinary record."); }
+            catch (FileNotFoundException) { return new HistorySnapshot(); }
+            using (var stream = SafePaths.ReadFile(path)) {
+                if (stream.Length > MaximumJson) throw new SafetyException("Saved import history is too large to read.");
+                var stamp = Native.Info(stream.SafeFileHandle);
+                var values = (List<CompletedBatch>)new DataContractJsonSerializer(typeof(List<CompletedBatch>)).ReadObject(stream);
+                if (values == null) throw new SafetyException("Saved import history is invalid.");
+                // Validate even older excess records before retaining the last 20.
+                foreach (var value in values) Validate(value);
+                if (values.Select(x => x.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != values.Count) throw new SafetyException("Saved history contains duplicate batch identities.");
+                stream.Position = 0; string hash = Hash(stream, CancellationToken.None);
+                if (!VerifiedImporter.SameStamp(stamp, Native.Info(stream.SafeFileHandle))) throw new SafetyException("Saved import history changed during its held read.");
+                return new HistorySnapshot { Values = values.Take(Limit).ToList(), Exists = true, Stamp = stamp, Hash = hash };
+            }
+        }
+        static void RequirePrevious(HistorySnapshot snapshot, FileStream previous) {
+            if (snapshot.Exists != (previous != null)) throw new SafetyException("Saved import history appeared or disappeared before publication. Refresh history before retrying.");
+            if (previous != null) previous.Position = 0;
+            if (previous != null && (!VerifiedImporter.SameStamp(snapshot.Stamp, Native.Info(previous.SafeFileHandle)) || previous.Length > MaximumJson || Hash(previous, CancellationToken.None) != snapshot.Hash))
+                throw new SafetyException("Saved import history changed before its exclusive replacement. Existing history is retained; refresh before retrying.");
+        }
         internal static void Add(CompletedBatch value) { Add(value, Profiles.Root); }
-        internal static void Add(CompletedBatch value, string root) {
+        internal static void Add(CompletedBatch value, string root, Action<string> checkpoint = null) {
             if (value == null) return;
-            lock (gate) {
-                // Deep copy before publication; callers cannot change already saved entries.
-                value = Clone(value); Validate(value); Directory.CreateDirectory(root); var values = Load(root);
-                if (values.Any(x => x.Id == value.Id)) throw new SafetyException("This import batch is already in history.");
+            // Validate a deep copy before creating any storage; callers cannot change
+            // this append after the shared transaction has been admitted.
+            value = Clone(value); Validate(value); root = SafePaths.Normalize(root);
+            lock (gate) using (var directories = ConfigurationWriter.CreateRoot(root)) using (var writer = Profiles.WriterGate(root)) {
+                directories.Validate(); writer.Validate(root); var snapshot = ReadHistory(root); directories.Validate();
+                if (checkpoint != null) checkpoint("After history read"); directories.Validate(); writer.Validate(root);
+                var values = snapshot.Values;
+                if (values.Any(x => String.Equals(x.Id, value.Id, StringComparison.OrdinalIgnoreCase))) throw new SafetyException("This import batch is already in history.");
                 values.Insert(0, value); values = values.Take(Limit).ToList();
                 using (var size = new MemoryStream()) { new DataContractJsonSerializer(typeof(List<CompletedBatch>)).WriteObject(size, values); if (size.Length > MaximumJson) throw new SafetyException("Completed history exceeds its safe storage limit. Verified copies remain available."); }
-                Profiles.WriteJson(values, typeof(List<CompletedBatch>), root, "completed-imports.json");
+                ConfigurationWriter.Write(values, typeof(List<CompletedBatch>), root, "completed-imports.json", null, writer, previous => RequirePrevious(snapshot, previous));
             }
         }
         internal static CompletedBatch Clone(CompletedBatch value) {
