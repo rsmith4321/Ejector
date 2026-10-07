@@ -74,6 +74,21 @@ namespace EasyEject {
         }
     }
     internal static class OfflineProfileDestination {
+        internal static void SaveSelected(SavedProfile expected, ImportProfile draft, IDiscovery discovery, string root, Func<string, string> volumeId = null, Action<string> checkpoint = null) {
+            if (draft == null) throw new SafetyException("Choose valid saved profile choices.");
+            var value = draft.Copy(); string destination = SafePaths.Normalize(value.Destination);
+            volumeId = volumeId ?? WindowsDiscovery.VolumeId;
+            using (var directories = SafePaths.HoldDirectories(destination)) {
+                directories.Validate(); string id = volumeId(destination); directories.Validate();
+                var identity = DestinationIdentity.Capture(discovery.Scan(), id); directories.Validate(); Validate(value, identity);
+                var guard = new WindowsDestinationGuard(discovery, destination, identity, volumeId); directories.Validate();
+                Profiles.SaveOffline(expected, value, root, identity, stage => {
+                    directories.Validate(); guard.Validate(); directories.Validate();
+                    if (checkpoint != null) checkpoint(stage);
+                    directories.Validate(); guard.Validate(); directories.Validate();
+                });
+            }
+        }
         internal static void Validate(ImportProfile profile, DestinationIdentity target) {
             if (profile == null || target == null) throw new SafetyException("Destination identity is unavailable."); target.Validate();
             if (String.Equals(profile.VolumeId, target.VolumeId, StringComparison.OrdinalIgnoreCase) || String.Equals(profile.DiskInstance, target.DiskInstance, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Choose a destination on a different physical disk from this saved device.");

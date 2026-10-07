@@ -744,11 +744,7 @@ namespace EasyEject {
                 working = true; UpdateActions();
                 using (var dialog = new SavedProfilesDialog(() => Profiles.Catalog(), ReadDefaults, delegate(SavedProfile expected, ImportProfile draft, bool chosen) {
                     if (chosen || !String.Equals(expected.Profile.Destination, draft.Destination, StringComparison.OrdinalIgnoreCase)) {
-                        using (SafePaths.LockDirectories(draft.Destination)) {
-                            string id = WindowsDiscovery.VolumeId(draft.Destination);
-                            var identity = DestinationIdentity.Capture(discovery.Scan(), id); OfflineProfileDestination.Validate(draft, identity);
-                            Profiles.SaveOffline(expected, draft, Profiles.Root, identity);
-                        }
+                        OfflineProfileDestination.SaveSelected(expected, draft, discovery, Profiles.Root);
                     } else Profiles.SaveOffline(expected, draft);
                 }, entry => Profiles.ForgetOffline(entry), automatic.SettingsSaved)) {
                     dialog.ShowDialog(this);

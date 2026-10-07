@@ -91,6 +91,7 @@ namespace EasyEject {
         internal static void SaveOffline(SavedProfile expected, ImportProfile draft) { SaveOffline(expected, draft, Root); }
         internal static void SaveOffline(SavedProfile expected, ImportProfile draft, string root, DestinationIdentity selectedDestination = null, Action<string> checkpoint = null) {
             if (expected == null || draft == null || !expected.CanEdit) throw new SafetyException("Choose a valid saved profile.");
+            draft = draft.Copy();
             var original = expected.Profile;
             if (draft.VolumeId != original.VolumeId || draft.VolumeSerial != original.VolumeSerial || draft.DiskInstance != original.DiskInstance || draft.RelativeSource != original.RelativeSource || draft.MacTrashUid != original.MacTrashUid && draft.MacTrashUid != null) throw new SafetyException("Connect the original device to change its identity, media folder or Mac Trash owner.");
             ValidateName(draft.Name, true); ValidateStoredFolders(draft); SafePaths.Normalize(draft.Destination);
