@@ -2,6 +2,21 @@
 
 This records actual foreground observations separately from hidden renders and fixture tests. The full scope remains [PARITY.md](PARITY.md), against Mac baseline `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c`. The Windows port is not complete.
 
+## Modern shared defaults page · October 7
+
+Source `cd0445285a6ae4d059651bb4c6d345b6a02c1eef`, own preview **PID 9856**, started **09:35:41.2643529 EDT**, HWND **33882540**, under the private `ModernDefaultsBuild` output. The access task granted this brief input slot; it was explicitly released afterward. Older read-only font-preview replacement was guarded by its exact path/start time/managed payload hash, with no modal/operation. This is engineering cleanup, not tray Quit evidence.
+
+Actual own-window input opened Import defaults; initial screenshot showed Videos only/previews/clean layout enabled and fixed Save/Cancel. Videos only was toggled off only in the unsaved draft. Scrolling and a fresh snapshot after smooth animation reached the complete final EVERY-device/shared-scope explanation, with Save/Cancel remaining visible. Opening recovery review produced a native WinUI confirmation containing the existing full warning, disabled page choices/Save/Cancel, and visually selected Cancel. Escape dismissed it; a subsequent snapshot showed recovery unchecked and the page enabled. Page Cancel returned Connected storage with the draft-discarded message. No affirmative enable or live Save was used; permanent-original-removal confirmation and affirmative/persistence/busy close/Quit foreground flows remain untested.
+
+Both known defaults files remained absent/unchanged before/after, recorded in `modern-defaults-before.json` / `modern-defaults-after.json` under `%USERPROFILE%\.codex\EasyEjectWindowsPreview`. The preview is left visible/idle on storage with no modal. No other-app/login/security input, real media/device action, startup installation or publishing occurred.
+
+| Inspected artifact | SHA-256 |
+| --- | --- |
+| `ModernDefaultsBuild/.../EasyEject.Modern.dll` | `4962a3a7cd3137111c1341abcd79bd624694c4d2694379dde4dc9e7b41f52495` |
+| Runtime beside that payload `EasyEject.Runtime.dll` | `6879e3d40dc598d9f37311838848fec54c6f4dd070e4e4c66702ae5158fdafff` |
+
+The final warning-free build/test log `modern-defaults-verified.log` ends **25/0**, terminal 16836 exit zero. Its 13 existing reopening cases plus 12 new draft/confirmation/persistence/frozen disposable-import cases reference the actual .NET 10 runtime. This remains selected contract/fixture evidence, not a full modern-runtime/hardware/tool/foreground pass; retained full classic 1214/0 was not rerun. Modern operation/scheduler/default-adoption and remaining dialogs are still incomplete.
+
 ## Modern WinUI preview · October 7, 09:20–09:25 EDT
 
 Source `4ab69f06268c3a7884a567a8c9f9bd51243ff1d1` is the new read-only WinUI 3 preview, not the complete modern port. Two brief input slots were explicitly coordinated with the access task and released afterward. Only the preview's own returned window received input.
