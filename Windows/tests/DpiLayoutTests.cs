@@ -16,10 +16,10 @@ namespace EasyEject {
             Check(Math.Abs(scaled.Width - original.Width * factor) <= 2 && Math.Abs(scaled.Height - original.Height * factor) <= 2, explanation + " | original=" + original + ", scaled=" + scaled + ", factor=" + factor);
         }
         static void DpiLayoutTests() {
-            Test("native UI test manifest uses the application's DPI awareness", () => {
+            Test("native UI tests use the application's DPI awareness", () => {
                 Check(IsProcessDPIAware(), "Test executable does not share the app's DPI-aware context");
                 using (var form = new AppSettingsDialog(new AppSettings())) Check(form.CurrentAutoScaleDimensions.Width == GetDpiForSystem(), "Native UI dimensions disagree with system DPI");
-                Console.WriteLine("Native system DPI=" + GetDpiForSystem() + "; app/test manifests match.");
+                Console.WriteLine("Native system DPI=" + GetDpiForSystem() + "; app/test DPI contexts match.");
             });
             Test("settings scales its design viewport minimum and footer once at native DPI", () => {
                 using (var form = new AppSettingsDialog(new AppSettings())) {

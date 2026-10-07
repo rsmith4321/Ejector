@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 namespace EasyEject {
     public static partial class Tests {
         sealed class ChannelHttpFixture : HttpMessageHandler {
-            internal Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> Send;
+            internal Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> Respond;
             internal int Calls, Disposals;
-            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancel) { Interlocked.Increment(ref Calls); return Send(request, cancel); }
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancel) { Interlocked.Increment(ref Calls); return Respond(request, cancel); }
             protected override void Dispose(bool disposing) { if (disposing) Interlocked.Increment(ref Disposals); base.Dispose(disposing); }
         }
         sealed class ChannelBodyFixture : Stream {
@@ -58,7 +58,7 @@ namespace EasyEject {
             });
             Test("Channel HTTP only GETs the exact approved metadata/signature without profile or authorization", () => {
                 using (var f = new WindowsChannelFixture()) foreach (WindowsChannelResource resource in new[] { WindowsChannelResource.Metadata, WindowsChannelResource.Signature }) {
-                    var handler = new ChannelHttpFixture { Send = (request, cancel) => {
+                    var handler = new ChannelHttpFixture { Respond = (request, cancel) => {
                         Check(request.Method == HttpMethod.Get && request.RequestUri == (resource == WindowsChannelResource.Metadata ? f.Channel.Metadata : f.Channel.Signature) && request.Content == null, "Wrong method, endpoint or request body");
                         Check(request.Headers.Authorization == null && !request.Headers.Contains("Cookie") && request.Headers.UserAgent.ToString() == "EasyEject-Windows-Channel/1" && request.Headers.CacheControl.NoCache && request.Headers.CacheControl.NoStore && request.Headers.Count() == 3, "Unsolicited credentials/profile or incorrect cache policy");
                         Check(request.Headers.Accept.Single().MediaType == (resource == WindowsChannelResource.Metadata ? "application/json" : "application/pkcs7-signature"), "Wrong metadata representation"); return Task.FromResult(ChannelResponse(request, new ByteArrayContent(new byte[] { 7, 8 }))); } };
@@ -76,74 +76,74 @@ namespace EasyEject {
             });
             Test("Channel HTTP refuses redirects and every non-200 status without another request", () => {
                 using (var f = new WindowsChannelFixture()) foreach (HttpStatusCode status in new[] { HttpStatusCode.MovedPermanently, HttpStatusCode.Redirect, HttpStatusCode.TemporaryRedirect, HttpStatusCode.NotModified, HttpStatusCode.NoContent, HttpStatusCode.Unauthorized, HttpStatusCode.InternalServerError }) {
-                    var handler = new ChannelHttpFixture { Send = (request, cancel) => { var response = ChannelResponse(request, new ByteArrayContent(new byte[] { 1 }), status); response.Headers.Location = new Uri("https://other.invalid/foreign.json"); return Task.FromResult(response); } };
+                    var handler = new ChannelHttpFixture { Respond = (request, cancel) => { var response = ChannelResponse(request, new ByteArrayContent(new byte[] { 1 }), status); response.Headers.Location = new Uri("https://other.invalid/foreign.json"); return Task.FromResult(response); } };
                     Throws<SafetyException>(() => ChannelFetch(f.Channel, handler)); Check(handler.Calls == 1 && handler.Disposals == 1, "Refusal retried or leaked handler");
                 }
             });
             Test("Channel HTTP refuses retargeted and encoded responses", () => {
                 using (var f = new WindowsChannelFixture()) foreach (bool retarget in new[] { false, true }) {
-                    var stream = new ChannelBodyFixture(new byte[] { 1 }); var handler = new ChannelHttpFixture { Send = (request, cancel) => { var content = new StreamContent(stream); if (!retarget) content.Headers.ContentEncoding.Add("gzip"); return Task.FromResult(ChannelResponse(retarget ? new HttpRequestMessage(HttpMethod.Get, "https://other.invalid/channel.json") : request, content)); } };
+                    var stream = new ChannelBodyFixture(new byte[] { 1 }); var handler = new ChannelHttpFixture { Respond = (request, cancel) => { var content = new StreamContent(stream); if (!retarget) content.Headers.ContentEncoding.Add("gzip"); return Task.FromResult(ChannelResponse(retarget ? new HttpRequestMessage(HttpMethod.Get, "https://other.invalid/channel.json") : request, content)); } };
                     Throws<SafetyException>(() => ChannelFetch(f.Channel, handler)); Check(stream.Reads == 0 && stream.Disposals > 0 && handler.Calls == 1, "Rejected representation was read or leaked");
                 }
             });
             Test("Channel HTTP accepts exact independent 64K/256K response bounds", () => {
                 using (var f = new WindowsChannelFixture()) foreach (WindowsChannelResource resource in new[] { WindowsChannelResource.Metadata, WindowsChannelResource.Signature }) {
                     byte[] bytes = Enumerable.Repeat((byte)31, resource == WindowsChannelResource.Metadata ? WindowsManifestTrust.MaximumManifest : WindowsManifestTrust.MaximumSignature).ToArray();
-                    var handler = new ChannelHttpFixture { Send = (request, cancel) => Task.FromResult(ChannelResponse(request, new ByteArrayContent(bytes))) }; Check(ChannelFetch(f.Channel, handler, resource).SequenceEqual(bytes), "Exact transport bound lost bytes");
+                    var handler = new ChannelHttpFixture { Respond = (request, cancel) => Task.FromResult(ChannelResponse(request, new ByteArrayContent(bytes))) }; Check(ChannelFetch(f.Channel, handler, resource).SequenceEqual(bytes), "Exact transport bound lost bytes");
                 }
             });
             Test("Channel HTTP refuses empty and excessive declared lengths before reading", () => {
                 using (var f = new WindowsChannelFixture()) foreach (long length in new[] { 0L, WindowsManifestTrust.MaximumManifest + 1L, Int64.MaxValue }) {
-                    var stream = new ChannelBodyFixture(new byte[] { 1 }); var handler = new ChannelHttpFixture { Send = (request, cancel) => { var content = new StreamContent(stream); content.Headers.ContentLength = length; return Task.FromResult(ChannelResponse(request, content)); } };
+                    var stream = new ChannelBodyFixture(new byte[] { 1 }); var handler = new ChannelHttpFixture { Respond = (request, cancel) => { var content = new StreamContent(stream); content.Headers.ContentLength = length; return Task.FromResult(ChannelResponse(request, content)); } };
                     Throws<SafetyException>(() => ChannelFetch(f.Channel, handler)); Check(stream.Reads == 0 && stream.Disposals > 0, "Invalid length read body or leaked stream");
                 }
             });
             Test("Channel HTTP accepts unknown streamed length and refuses actual expansion", () => {
                 using (var f = new WindowsChannelFixture()) foreach (int size in new[] { 12345, WindowsManifestTrust.MaximumManifest + 1 }) {
-                    byte[] bytes = Enumerable.Repeat((byte)17, size).ToArray(); var stream = new ChannelBodyFixture(bytes); var handler = new ChannelHttpFixture { Send = (request, cancel) => Task.FromResult(ChannelResponse(request, new StreamContent(stream))) };
+                    byte[] bytes = Enumerable.Repeat((byte)17, size).ToArray(); var stream = new ChannelBodyFixture(bytes); var handler = new ChannelHttpFixture { Respond = (request, cancel) => Task.FromResult(ChannelResponse(request, new StreamContent(stream))) };
                     if (size > WindowsManifestTrust.MaximumManifest) Throws<SafetyException>(() => ChannelFetch(f.Channel, handler)); else Check(ChannelFetch(f.Channel, handler).SequenceEqual(bytes), "Unknown-length content changed"); Check(stream.Disposals > 0, "Stream was not released");
                 }
             });
             Test("Channel HTTP refuses empty, truncated and inconsistent streamed content", () => {
                 using (var f = new WindowsChannelFixture()) foreach (int declared in new[] { -1, 1, 3 }) {
-                    var stream = new ChannelBodyFixture(declared == -1 ? new byte[0] : new byte[] { 1, 2 }); var handler = new ChannelHttpFixture { Send = (request, cancel) => { var content = new StreamContent(stream); if (declared >= 0) content.Headers.ContentLength = declared; return Task.FromResult(ChannelResponse(request, content)); } };
+                    var stream = new ChannelBodyFixture(declared == -1 ? new byte[0] : new byte[] { 1, 2 }); var handler = new ChannelHttpFixture { Respond = (request, cancel) => { var content = new StreamContent(stream); if (declared >= 0) content.Headers.ContentLength = declared; return Task.FromResult(ChannelResponse(request, content)); } };
                     Throws<SafetyException>(() => ChannelFetch(f.Channel, handler)); Check(stream.Disposals > 0, "Inconsistent body was retained");
                 }
             });
             Test("Channel HTTP wraps request and read failures and releases owned transport", () => {
                 using (var f = new WindowsChannelFixture()) {
-                    var requestFailure = new ChannelHttpFixture { Send = (request, cancel) => { throw new HttpRequestException("fixture network refusal"); } };
+                    var requestFailure = new ChannelHttpFixture { Respond = (request, cancel) => { throw new HttpRequestException("fixture network refusal"); } };
                     Check(Throws<SafetyException>(() => ChannelFetch(f.Channel, requestFailure)).Message.Contains("could not be retrieved"), "Request error lost actionable refusal"); Check(requestFailure.Disposals == 1, "Failed request leaked handler");
-                    var stream = new ChannelBodyFixture(new byte[0]) { ReadOperation = (buffer, offset, count, cancel) => { throw new IOException("fixture stream failure"); } }; var readFailure = new ChannelHttpFixture { Send = (request, cancel) => Task.FromResult(ChannelResponse(request, new StreamContent(stream))) };
+                    var stream = new ChannelBodyFixture(new byte[0]) { ReadOperation = (buffer, offset, count, cancel) => { throw new IOException("fixture stream failure"); } }; var readFailure = new ChannelHttpFixture { Respond = (request, cancel) => Task.FromResult(ChannelResponse(request, new StreamContent(stream))) };
                     Check(Throws<SafetyException>(() => ChannelFetch(f.Channel, readFailure)).Message.Contains("could not be retrieved") && stream.Disposals > 0 && readFailure.Disposals == 1, "Failed stream leaked ownership");
                 }
             });
             Test("Channel HTTP total deadline ends ignored header cancellation and disposes a late response", () => {
                 using (var f = new WindowsChannelFixture()) using (var entered = new ManualResetEventSlim()) {
                     var pending = new TaskCompletionSource<HttpResponseMessage>(); HttpRequestMessage seen = null;
-                    var handler = new ChannelHttpFixture { Send = (request, cancel) => { seen = request; entered.Set(); return pending.Task; } };
+                    var handler = new ChannelHttpFixture { Respond = (request, cancel) => { seen = request; entered.Set(); return pending.Task; } };
                     Check(Throws<SafetyException>(() => ChannelFetch(f.Channel, handler, deadline: 250)).Message.Contains("timed out") && entered.IsSet && handler.Disposals == 1, "Ignored header operation escaped deadline");
                     var stream = new ChannelBodyFixture(new byte[] { 1 }); pending.SetResult(ChannelResponse(seen, new StreamContent(stream))); Check(SpinWait.SpinUntil(() => stream.Disposals > 0, 2000), "Late header response leaked its content");
                 }
             });
             Test("Channel HTTP caller cancellation wins over late header failures and permits a fresh request", () => {
                 using (var f = new WindowsChannelFixture()) using (var cancel = new CancellationTokenSource()) using (var entered = new ManualResetEventSlim()) {
-                    var pending = new TaskCompletionSource<HttpResponseMessage>(); var handler = new ChannelHttpFixture { Send = (request, token) => { entered.Set(); return pending.Task; } };
+                    var pending = new TaskCompletionSource<HttpResponseMessage>(); var handler = new ChannelHttpFixture { Respond = (request, token) => { entered.Set(); return pending.Task; } };
                     var work = Task.Run(() => new WindowsChannelHttpTransport(() => handler, TimeSpan.FromSeconds(2)).FetchAsync(f.Channel, WindowsChannelResource.Metadata, cancel.Token)); Check(entered.Wait(2000), "Header fixture did not start"); cancel.Cancel();
                     Throws<OperationCanceledException>(() => ChannelAwait(() => work)); pending.SetException(new HttpRequestException("late fixture failure")); Check(handler.Disposals == 1, "Cancelled headers leaked handler");
-                    var fresh = new ChannelHttpFixture { Send = (request, token) => Task.FromResult(ChannelResponse(request, new ByteArrayContent(new byte[] { 9 }))) }; Check(ChannelFetch(f.Channel, fresh).Single() == 9 && fresh.Calls == 1, "Manual fresh request failed");
+                    var fresh = new ChannelHttpFixture { Respond = (request, token) => Task.FromResult(ChannelResponse(request, new ByteArrayContent(new byte[] { 9 }))) }; Check(ChannelFetch(f.Channel, fresh).Single() == 9 && fresh.Calls == 1, "Manual fresh request failed");
                 }
             });
             Test("Channel HTTP body deadline ends token-ignoring reads and releases the private stream", () => {
                 using (var f = new WindowsChannelFixture()) {
                     var pending = new TaskCompletionSource<int>(); var stream = new ChannelBodyFixture(new byte[0]) { ReadOperation = (buffer, offset, count, token) => pending.Task };
-                    var handler = new ChannelHttpFixture { Send = (request, cancel) => Task.FromResult(ChannelResponse(request, new StreamContent(stream))) };
+                    var handler = new ChannelHttpFixture { Respond = (request, cancel) => Task.FromResult(ChannelResponse(request, new StreamContent(stream))) };
                     Check(Throws<SafetyException>(() => ChannelFetch(f.Channel, handler, deadline: 250)).Message.Contains("timed out") && stream.Reads == 1 && stream.Disposals > 0 && handler.Disposals == 1, "Ignored read escaped total deadline or leaked resources"); pending.SetResult(1);
                 }
             });
             Test("Channel HTTP total deadline covers a stalled stream handoff and disposes its late stream", () => {
                 using (var f = new WindowsChannelFixture()) {
-                    var content = new ChannelPendingContent(); var handler = new ChannelHttpFixture { Send = (request, cancel) => Task.FromResult(ChannelResponse(request, content)) };
+                    var content = new ChannelPendingContent(); var handler = new ChannelHttpFixture { Respond = (request, cancel) => Task.FromResult(ChannelResponse(request, content)) };
                     Check(Throws<SafetyException>(() => ChannelFetch(f.Channel, handler, deadline: 250)).Message.Contains("timed out") && content.Opened == 1 && content.Disposals > 0 && handler.Disposals == 1, "Stream acquisition escaped deadline or leaked content");
                     var late = new ChannelBodyFixture(new byte[] { 1 }); content.Pending.SetResult(late); Check(SpinWait.SpinUntil(() => late.Disposals > 0, 2000), "Late stream handoff leaked");
                 }
@@ -151,7 +151,7 @@ namespace EasyEject {
             Test("Channel HTTP mid-body caller cancellation returns cancellation without accepting late bytes", () => {
                 using (var f = new WindowsChannelFixture()) using (var cancel = new CancellationTokenSource()) using (var entered = new ManualResetEventSlim()) {
                     var pending = new TaskCompletionSource<int>(); byte[] privateBuffer = null; var stream = new ChannelBodyFixture(new byte[0]) { ReadOperation = (buffer, offset, count, token) => { privateBuffer = buffer; entered.Set(); return pending.Task; } };
-                    var handler = new ChannelHttpFixture { Send = (request, token) => Task.FromResult(ChannelResponse(request, new StreamContent(stream))) };
+                    var handler = new ChannelHttpFixture { Respond = (request, token) => Task.FromResult(ChannelResponse(request, new StreamContent(stream))) };
                     var work = Task.Run(() => new WindowsChannelHttpTransport(() => handler, TimeSpan.FromSeconds(2)).FetchAsync(f.Channel, WindowsChannelResource.Metadata, cancel.Token)); Check(entered.Wait(2000), "Body fixture did not start"); cancel.Cancel(); Throws<OperationCanceledException>(() => ChannelAwait(() => work)); privateBuffer[0] = 33; pending.SetResult(1);
                     Check(work.IsCanceled && stream.Disposals > 0 && handler.Disposals == 1, "Late bytes became a response or resources leaked");
                 }

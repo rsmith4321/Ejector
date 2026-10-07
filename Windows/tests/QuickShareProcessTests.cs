@@ -10,7 +10,13 @@ using Microsoft.Win32.SafeHandles;
 
 namespace EasyEject {
     public static partial class Tests {
-        static string ShareHelper { get { return Process.GetCurrentProcess().MainModule.FileName; } }
+        static string ShareHelper { get {
+#if NET
+            return Path.Combine(Path.GetDirectoryName(typeof(Tests).Assembly.Location), "fixture-tools", "EasyEject.Tests.exe");
+#else
+            return Process.GetCurrentProcess().MainModule.FileName;
+#endif
+        } }
         static string FixtureShareHelper(Fixture fixture) { string path = Path.Combine(fixture.Source, "helper.exe"); if (!File.Exists(path)) File.Copy(ShareHelper, path); return path; }
         static string[] ShareHelperArguments(string mode, params string[] values) { return new[] { "--share-process-fixture", mode }.Concat(values).ToArray(); }
         static byte[] RunShareHelper(Fixture fixture, string mode, Action<string> progress = null, CancellationToken cancel = default(CancellationToken), Action validate = null, double seconds = 10) {

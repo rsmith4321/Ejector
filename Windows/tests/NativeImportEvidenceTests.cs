@@ -77,7 +77,12 @@ namespace EasyEject {
             File.WriteAllText(Path.Combine(fixture.Root, ".cold-probe-owner"), challenge, new UTF8Encoding(false));
             string hash = IndependentFileHash(Path.Combine(NativeHistoryRoot(fixture), "completed-imports.json"));
             var arguments = new[] { "--owned-history-probe", fixture.Root, challenge, hash, count.ToString(System.Globalization.CultureInfo.InvariantCulture), newest, refuse ? "refuse" : "verify" };
-            var start = new ProcessStartInfo(typeof(Tests).Assembly.Location, String.Join(" ", arguments.Select(WindowsQuickShareProcess.Quote))) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = fixture.Root, RedirectStandardOutput = true, RedirectStandardError = true };
+#if NET
+            string executable = Environment.ProcessPath;
+#else
+            string executable = typeof(Tests).Assembly.Location;
+#endif
+            var start = new ProcessStartInfo(executable, String.Join(" ", arguments.Select(WindowsQuickShareProcess.Quote))) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = fixture.Root, RedirectStandardOutput = true, RedirectStandardError = true };
             using (var process = Process.Start(start)) {
                 Check(process != null && process.Id != Process.GetCurrentProcess().Id, "Cold verification did not create a separate process");
                 if (!process.WaitForExit(60000)) { process.Kill(); process.WaitForExit(); throw new Exception("Owned cold-history child timed out"); }

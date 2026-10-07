@@ -78,6 +78,12 @@ namespace EasyEject {
             }
         }
         [STAThread] public static int Main(string[] args) {
+#if NET
+            // The existing hidden Forms tests require the classic application's
+            // SystemAware context. Modern WinUI has its own PerMonitorV2 manifest.
+            // Set the test process only, before any Forms/native handle is created.
+            System.Windows.Forms.Application.SetHighDpiMode(System.Windows.Forms.HighDpiMode.SystemAware);
+#endif
             if (args.Length > 0 && args[0] == "--reopen-signal-fixture") return ReopenSignalFixture(args);
             if (args.Length == 1 && args[0] == "--window-reopen") { System.Windows.Forms.Application.EnableVisualStyles(); System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false); WindowReopenTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned session events/child processes and nonactivating disposable forms only; no real app signal or device/media operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--manual-import-review") { ManualImportReviewTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated selections/configuration and fake devices only; no foreground confirmation or real device action."); return failed == 0 ? 0 : 1; }
