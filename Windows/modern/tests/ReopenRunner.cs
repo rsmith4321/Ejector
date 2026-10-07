@@ -22,6 +22,7 @@ namespace EasyEject {
             WindowReopenTests();
             DefaultsEditTests();
             StorageControllerTests();
+            ProfileEditTests();
             Console.WriteLine(passed + " passed, " + failed + " failed");
             return failed == 0 ? 0 : 1;
         }

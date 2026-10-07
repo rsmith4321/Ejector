@@ -1,0 +1,44 @@
+<UserControl x:Class="EasyEject.Modern.ProfilesView"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:EasyEject.Modern">
+ <Grid Padding="36,28,36,24" RowSpacing="16">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel Spacing="8"><TextBlock x:Name="Heading" Text="Saved profiles" FontSize="24" FontWeight="SemiBold"/><TextBlock x:Name="Intro" Text="Review saved devices even when disconnected. Connect the original device to enroll it or change its media folder. Saving never starts an import." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+  <Grid x:Name="Catalog" Grid.Row="1" RowSpacing="16"><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <ListView x:Name="Records" SelectionMode="Single" SelectionChanged="Records_SelectionChanged"><ListView.ItemTemplate><DataTemplate x:DataType="local:ProfileCard"><StackPanel Spacing="4" Margin="8"><TextBlock Text="{x:Bind DisplayName}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{x:Bind ChoiceSummary}" TextWrapping="Wrap"/><TextBlock Text="{x:Bind TargetPath}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
+   <ScrollViewer Grid.Row="1"><TextBlock x:Name="Detail" Text="Reading saved profiles…" IsTextSelectionEnabled="True" TextWrapping="Wrap"/></ScrollViewer>
+  </Grid>
+  <ScrollViewer x:Name="EditorBody" Grid.Row="1" Visibility="Collapsed" HorizontalScrollBarVisibility="Disabled">
+   <StackPanel Spacing="18">
+    <TextBox x:Name="DeviceName" Header="Device name" MaxLength="120" TextChanged="Name_Changed"/>
+    <StackPanel Spacing="8"><TextBox x:Name="Source" Header="Media folder" IsReadOnly="True"/><Button x:Name="ChooseSource" Content="Choose media folder…" Tag="source" Click="Choose_Click"/></StackPanel>
+    <StackPanel Spacing="8"><TextBox x:Name="Destination" Header="Save full-quality copies under" IsReadOnly="True"/><Button Content="Choose destination…" Tag="destination" Click="Choose_Click"/></StackPanel>
+    <ComboBox x:Name="Mode" Header="Import settings" SelectionChanged="Mode_Changed"><ComboBoxItem Content="Use defaults"/><ComboBoxItem Content="Use custom settings"/></ComboBox>
+    <Button Content="Import defaults…" Click="Defaults_Click"/>
+    <ContentControl x:Name="CustomChoices"><StackPanel Spacing="10">
+     <CheckBox x:Name="Videos" Content="Videos only" Tag="VideosOnly" Checked="Choice_Changed" Unchecked="Choice_Changed"/>
+     <CheckBox x:Name="Previews" Content="Include camera previews" Tag="IncludePreviews" Checked="Choice_Changed" Unchecked="Choice_Changed"/>
+     <CheckBox x:Name="Clean" Content="Clean folder layout" Tag="CleanLayout" Checked="Choice_Changed" Unchecked="Choice_Changed"/>
+     <CheckBox x:Name="Automatic" Content="Import automatically when connected" Tag="AutomaticImport" Checked="Choice_Changed" Unchecked="Choice_Changed"/>
+     <CheckBox x:Name="AskEject" Content="Ask to eject after import" Tag="AskToEject" Checked="Choice_Changed" Unchecked="Choice_Changed"/>
+     <CheckBox x:Name="Remove" Content="Permanently remove verified imported originals" Tag="remove" Checked="Removal_Changed" Unchecked="Removal_Changed"/>
+     <CheckBox x:Name="Recover" Content="Recover and clear selected device Trash" Tag="recover" Checked="Removal_Changed" Unchecked="Removal_Changed"/>
+    </StackPanel></ContentControl>
+    <TextBlock Text="Videos only leaves photos and unfamiliar files on the device. Required package support files stay with recordings. Previews are optional. Clean layout uses dated folders with unchanged names and preserves camera packages and conflicting groups. Keep originals is recommended. Changing Videos only to All media turns removal and recovery off for fresh review." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <TextBlock Text="Automatic import uses these choices, including acknowledged removal/recovery, on the next source connection and at launch. Saving starts no import on an already connected device. Eject and sharing always require a manual choice." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <TextBlock Text="Device Trash owner" FontSize="18" FontWeight="SemiBold"/>
+    <TextBlock x:Name="OwnerScope" TextWrapping="Wrap"/><StackPanel Orientation="Horizontal" Spacing="8"><Button x:Name="ChooseOwner" Content="Choose Mac owner…" Tag="owner" Click="Choose_Click"/><Button Content="Windows Trash only" Click="ClearOwner_Click"/></StackPanel>
+    <TextBlock Text="Choosing an owner does not enable recovery. Only the current Windows user's Trash and this explicitly selected Mac owner are eligible. Other owners are never inferred." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <TextBlock Text="Manual Quick Share" FontSize="18" FontWeight="SemiBold"/>
+    <CheckBox x:Name="Offer" Content="Offer manual Quick Share for this device" Checked="Sharing_Changed" Unchecked="Sharing_Changed"/>
+    <ContentControl x:Name="SharingChoices"><StackPanel Spacing="10"><ComboBox x:Name="ShareSize" Header="Preferred size (asked again for every export)" SelectionChanged="ShareSize_Changed"><ComboBoxItem Content="1080p"/><ComboBoxItem Content="4K"/></ComboBox><CheckBox x:Name="Lut" Content="Prefer official Luna I-Log LUT in the export prompt" Checked="Sharing_Changed" Unchecked="Sharing_Changed"/></StackPanel></ContentControl>
+    <TextBlock Text="Only supported Insta360 Luna VID MP4 recordings are eligible. Each export asks for size and LUT on/off. Leave the LUT off for normal-color footage. This preference is independent of shared import defaults. Saved verified batches remain available after source eject; disabling this offer hides sharing actions. Saving and importing start no export. Quick Share never ejects and leaves full-quality originals unchanged. Existing FFmpeg, FFprobe and an official user-supplied LUT are configured separately." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <TextBlock x:Name="Identity" TextWrapping="Wrap" IsTextSelectionEnabled="True" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+   </StackPanel>
+  </ScrollViewer>
+  <StackPanel Grid.Row="2" Spacing="12"><TextBlock x:Name="Status" Text="Reading saved profiles…" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+   <StackPanel x:Name="CatalogButtons" Orientation="Horizontal" Spacing="10"><Button x:Name="Refresh" Content="Refresh profiles" Click="Refresh_Click"/><Button x:Name="Edit" Content="Edit profile…" IsEnabled="False" Click="Edit_Click"/><Button x:Name="Forget" Content="Forget profile…" IsEnabled="False" Click="Forget_Click"/></StackPanel>
+   <StackPanel x:Name="EditButtons" Orientation="Horizontal" Spacing="10" Visibility="Collapsed"><Button x:Name="Save" Content="Save profile" Style="{StaticResource AccentButtonStyle}" Click="Save_Click"/><Button x:Name="Cancel" Content="Cancel" Click="Cancel_Click"/><Button x:Name="ForgetDraft" Content="Forget profile…" Click="Forget_Click"/></StackPanel>
+  </StackPanel>
+ </Grid>
+</UserControl>

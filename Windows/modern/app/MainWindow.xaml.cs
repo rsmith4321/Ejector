@@ -14,10 +14,12 @@ namespace EasyEject.Modern {
         public string Detail { get; set; }
         public string State { get; set; }
         internal TrayStorageChoice Choice;
+        internal AutomaticConnection Connection;
     }
     public sealed partial class MainWindow : Window {
         readonly WindowsDiscovery discovery = new WindowsDiscovery();
         readonly Operations operations = new Operations();
+        readonly AutomaticImportScheduler automatic = new AutomaticImportScheduler();
         readonly StorageInventorySession inventory;
         readonly StorageNotificationWindow notifications;
         readonly DispatcherQueueTimer pulse;
@@ -27,9 +29,9 @@ namespace EasyEject.Modern {
         ManualEjectReview activeReview;
         ContentDialog confirmation;
         CancellationTokenSource operationCancel;
-        bool quitting, working, closed, started;
-        bool UiBusy { get { return working || DefaultsPanel.Busy; } }
-        bool StorageBusy { get { return UiBusy || DefaultsPanel.Visibility == Visibility.Visible; } }
+        bool quitting, working, closed, started, returnToProfile;
+        bool UiBusy { get { return working || DefaultsPanel.Busy || ProfilesPanel.Busy; } }
+        bool StorageBusy { get { return UiBusy || DefaultsPanel.Visibility == Visibility.Visible || ProfilesPanel.Visibility == Visibility.Visible; } }
         public MainWindow() {
             InitializeComponent(); SystemBackdrop = new MicaBackdrop();
             inventory = new StorageInventorySession(discovery);
@@ -48,6 +50,7 @@ namespace EasyEject.Modern {
             menu.Items.Add("Open Easy Eject", null, delegate { Reveal(); });
             menu.Items.Add(storageMenu);
             menu.Items.Add("Import defaults…", null, delegate { Reveal(); OpenDefaults(); });
+            menu.Items.Add("Saved profiles…", null, delegate { Reveal(); OpenProfiles(); });
             menu.Items.Add("Quit preview", null, delegate { if (StorageBusy) { Reveal(); return; } quitting = true; Close(); });
             menu.Opening += delegate { RebuildStorageMenu(); };
             tray = new Forms.NotifyIcon { Icon = System.Drawing.SystemIcons.Information, Text = "Easy Eject interface preview", Visible = true, ContextMenuStrip = menu };
@@ -60,9 +63,26 @@ namespace EasyEject.Modern {
             };
             Closed += delegate {
                 closed = true; pulse.Stop(); inventory.Dispose(); notifications.Dispose();
-                DefaultsPanel.TryLeave(); tray.Dispose(); menu.Dispose();
+                DefaultsPanel.TryLeave(); ProfilesPanel.TryLeave(); tray.Dispose(); menu.Dispose();
             };
-            DefaultsPanel.Completed += delegate(string message) { ShowStorage(); Summary.Text = message; UpdateActions(); };
+            DefaultsPanel.Completed += async delegate(string message) {
+                automatic.SettingsSaved();
+                if (returnToProfile) { returnToProfile = false; ShowProfiles(); await ProfilesPanel.ReloadDefaults(); }
+                else ShowStorage();
+                Summary.Text = message; UpdateActions();
+            };
+            ProfilesPanel.RequestDefaults += async delegate {
+                if (UiBusy) return; returnToProfile = true; ProfilesPanel.Visibility = StorageView.Visibility = Visibility.Collapsed;
+                Navigation.SelectedItem = DefaultsNavigation; DefaultsPanel.Visibility = Visibility.Visible; UpdateActions(); await DefaultsPanel.StartEdit(); UpdateActions();
+            };
+            ProfilesPanel.Initialize(discovery, async kind => {
+                var picker = new Microsoft.Windows.Storage.Pickers.FolderPicker(AppWindow.Id) {
+                    CommitButtonText = kind == "owner" ? "Choose my Mac Trash owner" : kind == "source" ? "Choose media folder" : "Choose destination"
+                };
+                var selected = await picker.PickSingleFolderAsync(); return selected == null ? null : selected.Path;
+            });
+            ProfilesPanel.Changed += delegate(string message) { automatic.SettingsSaved(); Summary.Text = message; };
+            ProfilesPanel.Completed += delegate(string message) { ShowStorage(); Summary.Text = message; UpdateActions(); };
             Root.Loaded += async delegate {
                 if (started) return; started = true;
                 try { notifications.Start(); } catch (Exception ex) { Summary.Text = "Connection monitoring unavailable. Device actions are blocked. " + ex.Message; }
@@ -71,17 +91,25 @@ namespace EasyEject.Modern {
         }
         internal void Reveal() { DispatcherQueue.TryEnqueue(delegate { if (!closed) { AppWindow.Show(); Activate(); } }); }
         async void OpenDefaults() {
-            if (working || inventory.Scanning || DefaultsPanel.Busy || DefaultsPanel.Visibility == Visibility.Visible) return;
+            if (UiBusy || inventory.Scanning || DefaultsPanel.Visibility == Visibility.Visible || !ProfilesPanel.TryLeave()) return;
+            returnToProfile = false; ProfilesPanel.Visibility = Visibility.Collapsed;
             Navigation.SelectedItem = DefaultsNavigation; StorageView.Visibility = Visibility.Collapsed; DefaultsPanel.Visibility = Visibility.Visible;
             UpdateActions(); await DefaultsPanel.StartEdit();
         }
-        void ShowStorage() { Navigation.SelectedItem = StorageNavigation; DefaultsPanel.Visibility = Visibility.Collapsed; StorageView.Visibility = Visibility.Visible; }
+        async void OpenProfiles() {
+            if (UiBusy || inventory.Scanning || ProfilesPanel.Visibility == Visibility.Visible || !DefaultsPanel.TryLeave()) return;
+            returnToProfile = false; ShowProfiles(); UpdateActions(); await ProfilesPanel.StartCatalog(); UpdateActions();
+        }
+        void ShowProfiles() { Navigation.SelectedItem = ProfilesNavigation; DefaultsPanel.Visibility = StorageView.Visibility = Visibility.Collapsed; ProfilesPanel.Visibility = Visibility.Visible; }
+        void ShowStorage() { Navigation.SelectedItem = StorageNavigation; DefaultsPanel.Visibility = ProfilesPanel.Visibility = Visibility.Collapsed; StorageView.Visibility = Visibility.Visible; }
         void Navigation_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args) {
             var item = args.InvokedItemContainer as NavigationViewItem;
             if (item == null || DefaultsPanel == null || inventory == null) return;
-            if (working) { Navigation.SelectedItem = StorageNavigation; return; }
+            if (UiBusy) { Navigation.SelectedItem = DefaultsPanel.Visibility == Visibility.Visible ? DefaultsNavigation : ProfilesPanel.Visibility == Visibility.Visible ? ProfilesNavigation : StorageNavigation; return; }
             if ((string)item.Tag == "defaults") { OpenDefaults(); return; }
-            if (!DefaultsPanel.TryLeave()) { Navigation.SelectedItem = DefaultsNavigation; return; }
+            if ((string)item.Tag == "profiles") { OpenProfiles(); return; }
+            if (!DefaultsPanel.TryLeave() || !ProfilesPanel.TryLeave()) return;
+            returnToProfile = false;
             ShowStorage(); UpdateActions();
         }
         void Storage_SelectionChanged(object sender, SelectionChangedEventArgs args) { if (inventory != null) UpdateActions(); }
@@ -90,6 +118,7 @@ namespace EasyEject.Modern {
             bool fresh = state != null && state.Epoch == discovery.Epoch && notifications.Available;
             bool ready = fresh && !StorageBusy && !inventory.Scanning && settings != null && card != null;
             Eject.IsEnabled = ready && card.Choice.CanEject; CleanEject.IsEnabled = ready && card.Choice.CanClean;
+            EditProfile.IsEnabled = ready && card.Connection != null;
             Refresh.IsEnabled = !UiBusy && !inventory.Scanning;
             CancelOperation.Visibility = working && activeReview != null && activeReview.HasCleanup && confirmation == null ? Visibility.Visible : Visibility.Collapsed;
             CancelOperation.IsEnabled = operationCancel != null && !operationCancel.IsCancellationRequested;
@@ -119,14 +148,20 @@ namespace EasyEject.Modern {
                     Title = string.IsNullOrEmpty(v.Label) ? "Unnamed volume" : v.Label,
                     Detail = v.Classification + " · " + (v.Mounts.Count == 0 ? "No drive letter" : string.Join(", ", v.Mounts)),
                     State = v.System ? "Protected" : v.Error == "" ? "Connected" : "Needs review",
-                    Choice = new TrayStorageChoice(state, v, discovery.Epoch)
+                    Choice = new TrayStorageChoice(state, v, discovery.Epoch), Connection = AutomaticConnection.Capture(state, v)
                 }).ToArray();
                 Summary.Text = settings == null ? "Saved app settings unavailable. Device actions are blocked." : state.Complete ? state.Volumes.Count + " volumes across " + state.Disks.Count + " physical disks" : "Storage cannot be safely acted on. " + string.Join(" ", state.Errors);
                 tray.Text = "Easy Eject · " + state.Volumes.Count + " connected volumes";
+                automatic.Observe(state);
             } else if (inventory.Error != null) Summary.Text = "Storage could not be checked. " + inventory.Error;
             UpdateActions();
         }
         async void Eject_Click(object sender, RoutedEventArgs args) { await EjectDevice(false); }
+        async void Profile_Click(object sender, RoutedEventArgs args) {
+            var card = StorageCards.SelectedItem as StorageCard;
+            if (StorageBusy || inventory.Scanning || !notifications.Available || card == null || card.Connection == null) return;
+            ShowProfiles(); UpdateActions(); await ProfilesPanel.StartConnected(card.Connection); UpdateActions();
+        }
         async void CleanEject_Click(object sender, RoutedEventArgs args) { await EjectDevice(true); }
         void CancelOperation_Click(object sender, RoutedEventArgs args) { if (operationCancel != null) { operationCancel.Cancel(); Summary.Text = "Stopping cleanup before removal. Ordinary media and remaining metadata are kept."; UpdateActions(); } }
         async Task EjectDevice(bool forceClean, TrayStorageChoice chosen = null) {
