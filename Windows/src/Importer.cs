@@ -350,7 +350,7 @@ namespace EasyEject {
             catch (DirectoryNotFoundException) { return null; }
             var p = Configuration.Read<ImportProfile>(root, FileName(volume.Id), checkpoint, 65536);
             if (p == null) return null;
-            if (p.VolumeId != volume.Id || p.VolumeSerial != volume.Serial || p.DiskInstance != disk.InstanceId) throw new SafetyException("Saved import profile no longer matches this card. Choose the folders again and save a new profile.");
+            RequireConnectedIdentity(p, volume, disk);
             ValidateStoredFolders(p);
             ValidateName(p.Name, false);
             QuickShareProfile.Validate(p);
@@ -359,15 +359,24 @@ namespace EasyEject {
             return p;
         }
         public static void Remove(Volume volume, Disk disk) { Remove(volume, disk, Root); }
-        internal static void Remove(Volume volume, Disk disk, string root) {
-            using (SafePaths.LockDirectories(root)) using (WriterGate(root)) {
+        static void RequireConnectedIdentity(ImportProfile profile, Volume volume, Disk disk) {
+            if (profile.VolumeId != volume.Id || profile.VolumeSerial != volume.Serial || profile.DiskInstance != disk.InstanceId) throw new SafetyException("Saved import profile no longer matches this card. Choose the folders again and save a new profile.");
+        }
+        internal static void Remove(Volume volume, Disk disk, string root, Action<string> checkpoint = null) {
+            using (var directories = SafePaths.HoldDirectories(root)) using (WriterGate(root)) {
                 if (Load(volume, disk, root) == null) return;
-                string path = Path.Combine(root, FileName(volume.Id));
-                using (var handle = Native.CreateFile(path, 0x10080, 0, IntPtr.Zero, 3, 0x00200000, IntPtr.Zero)) {
-                    if (handle.IsInvalid) throw Native.Error("Cannot forget the saved import profile");
-                    Native.Info(handle);
-                    if (!Native.FinalPath(handle).Equals(path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Saved profile resolves to another path.");
-                    Native.DeleteOnClose(handle);
+                string name = FileName(volume.Id), path = Path.Combine(root, name);
+                var expected = ReadSaved(root, name); RequireConnectedIdentity(expected.Profile, volume, disk);
+                if (checkpoint != null) checkpoint("After connected forget review");
+                directories.Validate();
+                using (var stream = ConfigurationWriter.OpenPrevious(path)) {
+                    if (stream != null) stream.Position = 0;
+                    CheckSnapshot(expected, stream == null ? null : ReadSaved(stream, name));
+                    if (checkpoint != null) checkpoint("Before connected forget disposition");
+                    directories.Validate();
+                    var stamp = Native.Info(stream.SafeFileHandle);
+                    if ((stamp.Attributes & 0x1015) != 0 || stamp.Links != 1 || !VerifiedImporter.SameStamp(expected.Stamp, stamp) || !Native.FinalPath(stream.SafeFileHandle).Equals(path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("This profile changed or became protected before forgetting it. Existing data is retained.");
+                    Native.DeleteOnClose(stream.SafeFileHandle, "Cannot forget the saved import profile");
                 }
             }
         }

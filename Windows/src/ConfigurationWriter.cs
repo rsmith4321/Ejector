@@ -85,7 +85,7 @@ namespace EasyEject {
             }
         }
         static string Parent(string path) { var parent = Directory.GetParent(path); if (parent == null) throw new SafetyException("Configuration drive is unavailable."); return parent.FullName; }
-        static FileStream OpenPrevious(string path) {
+        internal static FileStream OpenPrevious(string path) {
             try { File.GetAttributes(path); }
             catch (FileNotFoundException) { return null; }
             // The root is already pinned. A missing ancestor is an identity failure, not absent settings.
