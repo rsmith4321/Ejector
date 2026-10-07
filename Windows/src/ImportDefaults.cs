@@ -21,17 +21,8 @@ namespace EasyEject {
                 RelativeSource = "", Destination = "", UsesImportDefaults = true, AutomaticImport = AutomaticEnabled, VideosOnly = options.VideosOnly, IncludePreviews = options.IncludePreviews, CleanLayout = options.CleanLayout, AskToEject = options.AskToEject, DeleteOriginals = options.DeleteOriginals, RecoverTrash = options.RecoverTrash };
         }
         public static ImportDefaults Load() { return Load(Profiles.Root); }
-        internal static ImportDefaults Load(string root) {
-            string path = Path.Combine(root, "import-defaults.json");
-            using (SafePaths.LockDirectories(root)) {
-                if (!File.Exists(path)) return new ImportDefaults();
-                using (var stream = SafePaths.ReadFile(path)) {
-                    if (stream.Length > 16384) throw new SafetyException("Saved import defaults are too large to read.");
-                    var value = (ImportDefaults)new DataContractJsonSerializer(typeof(ImportDefaults)).ReadObject(stream);
-                    if (value == null) throw new SafetyException("Saved import defaults are invalid.");
-                    return value;
-                }
-            }
+        internal static ImportDefaults Load(string root, Action<string> checkpoint = null) {
+            return Configuration.Read<ImportDefaults>(root, "import-defaults.json", checkpoint) ?? new ImportDefaults();
         }
         public static void Save(ImportDefaults value) { Save(value, Profiles.Root); }
         internal static void Save(ImportDefaults value, string root) {

@@ -341,19 +341,22 @@ namespace EasyEject {
         public static ImportProfile Load(Volume volume, Disk disk) {
             return Load(volume, disk, Root);
         }
-        internal static ImportProfile Load(Volume volume, Disk disk, string root) {
-            string path = Path.Combine(root, FileName(volume.Id)); if (!File.Exists(path)) return null;
-            using (SafePaths.LockDirectories(root)) using (var stream = SafePaths.ReadFile(path)) {
-                if (stream.Length > 65536) throw new SafetyException("Saved import profile is too large to read.");
-                var p = (ImportProfile)new DataContractJsonSerializer(typeof(ImportProfile)).ReadObject(stream);
-                if (p == null || p.VolumeId != volume.Id || p.VolumeSerial != volume.Serial || p.DiskInstance != disk.InstanceId) throw new SafetyException("Saved import profile no longer matches this card. Choose the folders again and save a new profile.");
-                if (p.RelativeSource == null || p.Destination == null) throw new SafetyException("Saved import folders are invalid. Choose the folders again.");
-                ValidateName(p.Name, false);
-                QuickShareProfile.Validate(p);
-                if (p.SavedDestination != null) p.SavedDestination.Validate();
-                if (p.MacTrashUid != null && !DeviceTrash.ValidMacOwner(p.MacTrashUid)) throw new SafetyException("Saved Mac Trash owner selection is invalid. Review this device's profile.");
-                return p;
-            }
+        internal static ImportProfile Load(Volume volume, Disk disk, string root, Action<string> checkpoint = null) {
+            root = SafePaths.Normalize(root);
+            // Preserve the established no-profile result before storage is created.
+            // Existing storage/records still require the shared identity-bound read.
+            try { if ((File.GetAttributes(root) & FileAttributes.Directory) == 0) throw new SafetyException("Saved profile storage is not a directory."); }
+            catch (FileNotFoundException) { return null; }
+            catch (DirectoryNotFoundException) { return null; }
+            var p = Configuration.Read<ImportProfile>(root, FileName(volume.Id), checkpoint, 65536);
+            if (p == null) return null;
+            if (p.VolumeId != volume.Id || p.VolumeSerial != volume.Serial || p.DiskInstance != disk.InstanceId) throw new SafetyException("Saved import profile no longer matches this card. Choose the folders again and save a new profile.");
+            if (p.RelativeSource == null || p.Destination == null) throw new SafetyException("Saved import folders are invalid. Choose the folders again.");
+            ValidateName(p.Name, false);
+            QuickShareProfile.Validate(p);
+            if (p.SavedDestination != null) p.SavedDestination.Validate();
+            if (p.MacTrashUid != null && !DeviceTrash.ValidMacOwner(p.MacTrashUid)) throw new SafetyException("Saved Mac Trash owner selection is invalid. Review this device's profile.");
+            return p;
         }
         public static void Remove(Volume volume, Disk disk) { Remove(volume, disk, Root); }
         internal static void Remove(Volume volume, Disk disk, string root) {

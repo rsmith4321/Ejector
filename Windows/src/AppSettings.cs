@@ -26,7 +26,8 @@ namespace EasyEject {
         internal void Validate() { if (!GlobalHotkey.Supported(ShortcutKey)) throw new SafetyException("Saved shortcut letter is unsupported. Choose a supported letter in Settings."); }
     }
     internal static class Configuration {
-        internal static T Read<T>(string root, string name, Action<string> checkpoint = null) where T : class {
+        internal static T Read<T>(string root, string name, Action<string> checkpoint = null, int maximumBytes = 16384) where T : class {
+            if (maximumBytes <= 0 || maximumBytes > 65536) throw new ArgumentOutOfRangeException("maximumBytes");
             using (var directories = SafePaths.HoldDirectories(root)) {
                 if (checkpoint != null) checkpoint("Before configuration read"); directories.Validate();
                 string path = Path.Combine(root, name); T value = null; bool exists = true;
@@ -34,7 +35,7 @@ namespace EasyEject {
                 catch (FileNotFoundException) { exists = false; }
                 if (exists) {
                     using (var stream = SafePaths.ReadFile(path)) {
-                        if (stream.Length > 16384) throw new SafetyException("Saved application settings are too large to read.");
+                        if (stream.Length > maximumBytes) throw new SafetyException("Saved application settings are too large to read.");
                         value = (T)new DataContractJsonSerializer(typeof(T)).ReadObject(stream);
                         if (value == null) throw new SafetyException("Saved application settings are invalid.");
                     }
