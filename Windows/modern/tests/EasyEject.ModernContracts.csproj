@@ -16,6 +16,7 @@
     <Compile Include="ImportOperationTests.cs" />
     <Compile Include="SharingOperationTests.cs" />
     <Compile Include="ResumeOperationTests.cs" />
+    <Compile Include="SettingsOperationTests.cs" />
     <Compile Include="ReopenRunner.cs" />
     <ProjectReference Include="..\EasyEject.Runtime.csproj" />
   </ItemGroup>

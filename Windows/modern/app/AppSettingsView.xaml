@@ -1,0 +1,31 @@
+<UserControl x:Class="EasyEject.Modern.AppSettingsView"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <Grid Padding="36,28,36,24" RowSpacing="20">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel Spacing="8"><TextBlock Text="Settings" FontSize="24" FontWeight="SemiBold"/><TextBlock x:Name="Status" TextWrapping="Wrap" IsTextSelectionEnabled="True"/></StackPanel>
+  <ScrollViewer x:Name="Scroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+   <StackPanel x:Name="Choices" Spacing="18">
+    <TextBlock Text="General" FontSize="16" FontWeight="SemiBold"/>
+    <TextBlock Text="Launch at login is unavailable in this preview. Your Windows Startup apps remain available below." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <Button Content="Windows Startup apps…" Click="Startup_Click"/>
+    <CheckBox x:Name="Notifications" Content="Show operation notifications" Tag="Notifications" Checked="Choice_Changed" Unchecked="Choice_Changed"/>
+    <TextBlock Text="Windows notification and quiet-hour settings may hide alerts. Completed imports remain available in Easy Eject." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <CheckBox x:Name="Cleanup" Content="Clean macOS metadata from cards before ejecting" Checked="Cleanup_Changed" Unchecked="Cleanup_Changed"/>
+    <TextBlock Text="Removes only hidden macOS metadata during a separately confirmed card eject. Keeps photos, recordings and device Trash. Saving starts no cleanup." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <CheckBox x:Name="WarnOther" Content="Warn when ejecting other external storage" Tag="WarnOther" Checked="Choice_Changed" Unchecked="Choice_Changed"/>
+    <TextBlock Text="Keyboard shortcut" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,0"/>
+    <CheckBox x:Name="Shortcut" Content="Enable global card-removal shortcut" Tag="Shortcut" Checked="Choice_Changed" Unchecked="Choice_Changed"/>
+    <StackPanel Orientation="Horizontal" Spacing="12"><TextBlock Text="Ctrl + Alt + Shift +" VerticalAlignment="Center"/><ComboBox x:Name="Letter" Width="100" SelectionChanged="Letter_Changed" AutomationProperties.Name="Shortcut letter"/></StackPanel>
+    <TextBlock x:Name="ShortcutStatus" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <TextBlock Text="The shortcut opens the same Keep Connected default review as Eject cards. It never removes devices without confirmation and waits while work or another review is active." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <TextBlock Text="Updates and diagnostics" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,0"/>
+    <CheckBox x:Name="Updates" Content="Automatically check for Windows releases" Tag="AutomaticUpdates" Checked="Choice_Changed" Unchecked="Choice_Changed"/>
+    <TextBlock x:Name="UpdateStatus" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <CheckBox x:Name="Debug" Content="Enable debug logging" Tag="Debug" Checked="Choice_Changed" Unchecked="Choice_Changed"/>
+    <TextBlock Text="Debug logs can contain device names and file paths. They stay in local app-data and are never sent automatically." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+   </StackPanel>
+  </ScrollViewer>
+  <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12"><Button x:Name="Save" Content="Save settings" Click="Save_Click"/><Button x:Name="Cancel" Content="Cancel" Click="Cancel_Click"/></StackPanel>
+ </Grid>
+</UserControl>

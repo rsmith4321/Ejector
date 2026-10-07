@@ -30,10 +30,14 @@ namespace EasyEject.Modern {
         ContentDialog confirmation;
         CancellationTokenSource operationCancel;
         bool quitting, working, closed, started, returnToProfile;
-        bool UiBusy { get { return working || automaticReading || DefaultsPanel.Busy || ProfilesPanel.Busy; } }
-        bool StorageBusy { get { return UiBusy || DefaultsPanel.Visibility == Visibility.Visible || ProfilesPanel.Visibility == Visibility.Visible; } }
+        bool UiBusy { get { return working || automaticReading || DefaultsPanel.Busy || ProfilesPanel.Busy || SettingsPanel.Busy; } }
+        bool StorageBusy { get { return UiBusy || DefaultsPanel.Visibility == Visibility.Visible || ProfilesPanel.Visibility == Visibility.Visible || SettingsPanel.Visibility == Visibility.Visible; } }
         public MainWindow() {
             InitializeComponent(); SystemBackdrop = new MicaBackdrop();
+            shortcut = new HotkeyMessageWindow(() => StorageBusy || closed || inventory == null || inventory.Scanning || !notifications.Available, action => DispatcherQueue.TryEnqueue(() => action()), () => { Reveal(); ReviewCards(); });
+            SettingsPanel.ShortcutDescription = () => shortcutWarning ?? shortcut.Status;
+            SettingsPanel.Saved += SettingsSaved;
+            SettingsPanel.Completed += delegate(string message) { ShowStorage(); Summary.Text = settingsRuntimeMessage ?? message; settingsRuntimeMessage = null; UpdateActions(); };
             inventory = new StorageInventorySession(discovery);
             notifications = new StorageNotificationWindow(discovery, () => StorageBusy);
             pulse = DispatcherQueue.CreateTimer(); pulse.Interval = TimeSpan.FromMilliseconds(500);
@@ -44,6 +48,7 @@ namespace EasyEject.Modern {
                     if (confirmation != null && activeReview != null && !activeReview.Current) confirmation.IsPrimaryButtonEnabled = false;
                     if (confirmation != null && importing != null && !importing.Current) confirmation.IsPrimaryButtonEnabled = false;
                     if (confirmation != null && resuming != null && !resuming.Current) confirmation.IsPrimaryButtonEnabled = false;
+                    if (confirmation != null && groupedReview != null && !groupedReview.Current) confirmation.IsPrimaryButtonEnabled = false;
                     if (confirmation != null && activeCompletionId != null && completions.Get(activeCompletionId) == null) confirmation.IsPrimaryButtonEnabled = false;
                     UpdateActions();
                 }
@@ -53,6 +58,8 @@ namespace EasyEject.Modern {
             var menu = new Forms.ContextMenuStrip();
             menu.Items.Add("Open Easy Eject", null, delegate { Reveal(); });
             menu.Items.Add(storageMenu);
+            menu.Items.Add("Eject cards…", null, delegate { Reveal(); ReviewCards(); });
+            menu.Items.Add("Settings…", null, delegate { Reveal(); OpenSettings(); });
             menu.Items.Add("Import defaults…", null, delegate { Reveal(); OpenDefaults(); });
             menu.Items.Add("Saved profiles…", null, delegate { Reveal(); OpenProfiles(); });
             menu.Items.Add("Resume interrupted import…", null, delegate { Reveal(); ResumeSelectedImport(); });
@@ -72,7 +79,7 @@ namespace EasyEject.Modern {
             };
             Closed += delegate {
                 closed = true; pulse.Stop(); inventory.Dispose(); notifications.Dispose();
-                DefaultsPanel.TryLeave(); ProfilesPanel.TryLeave(); tray.Dispose(); menu.Dispose();
+                DefaultsPanel.TryLeave(); ProfilesPanel.TryLeave(); SettingsPanel.TryLeave(); shortcut.Dispose(); tray.Dispose(); menu.Dispose();
             };
             DefaultsPanel.Saved += delegate { automatic.SettingsSaved(); };
             DefaultsPanel.Completed += async delegate(string message) {
@@ -100,24 +107,25 @@ namespace EasyEject.Modern {
         }
         internal void Reveal() { DispatcherQueue.TryEnqueue(delegate { if (!closed) { AppWindow.Show(); Activate(); } }); }
         async void OpenDefaults() {
-            if (UiBusy || inventory.Scanning || DefaultsPanel.Visibility == Visibility.Visible || !ProfilesPanel.TryLeave()) return;
+            if (UiBusy || inventory.Scanning || DefaultsPanel.Visibility == Visibility.Visible || (!ProfilesPanel.TryLeave() || !SettingsPanel.TryLeave())) return;
             returnToProfile = false; ProfilesPanel.Visibility = Visibility.Collapsed;
             Navigation.SelectedItem = DefaultsNavigation; StorageView.Visibility = Visibility.Collapsed; DefaultsPanel.Visibility = Visibility.Visible;
             UpdateActions(); await DefaultsPanel.StartEdit();
         }
         async void OpenProfiles() {
-            if (UiBusy || inventory.Scanning || ProfilesPanel.Visibility == Visibility.Visible || !DefaultsPanel.TryLeave()) return;
+            if (UiBusy || inventory.Scanning || ProfilesPanel.Visibility == Visibility.Visible || (!DefaultsPanel.TryLeave() || !SettingsPanel.TryLeave())) return;
             returnToProfile = false; ShowProfiles(); UpdateActions(); await ProfilesPanel.StartCatalog(); UpdateActions();
         }
-        void ShowProfiles() { Navigation.SelectedItem = ProfilesNavigation; DefaultsPanel.Visibility = StorageView.Visibility = Visibility.Collapsed; ProfilesPanel.Visibility = Visibility.Visible; }
-        void ShowStorage() { Navigation.SelectedItem = StorageNavigation; DefaultsPanel.Visibility = ProfilesPanel.Visibility = Visibility.Collapsed; StorageView.Visibility = Visibility.Visible; }
+        void ShowProfiles() { Navigation.SelectedItem = ProfilesNavigation; DefaultsPanel.Visibility = StorageView.Visibility = SettingsPanel.Visibility = Visibility.Collapsed; ProfilesPanel.Visibility = Visibility.Visible; }
+        void ShowStorage() { Navigation.SelectedItem = StorageNavigation; DefaultsPanel.Visibility = ProfilesPanel.Visibility = SettingsPanel.Visibility = Visibility.Collapsed; StorageView.Visibility = Visibility.Visible; }
         void Navigation_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args) {
             var item = args.InvokedItemContainer as NavigationViewItem;
             if (item == null || DefaultsPanel == null || inventory == null) return;
-            if (UiBusy) { Navigation.SelectedItem = DefaultsPanel.Visibility == Visibility.Visible ? DefaultsNavigation : ProfilesPanel.Visibility == Visibility.Visible ? ProfilesNavigation : StorageNavigation; return; }
+            if (UiBusy) { Navigation.SelectedItem = SettingsPanel.Visibility == Visibility.Visible ? SettingsNavigation : DefaultsPanel.Visibility == Visibility.Visible ? DefaultsNavigation : ProfilesPanel.Visibility == Visibility.Visible ? ProfilesNavigation : StorageNavigation; return; }
+            if ((string)item.Tag == "settings") { OpenSettings(); return; }
             if ((string)item.Tag == "defaults") { OpenDefaults(); return; }
             if ((string)item.Tag == "profiles") { OpenProfiles(); return; }
-            if (!DefaultsPanel.TryLeave() || !ProfilesPanel.TryLeave()) return;
+            if (!DefaultsPanel.TryLeave() || (!ProfilesPanel.TryLeave() || !SettingsPanel.TryLeave())) return;
             returnToProfile = false;
             ShowStorage(); UpdateActions();
         }
@@ -130,9 +138,10 @@ namespace EasyEject.Modern {
             EditProfile.IsEnabled = ready && card.Connection != null;
             Import.IsEnabled = ready && card.Connection != null;
             Resume.IsEnabled = ready && card.Connection != null;
+            EjectCards.IsEnabled = fresh && !StorageBusy && !inventory.Scanning && settings != null && state.Complete && state.Volumes.Any(v => v.IsCard);
             Refresh.IsEnabled = !UiBusy && !inventory.Scanning;
             CancelOperation.Visibility = working && operationCancel != null && confirmation == null ? Visibility.Visible : Visibility.Collapsed;
-            CancelOperation.Content = quickShareSetupSaving ? "Stop setup" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Share ? "Stop export" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Verify ? "Stop verification" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Resume ? "Stop resume" : importOperationActive ? "Stop import" : "Stop cleanup";
+            CancelOperation.Content = quickShareSetupSaving ? "Stop setup" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Share ? "Stop export" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Verify ? "Stop verification" : groupedReview != null ? "Stop removal" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Resume ? "Stop resume" : importOperationActive ? "Stop import" : "Stop cleanup";
             CancelOperation.IsEnabled = operationCancel != null && !operationCancel.IsCancellationRequested;
             SelectionStatus.Text = StorageBusy ? "Finish the current review or operation first." : !fresh ? "Refresh the storage list before reviewing a device." : card == null ? "Select a device to review safe removal." : card.Choice.Error ?? "Safe removal affects this physical device and all its volumes. Review before unplugging.";
         }
@@ -148,7 +157,7 @@ namespace EasyEject.Modern {
             if (closed || UiBusy || inventory.Scanning) return;
             var refresh = inventory.Refresh(); UpdateActions();
             if (settings == null) {
-                try { settings = await Task.Run(() => AppSettings.Load()); }
+                try { settings = await Task.Run(() => AppSettings.Load()); ConfigureShortcut(); }
                 catch (Exception ex) { if (!closed) Summary.Text = "Saved app settings could not be read. Device actions are blocked. " + ex.Message; }
             }
             bool published = await refresh;
@@ -163,6 +172,7 @@ namespace EasyEject.Modern {
                     Choice = new TrayStorageChoice(state, v, discovery.Epoch), Connection = AutomaticConnection.Capture(state, v)
                 }).ToArray();
                 Summary.Text = settings == null ? "Saved app settings unavailable. Device actions are blocked." : state.Complete ? state.Volumes.Count + " volumes across " + state.Disks.Count + " physical disks" : "Storage cannot be safely acted on. " + string.Join(" ", state.Errors);
+                if (shortcutWarning != null) Summary.Text += "\n" + shortcutWarning;
                 tray.Text = "Easy Eject · " + state.Volumes.Count + " connected volumes";
                 automatic.Observe(state);
                 completions.Reconcile(state, WindowsDiscovery.VolumeId);
@@ -196,6 +206,7 @@ namespace EasyEject.Modern {
                 var result = await Task.Run(() => owner.Execute(operationCancel.Token, message => DispatcherQueue.TryEnqueue(delegate { if (!closed && activeReview == owner) Summary.Text = message; })));
                 terminal = result;
                 Summary.Text = result.Success ? "Windows accepted safe removal." : "Device removal stopped. Review the explanation.";
+                string logWarning = LogModernOperation("Manual safe removal | " + result.Message); if (logWarning != null) Summary.Text += " " + logWarning;
                 if (reviewedSettings.NotificationsEnabled) tray.ShowBalloonTip(5000, result.Success ? "Safe removal accepted" : "Device still connected", result.Message.Length > 255 ? result.Message.Substring(0, 255) : result.Message, result.Success ? Forms.ToolTipIcon.Info : Forms.ToolTipIcon.Warning);
                 confirmation = MessageDialog(result.Success ? "Safe removal accepted" : "Device still connected", result.Message, null);
                 await confirmation.ShowAsync(); confirmation = null;

@@ -118,14 +118,16 @@ namespace EasyEject.Modern {
         void UpdateImportTray() { if (!closed) tray.Text = TrayPresentation.Create(activity, UiBusy, inventory.Scanning, inventory.Current == null ? 0 : inventory.Current.Volumes.Count(v => v.IsCard), false).Tooltip; }
         void RequestOperationStop() {
             if (operationCancel == null) return; operationCancel.Cancel(); activity.RequestStop();
-            if (confirmation != null && (importing != null || resuming != null)) confirmation.IsPrimaryButtonEnabled = false;
+            if (confirmation != null && (importing != null || resuming != null || groupedReview != null)) confirmation.IsPrimaryButtonEnabled = false;
             Summary.Text = quickShareSetupSaving ? "Stopping setup validation. Waiting for the current file read/write…"
                 : activity.Current != null && activity.Current.Kind == TrayOperationKind.Share ? "Stopping Quick Share. Saved originals and earlier verified sharing copies are kept. Retry is manual."
                 : activity.Current != null && activity.Current.Kind == TrayOperationKind.Verify ? "Stopping saved-file verification. Files remain unchanged."
+                : groupedReview != null ? "Stopping card removal before the next request. Wait for verified results before unplugging."
                 : importOperationActive ? "Stopping after the current check. Verified copies and remaining source/Trash data are retained." : "Stopping cleanup before removal. Ordinary media and remaining metadata are retained.";
             UpdateImportTray(); UpdateActions();
         }
         void NotifyImport(string title, string message, bool warning) {
+            string warningText = LogModernOperation(title + " | " + message); if (warningText != null) Summary.Text += " " + warningText;
             if (settings == null || !settings.NotificationsEnabled || closed) return;
             try { tray.ShowBalloonTip(5000, title.Length > 63 ? title.Substring(0, 63) : title, message.Length > 255 ? message.Substring(0, 255) : message, warning ? Forms.ToolTipIcon.Warning : Forms.ToolTipIcon.Info); }
             catch (Exception ex) { Summary.Text += " Notification unavailable: " + ex.Message + " Review the result in Easy Eject."; }

@@ -19,7 +19,7 @@ namespace EasyEject.Modern {
         static TextBlock Wrapped(string value) { return new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true }; }
         static ScrollViewer Scrolling(StackPanel body) { return new ScrollViewer { Content = body, MaxHeight = 420, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; }
         bool BeginSavedReview() {
-            if (closed || UiBusy || inventory.Scanning || !DefaultsPanel.TryLeave() || !ProfilesPanel.TryLeave()) return false;
+            if (closed || UiBusy || inventory.Scanning || !DefaultsPanel.TryLeave() || !ProfilesPanel.TryLeave() || !SettingsPanel.TryLeave()) return false;
             ShowStorage(); working = true; UpdateActions(); return true;
         }
         void FinishSavedReview() {
