@@ -1,5 +1,11 @@
 # Windows progress · October 7, 2026
 
+## Integrated bundled release regression · October 7
+
+Isolated committed **840f8b1** includes the latest release presenter/delivery follow-up and native inspector. Its outside-OneDrive app and separately published bundled Release runners compile without warnings/errors. Terminal **87306**, exit **0**: **205/0** selected and **1214/0** full existing default, both using the exact app runtime SHA **43d7dad946c3684cb19d1d4762d650797c71649ea62849e41f994df9f7932977**. Actual full PID 32572/start 12:59:31.722 EDT loads its bundled .NET **10.0.12** coreclr and is terminal. Counts overlap. `ReviewIntegrated-20261007/app`: 600 files/269.0 MiB, all manifest/import-report hashes match. Read-only native inventory sees only one internal disk/five volumes, protected C:, and explicitly blocks actions without notifications. No real eject API is used. [modern/REVIEW_BUILD.md](modern/REVIEW_BUILD.md) records source, commands, logs, byte/module scope and fixture compiler inputs.
+
+This closes the final release runtime's prior full-suite byte gap; it excludes newer uncommitted profile handoff work and does not imply actual WinUI launch, clean-computer loading or physical acceptance. Earlier actual-media **11/0** remains a separate exact bundled-runtime checkpoint; official positive Luna LUT is NOT RUN. No app/system installation, real user-media/device/clipboard/Explorer/startup/security/power change or publication. Goal active; profile handoff, full foreground/lifecycle, official LUT/genuine camera, identified disposable hardware/filesystems/travel and approved modern distribution remain.
+
 ## Native import observation and bundled-runtime rehearsal · October 7
 
 The local review builder now records a maintained static PE import observation outside the payload, without loading DLLs. Isolated source **5478303** plus only inspector/build-helper changes builds warning-free, terminal **24798** exit zero; `LocalReviewAudited-20261007/app` includes bundled .NET **10.0.12** / Windows App SDK **2.5.1**. All **600** payload hashes match; **357** PE files / **1500** import references match their manifest bytes. No ordinary name is absent locally and no Visual C++ runtime DLL name is imported; this is not clean-computer loader/dynamic/symbol proof. Report overwrite/payload placement refuse with prior bytes preserved.
