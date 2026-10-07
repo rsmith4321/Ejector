@@ -37,6 +37,8 @@ namespace EasyEject {
                     Test("real tools: foreign output conflict is retained and fresh export is reusable", () => RealShareConflict(tools));
                     Test("real tools: encoder progress cancellation publishes nothing and fresh manual retry works", () => RealShareCancellation(tools));
                     Test("real tools: changed saved original and destination refuse before tools run", () => RealShareRefusals(tools));
+                    Test("real tools: silent 720x1280 portrait 60 fps keeps framing and earlier HD copy", () => RealShareSilentPortrait(tools));
+                    Test("real tools: corrupt receipt retains real encoded copy and fresh retry is reusable", () => RealShareCorruptReceipt(tools));
                     if (tools.Lut != null) {
                         Test("real tools: official LUT transform produces validated 1080p output", () => RealShareCase(tools, 1920, 1080, 30, true, QuickSharePreset.Hd, QuickShareColor.LunaILog, 1920, 1080, 30));
                         Test("real tools: official LUT transform produces validated 4K output", () => RealShareCase(tools, 3840, 2160, 30, true, QuickSharePreset.Uhd, QuickShareColor.LunaILog, 3840, 2160, 30));
@@ -152,6 +154,44 @@ namespace EasyEject {
                 Throws<QuickShareFailure>(() => new QuickShareEngine(process, operations).Run(batch, destination, new FakeGuard(), tools, QuickSharePreset.Hd, QuickShareColor.Standard, CancellationToken.None, _ => {}));
                 Check(process.Calls == 0 && !Directory.Exists(Path.Combine(batch.Folder, "Sharing Copies")), "Changed destination invoked tools or created sharing work");
                 var retry = RunRealShare(service, batch); Check(retry.Created == 1 && retry.PublishedReceipts == 1, "Fresh valid review did not retry"); VerifyShareOriginals(batch); CheckSharePrivateGone(batch); using (operations.Reserve(new[] { 700, 701 })) {}
+            }
+        }
+        static void RealShareSilentPortrait(QuickShareTools tools) {
+            using (var f = new Fixture()) {
+                var batch = GenerateRealShareBatch(f, tools, 720, 1280, 60, false); string root = RealShareSetup(f, batch, tools);
+                var operations = new Operations(); var process = new ObservedRealShareProcess(); var service = RealShares(root, process, operations);
+                string hd = RunRealShare(service, batch).Outputs.Single(), hdReceipt = QuickShareEngine.ReceiptPath(hd);
+                string hdHash = IndependentFileHash(hd), receiptHash = IndependentFileHash(hdReceipt);
+                string uhd = RunRealShare(service, batch, QuickSharePreset.Uhd).Outputs.Single();
+                Check(uhd != hd && IndependentFileHash(hd) == hdHash && IndependentFileHash(hdReceipt) == receiptHash, "Later 4K choice replaced the earlier HD copy or receipt");
+                foreach (string output in new[] { hd, uhd }) {
+                    var probe = QuickShareProbe.Parse(new WindowsQuickShareProcess().Run(tools.Ffprobe, QuickSharePlan.ProbeArguments(output), f.Root, 30, CancellationToken.None, () => {}));
+                    Check(probe.Video.Width == 720 && probe.Video.Height == 1280 && probe.Video.FrameRate == "30/1" && probe.Streams.Count == 1 && probe.Audio == null && Math.Abs(probe.Seconds - 1) < 0.25, "Silent portrait was enlarged, reframed or given audio, or its frame rate/duration changed unexpectedly");
+                    using (var stream = SafePaths.ReadFile(QuickShareEngine.ReceiptPath(output))) {
+                        var receipt = JsonDocuments.Read<QuickShareReceipt>(stream, 31999);
+                        Check(receipt.OutputSha256 == IndependentFileHash(output) && receipt.SourceSha256 == batch.Originals.Single().Sha256 && receipt.Width == 720 && receipt.Height == 1280 && receipt.LutSha256 == null, "Silent portrait receipt differs from the generated original/output");
+                    }
+                }
+                Check(process.Encodes == 2 && process.Decodes == 2 && process.Probes >= 4, "Both size choices did not execute independent real encode/probe/full-decode validation");
+                foreach (QuickSharePreset preset in new[] { QuickSharePreset.Hd, QuickSharePreset.Uhd }) {
+                    var reused = RunRealShare(RealShares(root, process, operations), ImportHistory.Load(root).Single(), preset);
+                    Check(reused.Reused == 1 && reused.Created == 0 && reused.Outputs.Single() == (preset == QuickSharePreset.Hd ? hd : uhd), "Fresh review did not reuse the exact retained size choice");
+                }
+                Check(process.Encodes == 2 && IndependentFileHash(hd) == hdHash && IndependentFileHash(hdReceipt) == receiptHash, "Reuse reran the encoder or changed the earlier HD copy");
+                VerifyShareOriginals(batch); CheckSharePrivateGone(batch); using (operations.Reserve(new[] { 700, 701 })) {}
+            }
+        }
+        static void RealShareCorruptReceipt(QuickShareTools tools) {
+            using (var f = new Fixture()) {
+                var batch = GenerateRealShareBatch(f, tools, 640, 360, 30, false); string root = RealShareSetup(f, batch, tools);
+                var operations = new Operations(); var process = new ObservedRealShareProcess(); var service = RealShares(root, process, operations);
+                string first = RunRealShare(service, batch).Outputs.Single(), receipt = QuickShareEngine.ReceiptPath(first), outputHash = IndependentFileHash(first);
+                File.WriteAllText(receipt, "owned damaged receipt; retain these exact bytes"); string damagedHash = IndependentFileHash(receipt);
+                var retry = RunRealShare(service, batch);
+                Check(retry.Created == 1 && retry.Reused == 0 && retry.Outputs.Single() != first && process.Encodes == 2 && process.Decodes == 2 && IndependentFileHash(first) == outputHash && IndependentFileHash(receipt) == damagedHash, "Corrupt receipt reused or replaced the earlier encoded copy/receipt");
+                var reused = RunRealShare(RealShares(root, process, operations), ImportHistory.Load(root).Single());
+                Check(reused.Reused == 1 && reused.Created == 0 && reused.Outputs.Single() == retry.Outputs.Single() && process.Encodes == 2 && IndependentFileHash(first) == outputHash && IndependentFileHash(receipt) == damagedHash, "Fresh retry did not retain the damaged entry and reuse the exact valid new copy");
+                VerifyShareOriginals(batch); CheckSharePrivateGone(batch); using (operations.Reserve(new[] { 700, 701 })) {}
             }
         }
     }

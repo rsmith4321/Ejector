@@ -1,5 +1,9 @@
 # Windows progress · October 7, 2026
 
+## Named real sharing cases · October 7
+
+The opt-in real-tool rehearsal now adds the exact Mac silent 720×1280 60→30 fps/no-upscale case at both sizes, with earlier HD retention and fresh reuse, and corrupt-receipt preservation beside an actual encoded video with distinct validated retry. Isolated archive `3232353` plus only the test change passes **9/0** separately on .NET 10 and Framework, warnings-as-errors compilation and terminal **39771** exit zero. Production source and default suite behavior unchanged; counts overlap and default cases were not rerun. Snapshot/test/runtime/log hashes and remaining official LUT/genuine media/foreground/restart/physical/filesystem/distribution gates are in [QUICK_SHARE_ACCEPTANCE.md](QUICK_SHARE_ACCEPTANCE.md), mapped individually in [SHARE_REGRESSION_MAP.md](SHARE_REGRESSION_MAP.md). No normal app configuration, user footage, device action or installation. Full goal active.
+
 ## Real Quick Share conversion checkpoint · October 7
 
 Seven standard-color cases pass separately on the installed Framework runner and modern .NET 10 runtime: landscape 60→30 fps 1080p, full-frame 4K, portrait, small silent/no-upscale, foreign-output preservation and exact reuse, encoder-progress cancellation/private cleanup/reservation release/fresh retry, and changed-original/fake-destination refusal before tools. Actual FFmpeg/FFprobe, generated clips, production manual sharing and real probes/full decoding were exercised; originals retained. No downloads, user footage, live settings or native device action. Official Luna LUT conversion and real camera/foreground/physical/filesystem/restart/trusted distribution remain open. Overlapping 7/0 runs are not summed. [QUICK_SHARE_ACCEPTANCE.md](QUICK_SHARE_ACCEPTANCE.md) records exact retained binaries/logs/hashes and mixed working-checkout scope. Full goal active.
