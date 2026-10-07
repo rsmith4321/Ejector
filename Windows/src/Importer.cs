@@ -351,7 +351,7 @@ namespace EasyEject {
             var p = Configuration.Read<ImportProfile>(root, FileName(volume.Id), checkpoint, 65536);
             if (p == null) return null;
             if (p.VolumeId != volume.Id || p.VolumeSerial != volume.Serial || p.DiskInstance != disk.InstanceId) throw new SafetyException("Saved import profile no longer matches this card. Choose the folders again and save a new profile.");
-            if (p.RelativeSource == null || p.Destination == null) throw new SafetyException("Saved import folders are invalid. Choose the folders again.");
+            ValidateStoredFolders(p);
             ValidateName(p.Name, false);
             QuickShareProfile.Validate(p);
             if (p.SavedDestination != null) p.SavedDestination.Validate();
