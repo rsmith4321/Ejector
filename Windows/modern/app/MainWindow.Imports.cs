@@ -107,7 +107,7 @@ namespace EasyEject.Modern {
                 if (closed || !activity.Report(token, message, measured)) return;
                 if (message != null) Summary.Text = message;
                 ImportStatus.Text = message ?? (measured == null ? "Preparing import…" : measured.Phase);
-                if (measured != null) { ImportProgress.IsIndeterminate = !activity.Percent.HasValue; ImportProgress.Value = measured.Percent; }
+                ImportProgress.IsIndeterminate = !activity.Percent.HasValue; ImportProgress.Value = activity.Percent ?? 0;
                 UpdateImportTray();
             });
         }
@@ -115,7 +115,10 @@ namespace EasyEject.Modern {
         void RequestOperationStop() {
             if (operationCancel == null) return; operationCancel.Cancel(); activity.RequestStop();
             if (confirmation != null && importing != null) confirmation.IsPrimaryButtonEnabled = false;
-            Summary.Text = importOperationActive ? "Stopping after the current check. Verified copies and remaining source/Trash data are retained." : "Stopping cleanup before removal. Ordinary media and remaining metadata are retained.";
+            Summary.Text = quickShareSetupSaving ? "Stopping setup validation. Waiting for the current file read/write…"
+                : activity.Current != null && activity.Current.Kind == TrayOperationKind.Share ? "Stopping Quick Share. Saved originals and earlier verified sharing copies are kept. Retry is manual."
+                : activity.Current != null && activity.Current.Kind == TrayOperationKind.Verify ? "Stopping saved-file verification. Files remain unchanged."
+                : importOperationActive ? "Stopping after the current check. Verified copies and remaining source/Trash data are retained." : "Stopping cleanup before removal. Ordinary media and remaining metadata are retained.";
             UpdateImportTray(); UpdateActions();
         }
         void NotifyImport(string title, string message, bool warning) {
@@ -141,8 +144,14 @@ namespace EasyEject.Modern {
             if (entry == null) { Summary.Text = "This import eject choice expired. Refresh and review the connected device."; return; }
             working = true; activeCompletionId = id; EjectResult terminal = null; CleanupCounts completionCounts = null; UpdateActions();
             try {
+                string shareMessage = "";
                 while (true) {
                     var freshSettings = await Task.Run(() => AppSettings.Load()); MetadataCleanupPlan cleanup = null;
+                    bool canShare = false; string sharingNote = "";
+                    if (entry.Batch != null) {
+                        try { canShare = await Task.Run(() => SharingService.CanOffer(entry.Batch)); }
+                        catch (Exception ex) { sharingNote = "\n\nSaved sharing choices need review. " + ex.Message; }
+                    }
                     bool canEject = await Task.Run(() => {
                         try {
                             var state = discovery.Scan(); bool current = state.Epoch == discovery.Epoch && completions.Matches(id, state, WindowsDiscovery.VolumeId(entry.Origin.SourceRoot), entry.Origin.SourceRoot);
@@ -153,10 +162,23 @@ namespace EasyEject.Modern {
                     string message = entry.Message + (entry.HasMedia ? "" : "\n\nPhotos, skipped previews or other files may remain on the device.")
                         + "\n\nKeep Connected for Lightroom or other transfers. Eject requests removal of the physical device and all affected volumes."
                         + (entry.Origin.Plan == null ? "\n" + entry.Origin.BlockedReason : "\n\nAffected storage:\n" + String.Join("\n", entry.Origin.Plan.Affected))
-                        + (cleanup == null ? "" : "\n\n" + cleanup.Description);
+                        + (cleanup == null ? "" : "\n\n" + cleanup.Description) + sharingNote + shareMessage;
                     confirmation = MessageDialog(entry.HasMedia ? "Import complete. Eject now?" : "No matching media. Eject now?", message, cleanup == null ? "Eject Now" : "Clean & eject");
                     confirmation.CloseButtonText = "Keep Connected"; confirmation.SecondaryButtonText = "Open Import Folder"; confirmation.IsPrimaryButtonEnabled = canEject;
+                    bool sharingRequested = false;
+                    if (canShare) {
+                        var body = new StackPanel { Spacing = 16 }; body.Children.Add(Wrapped(message));
+                        var share = new Button { Content = "Quick Share…" }; body.Children.Add(share); var dialog = confirmation;
+                        share.Click += delegate { sharingRequested = true; dialog.Hide(); };
+                        confirmation.Content = Scrolling(body);
+                    }
                     UpdateActions(); var answer = await confirmation.ShowAsync(); confirmation = null;
+                    if (sharingRequested) {
+                        bool shared = await PerformQuickShare(entry.Batch);
+                        if (!QuickSharePresentation.ReturnToCompletion(completions, entry, shared)) break;
+                        shareMessage = "\n\n" + Summary.Text;
+                        continue;
+                    }
                     if (answer == ContentDialogResult.Secondary) {
                         await Task.Run(() => CompletionFolder.Open(entry, entry.Destination, () => new WindowsDestinationGuard(discovery, entry.DestinationRoot, entry.Destination), operations,
                             folder => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "explorer.exe", Arguments = "\"" + folder + "\"", UseShellExecute = false })));
