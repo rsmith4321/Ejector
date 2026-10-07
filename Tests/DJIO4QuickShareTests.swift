@@ -26,7 +26,7 @@ final class LogManager {
         let correctPrompt = await MainActor.run { prompt.applyLUT.title.contains("DJI O4 Pro") && prompt.choice.color == .djiO4DLogM }
         precondition(correctPrompt)
         let eject = await MainActor.run { ImportEjectPrompt.make(hasMedia: true, deviceName: "O4 Pro", quickShare: true, gyroflowFirst: true) }
-        let correctEject = await MainActor.run { eject.buttons.last?.title == "Open in Gyroflow" }
+        let correctEject = await MainActor.run { eject.buttons.last?.title == "Open Folder" && eject.informativeText.contains("batch the originals in Gyroflow") }
         precondition(correctEject)
         let fake = folder.appendingPathComponent("DJI_20250101000000_0001_D_stabilized.mp4")
         try Data("not a real export".utf8).write(to: fake)
@@ -50,6 +50,6 @@ final class LogManager {
             precondition(unchanged)
             print("PASS injected stabilized export produces verified LUT sharing copy and leaves source fixture unchanged")
         }
-        print("PASS official O4 LUT, real O4P identity, camera-specific prompt, Gyroflow-first eject action, and unpaired-export refusal")
+        print("PASS official O4 LUT, real O4P identity, camera-specific prompt, batch-folder eject action, and unpaired-export refusal")
     }
 }

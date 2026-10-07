@@ -378,7 +378,7 @@ import UserNotifications
                 }
                 #if !APP_STORE
                 if choice == .alertThirdButtonReturn {
-                    if gyroflowFirst { openInGyroflow(entry.id) }
+                    if gyroflowFirst { openImportedFolder(entry.id) }
                     else { quickShareCompletedImport(entry.id, returnToEject: true) }
                 }
                 #endif
@@ -391,32 +391,25 @@ import UserNotifications
         if choice == .alertSecondButtonReturn { ejectCompletedImport(entry.id) }
         #if !APP_STORE
         if choice == .alertThirdButtonReturn {
-            if gyroflowFirst { openInGyroflow(entry.id) }
+            if gyroflowFirst { openImportedFolder(entry.id) }
             else { quickShareCompletedImport(entry.id, returnToEject: true) }
         }
         #endif
     }
 
     #if !APP_STORE
-    func openInGyroflow(_ id: String) {
+    func openImportedFolder(_ id: String) {
         guard !busy, let batch = completedImports.first(where: { $0.id == id }),
               quickShareProfile(for: id)?.sharingCamera == .djiO4Pro else { return }
-        let originals = batch.originals.map(\.url).filter {
-            $0.deletingPathExtension().lastPathComponent.range(of: #"^DJI_\d{14}_\d{4}_D$"#, options: .regularExpression) != nil
-        }
-        guard !originals.isEmpty else {
-            message = "No DJI O4 Pro originals were found in this completed import."
+        guard FileManager.default.fileExists(atPath: batch.folder.path) else {
+            message = "The imported folder is unavailable. Connect the destination drive and try again."
             return
         }
-        let app = URL(fileURLWithPath: "/Applications/Gyroflow.app")
-        guard FileManager.default.fileExists(atPath: app.path) else {
-            message = "Install Gyroflow to stabilize O4 Pro originals before Quick Share."
+        guard NSWorkspace.shared.open(batch.folder) else {
+            message = "Could not open the imported folder."
             return
         }
-        NSWorkspace.shared.open(originals, withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration()) { _, error in
-            if let error { DispatchQueue.main.async { self.message = "Could not open Gyroflow: \(error.localizedDescription)" } }
-        }
-        message = "Opened O4 Pro originals in Gyroflow. Export stabilized MP4s beside them, then choose Quick Share."
+        message = "Import folder opened. Stabilize O4 Pro clips in Gyroflow before using Quick Share to apply the DJI LUT."
     }
 
     func quickShareCompletedImport(_ id: String, returnToEject: Bool = false) {

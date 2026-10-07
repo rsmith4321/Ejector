@@ -33,6 +33,10 @@ struct EasyShareProfileOptions: View {
                     }
                     Text("Each Quick Share asks for 1080p or 4K and whether to apply the \(camera == .luna ? "Luna I-Log" : "DJI O4 D-Log M") LUT. Leave the LUT off for normal-color footage.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if camera == .djiO4Pro {
+                        Text("Stabilize the imported originals in Gyroflow first. Export beside them, then apply the DJI LUT with Quick Share.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
                     Text("Keeps audio, landscape or portrait framing, and up to 30 fps. Smaller clips keep their size. Targets about 60 MB per minute at 1080p, or 180 MB at 4K.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Text(lutReady ? "Official \(camera.rawValue) Rec.709 LUT ready." : "Choose the official \(camera.rawValue) Rec.709 LUT once for this Mac.")
@@ -69,7 +73,7 @@ struct QuickShareCompletedImports: View {
         if !importer.quickShareImports.isEmpty {
             GroupBox("Completed imports · Quick Share") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Make sharing copies after import, even after ejecting the device. DJI O4 Pro footage goes through Gyroflow first. The destination drive must be connected.")
+                    Text("Make sharing copies after import, even after ejecting the device. For DJI O4 Pro, open the folder, batch stabilize in Gyroflow, then use Quick Share to apply the LUT. The destination drive must be connected.")
                         .font(.caption).foregroundStyle(.secondary)
                     ForEach(importer.quickShareImports) { batch in
                         HStack(alignment: .top) {
@@ -81,7 +85,7 @@ struct QuickShareCompletedImports: View {
                             }
                             Spacer()
                             if importer.quickShareProfile(for: batch.id)?.sharingCamera == .djiO4Pro {
-                                Button("Open in Gyroflow") { importer.openInGyroflow(batch.id) }
+                                Button("Open Folder") { importer.openImportedFolder(batch.id) }
                                     .disabled(importer.busy)
                             }
                             Button("Quick Share…") { importer.quickShareCompletedImport(batch.id) }

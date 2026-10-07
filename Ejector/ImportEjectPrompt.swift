@@ -19,9 +19,9 @@ import AppKit
         alert.addButton(withTitle: storageSources.isEmpty ? "Eject Now" : "Eject Camera").keyEquivalent = ""
         if quickShare {
             alert.informativeText += gyroflowFirst
-                ? "\n\nOpen the verified originals in Gyroflow first. After exporting stabilized videos, make LUT sharing copies from Device Media Imports."
+                ? "\n\nOpen the imported folder to batch the originals in Gyroflow. Export stabilized videos beside them, then use Quick Share to apply the DJI LUT."
                 : "\n\nQuick Share makes smaller copies from the saved originals. Choose the size and the LUT for this device. You can also do this later in Device Media Imports."
-            alert.addButton(withTitle: gyroflowFirst ? "Open in Gyroflow" : "Quick Share…").keyEquivalent = ""
+            alert.addButton(withTitle: gyroflowFirst ? "Open Folder" : "Quick Share…").keyEquivalent = ""
         }
         return alert
     }
