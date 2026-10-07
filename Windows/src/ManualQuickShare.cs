@@ -65,8 +65,10 @@ namespace EasyEject {
                 using (var tools = QuickShareConfiguration.Acquire(request.Tools, root, request.Color, cancel)) {
                     // Hashing tools may take time; admission is checked again immediately before media work.
                     cancel.ThrowIfCancellationRequested(); batch = RequireCurrent(batch);
-                    using (SafePaths.LockDirectories(batch.DestinationRoot)) {
-                        var guard = makeGuard(ImportHistory.Clone(batch)); guard.Validate();
+                    using (var directories = QuickShareBatch.HoldDirectories(batch)) {
+                        cancel.ThrowIfCancellationRequested(); directories.Validate();
+                        var guard = makeGuard(ImportHistory.Clone(batch)); directories.Validate(); cancel.ThrowIfCancellationRequested();
+                        guard.Validate(); directories.Validate(); cancel.ThrowIfCancellationRequested();
                         return new QuickShareEngine(process, operations, freeSpace: freeSpace).Run(batch, batch.Destination, guard, tools.Tools, request.Preset, request.Color, cancel, report);
                     }
                 }

@@ -78,6 +78,7 @@ namespace EasyEject {
             }
         }
         [STAThread] public static int Main(string[] args) {
+            if (args.Length == 1 && args[0] == "--share-batch-ownership") { ShareBatchOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated batches and fake media processes/guards only; no real media tools/device actions."); return failed == 0 ? 0 : 1; }
             if (args.Length > 0 && args[0] == "--owned-history-probe") return OwnedHistoryProbe(args);
             if (args.Length == 1 && args[0] == "--cold-history") { ColdHistoryTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated files and separate history processes only; fake device identities, no tools/eject."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--native-large-import") { NativeLargeImportTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Optional allocated generated files beyond two GiB; fake device guards, no camera/tool/eject action."); return failed == 0 ? 0 : 1; }
@@ -759,7 +760,7 @@ namespace EasyEject {
             ColdHistoryTests(); JsonSyntaxTests(); JsonDocumentTests(); ConnectedReviewTests(); ConnectedForgetTests(); ConfigurationValidationTests(); ProfilePublicationTests(); QuickShareConfigurationOwnershipTests(); ImportConfigurationReadTests(); ConfigurationReadTests(); HistoryPublicationTests(); WindowsReplayRecoveryTests(); WindowsReplayBackupTests(); ProfileCatalogOwnershipTests(); OriginalOwnershipTests(); ResumeOwnershipTests(); TrashOwnershipTests(); QuickShareContractTests(); DefaultsContractTests(); BulkFinalTests(); PathOwnershipTests(); WindowsReleaseReviewTests(); WindowsUpdateCoordinatorTests(); WindowsChannelReplayTests(); WindowsChannelDiscoveryTests(); WindowsChannelTests(); WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
             QuickShareDialogTests();
             QuickShareConfigurationTests();
-            ManualQuickShareTests();
+            ShareBatchOwnershipTests(); ManualQuickShareTests();
             TrayStorageMenuTests();
             StatusLayoutTests();
             InformationDiagnosticsTests();
