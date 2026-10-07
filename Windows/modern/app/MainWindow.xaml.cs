@@ -43,6 +43,7 @@ namespace EasyEject.Modern {
                     completions.InvalidateNotifications();
                     if (confirmation != null && activeReview != null && !activeReview.Current) confirmation.IsPrimaryButtonEnabled = false;
                     if (confirmation != null && importing != null && !importing.Current) confirmation.IsPrimaryButtonEnabled = false;
+                    if (confirmation != null && resuming != null && !resuming.Current) confirmation.IsPrimaryButtonEnabled = false;
                     if (confirmation != null && activeCompletionId != null && completions.Get(activeCompletionId) == null) confirmation.IsPrimaryButtonEnabled = false;
                     UpdateActions();
                 }
@@ -54,6 +55,7 @@ namespace EasyEject.Modern {
             menu.Items.Add(storageMenu);
             menu.Items.Add("Import defaults…", null, delegate { Reveal(); OpenDefaults(); });
             menu.Items.Add("Saved profiles…", null, delegate { Reveal(); OpenProfiles(); });
+            menu.Items.Add("Resume interrupted import…", null, delegate { Reveal(); ResumeSelectedImport(); });
             menu.Items.Add("Completed imports…", null, delegate { Reveal(); ReviewPendingImports(); });
             menu.Items.Add("Import history…", null, delegate { Reveal(); ReviewHistory(); });
             menu.Items.Add("Quick Share tools…", null, delegate { Reveal(); OpenQuickShareTools(); });
@@ -127,9 +129,10 @@ namespace EasyEject.Modern {
             Eject.IsEnabled = ready && card.Choice.CanEject; CleanEject.IsEnabled = ready && card.Choice.CanClean;
             EditProfile.IsEnabled = ready && card.Connection != null;
             Import.IsEnabled = ready && card.Connection != null;
+            Resume.IsEnabled = ready && card.Connection != null;
             Refresh.IsEnabled = !UiBusy && !inventory.Scanning;
             CancelOperation.Visibility = working && operationCancel != null && confirmation == null ? Visibility.Visible : Visibility.Collapsed;
-            CancelOperation.Content = quickShareSetupSaving ? "Stop setup" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Share ? "Stop export" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Verify ? "Stop verification" : importOperationActive ? "Stop import" : "Stop cleanup";
+            CancelOperation.Content = quickShareSetupSaving ? "Stop setup" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Share ? "Stop export" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Verify ? "Stop verification" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Resume ? "Stop resume" : importOperationActive ? "Stop import" : "Stop cleanup";
             CancelOperation.IsEnabled = operationCancel != null && !operationCancel.IsCancellationRequested;
             SelectionStatus.Text = StorageBusy ? "Finish the current review or operation first." : !fresh ? "Refresh the storage list before reviewing a device." : card == null ? "Select a device to review safe removal." : card.Choice.Error ?? "Safe removal affects this physical device and all its volumes. Review before unplugging.";
         }

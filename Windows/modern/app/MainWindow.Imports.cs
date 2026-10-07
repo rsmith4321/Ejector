@@ -72,22 +72,7 @@ namespace EasyEject.Modern {
                 importTerminal = result; var profile = owner.Profile; var guard = owner.Guard; var options = owner.Options; var root = owner.Root; var destination = owner.Destination;
                 operationCancel.Dispose(); operationCancel = null; importOperationActive = false; UpdateActions();
                 owner.Dispose(); owner = null; importing = null; ImportProgress.IsIndeterminate = false; ImportProgress.Value = 100;
-                outcome = await Task.Run(() => new ImportedOutcome(result, profile, guard, root, discovery, ImportHistory.Add));
-                Summary.Text = outcome.Message; activity.End(outcome.Message); UpdateImportTray();
-                ImportCompletion completion = null;
-                if (options.AskToEject && outcome.SourceCurrent) {
-                    completion = new ImportCompletion(guard.CompletionOrigin, ProfileName.Display(profile), result.Files == 0 ? destination : result.Folder,
-                        destination, guard.DestinationIdentity, result.HasSelectedMedia, outcome.Message, outcome.Batch);
-                    completions.Insert(completion);
-                }
-                NotifyImport(outcome.HistoryWarning == null ? result.HasSelectedMedia ? "Import complete" : "No matching media" : "Import verified; history needs attention", outcome.Message, outcome.HistoryWarning != null);
-                // The worker has ended and released folders before any completion action.
-                working = false; UpdateActions();
-                if (completion != null && CompletionPresentation.ShowChoice(options.AskToEject, AppWindow.IsVisible, settings.NotificationsEnabled)) await ReviewImportCompletion(completion.Id);
-                else if (AppWindow.IsVisible) {
-                    working = true; confirmation = MessageDialog(result.HasSelectedMedia ? "Import complete" : "No matching media", outcome.Message, null);
-                    UpdateActions(); await confirmation.ShowAsync(); confirmation = null;
-                }
+                await PresentVerifiedImport(result, profile, guard, root, destination, options, completed => outcome = completed);
             } catch (OperationCanceledException) {
                 Summary.Text = importTerminal != null ? outcome == null ? "Import verified. " + importTerminal.Files + " files saved; completion display unavailable." : outcome.Message
                     : "Import cancelled. Completed verified copies and remaining source/Trash data are retained. No completion receipt was written; no automatic retry occurs on this connection.";
@@ -102,6 +87,25 @@ namespace EasyEject.Modern {
                 working = false; importOperationActive = false; ImportStatus.Text = Summary.Text; ImportProgress.Visibility = Visibility.Collapsed; activity.End(Summary.Text); UpdateImportTray(); UpdateActions();
             }
         }
+        async Task PresentVerifiedImport(ImportResult result, ImportProfile profile, VolumeImportGuard guard, string root, string destination, MediaOptions options, Action<ImportedOutcome> retainOutcome) {
+            var outcome = await Task.Run(() => new ImportedOutcome(result, profile, guard, root, discovery, ImportHistory.Add));
+            retainOutcome(outcome); // Preserve exact counts/history before any presentation callback.
+            Summary.Text = outcome.Message; activity.End(outcome.Message); UpdateImportTray();
+            ImportCompletion completion = null;
+            if (options.AskToEject && outcome.SourceCurrent) {
+                completion = new ImportCompletion(guard.CompletionOrigin, ProfileName.Display(profile), result.Files == 0 ? destination : result.Folder,
+                    destination, guard.DestinationIdentity, result.HasSelectedMedia, outcome.Message, outcome.Batch);
+                completions.Insert(completion);
+            }
+            NotifyImport(outcome.HistoryWarning == null ? result.HasSelectedMedia ? "Import complete" : "No matching media" : "Import verified; history needs attention", outcome.Message, outcome.HistoryWarning != null);
+            // The worker has ended and released folders before any completion action.
+            working = false; UpdateActions();
+            if (completion != null && CompletionPresentation.ShowChoice(options.AskToEject, AppWindow.IsVisible, settings.NotificationsEnabled)) await ReviewImportCompletion(completion.Id);
+            else if (AppWindow.IsVisible) {
+                working = true; confirmation = MessageDialog(result.HasSelectedMedia ? "Import complete" : "No matching media", outcome.Message, null);
+                UpdateActions(); await confirmation.ShowAsync(); confirmation = null;
+            }
+        }
         void QueueImportProgress(TrayOperation token, string message, ImportWorkProgress measured = null) {
             DispatcherQueue.TryEnqueue(delegate {
                 if (closed || !activity.Report(token, message, measured)) return;
@@ -114,7 +118,7 @@ namespace EasyEject.Modern {
         void UpdateImportTray() { if (!closed) tray.Text = TrayPresentation.Create(activity, UiBusy, inventory.Scanning, inventory.Current == null ? 0 : inventory.Current.Volumes.Count(v => v.IsCard), false).Tooltip; }
         void RequestOperationStop() {
             if (operationCancel == null) return; operationCancel.Cancel(); activity.RequestStop();
-            if (confirmation != null && importing != null) confirmation.IsPrimaryButtonEnabled = false;
+            if (confirmation != null && (importing != null || resuming != null)) confirmation.IsPrimaryButtonEnabled = false;
             Summary.Text = quickShareSetupSaving ? "Stopping setup validation. Waiting for the current file read/write…"
                 : activity.Current != null && activity.Current.Kind == TrayOperationKind.Share ? "Stopping Quick Share. Saved originals and earlier verified sharing copies are kept. Retry is manual."
                 : activity.Current != null && activity.Current.Kind == TrayOperationKind.Verify ? "Stopping saved-file verification. Files remain unchanged."
