@@ -56,7 +56,8 @@ namespace EasyEject {
         internal static XmlElement ReadJson(byte[] bytes) {
             if (bytes == null || bytes.Length == 0 || bytes.Length > WindowsManifestTrust.MaximumManifest) throw new SafetyException("Signed Windows JSON metadata exceeds its supported bound.");
             try {
-                RequireJsonDocument(new UTF8Encoding(false, true).GetString(bytes));
+                string text = new UTF8Encoding(false, true).GetString(bytes);
+                JsonSyntax.Validate(text); RequireJsonDocument(text);
                 if (bytes.Length >= 3 && bytes[0] == 0xef && bytes[1] == 0xbb && bytes[2] == 0xbf) throw new SafetyException("Signed Windows JSON metadata must use UTF-8 without a byte-order mark.");
                 var quotas = new XmlDictionaryReaderQuotas { MaxDepth = 6, MaxStringContentLength = 65536, MaxArrayLength = 64, MaxBytesPerRead = 4096, MaxNameTableCharCount = 4096 };
                 var document = new XmlDocument { XmlResolver = null }; using (var reader = JsonReaderWriterFactory.CreateJsonReader(bytes, quotas)) document.Load(reader); return document.DocumentElement;

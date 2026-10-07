@@ -40,9 +40,12 @@ namespace EasyEject {
             Test("native scaled device window keeps bounded results and reachable independent actions", () => {
                 using (var form = new DeviceWindow(true)) {
                     Size original = form.ClientSize; var list = WindowControl<ListView>(form, "list"); int columnWidth = list.Columns[0].Width;
-                    var status = WindowControl<TextBox>(form, "status"); status.Text = new string('x', 12000); LoadDpiForm(form);
+                    var status = WindowControl<TextBox>(form, "status"); LoadDpiForm(form);
+                    // Startup read-only inventory owns the idle message. Inject the
+                    // deterministic operation result after native load/event delivery.
+                    status.Text = new string('x', 12000); form.PerformLayout();
                     double factor = GetDpiForSystem() / 96.0; CheckDpiSize(original, form.ClientSize, factor, "Device viewport did not scale");
-                    Check(list.Height >= 100 * factor && status.Height <= 96 * factor + 2 && status.Text.Length == 12000 && status.ReadOnly, "Scaled status collapsed storage or lost full result");
+                    Check(list.Height >= 100 * factor && status.Height <= 96 * factor + 2 && status.Text.Length == 12000 && status.ReadOnly, "Scaled status collapsed storage or lost full result | list=" + list.Height + ", status=" + status.Height + ", text=" + status.Text.Length + ", factor=" + factor);
                     Check(Math.Abs(list.Columns[0].Width - columnWidth * factor) <= 1, "Native storage columns did not retain logical widths");
                     var button = WindowControl<Button>(form, "cancel"); Point position = form.PointToClient(button.PointToScreen(Point.Empty)); Check(position.Y >= 0 && position.Y + button.Height <= form.ClientSize.Height, "Scaled cancel action is outside the window");
                 }
