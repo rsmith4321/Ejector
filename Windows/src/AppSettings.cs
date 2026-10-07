@@ -45,7 +45,7 @@ namespace EasyEject {
                 if (checkpoint != null) checkpoint("After configuration read"); directories.Validate(); return value;
             }
         }
-        static void CheckRecord(FileStream stream, int maximumBytes) {
+        internal static void CheckRecord(FileStream stream, int maximumBytes) {
             var identity = Native.Info(stream.SafeFileHandle);
             if (identity.Links != 1 || (identity.Attributes & 0x1000) != 0) throw new SafetyException("Saved application state is offline or has another file alias. Existing data is retained.");
             if (stream.Length > maximumBytes) throw new SafetyException("Saved application settings are too large to read.");

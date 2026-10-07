@@ -45,12 +45,15 @@ namespace EasyEject {
             if (stream.Length > 65536 || stamp.Links != 1 || (stamp.Attributes & 0x1000) != 0) throw new SafetyException("Saved profile is oversized, offline or hard-linked.");
             string hash = VerifiedImporter.Hash(stream, CancellationToken.None); stream.Position = 0;
             var value = (ImportProfile)new DataContractJsonSerializer(typeof(ImportProfile)).ReadObject(stream);
+            ValidateProfileRecord(value, name);
+            return new SavedProfile(name, value, hash, stamp);
+        }
+        static void ValidateProfileRecord(ImportProfile value, string name) {
             if (value == null || String.IsNullOrWhiteSpace(value.VolumeId) || value.VolumeSerial == null || String.IsNullOrWhiteSpace(value.DiskInstance) || FileName(value.VolumeId) != name) throw new SafetyException("Saved profile filename or device identity is invalid.");
             ValidateName(value.Name, false); ValidateStoredFolders(value);
             QuickShareProfile.Validate(value);
             if (value.SavedDestination != null) value.SavedDestination.Validate();
             if (value.MacTrashUid != null && !DeviceTrash.ValidMacOwner(value.MacTrashUid)) throw new SafetyException("Saved Mac Trash owner is invalid.");
-            return new SavedProfile(name, value, hash, stamp);
         }
         internal static SavedProfile[] Catalog() { return Catalog(Root); }
         internal static SavedProfile[] Catalog(string root, Action<string> checkpoint = null) {

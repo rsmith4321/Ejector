@@ -349,9 +349,9 @@ namespace EasyEject {
                 var disk = inventory.Disks.Single(d => d.Number == v.Disks.Single());
                 long selectionEpoch = inventory.Epoch; working = true; UpdateActions();
                 string root = v.Mounts.First(x => x.Length >= 3 && x[1] == ':');
-                ImportDefaults choices = ReadDefaults(); ImportProfile stored = ReadProfile(v, disk);
+                ImportDefaults choices = ReadDefaults(); ConnectedProfileReview profileReview = ReviewProfile(v, disk); ImportProfile stored = profileReview.Value;
                 if (stored == null) {
-                    stored = await SetUpProfile(v, disk, root, selectionEpoch, choices, null);
+                    stored = await SetUpProfile(v, disk, root, selectionEpoch, choices, profileReview);
                     if (stored == null) return;
                     // Setup may have edited shared defaults. Freeze the current choices once here.
                     choices = ReadDefaults();
@@ -363,7 +363,7 @@ namespace EasyEject {
                 ProfileDestination.Require(stored, guard.DestinationIdentity, false);
                 string text = (options.VideosOnly ? "Copy selected videos and their required companions under:\n" : "Copy all media and sidecars under:\n") + source + "\n\nTo a date folder under:\n" + destination + "\n\n" + (options.IncludePreviews ? "Camera previews included." : "Optional previews stay on the device; required package files are included.") + "\n" + (options.CleanLayout ? "Ordinary media uses a clean layout; packages and unfamiliar media keep their tree." : "Media folder paths are retained.") + "\nOriginal filenames are kept. SHA-256 verifies new and reused copies.\n\n" + OriginalRemovalChoice.BeforeImport(options) + "\n\n" + DeviceTrashChoice.BeforeImport(options) + "\n\nThe device remains connected. Start this manual import?";
                 using (var review = new VerifiedImportConfirmationDialog(text)) if (review.ShowDialog(this) != DialogResult.Yes) return;
-                if (stored.SavedDestination == null) { guard.Validate(); stored.SavedDestination = guard.DestinationIdentity; Profiles.Save(stored); }
+                if (stored.SavedDestination == null) { guard.Validate(); stored = Profiles.BindConnectedDestination(profileReview, guard.DestinationIdentity); }
                 completions.InvalidateSource(root); Log("User started import | " + source + " -> " + destination);
                 working = true; cancellation = new CancellationTokenSource(); cancel.Enabled = true; UpdateActions();
                 var activity = BeginActivity(TrayOperationKind.Import, ProfileName.Display(stored), "Preparing import");
@@ -723,6 +723,11 @@ namespace EasyEject {
                 return null;
             }
         }
+        ConnectedProfileReview ReviewProfile(Volume volume, Disk disk) {
+            var review = Profiles.ReviewConnected(volume, disk);
+            if (review.Error != null) MessageBox.Show(this, "Saved folder choices could not be used. Set up this device again; saving replaces the reviewed old profile if it stays unchanged.\n\n" + review.Error, "Import profile", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return review;
+        }
         void EditDefaults() {
             if (Busy) return;
             try {
@@ -758,16 +763,17 @@ namespace EasyEject {
                 var disk = inventory.Disks.Single(d => d.Number == volume.Disks.Single()); long epoch = inventory.Epoch;
                 working = true; UpdateActions();
                 string root = volume.Mounts.First(x => x.Length >= 3 && x[1] == ':');
-                await SetUpProfile(volume, disk, root, epoch, ReadDefaults(), ReadProfile(volume, disk));
+                await SetUpProfile(volume, disk, root, epoch, ReadDefaults(), ReviewProfile(volume, disk));
             } catch (Exception ex) { ShowError(ex); }
             finally { working = false; UpdateActions(); debounce.Start(); }
         }
-        async Task<ImportProfile> SetUpProfile(Volume volume, Disk disk, string root, long epoch, ImportDefaults choices, ImportProfile stored) {
+        async Task<ImportProfile> SetUpProfile(Volume volume, Disk disk, string root, long epoch, ImportDefaults choices, ConnectedProfileReview reviewed) {
+            ImportProfile stored = reviewed.Value;
             using (var dialog = new ImportProfileDialog(stored ?? choices.NewProfile(volume, disk), root, volume.Display, choices, stored != null, automatic.SettingsSaved)) {
                 DialogResult result = dialog.ShowDialog(this);
                 if (result == DialogResult.Retry) {
                     if (MessageBox.Show(this, "Forget this device's saved folders and import choices? Files and originals stay intact.", "Forget import profile", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes) {
-                        Profiles.Remove(volume, disk); automatic.SettingsSaved(); status.Text = "Import profile forgotten. No files were imported or removed.";
+                        Profiles.ForgetConnected(reviewed); automatic.SettingsSaved(); status.Text = "Import profile forgotten. No files were imported or removed.";
                     }
                     return null;
                 }
@@ -775,7 +781,7 @@ namespace EasyEject {
                 ImportProfile draft = dialog.Draft;
                 string source = SafePaths.Normalize(Path.Combine(root, draft.RelativeSource));
                 await Task.Run(() => { using (SafePaths.LockDirectories(source, draft.Destination)) { var guard = new VolumeImportGuard(discovery, source, draft.Destination, volume, disk, epoch); if (!dialog.DestinationWasChosen) ProfileDestination.Require(draft, guard.DestinationIdentity, false); guard.Validate(); draft.SavedDestination = guard.DestinationIdentity; } });
-                Profiles.Save(draft); automatic.SettingsSaved(); status.Text = "Import profile saved. No import started. Choose Verified import or reconnect for enabled automatic import.";
+                Profiles.SaveConnected(reviewed, draft); automatic.SettingsSaved(); status.Text = "Import profile saved. No import started. Choose Verified import or reconnect for enabled automatic import.";
                 return draft;
             }
         }
