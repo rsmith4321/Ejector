@@ -2,6 +2,24 @@
 
 This records actual foreground observations separately from hidden renders and fixture tests. The full scope remains [PARITY.md](PARITY.md), against Mac baseline `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c`. The Windows port is not complete.
 
+## Modern WinUI preview · October 7, 09:20–09:25 EDT
+
+Source `4ab69f06268c3a7884a567a8c9f9bd51243ff1d1` is the new read-only WinUI 3 preview, not the complete modern port. Two brief input slots were explicitly coordinated with the access task and released afterward. Only the preview's own returned window received input.
+
+The first preview launched as PID **5452**, started **09:20:09.234769 EDT**, HWND **15927262**. Actual screenshot/accessibility showed the five internal volumes and protected OS C:, dark Fluent cards, Refresh and the explicit interface-preview/no-device-change label. The summary correctly retained incomplete inventory status. Alt+F4 hid the window; a fresh subsequent enumeration found no preview window and the same process/start time remained alive. Ordinary second launch restored the same HWND/PID/start time, without follow-up activation or an extra persistent instance. This proves close-hide/ordinary reopen for the read-only preview, not active-dialog/operation/startup behavior.
+
+Ryan approved the appearance and requested smaller headings. The separately built font revision launched as PID **31824**, started **09:25:03.023725 EDT**, HWND **7406064**. Its actual screenshot shows the 22/24 headings and 16 drive names, Connected storage fitting one line, and the complete tray instruction wrapping over two lines. No Windows display/font/scale setting changed. It remains visible and idle. Replacing the exact old isolated read-only process after path/start-time/apphost-hash checks was engineering cleanup; it is not tray Quit evidence.
+
+| Preview artifact | SHA-256 |
+| --- | --- |
+| Apphost `EasyEject.Modern.exe`, both builds | `45f0a4efe101a956d6d2a7d5679224c5b81fce7cd1dd7ac1eb195e608cb3f564` |
+| Initial managed payload `ModernBuild/.../EasyEject.Modern.dll` | `471cd34bff92e59dbb3b153ba18104ba722a30c89c8c8f58c3ac907ce51de780` |
+| Inspected font payload `ModernBuildFontReview/.../EasyEject.Modern.dll` | `35d78947317eaae15fb23ecce65ca7f9d4c1e861426d35441fddd1c4c544023a` |
+
+Outputs are under `%USERPROFILE%\.codex\EasyEjectBuildTools`, outside OneDrive. Apphost hashes alone do not identify the changed managed/XAML payload. `modern-font-build.log` has 0 warnings/0 errors; the final reproducible script run `modern-build-script-test.log`, terminal 10652 exit zero, has both builds warning-free and 13/0 reused fixture reopen tests on .NET 10. The retained full 1214/0 classic suite is not a new full modern-runtime run.
+
+Tray single-click/context menu/Quit were implemented but not actually exercised; the supported helper did not return a targetable taskbar window. Full modern operation/dialog integration, restart/login, keyboard/notifications/hotkey, other sizes/themes/monitor DPI, supplied tools/LUT, identified disposable hardware and trusted distribution remain open. No real import/eject/cleanup/deletion/profile save/startup installation, other-app input, security/power/display change or publication occurred during these checks.
+
 ## October 7 observation
 
 Checkout was clean at `94a0047`; latest source is `e1598951d657749b310080190a9c1dcfe01f8bfb`. The existing build was launched without rebuilding or changing source. No source/test file was newer than the executable. The retained full-test log still ends **1201 passed; 0 failed**, `manual-import-review-worker-final-test.log`; that suite was not rerun for this observation.
