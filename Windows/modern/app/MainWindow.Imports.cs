@@ -85,9 +85,10 @@ namespace EasyEject.Modern {
                 }
                 completions.InvalidateSource(owner.Root);
                 Summary.Text = "Preparing verified import…"; UpdateActions();
-                var result = await Task.Run(() => owner.Execute(new VerifiedImporter(operations), operationCancel.Token,
-                    message => QueueImportProgress(token, message), measured => QueueImportProgress(token, null, measured)));
+                var result = await StartStorageTask(token, () => Task.Run(() => owner.Execute(new VerifiedImporter(operations), operationCancel.Token,
+                    message => QueueImportProgress(token, message), measured => QueueImportProgress(token, null, measured))), owner.Guard);
                 importTerminal = result; var profile = owner.Profile; var guard = owner.Guard; var options = owner.Options; var root = owner.Root; var destination = owner.Destination;
+                await DrainStorageTask(token);
                 operationCancel.Dispose(); operationCancel = null; importOperationActive = false; UpdateActions();
                 owner.Dispose(); owner = null; importing = null; ImportProgress.IsIndeterminate = false; ImportProgress.Value = 100;
                 await PresentVerifiedImport(result, profile, guard, root, destination, options, completed => outcome = completed);
@@ -100,6 +101,7 @@ namespace EasyEject.Modern {
                     : "Import stopped. No automatic retry of copying/removal on this connection. " + ex.Message;
                 NotifyImport(importTerminal == null ? "Import needs attention" : "Import verified; review needs attention", Summary.Text, true);
             } finally {
+                await DrainStorageTask(token);
                 if (owner != null) owner.Dispose(); importing = null; confirmation = null;
                 if (operationCancel != null) { operationCancel.Dispose(); operationCancel = null; }
                 working = false; importOperationActive = false; ImportStatus.Text = Summary.Text; ImportProgress.Visibility = Visibility.Collapsed; activity.End(Summary.Text); UpdateImportTray(); UpdateActions();

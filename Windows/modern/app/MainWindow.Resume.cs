@@ -40,9 +40,10 @@ namespace EasyEject.Modern {
                 var answer = await confirmation.ShowAsync(); confirmation = null;
                 if (answer != ContentDialogResult.Primary) { Summary.Text = "Resume review cancelled. Remaining sources and complete saved copies are kept."; return; }
                 owner.Confirm(); completions.InvalidateSource(owner.Root); UpdateActions();
-                var result = await Task.Run(() => owner.Execute(operations, operationCancel.Token, message => QueueImportProgress(token, message)));
+                var result = await StartStorageTask(token, () => Task.Run(() => owner.Execute(operations, operationCancel.Token, message => QueueImportProgress(token, message))), owner.Guard);
                 // Preserve the durable result before releasing folders or displaying completion.
                 importTerminal = result; var profile = owner.Profile; var guard = owner.Guard; var options = owner.Options; var root = owner.Root; var destination = owner.Destination;
+                await DrainStorageTask(token);
                 operationCancel.Dispose(); operationCancel = null; importOperationActive = false;
                 owner.Dispose(); owner = null; resuming = null; ImportProgress.IsIndeterminate = false; ImportProgress.Value = 100;
                 await PresentVerifiedImport(result, profile, guard, root, destination, options, completed => outcome = completed);
@@ -55,6 +56,7 @@ namespace EasyEject.Modern {
                     : (outcome == null ? "Resume verified. " + importTerminal.Files + " files saved." : outcome.Message) + " Completion review unavailable: " + ex.Message;
                 NotifyImport(importTerminal == null ? "Resume needs attention" : "Resume verified; review needs attention", Summary.Text, true);
             } finally {
+                await DrainStorageTask(token);
                 if (owner != null) owner.Dispose(); resuming = null; confirmation = null;
                 if (operationCancel != null) { operationCancel.Dispose(); operationCancel = null; }
                 working = false; importOperationActive = false; ImportStatus.Text = Summary.Text; ImportProgress.Visibility = Visibility.Collapsed;

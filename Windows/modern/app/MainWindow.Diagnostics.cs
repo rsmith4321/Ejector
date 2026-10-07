@@ -16,6 +16,8 @@ namespace EasyEject.Modern {
         readonly Forms.ToolStripMenuItem aboutMenu = new Forms.ToolStripMenuItem("About Easy Eject…");
         string RecordModernIssue(string message) {
             if (closed) return null;
+            if (concurrentIssuePending && appIssue.NeedsAttention && message != appIssue.Message)
+                message = message.Substring(0, Math.Min(1800, message.Length)) + "\n\nEarlier retained issue: " + appIssue.Message.Substring(0, Math.Min(1800, appIssue.Message.Length));
             string warning = null;
             try { issueState.Record(message, () => Profiles.Root); }
             catch (Exception ex) { warning = "Issue remains available here, but could not be saved. " + ex.Message; }
@@ -23,7 +25,7 @@ namespace EasyEject.Modern {
             UpdateImportTray(); return warning;
         }
         void ClearModernIssue() {
-            if (closed || !appIssue.HasIssue) return;
+            if (closed || concurrentIssuePending || !appIssue.HasIssue) return;
             try { issueState.Clear(Profiles.Root); }
             catch (Exception ex) { Summary.Text += "\nEarlier issue remains available; clearing its saved status failed. " + ex.Message; }
             UpdateImportTray();

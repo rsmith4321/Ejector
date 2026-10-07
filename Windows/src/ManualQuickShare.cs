@@ -58,7 +58,7 @@ namespace EasyEject {
             return current != null && BatchHash(current) == BatchHash(expected) && EligibleProfile(current, Profiles.Catalog(root)) != null;
         }
         // Called only after the UI's explicit manual size/LUT dialog returns OK.
-        internal QuickShareResult Run(ManualQuickShareRequest request, CancellationToken cancel, Action<string> report) {
+        internal QuickShareResult Run(ManualQuickShareRequest request, CancellationToken cancel, Action<string> report, Action<IImportGuard> ready = null) {
             if (Interlocked.CompareExchange(ref running, 1, 0) != 0) throw new SafetyException("Quick Share is already running. No second export started.");
             try {
                 cancel.ThrowIfCancellationRequested(); var batch = RequireCurrent(request.Batch);
@@ -69,6 +69,7 @@ namespace EasyEject {
                         cancel.ThrowIfCancellationRequested(); directories.Validate();
                         var guard = makeGuard(ImportHistory.Clone(batch)); directories.Validate(); cancel.ThrowIfCancellationRequested();
                         guard.Validate(); directories.Validate(); cancel.ThrowIfCancellationRequested();
+                        if (ready != null) ready(guard);
                         return new QuickShareEngine(process, operations, freeSpace: freeSpace).Run(batch, batch.Destination, guard, tools.Tools, request.Preset, request.Color, cancel, report);
                     }
                 }

@@ -55,6 +55,20 @@ namespace EasyEject {
             internal void Unchanged() { ImportHistory.Verify(Batch, Batch.Destination, batch => new WindowsDestinationGuard(Import.Discovery, batch.DestinationRoot, batch.Destination, Import.Resolve), Import.Operations, CancellationToken.None, message => {}); Check(Import.Operations.Available(new[] { 7, 8 }), "Reservations leaked"); }
         }
         static void SharingOperationTests() {
+            Test("modern sharing publishes exact validated destination proof only during explicit work", delegate {
+                var f = new ModernSharingFixture(); int ready = 0; var request = f.Review().Confirm();
+                var result = f.Service.Run(request, CancellationToken.None, message => {}, guard => {
+                    ready++; Check(f.Process.Probes == 0 && f.Process.Encodes == 0 && guard.ProtectedDisks.Contains(8), "Ready callback occurred after media processing or protected the wrong disk"); guard.Validate();
+                });
+                Check(ready == 1 && result.Created == 1 && result.Outputs.Count == 1 && f.Process.Decodes == 1, "Ready callback altered exact manual export/validation"); f.Unchanged();
+            });
+            Test("modern sharing failed ready callback releases tools and requires fresh manual retry", delegate {
+                var f = new ModernSharingFixture(); int ready = 0;
+                Throws<SafetyException>(() => f.Service.Run(f.Review().Confirm(), CancellationToken.None, message => {}, guard => { ready++; throw new SafetyException("Owned ready callback refused"); }));
+                Check(ready == 1 && f.Process.Probes == 0 && !Directory.Exists(Path.Combine(f.Batch.Folder, "Sharing Copies")), "Failed ready callback ran media or published output"); f.Unchanged();
+                var result = f.Service.Run(f.Review().Confirm(), CancellationToken.None, message => {}, guard => ready++);
+                Check(ready == 2 && result.Created == 1 && result.Outputs.Count == 1, "Released worker/tools blocked fresh explicit retry"); f.Unchanged();
+            });
             Test("modern manual sharing cancellation and closed review never authorize export", delegate {
                 var f = new ModernSharingFixture(); var review = f.Review(); review.Set(QuickSharePreset.Uhd, QuickShareColor.LunaILog); review.Cancel();
                 Throws<SafetyException>(() => review.Confirm()); Throws<InvalidOperationException>(() => review.Set(QuickSharePreset.Hd, QuickShareColor.Standard));

@@ -15,6 +15,7 @@
     <Compile Include="ProfileEditTests.cs" />
     <Compile Include="ImportOperationTests.cs" />
     <Compile Include="SavedProfileImportTests.cs" />
+    <Compile Include="ConcurrentOperationTests.cs" />
     <Compile Include="SharingOperationTests.cs" />
     <Compile Include="ResumeOperationTests.cs" />
     <Compile Include="SettingsOperationTests.cs" />

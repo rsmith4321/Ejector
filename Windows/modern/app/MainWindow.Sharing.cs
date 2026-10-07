@@ -29,7 +29,7 @@ namespace EasyEject.Modern {
         }
         async void ReviewHistory() {
             if (!BeginSavedReview()) return;
-            string verified = null;
+            string verified = null; TrayOperation token = null;
             try {
                 await EnsureVisible();
                 var batches = await Task.Run(() => ImportHistory.Load()); SavedProfile[] profiles = null; string profileWarning = "";
@@ -57,21 +57,22 @@ namespace EasyEject.Modern {
                 var selected = ImportHistory.Clone(batches[list.SelectedIndex]);
                 if (answer == ContentDialogResult.Secondary) { await PerformQuickShare(selected); return; }
                 operationCancel = new CancellationTokenSource(); ImportProgress.Visibility = Visibility.Visible; ImportProgress.IsIndeterminate = true;
-                var token = activity.Begin(TrayOperationKind.Verify, selected.DeviceName, "Checking saved files"); UpdateActions();
-                await Task.Run(() => ImportHistory.Verify(selected, selected.Destination,
-                    batch => new WindowsDestinationGuard(discovery, batch.DestinationRoot, batch.Destination), operations, operationCancel.Token, message => QueueImportProgress(token, message)));
+                token = activity.Begin(TrayOperationKind.Verify, selected.DeviceName, "Checking saved files"); UpdateActions();
+                await StartStorageTask(token, () => Task.Run(() => { ImportHistory.Verify(selected, selected.Destination,
+                    batch => new WindowsDestinationGuard(discovery, batch.DestinationRoot, batch.Destination), operations, operationCancel.Token, message => QueueImportProgress(token, message), guard => QueueStorageProof(token, guard)); return true; }));
                 verified = "Verified all " + selected.Originals.Count + " exact saved files. Originals unchanged.\n" + selected.Folder; Summary.Text = verified;
+                await DrainStorageTask(token);
                 operationCancel.Dispose(); operationCancel = null; activity.End(Summary.Text); UpdateActions();
                 confirmation = MessageDialog("Saved batch verified", Summary.Text, null); await confirmation.ShowAsync(); confirmation = null;
             } catch (OperationCanceledException) { Summary.Text = "Saved-file verification cancelled. Files unchanged."; }
             catch (Exception ex) { Summary.Text = verified == null ? "History review stopped. Saved originals remain unchanged. " + ex.Message : verified + "\nCompletion display unavailable: " + ex.Message; RecordModernIssue(Summary.Text); }
-            finally { FinishSavedReview(); }
+            finally { await DrainStorageTask(token); FinishSavedReview(); }
         }
         async Task<bool> PerformQuickShare(CompletedBatch expected) {
-            QuickShareResult terminal = null; ManualQuickShareRequest request = null; ManualQuickShareReview review = null; string success = null;
+            QuickShareResult terminal = null; ManualQuickShareRequest request = null; ManualQuickShareReview review = null; string success = null; TrayOperation token = null;
             try {
                 await EnsureVisible();
-                var token = activity.Begin(TrayOperationKind.Share, expected.DeviceName, "Reviewing saved batch and sharing choices");
+                token = activity.Begin(TrayOperationKind.Share, expected.DeviceName, "Reviewing saved batch and sharing choices");
                 var offer = await Task.Run(() => SharingService.Prepare(expected)); review = new ManualQuickShareReview(offer);
                 var size = new ComboBox { ItemsSource = new[] { "1080p · smaller files", "4K · more detail" }, SelectedIndex = review.Preset == QuickSharePreset.Uhd ? 1 : 0, HorizontalAlignment = HorizontalAlignment.Stretch };
                 var lut = new CheckBox { Content = "Apply official Luna I-Log LUT", IsChecked = review.Color == QuickShareColor.LunaILog };
@@ -85,8 +86,8 @@ namespace EasyEject.Modern {
                 review.Set(size.SelectedIndex == 1 ? QuickSharePreset.Uhd : QuickSharePreset.Hd, lut.IsChecked == true ? QuickShareColor.LunaILog : QuickShareColor.Standard); request = review.Confirm();
                 operationCancel = new CancellationTokenSource(); ImportProgress.Visibility = Visibility.Visible; ImportProgress.IsIndeterminate = true;
                 Summary.Text = "Creating sharing copies from exact verified saved originals…"; UpdateActions();
-                terminal = await Task.Run(() => SharingService.Run(request, operationCancel.Token, message => QueueImportProgress(token, message)));
-                success = QuickSharePresentation.Success(request.Batch, request.Preset, terminal); Summary.Text = success; StopSavedCancellation();
+                terminal = await StartStorageTask(token, () => Task.Run(() => SharingService.Run(request, operationCancel.Token, message => QueueImportProgress(token, message), guard => QueueStorageProof(token, guard))));
+                success = QuickSharePresentation.Success(request.Batch, request.Preset, terminal); Summary.Text = success; await DrainStorageTask(token); StopSavedCancellation();
                 NotifyImport(terminal.CleanupWarnings.Count == 0 ? "Sharing copies ready" : "Sharing copies ready; needs attention", success, terminal.CleanupWarnings.Count != 0, terminal.CleanupWarnings.Count == 0);
                 if (AppWindow.IsVisible) { confirmation = MessageDialog("Quick Share", success, null); await confirmation.ShowAsync(); confirmation = null; }
                 return true;
@@ -98,7 +99,7 @@ namespace EasyEject.Modern {
             } catch (Exception ex) {
                 StopSavedCancellation(); Summary.Text = terminal == null ? "Quick Share stopped. Saved originals remain unchanged. Retry is manual. " + ex.Message
                     : (success ?? QuickSharePresentation.Success(request.Batch, request.Preset, terminal)) + "\nCompletion display unavailable: " + ex.Message;
-            } finally { if (review != null) review.Cancel(); StopSavedCancellation(); activity.End(Summary.Text); UpdateImportTray(); ImportStatus.Text = Summary.Text; ImportProgress.Visibility = Visibility.Collapsed; UpdateActions(); }
+            } finally { await DrainStorageTask(token); if (review != null) review.Cancel(); StopSavedCancellation(); activity.End(Summary.Text); UpdateImportTray(); ImportStatus.Text = Summary.Text; ImportProgress.Visibility = Visibility.Collapsed; UpdateActions(); }
             return terminal != null;
         }
         void StopSavedCancellation() {

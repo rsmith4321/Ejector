@@ -34,10 +34,10 @@ namespace EasyEject.Modern {
         bool quitting, working, closed, started, returnToProfile;
         readonly System.Threading.Tasks.TaskCompletionSource<bool> visibleRoot = new System.Threading.Tasks.TaskCompletionSource<bool>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
         Task runtimeStart; readonly WindowReopenRequests reopen;
-        bool UiBusy { get { return working || automaticReading || DefaultsPanel.Busy || ProfilesPanel.Busy || SettingsPanel.Busy; } }
+        bool UiBusy { get { return working || concurrentWork != null && concurrentWork.State.Busy || automaticReading || DefaultsPanel.Busy || ProfilesPanel.Busy || SettingsPanel.Busy; } }
         bool StorageBusy { get { return UiBusy || DefaultsPanel.Visibility == Visibility.Visible || ProfilesPanel.Visibility == Visibility.Visible || SettingsPanel.Visibility == Visibility.Visible; } }
         public MainWindow() {
-            InitializeComponent(); SystemBackdrop = new MicaBackdrop();
+            InitializeComponent(); concurrentWork = new ConcurrentStorageWork(operations); SystemBackdrop = new MicaBackdrop();
             SettingsPanel.ReleaseDescription = () => releaseChecks.Status;
             reopen = new WindowReopenRequests(action => DispatcherQueue.TryEnqueue(() => action()), () => { if (!closed) { AppWindow.Show(); Activate(); } });
             AppWindow.SetIcon(Microsoft.UI.Win32Interop.GetIconIdFromIcon(appIcon.Handle));
@@ -59,7 +59,8 @@ namespace EasyEject.Modern {
                     if (confirmation != null && activeCompletionId != null && completions.Get(activeCompletionId) == null) confirmation.IsPrimaryButtonEnabled = false;
                     UpdateActions();
                 }
-                if (!UiBusy && inventory.Pending) await ReadInventory();
+                if (refreshOtherReview != null) refreshOtherReview();
+                if (CanReadStorage && inventory.Pending) await ReadInventory();
                 await PulseModernReleases();
             };
             WindowLayout.InitialSize(this);
@@ -79,6 +80,7 @@ namespace EasyEject.Modern {
             helpMenu.Click += delegate { ViewModernInformation(false); }; aboutMenu.Click += delegate { ViewModernInformation(true); };
             menu.Items.Add(issueMenu); menu.Items.Add(debugMenu); menu.Items.Add(helpMenu); menu.Items.Add(aboutMenu);
             menu.Items.Add("Stop current operation", null, delegate { RequestOperationStop(); });
+            stopOtherMenu.Enabled = false; stopOtherMenu.Click += delegate { if (otherReview != null) otherReview.RequestStop(); }; menu.Items.Add(stopOtherMenu);
             menu.Items.Add("Quit preview", null, delegate { if (StorageBusy) { Reveal(); return; } quitting = true; Close(); });
             menu.Opening += delegate { RebuildStorageMenu(); };
             tray = new Forms.NotifyIcon { Icon = appIcon, Text = "Easy Eject interface preview", Visible = true, ContextMenuStrip = menu };
@@ -159,12 +161,13 @@ namespace EasyEject.Modern {
             var card = StorageCards.SelectedItem as StorageCard; var state = inventory.Current;
             bool fresh = state != null && state.Epoch == discovery.Epoch && notifications.Available;
             bool ready = fresh && !StorageBusy && !inventory.Scanning && settings != null && card != null;
-            Eject.IsEnabled = ready && card.Choice.CanEject; CleanEject.IsEnabled = ready && card.Choice.CanClean;
+            bool otherReady = fresh && CanUseOtherStorage && !inventory.Scanning && card != null && concurrentWork.State.Unavailable(state, discovery.Epoch, card.Choice.VolumeId) == null;
+            Eject.IsEnabled = (ready || otherReady) && card.Choice.CanEject; CleanEject.IsEnabled = (ready || otherReady) && card.Choice.CanClean;
             EditProfile.IsEnabled = ready && card.Connection != null;
             Import.IsEnabled = ready && card.Connection != null;
             Resume.IsEnabled = ready && card.Connection != null;
             EjectCards.IsEnabled = fresh && !StorageBusy && !inventory.Scanning && settings != null && state.Complete && state.Volumes.Any(v => v.IsCard);
-            Refresh.IsEnabled = !UiBusy && !inventory.Scanning;
+            Refresh.IsEnabled = CanReadStorage && !inventory.Scanning;
             CancelOperation.Visibility = working && operationCancel != null && confirmation == null ? Visibility.Visible : Visibility.Collapsed;
             CancelOperation.Content = quickShareSetupSaving ? "Stop setup" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Share ? "Stop export" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Verify ? "Stop verification" : groupedReview != null ? "Stop removal" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Resume ? "Stop resume" : importOperationActive ? "Stop import" : "Stop cleanup";
             CancelOperation.IsEnabled = operationCancel != null && !operationCancel.IsCancellationRequested;
@@ -174,19 +177,22 @@ namespace EasyEject.Modern {
             debugMenu.Visible = DebugButton.Visibility == Visibility.Visible; DebugButton.IsEnabled = debugMenu.Enabled = canReview;
             HelpButton.IsEnabled = AboutButton.IsEnabled = helpMenu.Enabled = aboutMenu.Enabled = canReview;
             ReleaseButton.IsEnabled = releaseMenu.Enabled = canReview;
-            SelectionStatus.Text = StorageBusy ? "Finish the current review or operation first." : !fresh ? "Refresh the storage list before reviewing a device." : card == null ? "Select a device to review safe removal." : card.Choice.Error ?? "Safe removal affects this physical device and all its volumes. Review before unplugging.";
+            SelectionStatus.Text = CanUseOtherStorage && card != null ? concurrentWork.State.Unavailable(state, discovery.Epoch, card.Choice.VolumeId) ?? "This device is separate from the protected transfer disks. Review its own safe removal before unplugging."
+                : StorageBusy ? "Finish the current review or operation first." : !fresh ? "Refresh the storage list before reviewing a device." : card == null ? "Select a device to review safe removal." : card.Choice.Error ?? "Safe removal affects this physical device and all its volumes. Review before unplugging.";
+            stopOtherMenu.Enabled = otherReview != null && otherReview.Busy;
             if (tray != null) UpdateImportTray();
         }
         void RebuildStorageMenu() {
             foreach (var item in storageMenu.DropDownItems.Cast<Forms.ToolStripItem>().ToArray()) item.Dispose();
             storageMenu.DropDownItems.Clear();
             storageMenu.DropDownItems.AddRange(TrayStorageMenu.Build(inventory.Current, discovery.Epoch,
-                StorageBusy || inventory.Scanning, !notifications.Available || settings == null, settings != null && settings.CleanupCardsEnabled,
-                async (choice, clean) => { Reveal(); ShowStorage(); await EjectDevice(clean, choice); }));
+                StorageBusy && !CanUseOtherStorage || inventory.Scanning, !notifications.Available || settings == null, settings != null && settings.CleanupCardsEnabled,
+                async (choice, clean) => { Reveal(); ShowStorage(); await EjectDevice(clean, choice); },
+                working ? choice => concurrentWork.State.Unavailable(inventory.Current, discovery.Epoch, choice.VolumeId) : null));
         }
         async void Refresh_Click(object sender, RoutedEventArgs args) { await ReadInventory(); }
         async Task ReadInventory() {
-            if (closed || UiBusy || inventory.Scanning) return;
+            if (closed || !CanReadStorage || inventory.Scanning) return;
             var refresh = inventory.Refresh(); UpdateActions();
             if (settings == null || !issueLoaded) {
                 try {
@@ -204,6 +210,7 @@ namespace EasyEject.Modern {
             if (closed) return;
             var state = inventory.Current;
             if (published && state != null && state.Epoch == discovery.Epoch) {
+                string selectedVolume = working && StorageCards.SelectedItem is StorageCard selectedCard ? selectedCard.Choice.VolumeId : null;
                 StorageCards.SelectedItem = null;
                 StorageCards.ItemsSource = state.Volumes.OrderBy(v => v.Group).ThenBy(v => v.Display).Select(v => new StorageCard {
                     Title = string.IsNullOrEmpty(v.Label) ? "Unnamed volume" : v.Label,
@@ -211,8 +218,11 @@ namespace EasyEject.Modern {
                     State = v.System ? "Protected" : v.Error == "" ? "Connected" : "Needs review",
                     Choice = new TrayStorageChoice(state, v, discovery.Epoch), Connection = AutomaticConnection.Capture(state, v)
                 }).ToArray();
-                Summary.Text = settings == null ? "Saved app settings unavailable. Device actions are blocked." : state.Complete ? state.Volumes.Count + " volumes across " + state.Disks.Count + " physical disks" : "Storage cannot be safely acted on. " + string.Join(" ", state.Errors);
-                if (shortcutWarning != null) Summary.Text += "\n" + shortcutWarning;
+                if (selectedVolume != null) StorageCards.SelectedItem = StorageCards.Items.Cast<StorageCard>().SingleOrDefault(card => card.Choice.VolumeId == selectedVolume);
+                if (!working) {
+                    Summary.Text = settings == null ? "Saved app settings unavailable. Device actions are blocked." : state.Complete ? state.Volumes.Count + " volumes across " + state.Disks.Count + " physical disks" : "Storage cannot be safely acted on. " + string.Join(" ", state.Errors);
+                    if (shortcutWarning != null) Summary.Text += "\n" + shortcutWarning;
+                }
                 tray.Text = "Easy Eject · " + state.Volumes.Count + " connected volumes";
                 automatic.Observe(state);
                 completions.Reconcile(state, WindowsDiscovery.VolumeId);
@@ -222,7 +232,7 @@ namespace EasyEject.Modern {
             else if (state != null && !state.Complete) problem = (problem == null ? "" : problem + "\n") + "Storage cannot be safely acted on. " + string.Join(" ", state.Errors);
             if (problem != null) RecordDiscoveryIssue(problem);
             else { discoveryIssueEpoch = null; discoveryIssueText = null; }
-            if (appIssue.NeedsAttention) Summary.Text += "\nChoose View issue for the retained explanation.";
+            if (!working && appIssue.NeedsAttention) Summary.Text += "\nChoose View issue for the retained explanation.";
             UpdateActions();
             await PumpAutomaticImports();
         }
@@ -235,6 +245,7 @@ namespace EasyEject.Modern {
         async void CleanEject_Click(object sender, RoutedEventArgs args) { await EjectDevice(true); }
         void CancelOperation_Click(object sender, RoutedEventArgs args) { RequestOperationStop(); }
         async Task EjectDevice(bool forceClean, TrayStorageChoice chosen = null) {
+            if (working) { var selected = StorageCards.SelectedItem as StorageCard; await ReviewOtherStorage(forceClean, chosen ?? selected?.Choice); return; }
             if (closed || StorageBusy || inventory.Scanning || !notifications.Available || settings == null) return;
             var card = StorageCards.SelectedItem as StorageCard;
             var choice = chosen ?? (card == null ? null : card.Choice); if (choice == null) return;
