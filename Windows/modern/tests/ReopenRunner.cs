@@ -1,8 +1,8 @@
 using System;
 
 namespace EasyEject {
-    // Reuse the production contract cases on the modern runtime. Fixture events only;
-    // this executable has no discovery, importing, ejecting or real app listener.
+    // Exercise the actual runtime with fixture events/disposable files/fake removal APIs.
+    // Native monitoring is a separate explicit read-only command, never real removal.
     public static partial class Tests {
         static int passed, failed;
         static void Check(bool value, string message) { if (!value) throw new Exception(message); }
@@ -17,9 +17,11 @@ namespace EasyEject {
         [STAThread]
         static int Main(string[] args) {
             if (args.Length > 0 && args[0] == "--reopen-signal-fixture") return ReopenSignalFixture(args);
+            if (args.Length == 1 && args[0] == "--monitor-native") return NativeStorageMonitorSmoke();
             if (args.Length != 0) return 2;
             WindowReopenTests();
             DefaultsEditTests();
+            StorageControllerTests();
             Console.WriteLine(passed + " passed, " + failed + " failed");
             return failed == 0 ? 0 : 1;
         }
