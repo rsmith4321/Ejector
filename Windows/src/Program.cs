@@ -418,7 +418,7 @@ namespace EasyEject {
             CompletedBatch savedBatch = null;
             if (result.HasSelectedMedia) {
                 try { savedBatch = await Task.Run(() => { var batch = ImportHistory.Create(result, stored, deviceName, guard.DestinationIdentity); ImportHistory.Add(batch); return batch; }); historyNote = "\nExact verified files saved in Import history."; }
-                catch (Exception ex) { historyFailed = true; historyNote = "\nImport verified, but history could not be saved: " + ex.Message + "\nCopies and the completion receipt remain available."; RecordIssue(historyNote.Trim()); }
+                catch (Exception ex) { historyFailed = true; historyNote = Environment.NewLine + CompletionPresentation.HistoryFailure(ex); RecordIssue(historyNote.Trim()); }
             }
             string message = result.Files == 0 ? "No matching media or device indexes were found. No batch was created." : (result.HasSelectedMedia ? "Import complete. " : "No matching media. Device index backup only. ") + result.Files + " files verified (" + result.Bytes + " bytes; " + result.Reused + " reused).\n" + result.Folder;
             bool sourceUnchanged = await Task.Run(() => {

@@ -197,6 +197,12 @@ namespace EasyEject {
                 using (var window = new DeviceWindow(true)) {
                     window.Size = window.MinimumSize; window.PresentInventory(CardState()); Render(window, Path.Combine(output, "device-window.png"));
                     var statusControl = (System.Windows.Forms.Control)typeof(DeviceWindow).GetField("status", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(window);
+                    using (var noticeFixture = new Fixture()) {
+                        noticeFixture.Put("clip.mov", "Generated history notice media"); var noticeBatch = Batch(noticeFixture, noticeFixture.Run(_ => {}));
+                        var noticeFailure = Throws<SafetyException>(() => Profiles.WriteJson(new List<CompletedBatch> { noticeBatch }, typeof(List<CompletedBatch>), Path.Combine(noticeFixture.Root, "history"), "completed-imports.json", (stage, path) => { if (stage == "After publication") throw new InvalidOperationException("Generated final check refusal"); }));
+                        statusControl.Text = CompletionPresentation.HistoryFailure(noticeFailure);
+                        Render(window, Path.Combine(output, "device-window-history-publication.png"));
+                    }
                     statusControl.Text = String.Join(Environment.NewLine, Enumerable.Range(1, 80).Select(i => "Synthetic retained-work result " + i + ": full-quality originals are unchanged; retry is manual."));
                     Render(window, Path.Combine(output, "device-window-long-result.png"));
                     var volumesList = (System.Windows.Forms.ListView)typeof(DeviceWindow).GetField("list", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(window);
