@@ -25,18 +25,30 @@ The pre-existing executable at `%LOCALAPPDATA%\EasyEject\PrototypeBuild\EasyEjec
 
 No settings were saved, startup entry installed, media tool run, import started, cleanup performed or device ejected. Foreground input stopped when the access task requested focus for Ryan's Mac password interaction. Settings was left open; no Cancel, further scrolling, keyboard operation or app shutdown/restart was performed in this observation. This focus sequencing is not a paused goal or a verified background test job.
 
+## Coordinated mouse and lifecycle follow-up
+
+Ryan explicitly requested coordination with the other task for keyboard/mouse control. The recovery task confirmed the access task was idle with no active Mac viewer/password window and granted a short Easy Eject slot. This is direct user-authorized coordination, not permission inferred from another task's message alone.
+
+On the same build/process, actual scrolling brought the debug/shortcut controls and explanation into view while Save/Cancel stayed fixed. A screenshot-based click checked the shortcut only in the unsaved draft and enabled its letter control. The dropdown opened and visibly listed **D, E, F, G, K, M, R, T, X**. The current shortcut-status text remained off. This does not prove native hotkey registration/delivery or saving a changed letter.
+
+Modal keyboard/letter selection remain **unproved**. The focus-based checkbox click changed scroll/focus but did not check it; a subsequent Space attempt produced a snapshot focused on the disabled owner and did not toggle the checkbox. Screenshot-based checkbox input succeeded. A dropdown selection attempt closed the list but the selected value remained E. These observations are insufficient to establish an app defect or a keyboard/selection pass; the helper's owner/modal targeting needs resolution or direct foreground verification. No alternate UI automation or security bypass was used.
+
+Screenshot-based **Cancel** closed Settings and restored the active main window. Both known `app-settings.json` paths remained absent, and the own `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` value `EasyEject.Windows` remained absent. Before/after evidence is retained outside OneDrive in `%USERPROFILE%\.codex\EasyEjectWindowsPreview\foreground-settings-before.json` and `foreground-settings-after.json`; the latter records `SettingsUnchanged`, `StartupUnchanged` and `OriginalProcessStillRunning` as true at **06:59:59 local time**. No settings were saved, startup installed or media/device action performed.
+
+With no modal left, **Alt+F4** closed the device window. Fresh native window enumeration returned no Easy Eject window, while the same PID 16400/start time remained alive with an empty main-window title. This proves close/hide keeps that process running; tray re-opening, tray icon input, Quit, restart and busy/modal shutdown protection remain unrun. Keyboard/mouse control was then explicitly released to the access task and recovery task; subsequent work in this slot is background documentation only. The retained full-suite result stays 1201/0, not a new test run/count.
+
 ## Remaining foreground checks
 
 Use fresh returned window/state objects before each input. Do not automate authentication/security prompts or compete with another task's password/installer interaction. Check the actual Mac `SettingsView.swift`, `AppLifecycle.swift`, completion and manual-sharing contracts before treating an outcome as parity evidence.
 
 | Requirement | Next evidence | Current status |
 | --- | --- | --- |
-| Settings accessibility and cancellation | Scroll all content; inspect the letter dropdown, keyboard focus and Escape/Cancel; confirm temporary edits do not save or register a shortcut/login entry. | Not run |
+| Settings accessibility and cancellation | Scroll all content; inspect the letter dropdown, keyboard focus and Escape/Cancel; confirm temporary edits do not save or register a shortcut/login entry. | Partial: mouse scrolling/draft enable/dropdown display/Cancel with unchanged storage observed; full content, keyboard/Escape and changed-letter selection unproved |
 | Defaults and saved profiles | Exercise defaults/custom selection, broadening confirmations, cancel, migration and stale edits through actual dialogs with owned fixtures. | Not run |
 | History and completion | Inspect exact retained batches, explicit verification, Keep Connected default, return from manual sharing and loss of eject authority after restart. | Not run |
-| Tray and lifecycle | Close hides; tray reopens; Quit exits; fresh launch and active/modal quit protection are observed. | Not run |
+| Tray and lifecycle | Close hides; tray reopens; Quit exits; fresh launch and active/modal quit protection are observed. | Close/hide with same process alive observed; other actions not run |
 | Notifications and hotkey | Actual delivery/suppression, fresh review on balloon click, selected-key registration/collision and no repeated/stale removal. Do not install login registration during development. | Not run |
-| Scaling and controls | Minimum-size scrolling, fixed action visibility, actual dropdowns/pickers, larger layout and applicable monitor/DPI behavior. | Initial main/Settings render only |
+| Scaling and controls | Minimum-size scrolling, fixed action visibility, actual dropdowns/pickers, larger layout and applicable monitor/DPI behavior. | Main/Settings render, partial Settings scrolling/fixed actions/dropdown display observed at current size; remaining sizes/inputs unproved |
 | Quick Share | Manual opt-in/size/LUT/tool choice, actual validation, cancellation/retry and unchanged exact imported originals/history across restart. | [Actual-tool rehearsal](QUICK_SHARE_ACCEPTANCE.md) prepared, not run; tool/LUT paths still needed |
 | Hardware and optional removal | Explicitly identified disposable camera/card/reader/destination and authorized operations; physical import, long transfer, reconnect, grouping/veto/eject and any separately permitted cleanup/removal/recovery. | Identification/authorization still needed |
 | Direct distribution | Trusted publisher/artifact, manual installation/update/rollback and current-policy proof after runtime/hardware acceptance. | Signing/runtime proof still needed; no public release authorized |

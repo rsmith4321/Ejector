@@ -4,6 +4,14 @@ Overnight checkpoint: at **08:00 America/New_York**, paused `easy-eject-overnigh
 
 ## Full-port scope and latest software milestone
 
+### Coordinated foreground Settings cancellation and close/hide · October 7
+
+Ryan explicitly asked for direct coordination of keyboard/mouse control. After the recovery task verified no active viewer/password window and reserved a short slot, the existing `e159895` build/process performed actual Settings scrolling, an unsaved shortcut-checkbox change and dropdown display of all nine supported letters. Save/Cancel stayed visible. Screenshot-based Cancel closed the modal; both known app-settings files and the own login Run value remained absent before/after. Alt+F4 on the restored main window hid it: fresh enumeration found no Easy Eject window, while the same PID 16400/start time remained alive. Control was promptly released directly to the access and recovery tasks under Ryan's authorization.
+
+[FOREGROUND_ACCEPTANCE.md](FOREGROUND_ACCEPTANCE.md) records scope and the retained `foreground-settings-before.json` / `foreground-settings-after.json` outside OneDrive; actual final observation at 06:59:59 local time reports settings/startup unchanged and the original process still running. Modal keyboard/changed-letter selection are unproved: a focus-based click did not toggle, Space returned owner focus, and a dropdown selection attempt retained E. Coordinate checkbox/Cancel and dropdown display succeeded. These results do not establish an app defect or a full keyboard pass. No alternate automation/security bypass was attempted. Full Settings content/other sizes, tray reopen/Quit/restart, hotkey/notifications, tools/LUT and identified hardware/trusted distribution remain open.
+
+No source/test change or rebuild; retained full result remains **1201/0**, not a new run/count. No settings save/startup installation/media/device action/publication. Work continues in the background without competing for Mac login focus. Full goal active; bounded overnight heartbeat paused.
+
 ### Foreground review begins after goal resume · October 7
 
 The goal API now reports **active** with the original full-port objective intact. New available computer-use capability permits actual Windows foreground review; the earlier blocked checkpoint below is historical. Checkout was clean at `94a0047`, source `e159895`; the existing build and retained **1201/0** full-test log were inspected, with no source/test newer than the executable and no test process running. No rebuild or repeat suite was needed for this observation.
