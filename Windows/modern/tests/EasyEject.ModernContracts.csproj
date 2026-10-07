@@ -13,6 +13,7 @@
     <Compile Include="DefaultsEditTests.cs" />
     <Compile Include="StorageControllerTests.cs" />
     <Compile Include="ProfileEditTests.cs" />
+    <Compile Include="ImportOperationTests.cs" />
     <Compile Include="ReopenRunner.cs" />
     <ProjectReference Include="..\EasyEject.Runtime.csproj" />
   </ItemGroup>

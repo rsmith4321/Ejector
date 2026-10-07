@@ -10,6 +10,7 @@ namespace EasyEject.Modern {
         int loadRevision;
         internal bool Busy { get { return loading || saving || confirming; } }
         internal event Action<string> Completed;
+        internal event Action Saved;
         public ImportDefaultsView() { InitializeComponent(); }
         internal async Task StartEdit() {
             if (Busy) return;
@@ -77,7 +78,7 @@ namespace EasyEject.Modern {
             try { await Task.Run(() => owner.Save()); saved = true; }
             catch (Exception ex) { owner.Cancel(); Status.Text = "Could not finish saving. Close and reopen Import defaults to review the saved choices before retrying. " + ex.Message; }
             finally { saving = false; Render(); }
-            if (saved) { active = false; if (Completed != null) Completed("Import defaults saved. No import started."); }
+            if (saved) { active = false; if (Saved != null) Saved(); if (Completed != null) Completed("Import defaults saved. No import started."); }
         }
         void Cancel_Click(object sender, RoutedEventArgs args) {
             if (TryLeave() && Completed != null) Completed("Import defaults draft discarded. Saved choices were not changed.");

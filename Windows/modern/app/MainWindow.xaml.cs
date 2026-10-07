@@ -30,7 +30,7 @@ namespace EasyEject.Modern {
         ContentDialog confirmation;
         CancellationTokenSource operationCancel;
         bool quitting, working, closed, started, returnToProfile;
-        bool UiBusy { get { return working || DefaultsPanel.Busy || ProfilesPanel.Busy; } }
+        bool UiBusy { get { return working || automaticReading || DefaultsPanel.Busy || ProfilesPanel.Busy; } }
         bool StorageBusy { get { return UiBusy || DefaultsPanel.Visibility == Visibility.Visible || ProfilesPanel.Visibility == Visibility.Visible; } }
         public MainWindow() {
             InitializeComponent(); SystemBackdrop = new MicaBackdrop();
@@ -40,7 +40,10 @@ namespace EasyEject.Modern {
             pulse.Tick += async delegate {
                 if (closed) return;
                 if (inventory.Observe()) {
+                    completions.InvalidateNotifications();
                     if (confirmation != null && activeReview != null && !activeReview.Current) confirmation.IsPrimaryButtonEnabled = false;
+                    if (confirmation != null && importing != null && !importing.Current) confirmation.IsPrimaryButtonEnabled = false;
+                    if (confirmation != null && activeCompletionId != null && completions.Get(activeCompletionId) == null) confirmation.IsPrimaryButtonEnabled = false;
                     UpdateActions();
                 }
                 if (!UiBusy && inventory.Pending) await ReadInventory();
@@ -51,6 +54,8 @@ namespace EasyEject.Modern {
             menu.Items.Add(storageMenu);
             menu.Items.Add("Import defaults…", null, delegate { Reveal(); OpenDefaults(); });
             menu.Items.Add("Saved profiles…", null, delegate { Reveal(); OpenProfiles(); });
+            menu.Items.Add("Completed imports…", null, delegate { Reveal(); ReviewPendingImports(); });
+            menu.Items.Add("Stop current operation", null, delegate { RequestOperationStop(); });
             menu.Items.Add("Quit preview", null, delegate { if (StorageBusy) { Reveal(); return; } quitting = true; Close(); });
             menu.Opening += delegate { RebuildStorageMenu(); };
             tray = new Forms.NotifyIcon { Icon = System.Drawing.SystemIcons.Information, Text = "Easy Eject interface preview", Visible = true, ContextMenuStrip = menu };
@@ -65,8 +70,8 @@ namespace EasyEject.Modern {
                 closed = true; pulse.Stop(); inventory.Dispose(); notifications.Dispose();
                 DefaultsPanel.TryLeave(); ProfilesPanel.TryLeave(); tray.Dispose(); menu.Dispose();
             };
+            DefaultsPanel.Saved += delegate { automatic.SettingsSaved(); };
             DefaultsPanel.Completed += async delegate(string message) {
-                automatic.SettingsSaved();
                 if (returnToProfile) { returnToProfile = false; ShowProfiles(); await ProfilesPanel.ReloadDefaults(); }
                 else ShowStorage();
                 Summary.Text = message; UpdateActions();
@@ -119,8 +124,10 @@ namespace EasyEject.Modern {
             bool ready = fresh && !StorageBusy && !inventory.Scanning && settings != null && card != null;
             Eject.IsEnabled = ready && card.Choice.CanEject; CleanEject.IsEnabled = ready && card.Choice.CanClean;
             EditProfile.IsEnabled = ready && card.Connection != null;
+            Import.IsEnabled = ready && card.Connection != null;
             Refresh.IsEnabled = !UiBusy && !inventory.Scanning;
-            CancelOperation.Visibility = working && activeReview != null && activeReview.HasCleanup && confirmation == null ? Visibility.Visible : Visibility.Collapsed;
+            CancelOperation.Visibility = working && operationCancel != null && confirmation == null ? Visibility.Visible : Visibility.Collapsed;
+            CancelOperation.Content = importOperationActive ? "Stop import" : "Stop cleanup";
             CancelOperation.IsEnabled = operationCancel != null && !operationCancel.IsCancellationRequested;
             SelectionStatus.Text = StorageBusy ? "Finish the current review or operation first." : !fresh ? "Refresh the storage list before reviewing a device." : card == null ? "Select a device to review safe removal." : card.Choice.Error ?? "Safe removal affects this physical device and all its volumes. Review before unplugging.";
         }
@@ -153,8 +160,10 @@ namespace EasyEject.Modern {
                 Summary.Text = settings == null ? "Saved app settings unavailable. Device actions are blocked." : state.Complete ? state.Volumes.Count + " volumes across " + state.Disks.Count + " physical disks" : "Storage cannot be safely acted on. " + string.Join(" ", state.Errors);
                 tray.Text = "Easy Eject · " + state.Volumes.Count + " connected volumes";
                 automatic.Observe(state);
+                completions.Reconcile(state, WindowsDiscovery.VolumeId);
             } else if (inventory.Error != null) Summary.Text = "Storage could not be checked. " + inventory.Error;
             UpdateActions();
+            await PumpAutomaticImports();
         }
         async void Eject_Click(object sender, RoutedEventArgs args) { await EjectDevice(false); }
         async void Profile_Click(object sender, RoutedEventArgs args) {
@@ -163,7 +172,7 @@ namespace EasyEject.Modern {
             ShowProfiles(); UpdateActions(); await ProfilesPanel.StartConnected(card.Connection); UpdateActions();
         }
         async void CleanEject_Click(object sender, RoutedEventArgs args) { await EjectDevice(true); }
-        void CancelOperation_Click(object sender, RoutedEventArgs args) { if (operationCancel != null) { operationCancel.Cancel(); Summary.Text = "Stopping cleanup before removal. Ordinary media and remaining metadata are kept."; UpdateActions(); } }
+        void CancelOperation_Click(object sender, RoutedEventArgs args) { RequestOperationStop(); }
         async Task EjectDevice(bool forceClean, TrayStorageChoice chosen = null) {
             if (closed || StorageBusy || inventory.Scanning || !notifications.Available || settings == null) return;
             var card = StorageCards.SelectedItem as StorageCard;

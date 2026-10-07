@@ -42,8 +42,8 @@ namespace EasyEject {
     internal sealed class AutomaticImportRequest {
         readonly ImportProfile profile;
         internal ImportProfile Profile { get { return profile.Copy(); } }
-        internal readonly AutomaticConnection Connection; internal readonly MediaOptions Options;
-        internal AutomaticImportRequest(AutomaticConnection connection, ImportProfile profile, ImportDefaults defaults) { Connection = connection; this.profile = profile.Copy(); Options = profile.Resolve(defaults); }
+        internal readonly AutomaticConnection Connection; internal readonly MediaOptions Options; internal readonly bool Enabled;
+        internal AutomaticImportRequest(AutomaticConnection connection, ImportProfile profile, ImportDefaults defaults) { Connection = connection; this.profile = profile.Copy(); Options = profile.Resolve(defaults); Enabled = profile.AutomaticEnabled(defaults); }
         internal void ValidateAdmission(Inventory current, DestinationIdentity destination) {
             Connection.RequireCurrent(current);
             if (profile.VolumeId != Connection.Volume.Id || profile.VolumeSerial != Connection.Volume.Serial || profile.DiskInstance != Connection.Disk.InstanceId) throw new SafetyException("The automatic profile no longer matches this card. Connect the original card or enroll the formatted device again. No import started.");
