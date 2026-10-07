@@ -119,7 +119,7 @@ namespace EasyEject {
                     var tray = ActivityField<NotifyIcon>(window, "tray"); var menu = ActivityField<ToolStripMenuItem>(window, "activityMenu"); var icons = ActivityField<TrayBusyIcons>(window, "trayBusyIcons");
                     Check(!window.Visible && tray.Text.Contains("43%") && tray.Text.EndsWith("Needs attention", StringComparison.Ordinal) && Object.ReferenceEquals(tray.Icon, icons.Attention) && !menu.Enabled && menu.Text.Contains("Fixture camera"), "Hidden active native state missing");
                     menu.PerformClick(); Check(activity.Current == token, "Status row triggered work"); activity.End("Import verified; originals kept"); typeof(DeviceWindow).GetField("working", PrivateInstance).SetValue(window, false); RefreshActivityWindow(window);
-                    Check(menu.Text.Contains("Import verified") && Object.ReferenceEquals(tray.Icon, System.Drawing.SystemIcons.Warning), "Idle warning/outcome disappeared");
+                    Check(menu.Text.Contains("Import verified") && Object.ReferenceEquals(tray.Icon, icons.Attention), "Idle warning/outcome disappeared");
                 }
             });
             Test("queued native callback after finish cannot replace the final window or tray result", delegate {

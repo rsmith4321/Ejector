@@ -24,6 +24,8 @@ namespace EasyEject.Modern {
         readonly StorageNotificationWindow notifications;
         readonly DispatcherQueueTimer pulse;
         readonly Forms.NotifyIcon tray;
+        readonly System.Drawing.Icon appIcon = AppIcons.Load();
+        readonly TrayBusyIcons trayIcons = new TrayBusyIcons();
         readonly Forms.ToolStripMenuItem storageMenu = new Forms.ToolStripMenuItem("Connected storage");
         AppSettings settings;
         ManualEjectReview activeReview;
@@ -34,6 +36,7 @@ namespace EasyEject.Modern {
         bool StorageBusy { get { return UiBusy || DefaultsPanel.Visibility == Visibility.Visible || ProfilesPanel.Visibility == Visibility.Visible || SettingsPanel.Visibility == Visibility.Visible; } }
         public MainWindow() {
             InitializeComponent(); SystemBackdrop = new MicaBackdrop();
+            AppWindow.SetIcon(Microsoft.UI.Win32Interop.GetIconIdFromIcon(appIcon.Handle));
             shortcut = new HotkeyMessageWindow(() => StorageBusy || closed || inventory == null || inventory.Scanning || !notifications.Available, action => DispatcherQueue.TryEnqueue(() => action()), () => { Reveal(); ReviewCards(); });
             SettingsPanel.ShortcutDescription = () => shortcutWarning ?? shortcut.Status;
             SettingsPanel.Saved += SettingsSaved;
@@ -54,7 +57,7 @@ namespace EasyEject.Modern {
                 }
                 if (!UiBusy && inventory.Pending) await ReadInventory();
             };
-            AppWindow.Resize(new Windows.Graphics.SizeInt32(1120, 760));
+            WindowLayout.InitialSize(this);
             var menu = new Forms.ContextMenuStrip();
             menu.Items.Add("Open Easy Eject", null, delegate { Reveal(); });
             menu.Items.Add(storageMenu);
@@ -69,7 +72,7 @@ namespace EasyEject.Modern {
             menu.Items.Add("Stop current operation", null, delegate { RequestOperationStop(); });
             menu.Items.Add("Quit preview", null, delegate { if (StorageBusy) { Reveal(); return; } quitting = true; Close(); });
             menu.Opening += delegate { RebuildStorageMenu(); };
-            tray = new Forms.NotifyIcon { Icon = System.Drawing.SystemIcons.Information, Text = "Easy Eject interface preview", Visible = true, ContextMenuStrip = menu };
+            tray = new Forms.NotifyIcon { Icon = appIcon, Text = "Easy Eject interface preview", Visible = true, ContextMenuStrip = menu };
             tray.DoubleClick += delegate { Reveal(); };
             tray.MouseClick += delegate(object sender, Forms.MouseEventArgs args) { if (args.Button == Forms.MouseButtons.Left) Reveal(); };
             tray.BalloonTipClicked += delegate { Reveal(); };
@@ -79,7 +82,7 @@ namespace EasyEject.Modern {
             };
             Closed += delegate {
                 closed = true; pulse.Stop(); inventory.Dispose(); notifications.Dispose();
-                DefaultsPanel.TryLeave(); ProfilesPanel.TryLeave(); SettingsPanel.TryLeave(); shortcut.Dispose(); tray.Dispose(); menu.Dispose();
+                DefaultsPanel.TryLeave(); ProfilesPanel.TryLeave(); SettingsPanel.TryLeave(); shortcut.Dispose(); tray.Dispose(); trayIcons.Dispose(); appIcon.Dispose(); menu.Dispose();
             };
             DefaultsPanel.Saved += delegate { automatic.SettingsSaved(); };
             DefaultsPanel.Completed += async delegate(string message) {
@@ -144,6 +147,7 @@ namespace EasyEject.Modern {
             CancelOperation.Content = quickShareSetupSaving ? "Stop setup" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Share ? "Stop export" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Verify ? "Stop verification" : groupedReview != null ? "Stop removal" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Resume ? "Stop resume" : importOperationActive ? "Stop import" : "Stop cleanup";
             CancelOperation.IsEnabled = operationCancel != null && !operationCancel.IsCancellationRequested;
             SelectionStatus.Text = StorageBusy ? "Finish the current review or operation first." : !fresh ? "Refresh the storage list before reviewing a device." : card == null ? "Select a device to review safe removal." : card.Choice.Error ?? "Safe removal affects this physical device and all its volumes. Review before unplugging.";
+            if (tray != null) UpdateImportTray();
         }
         void RebuildStorageMenu() {
             foreach (var item in storageMenu.DropDownItems.Cast<Forms.ToolStripItem>().ToArray()) item.Dispose();

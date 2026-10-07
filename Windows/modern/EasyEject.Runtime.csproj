@@ -9,5 +9,6 @@
   <ItemGroup>
     <Compile Include="..\src\*.cs" />
     <Compile Include="RuntimePlatform.cs" />
+    <EmbeddedResource Include="..\assets\EasyEject.ico" LogicalName="EasyEject.AppIcon.ico" />
   </ItemGroup>
 </Project>

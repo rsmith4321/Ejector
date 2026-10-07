@@ -47,6 +47,7 @@ namespace EasyEject {
         readonly System.Windows.Forms.Timer releaseTimer = new System.Windows.Forms.Timer(); string releaseStatus;
         WindowsReleaseReviewDialog releaseReview;
         readonly TrayActivity trayActivity = new TrayActivity(); readonly TrayBusyIcons trayBusyIcons = new TrayBusyIcons();
+        readonly Icon appIcon = AppIcons.Load();
         ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu, helpMenu, aboutMenu, installationMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
         int cardCount;
@@ -71,6 +72,7 @@ namespace EasyEject {
             releaseChecks = WindowsReleaseChecks.Create(readOnly, appSettings.AutomaticUpdatesEnabled);
             Text = "Easy Eject · Windows prototype"; ClientSize = new Size(1000, 600); MinimumSize = new Size(800, 500); StartPosition = FormStartPosition.CenterScreen; AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Segoe UI", 10);
+            Icon = appIcon;
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(16) };
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
             var intro = new Label { AutoSize = true, MaximumSize = new Size(940, 0), Text = "Review connected storage before ejecting. Imports retain originals by default and verify SHA-256.\nAutomatic import starts off. Enable it in a profile or shared defaults. Eject and sharing require a manual choice.", Margin = new Padding(0, 0, 0, 12) };
@@ -111,7 +113,7 @@ namespace EasyEject {
             installationMenu = new ToolStripMenuItem("Windows updates && installation…", null, delegate { ViewInstallation(); }); menu.Items.Add(installationMenu);
             menu.Items.Add(releaseStatusMenu);
             menu.Items.Add("Quit", null, delegate { if (Busy) { MessageBox.Show(this, "Wait for the operation to finish or cancel the import before quitting."); return; } quit = true; Close(); });
-            tray = new NotifyIcon { Icon = SystemIcons.Information, Text = "Easy Eject Windows prototype", Visible = true, ContextMenuStrip = menu };
+            tray = new NotifyIcon { Icon = appIcon, Text = "Easy Eject Windows prototype", Visible = true, ContextMenuStrip = menu };
             status.TextChanged += delegate { UpdateTrayPresentation(); };
             tray.DoubleClick += delegate { UserWindowReveal.Show(this); };
             // Balloon clicks carry no device token. They only reveal the app for a fresh review.
@@ -467,7 +469,7 @@ namespace EasyEject {
         void FinishOperation() { FinishActivity(status.Text); working = false; preserveConcurrentIssue = false; cancel.Enabled = false; if (cancellation != null) { cancellation.Dispose(); cancellation = null; } UpdateActions(); debounce.Start(); }
         void UpdateTrayPresentation() {
             var view = TrayPresentation.Create(trayActivity, Busy, scanning, cardCount, appIssue.NeedsAttention);
-            tray.Text = view.Tooltip; tray.Icon = view.Busy ? view.Attention ? trayBusyIcons.Attention : trayBusyIcons.Busy : view.Attention ? SystemIcons.Warning : SystemIcons.Information;
+            tray.Text = view.Tooltip; tray.Icon = view.Attention ? trayBusyIcons.Attention : view.Busy ? trayBusyIcons.Busy : appIcon;
             activityMenu.Text = view.Heading;
         }
         internal void RequestCancellation() {
@@ -790,6 +792,6 @@ namespace EasyEject {
             }
         }
         void ShowError(Exception ex) { RecordIssue(ex.Message); Notify("Easy Eject needs attention", ex.Message, ToolTipIcon.Warning); if (ForegroundWindow) ShowMessage(ex.Message, "Easy Eject", MessageBoxIcon.Warning); }
-        protected override void Dispose(bool disposing) { if (disposing) { releaseTimer.Dispose(); if (releaseReview != null) releaseReview.Dispose(); if (releaseChecks != null) releaseChecks.Dispose(); hotkey.Dispose(); discovery.Instances.Dispose(); tray.Dispose(); trayBusyIcons.Dispose(); debounce.Dispose(); } base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { releaseTimer.Dispose(); if (releaseReview != null) releaseReview.Dispose(); if (releaseChecks != null) releaseChecks.Dispose(); hotkey.Dispose(); discovery.Instances.Dispose(); tray.Dispose(); trayBusyIcons.Dispose(); debounce.Dispose(); } base.Dispose(disposing); if (disposing) appIcon.Dispose(); }
     }
 }

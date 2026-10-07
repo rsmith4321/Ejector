@@ -54,11 +54,12 @@ try {
             $fixtureSources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot '../src') -Filter '*.cs' | ForEach-Object FullName)
             $fixtureTests = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot '../tests') -Filter '*.cs' | ForEach-Object FullName)
             $fixtureReferences = @('/r:System.dll', '/r:System.Core.dll', '/r:System.Security.dll', '/r:System.Xml.dll', '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Runtime.Serialization.dll', '/r:System.IO.Compression.dll', '/r:System.Net.Http.dll')
+            $fixtureIcons = @("/win32icon:$PSScriptRoot/../assets/EasyEject.ico", "/resource:$PSScriptRoot/../assets/EasyEject.ico,EasyEject.AppIcon.ico")
             $fixtureTools = Join-Path $fullOutput 'fixture-tools'
             New-Item -ItemType Directory -Force -Path $fixtureTools | Out-Null
-            & $fixtureCompiler /nologo /warn:4 /warnaserror+ /optimize+ /platform:x64 /target:winexe "/win32manifest:$PSScriptRoot/../app.manifest" "/out:$fullOutput/EasyEject.Windows.exe" @fixtureReferences @fixtureSources
+            & $fixtureCompiler /nologo /warn:4 /warnaserror+ /optimize+ /platform:x64 /target:winexe "/win32manifest:$PSScriptRoot/../app.manifest" "/out:$fullOutput/EasyEject.Windows.exe" @fixtureIcons @fixtureReferences @fixtureSources
             if ($LASTEXITCODE -ne 0) { throw 'Unsigned Framework package fixture compilation failed.' }
-            & $fixtureCompiler /nologo /warn:4 /warnaserror+ /optimize+ /platform:x64 /target:exe /main:EasyEject.Tests "/win32manifest:$PSScriptRoot/../app.manifest" "/out:$fixtureTools/EasyEject.Tests.exe" @fixtureReferences @fixtureSources @fixtureTests
+            & $fixtureCompiler /nologo /warn:4 /warnaserror+ /optimize+ /platform:x64 /target:exe /main:EasyEject.Tests "/win32manifest:$PSScriptRoot/../app.manifest" "/out:$fixtureTools/EasyEject.Tests.exe" @fixtureIcons @fixtureReferences @fixtureSources @fixtureTests
             if ($LASTEXITCODE -ne 0) { throw 'Synthetic Framework protocol fixture compilation failed.' }
             Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../app.config') -Destination (Join-Path $fullOutput 'EasyEject.Windows.exe.config')
             Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../app.config') -Destination (Join-Path $fixtureTools 'EasyEject.Tests.exe.config')

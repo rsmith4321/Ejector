@@ -79,11 +79,16 @@ namespace EasyEject {
         [DllImport("user32.dll")] static extern bool DestroyIcon(IntPtr icon);
         internal TrayBusyIcons() { Busy = Draw(false); try { Attention = Draw(true); } catch { Busy.Dispose(); throw; } }
         static Icon Draw(bool attention) {
-            using (var bitmap = new Bitmap(16, 16)) {
-                using (var graphics = Graphics.FromImage(bitmap)) using (var pen = new Pen(Color.FromArgb(35, 102, 180), 2)) {
-                    graphics.SmoothingMode = SmoothingMode.AntiAlias; graphics.Clear(Color.Transparent); graphics.DrawEllipse(pen, 1, 1, 13, 13);
-                    graphics.DrawLine(pen, 8, 3, 8, 11); graphics.DrawLine(pen, 4, 7, 8, 11); graphics.DrawLine(pen, 8, 11, 12, 7);
-                    if (attention) using (var brush = new SolidBrush(Color.Orange)) { graphics.FillEllipse(brush, 10, 0, 6, 6); }
+            using (var bitmap = new Bitmap(32, 32)) using (var source = AppIcons.Load()) {
+                using (var graphics = Graphics.FromImage(bitmap)) {
+                    graphics.SmoothingMode = SmoothingMode.AntiAlias; graphics.Clear(Color.Transparent); graphics.DrawIcon(source, new Rectangle(0, 0, 32, 32));
+                    using (var brush = new SolidBrush(attention ? Color.FromArgb(255, 192, 48) : Color.FromArgb(70, 154, 240))) {
+                        graphics.FillEllipse(Brushes.White, 19, 0, 13, 13); graphics.FillEllipse(brush, 20, 1, 11, 11);
+                    }
+                    using (var pen = new Pen(Color.FromArgb(45, 45, 45), 1.5f)) {
+                        if (attention) { graphics.DrawLine(pen, 25.5f, 3, 25.5f, 7); graphics.DrawEllipse(pen, 25, 9, 1, 1); }
+                        else { graphics.DrawLine(pen, 25.5f, 3, 25.5f, 6.5f); graphics.DrawLine(pen, 25.5f, 6.5f, 28, 8); }
+                    }
                 }
                 IntPtr handle = bitmap.GetHicon(); try { using (var borrowed = Icon.FromHandle(handle)) return (Icon)borrowed.Clone(); } finally { DestroyIcon(handle); }
             }

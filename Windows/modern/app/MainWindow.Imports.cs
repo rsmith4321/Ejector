@@ -115,7 +115,11 @@ namespace EasyEject.Modern {
                 UpdateImportTray();
             });
         }
-        void UpdateImportTray() { if (!closed) tray.Text = TrayPresentation.Create(activity, UiBusy, inventory.Scanning, inventory.Current == null ? 0 : inventory.Current.Volumes.Count(v => v.IsCard), false).Tooltip; }
+        void UpdateImportTray() {
+            if (closed) return;
+            var presentation = TrayPresentation.Create(activity, UiBusy, inventory.Scanning, inventory.Current == null ? 0 : inventory.Current.Volumes.Count(v => v.IsCard), false);
+            tray.Text = presentation.Tooltip; tray.Icon = presentation.Busy ? trayIcons.Busy : appIcon;
+        }
         void RequestOperationStop() {
             if (operationCancel == null) return; operationCancel.Cancel(); activity.RequestStop();
             if (confirmation != null && (importing != null || resuming != null || groupedReview != null)) confirmation.IsPrimaryButtonEnabled = false;

@@ -42,7 +42,7 @@ namespace EasyEject {
             Func<VolumeImportGuard> makeGuard = () => new VolumeImportGuard(discovery, source, destination, volume, disk, epoch, volumeId ?? WindowsDiscovery.VolumeId);
             ManualImportReview selection = null;
             try {
-                selection = new ManualImportReview(root, source, destination, (s, d) => makeGuard());
+                selection = new ManualImportReview(root, source, destination, (sourcePath, destinationPath) => makeGuard());
                 ProfileDestination.Require(profile, selection.Guard.DestinationIdentity, false); selection.Validate();
                 var evidence = RemovalResumeEvidence.Review(intent, root, source, destination, windowsSid, selection.Guard, operations, cancel);
                 selection.Validate();
