@@ -42,12 +42,19 @@ namespace EasyEject {
         internal const long MaximumToolBytes = 1073741824;
         internal static string LutPath(string root) { return System.IO.Path.Combine(SafePaths.Normalize(root), "luna-lut-" + QuickShareMedia.OfficialLutSha + ".cube"); }
         internal static QuickShareConfigurationSnapshot Load() { return Load(Profiles.Root); }
-        internal static QuickShareConfigurationSnapshot Load(string root) {
-            using (SafePaths.LockDirectories(root)) {
+        internal static QuickShareConfigurationSnapshot Load(string root, Action<string> checkpoint = null) {
+            root = SafePaths.Normalize(root);
+            using (var directories = SafePaths.HoldDirectories(root)) {
+                if (checkpoint != null) checkpoint("Before setup read");
+                directories.Validate();
                 string path = System.IO.Path.Combine(root, FileName);
-                if (Directory.Exists(path)) throw new SafetyException("Quick Share setup is a directory instead of a configuration file.");
-                if (!File.Exists(path)) return new QuickShareConfigurationSnapshot();
-                using (var stream = SafePaths.ReadFile(path)) return Read(stream, root);
+                bool exists = true;
+                try { if ((File.GetAttributes(path) & FileAttributes.Directory) != 0) throw new SafetyException("Quick Share setup is a directory instead of a configuration file."); }
+                catch (FileNotFoundException) { exists = false; }
+                var value = new QuickShareConfigurationSnapshot();
+                if (exists) using (var stream = SafePaths.ReadFile(path)) value = Read(stream, root);
+                if (checkpoint != null) checkpoint("After setup read");
+                directories.Validate(); return value;
             }
         }
         static QuickShareConfigurationSnapshot Read(FileStream stream, string root) {
@@ -70,10 +77,12 @@ namespace EasyEject {
                 return new QuickShareToolFile { Path = path, Bytes = stream.Length, Sha256 = ImportHistory.Hash(stream, cancel) };
             }
         }
-        internal static QuickShareConfigurationSnapshot Save(QuickShareConfigurationSnapshot expected, string ffmpeg, string ffprobe, string lutSource, string root, CancellationToken cancel) {
+        internal static QuickShareConfigurationSnapshot Save(QuickShareConfigurationSnapshot expected, string ffmpeg, string ffprobe, string lutSource, string root, CancellationToken cancel, Action<string> checkpoint = null) {
             root = SafePaths.Normalize(root);
-            using (SafePaths.LockDirectories(root)) using (var writer = Profiles.WriterGate(root)) {
+            using (var directories = SafePaths.HoldDirectories(root)) using (var writer = Profiles.WriterGate(root)) {
                 cancel.ThrowIfCancellationRequested(); CheckSnapshot(expected, Load(root));
+                if (checkpoint != null) checkpoint("After setup review");
+                directories.Validate(); cancel.ThrowIfCancellationRequested();
                 var value = new QuickShareToolSettings { Ffmpeg = Capture(ffmpeg, cancel), Ffprobe = Capture(ffprobe, cancel) };
                 if (!String.IsNullOrWhiteSpace(lutSource)) {
                     byte[] bytes = QuickShareMedia.ReadOfficialLut(SafePaths.Normalize(lutSource), cancel); string target = LutPath(root);
@@ -92,7 +101,16 @@ namespace EasyEject {
                 value.Validate(root);
                 using (var held = new VerifiedQuickShareTools(value, cancel, false, QuickShareColor.Standard)) {
                     cancel.ThrowIfCancellationRequested();
-                    Profiles.WriteJson(value, typeof(QuickShareToolSettings), root, FileName, writer: writer);
+                    if (checkpoint != null) checkpoint("Before setup publication");
+                    directories.Validate(); cancel.ThrowIfCancellationRequested();
+                    // Compare the reviewed record again while its exact current file is
+                    // exclusively held, after hashing/holding the selected tools.
+                    ConfigurationWriter.Write(value, typeof(QuickShareToolSettings), root, FileName, (stage, path) => {
+                        directories.Validate(); if (stage != "After publication") cancel.ThrowIfCancellationRequested();
+                    }, writer, previous => {
+                        if (previous != null) previous.Position = 0;
+                        CheckSnapshot(expected, previous == null ? new QuickShareConfigurationSnapshot() : Read(previous, root));
+                    });
                     // A late Cancel cannot pretend an already committed preference write did not happen.
                     return Load(root);
                 }
