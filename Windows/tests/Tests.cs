@@ -78,6 +78,8 @@ namespace EasyEject {
             }
         }
         [STAThread] public static int Main(string[] args) {
+            if (args.Length > 0 && args[0] == "--reopen-signal-fixture") return ReopenSignalFixture(args);
+            if (args.Length == 1 && args[0] == "--window-reopen") { System.Windows.Forms.Application.EnableVisualStyles(); System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false); WindowReopenTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned session events/child processes and nonactivating disposable forms only; no real app signal or device/media operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--manual-import-review") { ManualImportReviewTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated selections/configuration and fake devices only; no foreground confirmation or real device action."); return failed == 0 ? 0 : 1; }
             if (args.Length > 0 && args[0] == "--share-real-tools") return RealQuickShareAcceptance(args);
             if (args.Length == 1 && args[0] == "--saved-action-ownership") { SavedActionOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated folders/copies and fake factory/guard callbacks only; no real media/device/viewer/tool operation."); return failed == 0 ? 0 : 1; }
@@ -764,6 +766,7 @@ namespace EasyEject {
             SavedProfileTests();
             AutomaticImportTests();
             StartupTests();
+            WindowReopenTests();
             QuickShareRecipeTests();
             QuickShareProcessTests();
             ManualImportReviewTests(); ColdHistoryTests(); JsonSyntaxTests(); JsonDocumentTests(); ConnectedReviewTests(); ConnectedForgetTests(); ConfigurationValidationTests(); ProfilePublicationTests(); QuickShareConfigurationOwnershipTests(); ImportConfigurationReadTests(); ConfigurationReadTests(); HistoryPublicationTests(); WindowsReplayRecoveryTests(); WindowsReplayBackupTests(); ProfileCatalogOwnershipTests(); OriginalOwnershipTests(); ResumeOwnershipTests(); TrashOwnershipTests(); QuickShareContractTests(); DefaultsContractTests(); BulkFinalTests(); PathOwnershipTests(); WindowsReleaseReviewTests(); WindowsUpdateCoordinatorTests(); WindowsChannelReplayTests(); WindowsChannelDiscoveryTests(); WindowsChannelTests(); WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();

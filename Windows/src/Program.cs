@@ -14,9 +14,21 @@ namespace EasyEject {
             bool startup; try { startup = StartupLaunch.Parse(args); } catch (Exception ex) { MessageBox.Show(ex.Message, "Easy Eject"); return; }
             bool created;
             using (var mutex = new Mutex(true, @"Local\EasyEject.Windows.Prototype", out created)) {
-                if (!created) { if (!startup) MessageBox.Show("Easy Eject is already running in this session."); return; }
+                if (!created) {
+                    if (!SessionWindowReopen.Request("main", startup)) MessageBox.Show("Easy Eject is already running. Open its tray icon to review it; this older or closing instance could not receive the window request.");
+                    return;
+                }
                 Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new DeviceWindow(false, startup));
+                using (var reopen = new SessionWindowReopen("main"))
+                using (var window = new DeviceWindow(false, startup))
+                using (var requests = new WindowReopenRequests(action => {
+                    if (window.IsDisposed || window.Disposing || !window.IsHandleCreated) return false;
+                    window.BeginInvoke(action); return true;
+                }, () => UserWindowReveal.Show(window))) {
+                    IntPtr handle = window.Handle;
+                    reopen.Listen(() => requests.Request());
+                    Application.Run(window);
+                }
             }
         }
     }
@@ -101,9 +113,9 @@ namespace EasyEject {
             menu.Items.Add("Quit", null, delegate { if (Busy) { MessageBox.Show(this, "Wait for the operation to finish or cancel the import before quitting."); return; } quit = true; Close(); });
             tray = new NotifyIcon { Icon = SystemIcons.Information, Text = "Easy Eject Windows prototype", Visible = true, ContextMenuStrip = menu };
             status.TextChanged += delegate { UpdateTrayPresentation(); };
-            tray.DoubleClick += delegate { Show(); WindowState = FormWindowState.Normal; Activate(); };
+            tray.DoubleClick += delegate { UserWindowReveal.Show(this); };
             // Balloon clicks carry no device token. They only reveal the app for a fresh review.
-            tray.BalloonTipClicked += delegate { Show(); WindowState = FormWindowState.Normal; Activate(); };
+            tray.BalloonTipClicked += delegate { UserWindowReveal.Show(this); };
             menu.Opening += delegate { UpdateActions(); UpdateTrayStorageMenu(); };
             debounce.Interval = 800; debounce.Tick += async delegate { debounce.Stop(); await RefreshDevices(); };
             releaseTimer.Interval = 1000; releaseTimer.Tick += async delegate { await PulseReleaseChecks(); };
