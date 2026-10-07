@@ -39,6 +39,19 @@ With no modal left, **Alt+F4** closed the device window. Fresh native window enu
 
 ## Remaining foreground checks
 
+### Second-launch contract and current control failure
+
+The baseline `Ejector/AppLifecycle.swift:162` reveals Imports when the app is opened again. On the old Windows build, a second ordinary launch actually showed “Easy Eject is already running in this session.”; dismissing that notice left only the original hidden PID 16400. Source `9b38cc69f1714d43bb473566bc4c106fffaf39de` now sends a current-user/session window-only request and preserves the visible owned dialog. Duplicate login launches remain quiet. This fixes the software contract; actual new-build foreground activation is not yet observed.
+
+The isolated warnings-as-errors build at `%USERPROFILE%\.codex\EasyEjectFixtures\run-c880afad0ee94331\new-build` passes focused **13/0** and full **1214/0**, terminal session **4501** exit **0**. Native event/child-process/nonactivating-form fixtures do not signal the production listener or establish actual app foreground activation. Logs are `window-reopen-targeted.log` and `window-reopen-final-test.log` in `%USERPROFILE%\.codex\EasyEjectWindowsPreview`; the original source/tests/binaries are retained in the parent fixture directory.
+
+| Tested isolated artifact | SHA-256 |
+| --- | --- |
+| `EasyEject.Windows.exe` | `7063e4e169d7c7a4c5975e093d4148c37bd97e065d7443bbb9a76ee5758e6a98` |
+| `EasyEject.Tests.exe` | `6c3e6d0cdb1d5f174cf41c25a9dbbf6bacac3f6f0f8f9b7828de2830ca020aea` |
+
+After verification, the exact hidden old development preview was stopped with its PID/path/start time/hash checked; fresh read-only inventory still showed only one internal disk/five volumes. This was engineering process cleanup, **not graceful tray Quit proof**. Supported `sky.launch_app` failed before starting the new app: `GetCursorPos failed: Access is denied. (0x80070005)`. One retry after fresh window enumeration returned the same error. No new Easy Eject process was present. Enumeration still returned the Mac Studio viewer, Gyroflow, WireGuard, Settings, Steam and Codex, without an authentication dialog; this does not establish whether the interactive desktop is locked. Input stopped and the slot was released to the access task under Ryan's coordination authorization. No security setting or alternative UI automation was used.
+
 Use fresh returned window/state objects before each input. Do not automate authentication/security prompts or compete with another task's password/installer interaction. Check the actual Mac `SettingsView.swift`, `AppLifecycle.swift`, completion and manual-sharing contracts before treating an outcome as parity evidence.
 
 | Requirement | Next evidence | Current status |
@@ -46,7 +59,7 @@ Use fresh returned window/state objects before each input. Do not automate authe
 | Settings accessibility and cancellation | Scroll all content; inspect the letter dropdown, keyboard focus and Escape/Cancel; confirm temporary edits do not save or register a shortcut/login entry. | Partial: mouse scrolling/draft enable/dropdown display/Cancel with unchanged storage observed; full content, keyboard/Escape and changed-letter selection unproved |
 | Defaults and saved profiles | Exercise defaults/custom selection, broadening confirmations, cancel, migration and stale edits through actual dialogs with owned fixtures. | Not run |
 | History and completion | Inspect exact retained batches, explicit verification, Keep Connected default, return from manual sharing and loss of eject authority after restart. | Not run |
-| Tray and lifecycle | Close hides; tray reopens; Quit exits; fresh launch and active/modal quit protection are observed. | Close/hide with same process alive observed; other actions not run |
+| Tray and lifecycle | Close hides; manual second launch/tray reopens; Quit exits; fresh launch and active/modal quit protection are observed. | Prior close/hide and duplicate-launch notice observed; second-launch software fix passes 13/0 and full 1214/0; actual new-build reveal/tray/Quit/restart remain pending after control access failure |
 | Notifications and hotkey | Actual delivery/suppression, fresh review on balloon click, selected-key registration/collision and no repeated/stale removal. Do not install login registration during development. | Not run |
 | Scaling and controls | Minimum-size scrolling, fixed action visibility, actual dropdowns/pickers, larger layout and applicable monitor/DPI behavior. | Main/Settings render, partial Settings scrolling/fixed actions/dropdown display observed at current size; remaining sizes/inputs unproved |
 | Quick Share | Manual opt-in/size/LUT/tool choice, actual validation, cancellation/retry and unchanged exact imported originals/history across restart. | [Actual-tool rehearsal](QUICK_SHARE_ACCEPTANCE.md) prepared, not run; tool/LUT paths still needed |
