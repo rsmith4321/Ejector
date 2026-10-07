@@ -50,6 +50,7 @@ foreach ($required in @('EasyEject.Modern.exe', 'EasyEject.Modern.dll', 'EasyEje
 }
 $runtime = Get-Content -LiteralPath (Join-Path $payload 'EasyEject.Modern.runtimeconfig.json') -Raw | ConvertFrom-Json
 if ($runtime.runtimeOptions.framework -or $runtime.runtimeOptions.frameworks -or !$runtime.runtimeOptions.includedFrameworks) { throw 'Review output still requires an installed .NET framework.' }
+& (Join-Path $PSScriptRoot 'inspect-native-dependencies.ps1') -PayloadRoot $payload -ReportPath (Join-Path $reviewRoot 'native-imports.json')
 $readme = @'
 Easy Eject local Windows review
 
@@ -82,6 +83,7 @@ $evidence = [ordered]@{
     kind = 'unsigned-local-review'; declaredSourceRevision = $SourceRevision
     sdk = $sdkVersion.Trim(); architecture = 'win-x64'; configuration = 'Release'
     installedFrameworkRequired = $false; includedFrameworks = $runtime.runtimeOptions.includedFrameworks
+    nativeImportObservation = 'native-imports.json (static names only; not loader or clean-computer proof)'
     nativeCleanComputerAcceptance = 'pending'; foregroundAcceptance = 'pending'
     generatedUtc = [DateTime]::UtcNow.ToString('o'); files = $files
 }
