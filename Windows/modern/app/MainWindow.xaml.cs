@@ -108,7 +108,7 @@ namespace EasyEject.Modern {
         internal void Reveal() { DispatcherQueue.TryEnqueue(delegate { if (!closed) { AppWindow.Show(); Activate(); } }); }
         async void OpenDefaults() {
             if (UiBusy || inventory.Scanning || DefaultsPanel.Visibility == Visibility.Visible || (!ProfilesPanel.TryLeave() || !SettingsPanel.TryLeave())) return;
-            returnToProfile = false; ProfilesPanel.Visibility = Visibility.Collapsed;
+            returnToProfile = false; ProfilesPanel.Visibility = SettingsPanel.Visibility = Visibility.Collapsed;
             Navigation.SelectedItem = DefaultsNavigation; StorageView.Visibility = Visibility.Collapsed; DefaultsPanel.Visibility = Visibility.Visible;
             UpdateActions(); await DefaultsPanel.StartEdit();
         }
