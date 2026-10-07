@@ -115,7 +115,12 @@ namespace EasyEject {
                 if (encrypted == null || encrypted.Length == 0 || encrypted.Length > MaximumProtected) throw new SafetyException("Windows replay protection returned an invalid bounded envelope."); encrypted = (byte[])encrypted.Clone();
                 if (!next.Same(Unprotect(encrypted, policy))) throw new SafetyException("Windows replay protection returned another state. No publication occurred."); Guard(offer, cancel, stillAllowed); directories.Validate();
                 ConfigurationWriter.Write(new WindowsChannelReplayRecord(encrypted), typeof(WindowsChannelReplayRecord), root, FileName,
-                    (stage, file) => { checkpoint(stage, file); directories.Validate(); if (stage != "After publication") Guard(offer, cancel, stillAllowed); }, writer,
+                    (stage, file) => {
+                        // Native publication already committed this floor. Retain it in
+                        // the live store even if its final callback/check/flush fails.
+                        if (stage == "After publication") { seen = next; observed = true; }
+                        checkpoint(stage, file); directories.Validate(); if (stage != "After publication") Guard(offer, cancel, stillAllowed);
+                    }, writer,
                     previous => {
                         Guard(offer, cancel, stillAllowed); directories.Validate();
                         ValidatePrevious(current, previous, path, cancel);

@@ -124,6 +124,50 @@ namespace EasyEject {
             Test("Windows replay postpublication failure reports committed state and restart blocks older releases", () => {
                 using (var f = new ReplayFixture()) { f.Accept(f.Store()); var next = f.Offer("0.2.0.0", f.Channel.Seconds - 20); var store = f.Store((stage, path) => { if (stage == "After publication") throw new InvalidOperationException("fixture final check refusal"); }); Check(Throws<SafetyException>(() => f.Accept(store, next)).Message.Contains("was published"), "Ambiguous commit failure hid publication"); Check(ReplaySavedFloor(f).Version == "0.2.0.0" && Directory.GetFiles(f.Root).Length == 1, "Postcommit failure undid floor or leaked work"); Throws<SafetyException>(() => f.Accept(f.Store(), f.Offer("0.1.0.0"))); f.Accept(f.Store(), next); }
             });
+            Test("Windows replay failed first publication retains live observed deletion refusal", () => {
+                using (var f = new ReplayFixture()) {
+                    bool fail = true; var store = f.Store((stage, path) => { if (fail && stage == "After publication") throw new InvalidOperationException("fixture final check refusal"); });
+                    var next = f.Offer("0.2.0.0", f.Channel.Seconds - 20);
+                    Check(Throws<SafetyException>(() => f.Accept(store, next)).Message.Contains("was published"), "Fixture did not reach publication");
+                    Check(ReplaySavedFloor(f).Version == "0.2.0.0", "Published floor was not retained");
+                    File.Delete(f.PathValue); fail = false;
+                    Throws<SafetyException>(() => f.Accept(store, f.Offer()));
+                    Check(!File.Exists(f.PathValue) && Directory.GetFiles(f.Root).Length == 0, "Failed final check forgot observed publication and recreated deleted history");
+                }
+            });
+            Test("Windows replay failed advancing publication retains live rollback refusal", () => {
+                using (var f = new ReplayFixture()) {
+                    bool fail = false; var store = f.Store((stage, path) => { if (fail && stage == "After publication") throw new InvalidOperationException("fixture final check refusal"); });
+                    var first = f.Offer(); f.Accept(store, first); byte[] old = File.ReadAllBytes(f.PathValue); fail = true;
+                    Check(Throws<SafetyException>(() => f.Accept(store, f.Offer("0.2.0.0", f.Channel.Seconds - 20))).Message.Contains("was published"), "Fixture did not advance publication");
+                    Check(ReplaySavedFloor(f).Version == "0.2.0.0", "Advancing publication lost durable floor");
+                    f.Write(old); fail = false; Throws<SafetyException>(() => f.Accept(store, first));
+                    Check(File.ReadAllBytes(f.PathValue).SequenceEqual(old) && Directory.GetFiles(f.Root).Length == 1, "Live rollback refusal changed restored configuration");
+                }
+            });
+            Test("Windows replay failed normal publication constrains shared manual backup recovery", () => {
+                using (var f = new ReplayFixture()) {
+                    f.Accept(f.Store()); string backup = ReplayBackupPath(f); byte[] old = File.ReadAllBytes(backup);
+                    bool fail = true; var store = f.Store((stage, path) => { if (fail && stage == "After publication") throw new InvalidOperationException("fixture final check refusal"); });
+                    Check(Throws<SafetyException>(() => f.Accept(store, f.Offer("0.2.0.0", f.Channel.Seconds - 20))).Message.Contains("was published"), "Fixture did not publish newer history");
+                    byte[] latest = File.ReadAllBytes(f.PathValue); File.Delete(f.PathValue); fail = false;
+                    Throws<SafetyException>(() => { using (var review = store.ReviewBackup(f.Channel.Channel, backup, CancellationToken.None)) { } });
+                    Check(!File.Exists(f.PathValue) && File.ReadAllBytes(backup).SequenceEqual(old), "Old backup refusal changed target/source");
+                    File.WriteAllBytes(backup, latest);
+                    using (var review = store.ReviewBackup(f.Channel.Channel, backup, CancellationToken.None)) Check(store.RestoreBackup(review, CancellationToken.None), "Fresh explicit latest backup recovery refused");
+                    Check(File.ReadAllBytes(f.PathValue).SequenceEqual(latest) && File.ReadAllBytes(backup).SequenceEqual(latest), "Latest recovery did not preserve exact protected bytes");
+                    Throws<SafetyException>(() => f.Accept(store, f.Offer()));
+                }
+            });
+            Test("Windows replay first publication refusal before commit consumes no live floor", () => {
+                using (var f = new ReplayFixture()) {
+                    bool fail = true; var store = f.Store((stage, path) => { if (fail && stage == "Before publication") throw new InvalidOperationException("fixture prepublication refusal"); });
+                    Throws<InvalidOperationException>(() => f.Accept(store, f.Offer("0.2.0.0", f.Channel.Seconds - 20)));
+                    Check(!File.Exists(f.PathValue) && Directory.GetFiles(f.Root).Length == 0, "Before-commit refusal published or leaked work");
+                    fail = false; f.Accept(store, f.Offer());
+                    Check(ReplaySavedFloor(f).Version == "0.1.0.0" && Directory.GetFiles(f.Root).Length == 1, "Unpublished floor incorrectly constrained fresh manual acceptance");
+                }
+            });
             Test("Windows replay exact prior hash is checked inside exclusive replacement despite restored timestamps", () => {
                 using (var f = new ReplayFixture()) { f.Accept(f.Store()); var next = f.Offer("0.2.0.0", f.Channel.Seconds - 20); byte[] original = File.ReadAllBytes(f.PathValue), foreign = (byte[])original.Clone(); foreign[foreign.Length / 2] = foreign[foreign.Length / 2] == (byte)'A' ? (byte)'B' : (byte)'A'; var modified = File.GetLastWriteTimeUtc(f.PathValue);
                     var store = f.Store((stage, path) => { if (stage == "After replay read") { File.WriteAllBytes(f.PathValue, foreign); File.SetLastWriteTimeUtc(f.PathValue, modified); } }); Check(Throws<SafetyException>(() => f.Accept(store, next)).Message.Contains("changed before its exclusive"), "Exact prior hash did not guard replacement"); Check(File.ReadAllBytes(f.PathValue).SequenceEqual(foreign) && Directory.GetFiles(f.Root).Length == 1, "Foreign bytes overwritten or temporary leaked"); }
