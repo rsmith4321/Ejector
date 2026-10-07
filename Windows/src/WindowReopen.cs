@@ -18,7 +18,12 @@ namespace EasyEject {
         internal SessionWindowReopen(string purpose) {
             var security = new EventWaitHandleSecurity(); security.SetAccessRuleProtection(true, false);
             security.AddAccessRule(new EventWaitHandleAccessRule(User(), EventWaitHandleRights.FullControl, AccessControlType.Allow));
-            bool created; signal = new EventWaitHandle(false, EventResetMode.AutoReset, Name(purpose), out created, security);
+            bool created;
+#if NET
+            signal = EventWaitHandleAcl.Create(false, EventResetMode.AutoReset, Name(purpose), out created, security);
+#else
+            signal = new EventWaitHandle(false, EventResetMode.AutoReset, Name(purpose), out created, security);
+#endif
             if (!created) { signal.Dispose(); throw new InvalidOperationException("The reopen listener already exists. No second listener started."); }
         }
         internal void Listen(Action request) {
@@ -31,7 +36,13 @@ namespace EasyEject {
         }
         internal static bool Request(string purpose, bool startup) {
             if (startup) return true; // A repeated login launch must not reveal the window.
-            try { using (var existing = EventWaitHandle.OpenExisting(Name(purpose), EventWaitHandleRights.Modify)) return existing.Set(); }
+            try {
+#if NET
+                using (var existing = EventWaitHandleAcl.OpenExisting(Name(purpose), EventWaitHandleRights.Modify)) return existing.Set();
+#else
+                using (var existing = EventWaitHandle.OpenExisting(Name(purpose), EventWaitHandleRights.Modify)) return existing.Set();
+#endif
+            }
             catch (WaitHandleCannotBeOpenedException) { return false; }
             catch (UnauthorizedAccessException) { return false; }
         }

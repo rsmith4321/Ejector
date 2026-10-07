@@ -11,7 +11,9 @@ From the repository root in PowerShell:
 ./Windows/inspect-readonly.ps1
 ```
 
-The build uses the installed `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`, compiles app and test executable with `/warnaserror+ /platform:x64`, and places binaries/configuration under `%LOCALAPPDATA%\EasyEject\PrototypeBuild`, outside the OneDrive checkout. No SDK, NuGet download, installer, elevation, or startup registration is involved. A modern SDK project can be added later; this first slice uses the compiler already available on this laptop.
+The classic build uses the installed `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`, compiles app and test executable with `/warnaserror+ /platform:x64`, and places binaries/configuration under `%LOCALAPPDATA%\EasyEject\PrototypeBuild`, outside the OneDrive checkout. That build needs no SDK, NuGet download, installer, elevation or startup registration.
+
+Ryan has now authorized a **WinUI 3 modern tray interface**. Its first read-only preview, smaller headings and actual close/reopen observations are documented in [modern/MODERN_UI.md](modern/MODERN_UI.md). Build it with `./Windows/modern/build.ps1 -Test`, using the pinned privately provisioned SDK and private cache. The modern runtime compiles with warnings as errors and the reused reopen contract cases pass 13/0; the full classic 1214/0 result is retained evidence, not a full modern-runtime result. Imports, settings and the remaining dialogs still require modern integration. This preview is not a release artifact or completion of the full port.
 
 Only in an environment where execution is permitted by the existing security policy:
 

@@ -51,7 +51,13 @@ namespace EasyEject {
                 Guid clsid = DispenserClass, iid = DispenserInterface; Status(MetaDataGetDispenser(ref clsid, ref iid, out dispenser), "create dispenser"); RequirePointer(dispenser);
                 // ofReadOnly | ofNoTransform: no emit interface or WinMD projection.
                 iid = ImportInterface; Status(Method<OpenMemory>(dispenser, 5)(dispenser, pin.AddrOfPinnedObject(), (uint)bytes.Length, 0x1010, ref iid, out importer), "open metadata"); RequirePointer(importer);
-                iid = AssemblyInterface; Status(Marshal.QueryInterface(importer, ref iid, out assemblies), "assembly interface"); RequirePointer(assemblies);
+                iid = AssemblyInterface;
+#if NET
+                Status(Marshal.QueryInterface(importer, in iid, out assemblies), "assembly interface");
+#else
+                Status(Marshal.QueryInterface(importer, ref iid, out assemblies), "assembly interface");
+#endif
+                RequirePointer(assemblies);
                 locale = Marshal.AllocHGlobal(512); Marshal.WriteInt16(locale, 0); uint assembly;
                 Status(Method<AssemblyToken>(assemblies, 12)(assemblies, out assembly), "assembly token"); if (assembly != 0x20000001) throw new SafetyException("Ambiguous managed Windows assembly identity.");
                 var metadata = new AssemblyMetadata { Locale = locale, LocaleCount = 256 }; var name = new StringBuilder(256); uint count, keySize, algorithm, flags; IntPtr key;

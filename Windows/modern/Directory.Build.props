@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <EasyEjectBuildRoot Condition="'$(EasyEjectBuildRoot)' == ''">$(LocalAppData)\EasyEject\ModernBuild</EasyEjectBuildRoot>
+    <BaseIntermediateOutputPath>$(EasyEjectBuildRoot)\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(EasyEjectBuildRoot)\bin\$(MSBuildProjectName)\</BaseOutputPath>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+</Project>

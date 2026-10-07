@@ -68,7 +68,11 @@ namespace EasyEject {
                     throw new SafetyException("The manifest signing certificate is not embedded in its signature.");
                 // Crypto-only verification first; the separate native chain check is mandatory.
                 cms.CheckSignature(true); cancel.ThrowIfCancellationRequested();
+#if NET
+                using (var leaf = X509CertificateLoader.LoadCertificate(leafBytes)) {
+#else
                 using (var leaf = new X509Certificate2(leafBytes)) {
+#endif
                     WindowsSignerEvidence evidence = trust.Verify(leaf, certificates, digest); cancel.ThrowIfCancellationRequested(); approved.Require(evidence);
                     if (evidence.CertificateHash != WindowsSignerEvidence.Hash(leaf.RawData) || evidence.SubjectHash != WindowsSignerEvidence.Hash(leaf.SubjectName.RawData) || evidence.DigestOid != digest || (executable != null && evidence.CertificateHash != executable.CertificateHash))
                         throw new SafetyException("The authenticated manifest and verified executable do not share the exact signing certificate.");
