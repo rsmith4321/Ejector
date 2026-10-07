@@ -52,20 +52,33 @@ namespace EasyEject {
             }
         }
         internal static SavedProfile[] Catalog() { return Catalog(Root); }
-        internal static SavedProfile[] Catalog(string root) {
-            using (SafePaths.LockDirectories(root)) {
+        internal static SavedProfile[] Catalog(string root, Action<string> checkpoint = null) {
+            using (var directories = SafePaths.HoldDirectories(root)) {
+                // Keep one root identity for this read. Individual malformed records remain
+                // reviewable, but a changed catalog root invalidates the entire snapshot.
+                Action<string> check = stage => {
+                    directories.Validate();
+                    if (checkpoint != null) { checkpoint(stage); directories.Validate(); }
+                };
+                check("Before catalog enumeration");
                 // Other settings/history JSON and temporary files are not profile records.
                 var names = Directory.GetFileSystemEntries(root).Select(Path.GetFileName).Where(n => n.Length == 69 && n.EndsWith(".json", StringComparison.OrdinalIgnoreCase) && n.Take(64).All(c => Uri.IsHexDigit(c))).OrderBy(n => n, StringComparer.Ordinal).Take(1001).ToArray();
+                check("After catalog enumeration");
                 if (names.Length > 1000) throw new SafetyException("Too many saved profiles to review safely.");
                 var entries = new List<SavedProfile>();
                 foreach (string name in names) {
+                    check("Before profile read");
                     try { entries.Add(ReadSaved(root, name)); }
                     catch (Exception ex) {
                         if (!(ex is IOException || ex is System.ComponentModel.Win32Exception || ex is System.Runtime.Serialization.SerializationException || ex is SafetyException || ex is UnauthorizedAccessException || ex is ArgumentException)) throw;
                         entries.Add(new SavedProfile(name, ex.Message));
                     }
+                    // Outside the per-record catch: directory failure is never a bad record.
+                    check("After profile read");
                 }
-                return entries.OrderBy(p => p.Display, StringComparer.CurrentCultureIgnoreCase).ToArray();
+                var result = entries.OrderBy(p => p.Display, StringComparer.CurrentCultureIgnoreCase).ToArray();
+                check("Before catalog return");
+                return result;
             }
         }
         static void CheckSnapshot(SavedProfile expected, SavedProfile current) {
