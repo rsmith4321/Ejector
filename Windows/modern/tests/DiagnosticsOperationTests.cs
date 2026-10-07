@@ -127,7 +127,7 @@ namespace EasyEject {
             Test("modern information names actual runtime and available tools without claiming release approval", delegate {
                 Check(ApplicationInformation.About.Contains(".NET Framework 4.8") && !ApplicationInformation.About.Contains("WinUI 3"), "Classic About changed platform");
                 Check(ApplicationInformation.ModernAbout.Contains(".NET 10 / WinUI 3") && !ApplicationInformation.ModernAbout.Contains("Framework 4.8") && ApplicationInformation.ModernAbout.Contains(ApplicationInformation.Version), "Modern About has wrong runtime/version");
-                string help = ApplicationInformation.ModernHelp; Check(help.Contains("Quick Share tools lets you select") && help.Contains("Launch at login") && help.Contains("Updates are unavailable") && !help.Contains("Open Windows updates & installation"), "Help advertised unavailable action");
+                string help = ApplicationInformation.ModernHelp; Check(help.Contains("Quick Share tools lets you select") && help.Contains("Launch at login") && help.Contains("Updates are unavailable") && help.Contains("Open Windows updates & installation") && help.Contains("Metadata/file/backup review stays unavailable"), "Help misstated connected guide or release approval");
                 foreach (string required in new[] { "last 20", "1080p or 4K", "full-quality imported originals", "Export does not automatically eject", "Windows Startup apps" }) Check(help.Contains(required), "Missing manual parity guidance: " + required);
             });
         }

@@ -126,6 +126,10 @@ namespace EasyEject {
     internal static class WindowsReleaseChecks {
         // Explicit application-code approval is still pending hardware/signing proof.
         internal static ApprovedWindowsChannel ProductionChannel { get { return null; } }
+        // A modern multi-file artifact needs its own approved package/publisher policy.
+        // It must never silently inherit the classic six-file Framework channel.
+        internal static ApprovedWindowsChannel ModernProductionChannel { get { return null; } }
+        internal static WindowsUpdateCoordinator CreateModern(bool automatic) { return Create(ModernProductionChannel, () => Profiles.Root, new WindowsChannelHttpTransport(), new WindowsManifestTrust(), () => DateTime.UtcNow, automatic); }
         internal static WindowsUpdateCoordinator Create(bool readOnly, bool automatic) { return Create(readOnly ? null : ProductionChannel, () => Profiles.Root, new WindowsChannelHttpTransport(), new WindowsManifestTrust(), () => DateTime.UtcNow, automatic); }
         internal static WindowsUpdateCoordinator Create(ApprovedWindowsChannel channel, Func<string> root, IWindowsChannelTransport transport, IWindowsManifestEnvelopeTrust trust, Func<DateTime> clock, bool automatic) {
             if (root == null || transport == null || trust == null) throw new ArgumentNullException("Windows release dependencies");

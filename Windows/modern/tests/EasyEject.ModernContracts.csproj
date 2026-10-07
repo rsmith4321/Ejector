@@ -20,6 +20,7 @@
     <Compile Include="StartupOperationTests.cs" />
     <Compile Include="DiagnosticsOperationTests.cs" />
     <Compile Include="IssuePersistenceTests.cs" />
+    <Compile Include="ReleaseOperationTests.cs" />
     <Compile Include="ReopenRunner.cs" />
     <ProjectReference Include="..\EasyEject.Runtime.csproj" />
   </ItemGroup>

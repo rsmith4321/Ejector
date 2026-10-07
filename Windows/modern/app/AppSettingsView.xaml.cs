@@ -9,6 +9,7 @@ namespace EasyEject.Modern {
         internal event Action<AppSettings> Saved;
         internal event Action<string> Completed;
         internal Func<string> ShortcutDescription;
+        internal Func<string> ReleaseDescription;
         internal bool Busy { get { return loading || saving || confirming; } }
         public AppSettingsView() { InitializeComponent(); Letter.ItemsSource = GlobalHotkey.Letters; }
         internal async Task StartEdit() {
@@ -40,7 +41,7 @@ namespace EasyEject.Modern {
                 Scroll.IsEnabled = editor != null && editor.Open && !Busy; Letter.IsEnabled = p.ShortcutEnabled;
                 Save.IsEnabled = editor != null && editor.Open && !Busy; Cancel.IsEnabled = !Busy;
                 ShortcutStatus.Text = ShortcutDescription == null ? "Shortcut is off until saved and enabled." : ShortcutDescription();
-                UpdateStatus.Text = WindowsUpdateSafety.ChannelStatus + " Only signed metadata may be checked through an approved channel. Downloads and installation stay manual.";
+                UpdateStatus.Text = (ReleaseDescription == null ? WindowsUpdateSafety.ChannelStatus : ReleaseDescription()) + " Open Windows updates & installation for manual review and instructions. Downloads and installation stay manual.";
             } finally { updating = false; }
         }
         void Choice_Changed(object sender, RoutedEventArgs args) {

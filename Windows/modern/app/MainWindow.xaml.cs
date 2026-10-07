@@ -38,6 +38,7 @@ namespace EasyEject.Modern {
         bool StorageBusy { get { return UiBusy || DefaultsPanel.Visibility == Visibility.Visible || ProfilesPanel.Visibility == Visibility.Visible || SettingsPanel.Visibility == Visibility.Visible; } }
         public MainWindow() {
             InitializeComponent(); SystemBackdrop = new MicaBackdrop();
+            SettingsPanel.ReleaseDescription = () => releaseChecks.Status;
             reopen = new WindowReopenRequests(action => DispatcherQueue.TryEnqueue(() => action()), () => { if (!closed) { AppWindow.Show(); Activate(); } });
             AppWindow.SetIcon(Microsoft.UI.Win32Interop.GetIconIdFromIcon(appIcon.Handle));
             shortcut = new HotkeyMessageWindow(() => StorageBusy || closed || inventory == null || inventory.Scanning || !notifications.Available, action => DispatcherQueue.TryEnqueue(() => action()), () => { Reveal(); ReviewCards(); });
@@ -59,6 +60,7 @@ namespace EasyEject.Modern {
                     UpdateActions();
                 }
                 if (!UiBusy && inventory.Pending) await ReadInventory();
+                await PulseModernReleases();
             };
             WindowLayout.InitialSize(this);
             var menu = new Forms.ContextMenuStrip();
@@ -72,6 +74,7 @@ namespace EasyEject.Modern {
             menu.Items.Add("Completed imports…", null, delegate { Reveal(); ReviewPendingImports(); });
             menu.Items.Add("Import history…", null, delegate { Reveal(); ReviewHistory(); });
             menu.Items.Add("Quick Share tools…", null, delegate { Reveal(); OpenQuickShareTools(); });
+            releaseMenu.Click += delegate { ViewModernReleases(); }; menu.Items.Add(releaseMenu);
             issueMenu.Click += delegate { ViewModernIssue(); }; debugMenu.Click += delegate { ViewModernDebugLog(); };
             helpMenu.Click += delegate { ViewModernInformation(false); }; aboutMenu.Click += delegate { ViewModernInformation(true); };
             menu.Items.Add(issueMenu); menu.Items.Add(debugMenu); menu.Items.Add(helpMenu); menu.Items.Add(aboutMenu);
@@ -87,7 +90,7 @@ namespace EasyEject.Modern {
                 if (!quitting) { args.Cancel = true; AppWindow.Hide(); }
             };
             Closed += delegate {
-                closed = true; pulse.Stop(); inventory.Dispose(); notifications.Dispose();
+                closed = true; releaseChecks.Dispose(); pulse.Stop(); inventory.Dispose(); notifications.Dispose();
                 reopen.Dispose(); visibleRoot.TrySetCanceled();
                 DefaultsPanel.TryLeave(); ProfilesPanel.TryLeave(); SettingsPanel.TryLeave(); shortcut.Dispose(); tray.Dispose(); trayIcons.Dispose(); appIcon.Dispose(); menu.Dispose();
             };
@@ -118,7 +121,7 @@ namespace EasyEject.Modern {
         async Task StartRuntimeCore() {
             if (closed || started) return; started = true;
             try { notifications.Start(); } catch (Exception ex) { Summary.Text = "Connection monitoring unavailable. Device actions are blocked. " + ex.Message; }
-            pulse.Start(); await ReadInventory();
+            releaseChecks.Start(); pulse.Start(); await ReadInventory();
         }
         async Task EnsureVisible() {
             if (closed) throw new OperationCanceledException("Easy Eject closed.");
@@ -150,6 +153,7 @@ namespace EasyEject.Modern {
         }
         void Storage_SelectionChanged(object sender, SelectionChangedEventArgs args) { if (inventory != null) UpdateActions(); }
         void UpdateActions() {
+            UpdateReleaseActivity();
             var card = StorageCards.SelectedItem as StorageCard; var state = inventory.Current;
             bool fresh = state != null && state.Epoch == discovery.Epoch && notifications.Available;
             bool ready = fresh && !StorageBusy && !inventory.Scanning && settings != null && card != null;
@@ -167,6 +171,7 @@ namespace EasyEject.Modern {
             DebugButton.Visibility = settings != null && settings.DebugEnabled ? Visibility.Visible : Visibility.Collapsed;
             debugMenu.Visible = DebugButton.Visibility == Visibility.Visible; DebugButton.IsEnabled = debugMenu.Enabled = canReview;
             HelpButton.IsEnabled = AboutButton.IsEnabled = helpMenu.Enabled = aboutMenu.Enabled = canReview;
+            ReleaseButton.IsEnabled = releaseMenu.Enabled = canReview;
             SelectionStatus.Text = StorageBusy ? "Finish the current review or operation first." : !fresh ? "Refresh the storage list before reviewing a device." : card == null ? "Select a device to review safe removal." : card.Choice.Error ?? "Safe removal affects this physical device and all its volumes. Review before unplugging.";
             if (tray != null) UpdateImportTray();
         }
