@@ -20,20 +20,26 @@ namespace EasyEject {
         internal bool AutomaticUpdatesEnabled { get { return AutomaticUpdateChecks ?? true; } }
         internal static bool NeedsCleanupConfirmation(AppSettings before, AppSettings after) { return !before.CleanupCardsEnabled && after.CleanupCardsEnabled; }
         internal static AppSettings Load() { return Load(Profiles.Root); }
-        internal static AppSettings Load(string root) { var value = Configuration.Read<AppSettings>(root, "app-settings.json") ?? new AppSettings(); value.Validate(); return value; }
+        internal static AppSettings Load(string root, Action<string> checkpoint = null) { var value = Configuration.Read<AppSettings>(root, "app-settings.json", checkpoint) ?? new AppSettings(); value.Validate(); return value; }
         internal static void Save(AppSettings settings) { Save(settings, Profiles.Root); }
         internal static void Save(AppSettings settings, string root) { if (settings == null) throw new ArgumentNullException("settings"); settings.Validate(); Profiles.WriteJson(settings, typeof(AppSettings), root, "app-settings.json"); }
         internal void Validate() { if (!GlobalHotkey.Supported(ShortcutKey)) throw new SafetyException("Saved shortcut letter is unsupported. Choose a supported letter in Settings."); }
     }
     internal static class Configuration {
-        internal static T Read<T>(string root, string name) where T : class {
-            using (SafePaths.LockDirectories(root)) {
-                string path = Path.Combine(root, name); if (!File.Exists(path)) return null;
-                using (var stream = SafePaths.ReadFile(path)) {
-                    if (stream.Length > 16384) throw new SafetyException("Saved application settings are too large to read.");
-                    var value = (T)new DataContractJsonSerializer(typeof(T)).ReadObject(stream);
-                    if (value == null) throw new SafetyException("Saved application settings are invalid."); return value;
+        internal static T Read<T>(string root, string name, Action<string> checkpoint = null) where T : class {
+            using (var directories = SafePaths.HoldDirectories(root)) {
+                if (checkpoint != null) checkpoint("Before configuration read"); directories.Validate();
+                string path = Path.Combine(root, name); T value = null; bool exists = true;
+                try { if ((File.GetAttributes(path) & FileAttributes.Directory) != 0) throw new SafetyException("Saved application state is a directory, not an ordinary record. Existing data is retained."); }
+                catch (FileNotFoundException) { exists = false; }
+                if (exists) {
+                    using (var stream = SafePaths.ReadFile(path)) {
+                        if (stream.Length > 16384) throw new SafetyException("Saved application settings are too large to read.");
+                        value = (T)new DataContractJsonSerializer(typeof(T)).ReadObject(stream);
+                        if (value == null) throw new SafetyException("Saved application settings are invalid.");
+                    }
                 }
+                if (checkpoint != null) checkpoint("After configuration read"); directories.Validate(); return value;
             }
         }
     }
@@ -46,8 +52,8 @@ namespace EasyEject {
         internal void Dismiss() { Dismissed = true; }
         internal void Clear() { Message = ""; ObservedUtc = ""; Dismissed = false; }
         internal static AppIssue Load() { return Load(Profiles.Root); }
-        internal static AppIssue Load(string root) {
-            var value = Configuration.Read<AppIssue>(root, "issue-state.json") ?? new AppIssue();
+        internal static AppIssue Load(string root, Action<string> checkpoint = null) {
+            var value = Configuration.Read<AppIssue>(root, "issue-state.json", checkpoint) ?? new AppIssue();
             DateTime date;
             if (value.Message == null || value.Message.Length > 4096 || (value.HasIssue && !DateTime.TryParse(value.ObservedUtc, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out date))) throw new SafetyException("Saved issue state is invalid.");
             return value;
