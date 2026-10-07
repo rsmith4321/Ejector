@@ -88,10 +88,10 @@ namespace EasyEject {
             }
         }
         internal static ImportProfile BindConnectedDestination(ConnectedProfileReview expected, DestinationIdentity identity) { if (expected == null) throw new SafetyException("Review this device's saved profile first."); return BindConnectedDestination(expected, identity, expected.Root); }
-        internal static ImportProfile BindConnectedDestination(ConnectedProfileReview expected, DestinationIdentity identity, string root) {
+        internal static ImportProfile BindConnectedDestination(ConnectedProfileReview expected, DestinationIdentity identity, string root, Action<string> checkpoint = null) {
             RequireReviewRoot(expected, root); var value = expected.Value;
             if (value == null || value.SavedDestination != null || identity == null) throw new SafetyException("Review an unbound legacy profile and its destination first.");
-            identity.Validate(); ProfileDestination.Require(value, identity, false); value.SavedDestination = identity.Copy(); SaveConnected(expected, value, root); return value;
+            identity.Validate(); ProfileDestination.Require(value, identity, false); value.SavedDestination = identity.Copy(); SaveConnected(expected, value, root, checkpoint); return value;
         }
     }
 }

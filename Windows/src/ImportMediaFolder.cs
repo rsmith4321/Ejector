@@ -39,6 +39,7 @@ namespace EasyEject {
             if (files.Any(file => !MediaSelection.IsDeviceIndex(file))) throw new SafetyException("The saved recording folder is unavailable, but the card contains other files. Choose and review the correct media folder; it is not an empty card.");
             return new List<string>();
         }
+        internal void ValidateSelection() { if (Missing) RequireStillMissing(); else ValidateDirectories(); }
         void RequireStillMissing() {
             ValidateDirectories();
             if (entries(missingParent).Any(path => Path.GetFileName(path).Equals(missingName, StringComparison.OrdinalIgnoreCase)))

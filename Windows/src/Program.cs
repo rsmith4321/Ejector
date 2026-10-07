@@ -359,16 +359,19 @@ namespace EasyEject {
                 MediaOptions options = stored.Resolve(choices);
                 string source = SafePaths.Normalize(Path.Combine(root, stored.RelativeSource)), destination = SafePaths.Normalize(stored.Destination);
                 if (!SafePaths.Within(source, root)) throw new SafetyException("Choose a folder within the selected device volume.");
-                var guard = await Task.Run(() => new VolumeImportGuard(discovery, source, destination, v, disk, selectionEpoch));
-                ProfileDestination.Require(stored, guard.DestinationIdentity, false);
-                string text = (options.VideosOnly ? "Copy selected videos and their required companions under:\n" : "Copy all media and sidecars under:\n") + source + "\n\nTo a date folder under:\n" + destination + "\n\n" + (options.IncludePreviews ? "Camera previews included." : "Optional previews stay on the device; required package files are included.") + "\n" + (options.CleanLayout ? "Ordinary media uses a clean layout; packages and unfamiliar media keep their tree." : "Media folder paths are retained.") + "\nOriginal filenames are kept. SHA-256 verifies new and reused copies.\n\n" + OriginalRemovalChoice.BeforeImport(options) + "\n\n" + DeviceTrashChoice.BeforeImport(options) + "\n\nThe device remains connected. Start this manual import?";
-                using (var review = new VerifiedImportConfirmationDialog(text)) if (review.ShowDialog(this) != DialogResult.Yes) return;
-                if (stored.SavedDestination == null) { guard.Validate(); stored = Profiles.BindConnectedDestination(profileReview, guard.DestinationIdentity); }
-                completions.InvalidateSource(root); Log("User started import | " + source + " -> " + destination);
-                working = true; cancellation = new CancellationTokenSource(); cancel.Enabled = true; UpdateActions();
-                var activity = BeginActivity(TrayOperationKind.Import, ProfileName.Display(stored), "Preparing import");
-                AttachStorageWork(activity, guard);
-                var result = await Task.Run(() => new VerifiedImporter(operations).Run(root, source, destination, v.Id, guard, cancellation.Token, ActivityReporter(activity), options, ImportReporter(activity)));
+                VolumeImportGuard guard; ImportResult result;
+                using (var selection = await Task.Run(() => new ManualImportReview(root, source, destination, (selectedSource, selectedDestination) => new VolumeImportGuard(discovery, selectedSource, selectedDestination, v, disk, selectionEpoch)))) {
+                    guard = selection.Guard;
+                    ProfileDestination.Require(stored, guard.DestinationIdentity, false);
+                    string text = (options.VideosOnly ? "Copy selected videos and their required companions under:\n" : "Copy all media and sidecars under:\n") + source + "\n\nTo a date folder under:\n" + destination + "\n\n" + (options.IncludePreviews ? "Camera previews included." : "Optional previews stay on the device; required package files are included.") + "\n" + (options.CleanLayout ? "Ordinary media uses a clean layout; packages and unfamiliar media keep their tree." : "Media folder paths are retained.") + "\nOriginal filenames are kept. SHA-256 verifies new and reused copies.\n\n" + OriginalRemovalChoice.BeforeImport(options) + "\n\n" + DeviceTrashChoice.BeforeImport(options) + "\n\nThe device remains connected. Start this manual import?";
+                    using (var review = new VerifiedImportConfirmationDialog(text)) if (review.ShowDialog(this) != DialogResult.Yes) return;
+                    if (stored.SavedDestination == null) stored = selection.BindLegacy(profileReview);
+                    completions.InvalidateSource(root); Log("User started import | " + source + " -> " + destination);
+                    working = true; cancellation = new CancellationTokenSource(); cancel.Enabled = true; UpdateActions();
+                    var activity = BeginActivity(TrayOperationKind.Import, ProfileName.Display(stored), "Preparing import");
+                    AttachStorageWork(activity, guard);
+                    result = await Task.Run(() => selection.Run(new VerifiedImporter(operations), v.Id, options, cancellation.Token, ActivityReporter(activity), ImportReporter(activity)));
+                }
                 await PresentImportResult(result, stored, v, guard, root, destination, options);
             } catch (OperationCanceledException) { status.Text = "Import cancelled. All originals and completed copies kept. No completion receipt was written."; FinishActivity(status.Text); Log(status.Text); Notify("Import cancelled", status.Text, ToolTipIcon.Info); if (ForegroundWindow) MessageBox.Show(this, status.Text, "Import cancelled"); }
             catch (Exception ex) { ShowError(ex); }
