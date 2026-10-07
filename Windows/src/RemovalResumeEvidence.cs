@@ -152,7 +152,10 @@ namespace EasyEject {
                                 };
                                 execute(new RemovalResumeContext(intent, hash, folder, saved, inputs, missing, checkManifest, validate, checkPaths));
                             }
-                            checkPaths(); cancellation.ThrowIfCancellationRequested();
+                            // A read-only review must still validate its evidence at final return.
+                            // Execution already finished its durable receipt; later source/cancel state
+                            // is handled separately by completion/eject admission, as for a new import.
+                            if (execute == null) { checkPaths(); cancellation.ThrowIfCancellationRequested(); }
                             return reviewed;
                         } finally { foreach (var handle in held) handle.Dispose(); }
                     }

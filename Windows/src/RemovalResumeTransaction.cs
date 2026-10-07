@@ -82,7 +82,11 @@ namespace EasyEject {
                         try { new DataContractJsonSerializer(typeof(ImportReceipt)).WriteObject(output, receipt); output.Flush(true); cancellation.ThrowIfCancellationRequested(); validate(); context.CheckManifest(); Native.Rename(output.SafeFileHandle, target); output.Flush(true); complete = true; }
                         finally { if (!complete) Native.DeleteOnClose(output.SafeFileHandle); }
                     }
-                    context.CheckPaths(); result.ReceiptPath = target; return result;
+                    // The flushed, exclusively published receipt completes this saved batch.
+                    // Later cancellation/source changes cannot retract it; eject still needs fresh proof.
+                    result.ReceiptPath = target;
+                    try { report("Resume complete. Verified receipt saved."); } catch (Exception) {}
+                    return result;
                 } catch (Exception ex) {
                     try { audit("Resume stopped | removed this action: " + result.RemovedOriginals + " originals, " + result.ClearedTrashFiles + " Trash files, " + result.ClearedTrashRecords + " records | " + ex.Message); } catch {}
                     if (result.RemovedOriginals + result.ClearedTrashFiles + result.ClearedTrashRecords > 0) throw new RemovalResumeFailure(result, auditPath, ex); throw;

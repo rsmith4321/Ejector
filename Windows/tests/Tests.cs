@@ -103,6 +103,7 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--profile-catalog-ownership") { ProfileCatalogOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated configuration directory replacements only; no real media or device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--original-ownership") { OriginalOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated file/intent directory replacements and fake guards only; no real media or device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--resume-ownership") { ResumeOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated files and fake device guards only; no real media or device operation."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--resume-completion") { ResumeCompletionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated files and fake device guards only; no real media or device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--trash-ownership") { TrashOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned disposable read-only Trash directory replacements only; no real media or device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--path-ownership") { PathOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned disposable directory replacement only; no real device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--bulk-final") { BulkFinalTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake removal and inventory only; no real eject."); return failed == 0 ? 0 : 1; }
@@ -740,7 +741,7 @@ namespace EasyEject {
             TrashRecoveryTests();
             RemovalIntentTests();
             RemovalResumeTests();
-            RemovalResumeActionTests();
+            RemovalResumeActionTests(); ResumeCompletionTests();
             SavedProfileTests();
             AutomaticImportTests();
             StartupTests();
