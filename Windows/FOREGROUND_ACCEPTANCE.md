@@ -2,6 +2,14 @@
 
 This records actual foreground observations separately from hidden renders and fixture tests. The full scope remains [PARITY.md](PARITY.md), against Mac baseline `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c`. The Windows port is not complete.
 
+## Modern history/manual sharing acceptance pending · October 7
+
+Source `7144ff2b8a39c559438d1b37e0b45e4d321f5d48`; ModernSharingBuild passes both warnings-as-errors builds and **87/0** selected .NET 10 contracts, terminal **81145** exit **0**, `modern-sharing-verified.log`. Fifteen new cases use exact production services with owned generated files/fake process protocol only. Source absence/restart, exact originals/current opt-in/tools/last-20 checks, cancellation/reuse/probe/full-decode refusal, missing official LUT and expired eject authority pass. Full classic 1214/0 remains retained/separate; classic final shared-source app/tests compile warning-free. Full .NET 10 regression is pending. Final UI-only enabled-boundary refinement compiles **0 warnings/0 errors**, terminal **99567** exit **0**, `modern-sharing-final-build.log`; runtime/tests unchanged since the passing run.
+
+No native launch/input was attempted. Latest history/file details/verification/prompt/tools picker/save/cancel/Stop/completion-return/notification/tray/busy/keyboard/DPI acceptance remains unrun. Previous profile desktop-input denial is historical and no alternate helper/security action was attempted. Final completed managed app SHA-256 `6CF325B68E72634978FB43C68FA6DA8A1650655F2E21CE46201AB233086772D0`; adjacent runtime `E621E2F65327F5A5E05809D6493D71E5F748974C9FE3A8BF2644DCA9F95412C8`. Output is `%USERPROFILE%\.codex\EasyEjectBuildTools\ModernSharingBuild`, outside OneDrive; no real configuration/profile save or supplied-tool execution took place.
+
+Goal active; expired heartbeat paused. Full runtime/source/UI/lifecycle, existing supplied tools/official LUT, identified disposable hardware/filesystems/travel and trusted direct-distribution acceptance remain required. No real media/device operations, tool/LUT installation, security/power/display/startup change, push or publishing occurred.
+
 ## Modern import/completion acceptance pending · October 7
 
 Source `6202749fd6fe74a7eb6998b4c2dafc90e6b90902`; ModernImportsBuild passes both warnings-as-errors builds and **72/0** selected .NET 10 runtime contracts, terminal **98706** exit **0**, `modern-imports-verified.log`. Eighteen new fixtures use owned generated files/fake devices, including explicitly acknowledged removal of a verified disposable original, excluded-media retention, cancellation/reuse/history/completion/scheduler cases. Classic final shared-source compilation is warning-free; retained full classic 1214/0 is separate. This does not prove foreground behavior or physical hardware.
