@@ -26,12 +26,13 @@ namespace EasyEject {
         public VolumeImportGuard(IDiscovery discovery, string source, string destination, Volume expectedVolume, Disk expectedDisk, long selectionEpoch)
             : this(discovery, source, destination, expectedVolume, expectedDisk, selectionEpoch, WindowsDiscovery.VolumeId) {}
         internal VolumeImportGuard(IDiscovery discovery, string source, string destination, Volume expectedVolume, Disk expectedDisk, long selectionEpoch, Func<string, string> volumeId, Func<Inventory, bool> selectionCurrent = null) {
+            string selectedSourceId = expectedVolume.Id, selectedVolumeFingerprint = expectedVolume.Fingerprint, selectedDiskFingerprint = expectedDisk.Fingerprint;
             this.discovery = discovery; this.source = source; this.destination = destination; this.volumeId = volumeId;
             sourceId = volumeId(source); destinationId = volumeId(destination);
-            if (sourceId != expectedVolume.Id) throw new SafetyException("The selected source belongs to a different volume.");
+            if (sourceId != selectedSourceId) throw new SafetyException("The selected source belongs to a different volume.");
             var state = discovery.Scan(); long epoch = state.Epoch;
             var currentSource = Resolve(state, sourceId);
-            if (!(selectionCurrent == null ? epoch == selectionEpoch : selectionCurrent(state)) || currentSource.Fingerprint != expectedVolume.Fingerprint || state.Disks.Single(d => d.Number == currentSource.Disks[0]).Fingerprint != expectedDisk.Fingerprint)
+            if (!(selectionCurrent == null ? epoch == selectionEpoch : selectionCurrent(state)) || currentSource.Fingerprint != selectedVolumeFingerprint || state.Disks.Single(d => d.Number == currentSource.Disks[0]).Fingerprint != selectedDiskFingerprint)
                 throw new SafetyException("The selected card connection changed while choosing folders. Refresh and choose the device again.");
             disks = PlanProtection(state, sourceId, destinationId); connection = new StorageConnectionProof(discovery, state, disks); destinationIdentity = DestinationIdentity.Capture(state, destinationId); sourceIdentity = DestinationIdentity.Capture(state, sourceId);
             string root = currentSource.Mounts.Where(x => SafePaths.Within(source, SafePaths.Normalize(x))).OrderByDescending(x => x.Length).FirstOrDefault();
