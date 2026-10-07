@@ -78,6 +78,7 @@ namespace EasyEject {
             }
         }
         [STAThread] public static int Main(string[] args) {
+            if (args.Length > 0 && args[0] == "--share-real-tools") return RealQuickShareAcceptance(args);
             if (args.Length == 1 && args[0] == "--saved-action-ownership") { SavedActionOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated folders/copies and fake factory/guard callbacks only; no real media/device/viewer/tool operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--saved-action-properties") { SavedActionPropertyTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated files/folders and fake guard properties only; no real media or device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--connected-profile-selection") { ConnectedProfileSelectionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated folders/configuration and fake card/destination evidence only; no real media or device operation."); return failed == 0 ? 0 : 1; }
