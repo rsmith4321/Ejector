@@ -34,7 +34,7 @@ struct EasyShareProfileOptions: View {
                     Text("Each Quick Share asks for 1080p or 4K and whether to apply the \(camera == .luna ? "Luna I-Log" : "DJI O4 D-Log M") LUT. Leave the LUT off for normal-color footage.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     if camera == .djiO4Pro {
-                        Text("Stabilize the imported originals in Gyroflow first. Export beside them, then apply the DJI LUT with Quick Share.")
+                        Text("Stabilize the imported originals in Gyroflow first. Export beside them. You can apply a LUT in Gyroflow or with Quick Share; recognized Gyroflow LUT exports keep their existing colors.")
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                     Text("Keeps audio, landscape or portrait framing, and up to 30 fps. Smaller clips keep their size. Targets about 60 MB per minute at 1080p, or 180 MB at 4K.")
@@ -73,7 +73,7 @@ struct QuickShareCompletedImports: View {
         if !importer.quickShareImports.isEmpty {
             GroupBox("Completed imports · Quick Share") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Make sharing copies after import, even after ejecting the device. For DJI O4 Pro, open the folder, batch stabilize in Gyroflow, then use Quick Share to apply the LUT. The destination drive must be connected.")
+                    Text("Make sharing copies after import, even after ejecting the device. For DJI O4 Pro, open the folder, batch stabilize in Gyroflow, then use Quick Share for smaller sharing copies. Recognized Gyroflow LUT exports keep their existing colors. The destination drive must be connected.")
                         .font(.caption).foregroundStyle(.secondary)
                     ForEach(importer.quickShareImports) { batch in
                         HStack(alignment: .top) {

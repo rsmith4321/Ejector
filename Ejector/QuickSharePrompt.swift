@@ -18,6 +18,9 @@ import AppKit
         let alert = NSAlert()
         alert.messageText = "Make Quick Share copies?"
         alert.informativeText = "Create compressed MP4 copies for \(deviceName) in Sharing Copies. Full-quality imported originals stay intact.\n\nApply the \(camera == .luna ? "Luna LUT only to I-Log" : "DJI O4 LUT only to D-Log M") footage. For normal-color footage, turn it off."
+        if camera == .djiO4Pro {
+            alert.informativeText += "\n\nGyroflow exports marked as having a LUT applied keep their existing colors; Quick Share only makes them smaller. For other already-colored exports, turn the LUT off."
+        }
         alert.addButton(withTitle: "Cancel").keyEquivalent = "\r"
         alert.addButton(withTitle: "Make Quick Share Copies").keyEquivalent = ""
         let view = NSView(frame: NSRect(x: 0, y: 0, width: 350, height: 78))

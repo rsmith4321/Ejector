@@ -87,7 +87,7 @@ nonisolated struct EasyShareEngine {
     let report: (ImportProgress) -> Void
     let audit: (String) throws -> Void
     static let recipe = "luna-share-v1-h264-30fps-aac160"
-    var recipe: String { camera == .luna ? Self.recipe : "dji-o4-share-v1-h264-30fps-aac160" }
+    var recipe: String { camera == .luna ? Self.recipe : "dji-o4-share-v2-h264-30fps-aac160" }
     init(tools: EasyShareTools, preset: EasySharePreset, color: EasyShareColor, camera: EasyShareCamera = .luna,
          cancellation: ImportCancellation, validate: @escaping () throws -> Void,
          report: @escaping (ImportProgress) -> Void, audit: @escaping (String) throws -> Void) {
@@ -127,6 +127,14 @@ nonisolated struct EasyShareEngine {
         var video: Stream? { streams.first { $0.codec_type == "video" } }
         var audio: Stream? { streams.first { $0.codec_type == "audio" } }
         var seconds: Double { Double(video?.duration ?? format.duration ?? "") ?? 0 }
+    }
+
+    /// An explicit marker written by Gyroflow's export LUT option. Never infer log color from video tags.
+    static func gyroflowAppliedLUT(_ input: Probe) -> Bool {
+        (input.format.tags?["comment"] ?? "").components(separatedBy: .newlines).contains { line in
+            let prefix = "Gyroflow export LUT applied: "
+            return line.hasPrefix(prefix) && !line.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces).isEmpty
+        }
     }
 
     func check() throws { try cancellation.check(); try validate() }
@@ -182,8 +190,7 @@ nonisolated struct EasyShareEngine {
         }
         result.skipped = originals.filter { $0.url.pathExtension.lowercased() == "mp4" }.count - candidates.count
         guard !candidates.isEmpty else { return result }
-        let lutData = color == .standard ? nil : try EasyShareTools.validateLUT(tools.lutURL(for: color), color: color)
-        let lutSHA = EasyShareTools.lutSHA(for: color)
+        var cachedLUTData: Data?
         try MediaImportEngine.checkPath(sharing)
         try FileManager.default.createDirectory(at: sharing, withIntermediateDirectories: true)
         for (index, original) in candidates.enumerated() {
@@ -214,6 +221,19 @@ nonisolated struct EasyShareEngine {
                   !(video.side_data_list?.contains { $0.side_data_type?.contains("DOVI") == true } ?? false) else {
                 throw ImportFailure("Quick Share supports D-Log M, I-Log, and standard SDR clips. This clip is HDR.")
             }
+            let alreadyApplied = camera == .djiO4Pro && Self.gyroflowAppliedLUT(input)
+            let effectiveColor: EasyShareColor = alreadyApplied ? .standard : color
+            if alreadyApplied {
+                try audit("Quick Share keeps the LUT already applied by Gyroflow | \(original.url.path)")
+            }
+            let lutSHA = EasyShareTools.lutSHA(for: effectiveColor)
+            let lutData: Data?
+            if effectiveColor == .standard {
+                lutData = nil
+            } else {
+                if cachedLUTData == nil { cachedLUTData = try EasyShareTools.validateLUT(tools.lutURL(for: effectiveColor), color: effectiveColor) }
+                lutData = cachedLUTData
+            }
             let rotation = abs(video.side_data_list?.compactMap(\.rotation).first ?? 0) % 180
             let displayWidth = rotation == 90 ? height : width
             let displayHeight = rotation == 90 ? width : height
@@ -227,7 +247,7 @@ nonisolated struct EasyShareEngine {
             let fps = rate.isFinite && rate > 0 && rate <= 30 ? rateString : "30"
             let basename = original.url.deletingPathExtension().lastPathComponent + "-sharing-" + preset.rawValue
             let destination = sharing.appendingPathComponent(basename + ".mp4")
-            let output = try chooseOutput(destination, original: original, lutSHA: lutSHA)
+            let output = try chooseOutput(destination, original: original, lutSHA: lutSHA, color: effectiveColor)
             if output.reused {
                 result.reused += 1
                 try audit("Easy Share reused verified \(preset.rawValue) copy | \(output.url.path)")
@@ -284,12 +304,12 @@ nonisolated struct EasyShareEngine {
             guard renamex_np(temporary.path, output.url.path, UInt32(RENAME_EXCL)) == 0 else { throw ImportFailure("The sharing filename is now occupied or cannot be saved. Existing files were kept.") }
             try MediaImportEngine.flushSavedCopy(output.url)
             let receipt = Receipt(recipe: recipe, sourceSHA256: original.sha256, lutSHA256: lutSHA,
-                                  preset: preset, color: color, outputSHA256: outputSHA)
+                                  preset: preset, color: effectiveColor, outputSHA256: outputSHA)
             let receiptURL = Self.receiptURL(output.url)
             try MediaImportEngine.checkPath(receiptURL)
             try JSONEncoder().encode(receipt).write(to: receiptURL, options: .withoutOverwriting)
             try MediaImportEngine.flushSavedCopy(receiptURL)
-            try audit("Easy Share verified \(preset.rawValue), \(color.rawValue), original SHA256 \(original.sha256), output SHA256 \(outputSHA) | \(output.url.path)")
+            try audit("Easy Share verified \(preset.rawValue), \(effectiveColor.rawValue), original SHA256 \(original.sha256), output SHA256 \(outputSHA) | \(output.url.path)")
             result.created += 1
         }
         return result
@@ -298,7 +318,7 @@ nonisolated struct EasyShareEngine {
     static func receiptURL(_ output: URL) -> URL {
         output.deletingLastPathComponent().appendingPathComponent("." + output.lastPathComponent + ".easy-share.json")
     }
-    private func chooseOutput(_ proposed: URL, original: MediaImportEngine.VerifiedMedia, lutSHA: String?) throws -> (url: URL, reused: Bool) {
+    private func chooseOutput(_ proposed: URL, original: MediaImportEngine.VerifiedMedia, lutSHA: String?, color: EasyShareColor) throws -> (url: URL, reused: Bool) {
         for index in 0..<100 {
             let suffix = index == 0 ? "" : "-\(original.sha256.prefix(10))-\(index)"
             let url = proposed.deletingLastPathComponent().appendingPathComponent(proposed.deletingPathExtension().lastPathComponent + suffix + ".mp4")

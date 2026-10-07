@@ -409,7 +409,7 @@ import UserNotifications
             message = "Could not open the imported folder."
             return
         }
-        message = "Import folder opened. Stabilize O4 Pro clips in Gyroflow before using Quick Share to apply the DJI LUT."
+        message = "Import folder opened. Stabilize O4 Pro clips in Gyroflow before using Quick Share. Apply the LUT in Gyroflow or Quick Share; recognized Gyroflow LUT exports keep their existing colors."
     }
 
     func quickShareCompletedImport(_ id: String, returnToEject: Bool = false) {
