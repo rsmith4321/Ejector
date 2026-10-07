@@ -20,7 +20,7 @@ namespace EasyEject {
             }
         }
     }
-    internal sealed class DeviceWindow : Form {
+    internal sealed class DeviceWindow : DpiForm {
         readonly WindowsDiscovery discovery = new WindowsDiscovery(); readonly Operations operations = new Operations();
         readonly ImportCompletionRegistry completions = new ImportCompletionRegistry();
         readonly AutomaticImportScheduler automatic = new AutomaticImportScheduler();

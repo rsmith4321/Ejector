@@ -104,6 +104,10 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--original-ownership") { OriginalOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated file/intent directory replacements and fake guards only; no real media or device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--resume-ownership") { ResumeOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated files and fake device guards only; no real media or device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--resume-completion") { ResumeCompletionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated files and fake device guards only; no real media or device operation."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--dpi-layout") { DpiLayoutTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Native hidden forms and draft/fake/read-only data only; no display setting or device change."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--dpi-render") { DpiLayoutRender(); return 0; }
+            if (args.Length == 1 && args[0] == "--status-layout") { StatusLayoutTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Native read-only hidden layouts only."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--native-ui") { DpiLayoutTests(); StatusLayoutTests(); InformationDiagnosticsTests(); TrayActivityTests(); WindowsReleaseReviewTests(); WindowsReplayRecoveryTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Hidden native controls and owned/fake/read-only fixtures only; no real device or display setting change."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--trash-ownership") { TrashOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned disposable read-only Trash directory replacements only; no real media or device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--path-ownership") { PathOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned disposable directory replacement only; no real device operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--bulk-final") { BulkFinalTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake removal and inventory only; no real eject."); return failed == 0 ? 0 : 1; }
@@ -741,7 +745,7 @@ namespace EasyEject {
             TrashRecoveryTests();
             RemovalIntentTests();
             RemovalResumeTests();
-            RemovalResumeActionTests(); ResumeCompletionTests();
+            RemovalResumeActionTests(); ResumeCompletionTests(); DpiLayoutTests();
             SavedProfileTests();
             AutomaticImportTests();
             StartupTests();
@@ -799,6 +803,7 @@ namespace EasyEject {
             }
         }
         static void CreateRenderHandles(System.Windows.Forms.Control control) {
+            var form = control as DpiForm; if (form != null) form.PrepareDpiLayout();
             IntPtr handle = control.Handle; control.PerformLayout();
             if (control is System.Windows.Forms.TextBox) Console.WriteLine("Text field bounds=" + control.Bounds + " characters=" + control.Text.Length);
             foreach (System.Windows.Forms.Control child in control.Controls) CreateRenderHandles(child);

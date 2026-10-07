@@ -2,7 +2,7 @@ using System.Drawing;
 using System.Windows.Forms;
 
 namespace EasyEject {
-    internal sealed class WindowsReplayBackupConfirmation : Form {
+    internal sealed class WindowsReplayBackupConfirmation : DpiForm {
         internal readonly TextBox Content;
         internal readonly Button Restore, Keep;
         internal WindowsReplayBackupConfirmation(string description) {

@@ -6,7 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 
 namespace EasyEject {
-    internal sealed class ImportHistoryDialog : Form {
+    internal sealed class ImportHistoryDialog : DpiForm {
         internal readonly ListView Batches = new ListView();
         internal readonly TextBox Details = new TextBox();
         readonly Button verify = new Button();

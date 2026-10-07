@@ -31,7 +31,7 @@ namespace EasyEject {
         internal MediaOptions Snapshot() { return new MediaOptions(Videos.Checked, Previews.Checked, Clean.Checked, AskEject.Checked, DeleteOriginals.Checked, RecoverTrash.Checked); }
         internal void SetTextWidth(int width) { explanation.MaximumSize = new Size(Math.Max(250, width - 12), 0); }
     }
-    internal sealed class ImportDefaultsDialog : Form {
+    internal sealed class ImportDefaultsDialog : DpiForm {
         internal readonly SelectionControls Selection = new SelectionControls();
         internal ImportDefaults Value { get { var options = Selection.Snapshot(); return new ImportDefaults { AutomaticImport = Selection.Automatic.Checked, VideosOnly = options.VideosOnly, IncludePreviews = options.IncludePreviews, CleanLayout = options.CleanLayout, AskToEject = options.AskToEject, DeleteOriginals = options.DeleteOriginals, RecoverTrash = options.RecoverTrash }; } }
         internal ImportDefaultsDialog(ImportDefaults defaults) {
@@ -52,7 +52,7 @@ namespace EasyEject {
             body.SizeChanged += delegate { int width = Math.Max(300, body.ClientSize.Width - 60); intro.MaximumSize = retained.MaximumSize = new Size(width, 0); Selection.SetTextWidth(width); };
         }
     }
-    internal sealed class ImportProfileDialog : Form {
+    internal sealed class ImportProfileDialog : DpiForm {
         internal readonly ImportProfile Draft; internal readonly SelectionControls Selection = new SelectionControls();
         internal readonly QuickShareControls Sharing;
         internal readonly RadioButton UseDefaults = new RadioButton(), UseCustom = new RadioButton();

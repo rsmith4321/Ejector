@@ -18,7 +18,7 @@ namespace EasyEject {
             return "This resume action permanently removed " + result.RemovedOriginals + " verified ordinary originals and cleared " + result.ClearedTrashFiles + " Trash files and " + result.ClearedTrashRecords + " restoration records.\nAlready absent before this action: " + result.PriorAbsentOriginals + " ordinary originals, " + result.PriorAbsentTrashFiles + " Trash files and " + result.PriorAbsentTrashRecords + " records. Complete saved copies are kept.";
         }
     }
-    internal sealed class RemovalResumeConfirmationDialog : Form {
+    internal sealed class RemovalResumeConfirmationDialog : DpiForm {
         internal readonly Button Cancel = new Button(), Resume = new Button(); internal readonly Label Explanation = new Label();
         internal RemovalResumeConfirmationDialog(string text) {
             Text = "Resume interrupted verified import?"; Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi;

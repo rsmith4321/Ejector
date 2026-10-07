@@ -143,7 +143,7 @@ namespace EasyEject {
         }
         public void Dispose() { WindowsUpdateCheckScope revoked; WindowsChannelReplayStore.BackupReview discarded; lock (sync) { if (disposed) return; disposed = true; available = false; epoch++; revoked = active; if (revoked != null) revoked.Invalidate(); offer = null; archivePath = null; discarded = backup; backup = null; backupPresented = false; } if (revoked != null) revoked.Cancel(); if (discarded != null) discarded.Dispose(); }
     }
-    internal sealed class WindowsReleaseReviewDialog : Form {
+    internal sealed class WindowsReleaseReviewDialog : DpiForm {
         internal readonly Button CheckRelease, VerifyArchive, VerifyExtracted, StopReview, CloseReview, ReviewBackup, RestoreBackup, StopBackup;
         internal readonly TextBox ReleaseContent, GuideContent, ReviewStatus, BackupContent, BackupStatus;
         readonly WindowsReleaseReviewSession session; readonly InstallationFolders folders; readonly string version; readonly Action activity;

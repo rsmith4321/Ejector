@@ -51,7 +51,7 @@ namespace EasyEject {
         internal void SetTextWidth(int width) { explanation.MaximumSize = new Size(Math.Max(250, width - 12), 0); }
     }
     // A fresh dialog is required for every action, even when a device has saved preferences.
-    internal sealed class QuickSharePromptDialog : Form {
+    internal sealed class QuickSharePromptDialog : DpiForm {
         internal readonly ComboBox SizeChoice = new ComboBox();
         internal readonly CheckBox Lut = new CheckBox();
         internal readonly Button CancelExport = new Button(), Export = new Button();

@@ -4,7 +4,7 @@ using System.IO;
 using System.Windows.Forms;
 
 namespace EasyEject {
-    internal sealed class SavedProfilesDialog : Form {
+    internal sealed class SavedProfilesDialog : DpiForm {
         internal readonly ListView ProfilesList = new ListView();
         internal readonly Button Edit = new Button(), Forget = new Button();
         internal readonly TextBox Detail = new TextBox();

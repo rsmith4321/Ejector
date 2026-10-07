@@ -13,7 +13,7 @@ namespace EasyEject {
             using (var dialog = new OriginalRemovalConfirmationDialog(scope, videosOnly)) return dialog.ShowDialog(owner) == DialogResult.Yes;
         }
     }
-    internal sealed class OriginalRemovalConfirmationDialog : Form {
+    internal sealed class OriginalRemovalConfirmationDialog : DpiForm {
         internal readonly Button Cancel = new Button(), EnableRemoval = new Button();
         internal readonly Label Explanation = new Label();
         internal OriginalRemovalConfirmationDialog(string scope, bool videosOnly) {
@@ -31,7 +31,7 @@ namespace EasyEject {
             Controls.Add(body); Controls.Add(footer); AcceptButton = Cancel; CancelButton = Cancel;
         }
     }
-    internal sealed class VerifiedImportConfirmationDialog : Form {
+    internal sealed class VerifiedImportConfirmationDialog : DpiForm {
         internal readonly Button Cancel = new Button(), StartImport = new Button();
         internal readonly Label Explanation = new Label();
         internal VerifiedImportConfirmationDialog(string description) {

@@ -4,7 +4,7 @@ using System.Threading;
 using System.Windows.Forms;
 
 namespace EasyEject {
-    internal sealed class ManualStorageDialog : Form {
+    internal sealed class ManualStorageDialog : DpiForm {
         internal readonly TextBox Status = new TextBox(); internal readonly Button Stop = new Button(), Done = new Button();
         readonly CancellationTokenSource cancellation; bool running = true;
         internal ManualStorageDialog(string deviceName, CancellationTokenSource cancellation) {

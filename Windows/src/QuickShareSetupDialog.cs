@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace EasyEject {
-    internal sealed class QuickShareSetupDialog : Form {
+    internal sealed class QuickShareSetupDialog : DpiForm {
         internal readonly TextBox Ffmpeg = new TextBox(), Ffprobe = new TextBox(), Lut = new TextBox();
         internal readonly Button SaveSelection = new Button(), CancelSelection = new Button(), ClearLut = new Button(), ClearTools = new Button();
         readonly Button chooseFfmpeg = new Button(), chooseFfprobe = new Button(), chooseLut = new Button();

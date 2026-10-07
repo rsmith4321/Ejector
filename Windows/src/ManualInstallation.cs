@@ -46,7 +46,7 @@ namespace EasyEject {
         }
         static string FolderIssue(InstallationFolders.Folder folder) { return folder.Available ? "" : "\r\nFolder access unavailable: " + folder.Error; }
     }
-    internal sealed class ManualInstallationDialog : Form {
+    internal sealed class ManualInstallationDialog : DpiForm {
         internal readonly TextBox Content;
         internal readonly Button OpenApplication, OpenSettings, CloseGuide;
         readonly InstallationFolders folders; readonly Action<string> showError;

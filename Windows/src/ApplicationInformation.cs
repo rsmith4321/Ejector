@@ -28,7 +28,7 @@ namespace EasyEject {
             "Windows updates and installation\r\nOpen Windows updates & installation from the tray for the separate app/settings folders and manual install, update and rollback instructions. No Windows release channel or signing publisher is approved in this development build. It cannot determine whether newer Windows releases are available. Instructions never download, install or restart the app.";
         } }
     }
-    internal sealed class InformationDialog : Form {
+    internal sealed class InformationDialog : DpiForm {
         internal readonly TextBox Content;
         internal InformationDialog(bool about) {
             Text = about ? "About Easy Eject" : "Easy Eject Help & Instructions";

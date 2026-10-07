@@ -10,7 +10,7 @@ namespace EasyEject {
         internal static string Summary(int recovered, int cleared, int records) { return recovered == 0 ? "" : "Recovered " + recovered + " Trash files; permanently cleared " + cleared + " verified files and " + records + " restoration records."; }
         internal static bool Confirm(IWin32Window owner, string scope) { using (var dialog = new DeviceTrashRecoveryConfirmationDialog(scope)) return dialog.ShowDialog(owner) == DialogResult.Yes; }
     }
-    internal sealed class DeviceTrashRecoveryConfirmationDialog : Form {
+    internal sealed class DeviceTrashRecoveryConfirmationDialog : DpiForm {
         internal readonly Button Cancel = new Button(), EnableRecovery = new Button(); internal readonly Label Explanation = new Label();
         internal DeviceTrashRecoveryConfirmationDialog(string scope) {
             Text = "Enable verified device Trash recovery?"; Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi;

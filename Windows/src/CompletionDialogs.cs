@@ -4,7 +4,7 @@ using System.Linq;
 using System.Windows.Forms;
 
 namespace EasyEject {
-    internal sealed class ImportCompletionDialog : Form {
+    internal sealed class ImportCompletionDialog : DpiForm {
         internal readonly Button Keep = new Button(), Eject = new Button(), OpenFolder = new Button(), Share = new Button();
         internal readonly Label Explanation = new Label();
         internal readonly string CompletionId;
@@ -36,7 +36,7 @@ namespace EasyEject {
         }
         internal void ExpireEject() { Eject.Enabled = false; if (expired) return; expired = true; Explanation.Text += "\n\nThe device connection changed. Ejection from this choice is disabled; refresh and review the device."; }
     }
-    internal sealed class PendingCompletionsDialog : Form {
+    internal sealed class PendingCompletionsDialog : DpiForm {
         internal readonly ListBox Entries = new ListBox();
         internal string SelectedId { get { return Entries.SelectedItem == null ? null : ((ImportCompletion)Entries.SelectedItem).Id; } }
         internal PendingCompletionsDialog(ImportCompletion[] values) {
@@ -55,7 +55,7 @@ namespace EasyEject {
             layout.Controls.Add(intro); layout.Controls.Add(Entries); layout.Controls.Add(footer); Controls.Add(layout); CancelButton = close;
         }
     }
-    internal sealed class AppSettingsDialog : Form {
+    internal sealed class AppSettingsDialog : DpiForm {
         internal readonly CheckBox Notifications = new CheckBox(), Debug = new CheckBox(), Shortcut = new CheckBox(), Cleanup = new CheckBox(), WarnOther = new CheckBox();
         internal readonly ComboBox ShortcutLetter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 80 };
         internal readonly CheckBox Login = new CheckBox(); internal readonly Button UseThisCopy = new Button();
@@ -96,7 +96,7 @@ namespace EasyEject {
         }
         internal void RetargetLogin() { if (startup == null || !startup.Owned || startup.Here) return; retarget = true; Login.Checked = true; LoginStatus.Text = "Save settings to register this copy. The other copy's registration is replaced only after a fresh status check."; }
     }
-    internal sealed class IssueDialog : Form {
+    internal sealed class IssueDialog : DpiForm {
         internal IssueDialog(AppIssue issue) {
             Text = "Easy Eject issue"; Font = new Font("Segoe UI", 10); Size = new Size(700, 450); MinimumSize = new Size(600, 380); StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
             var text = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Text = issue.Message + Environment.NewLine + Environment.NewLine + "Dismiss acknowledges this issue. It never retries an import or eject. A later failure will restore attention." };
@@ -106,7 +106,7 @@ namespace EasyEject {
             Controls.Add(text); Controls.Add(footer); AcceptButton = close; CancelButton = close;
         }
     }
-    internal sealed class DiagnosticsDialog : Form {
+    internal sealed class DiagnosticsDialog : DpiForm {
         readonly TextBox text;
         readonly Label outcome;
         readonly Button clear, copy, refresh;
