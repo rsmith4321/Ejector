@@ -38,8 +38,8 @@ namespace EasyEject {
         }
     }
     internal sealed class StartupSnapshot {
-        internal readonly StartupValue Value; internal readonly string CurrentCommand, RegisteredPath, Error;
-        internal StartupSnapshot(StartupValue value, string command, string error = null) { Value = value; CurrentCommand = command; Error = error; if (value != null && value.Present && value.Kind == RegistryValueKind.String) RegisteredPath = StartupRegistration.OwnedPath(value.Value as string); }
+        internal readonly StartupValue Value; internal readonly string CurrentCommand, RegisteredPath, Error; internal readonly bool Modern;
+        internal StartupSnapshot(StartupValue value, string command, string error = null, bool modern = false) { Value = value; CurrentCommand = command; Error = error; Modern = modern; if (value != null && value.Present && value.Kind == RegistryValueKind.String) RegisteredPath = StartupRegistration.OwnedPath(value.Value as string, modern); }
         internal bool Available { get { return Error == null && Value != null; } }
         internal bool Owned { get { return Available && RegisteredPath != null; } }
         internal bool Here { get { return Owned && String.Equals(Value.Value as string, CurrentCommand, StringComparison.OrdinalIgnoreCase); } }
@@ -53,17 +53,18 @@ namespace EasyEject {
     }
     internal sealed class StartupRegistration {
         const string Suffix = " --startup";
-        readonly IStartupStore store; readonly string executable, command; readonly Func<string, IDisposable> hold;
-        internal StartupRegistration(IStartupStore store, string executable, Func<string, IDisposable> hold = null) { this.store = store; this.executable = SafePaths.Normalize(executable); command = Command(this.executable); this.hold = hold ?? HoldExecutable; }
-        internal static string Command(string executable) {
+        readonly IStartupStore store; readonly string executable, command; readonly Func<string, IDisposable> hold; readonly bool modern;
+        internal StartupRegistration(IStartupStore store, string executable, Func<string, IDisposable> hold = null, bool modern = false) { this.store = store; this.modern = modern; this.executable = SafePaths.Normalize(executable); command = Command(this.executable, modern); this.hold = hold ?? HoldExecutable; }
+        internal static string Command(string executable, bool modern = false) {
             string path = SafePaths.Normalize(executable);
-            if (!Path.GetFileName(path).Equals("EasyEject.Windows.exe", StringComparison.OrdinalIgnoreCase) || path.Any(Char.IsControl) || path.Contains("\"")) throw new SafetyException("Login registration requires the local EasyEject.Windows.exe application.");
+            string name = modern ? "EasyEject.Modern.exe" : "EasyEject.Windows.exe";
+            if (!Path.GetFileName(path).Equals(name, StringComparison.OrdinalIgnoreCase) || path.Any(Char.IsControl) || path.Contains("\"")) throw new SafetyException("Login registration requires the local " + name + " application.");
             string value = "\"" + path + "\"" + Suffix;
             if (value.Length > 260) throw new SafetyException("The login command exceeds Windows' supported length."); return value;
         }
-        internal static string OwnedPath(string value) {
+        internal static string OwnedPath(string value, bool modern = false) {
             if (String.IsNullOrEmpty(value) || value.Length > 260 || !value.StartsWith("\"", StringComparison.Ordinal) || !value.EndsWith("\"" + Suffix, StringComparison.Ordinal)) return null;
-            try { string path = value.Substring(1, value.Length - Suffix.Length - 2); return Command(path) == value ? path : null; }
+            try { string path = value.Substring(1, value.Length - Suffix.Length - 2); bool targetModern = modern && Path.GetFileName(path).Equals("EasyEject.Modern.exe", StringComparison.OrdinalIgnoreCase); return Command(path, targetModern) == value ? path : null; }
             catch (Exception ex) { if (ex is SafetyException || ex is ArgumentException || ex is NotSupportedException) return null; throw; }
         }
         static IDisposable HoldExecutable(string path) {
@@ -71,9 +72,10 @@ namespace EasyEject {
             try { var stream = SafePaths.ReadFile(path); return new HeldExecutable(directories, stream); } catch { directories.Dispose(); throw; }
         }
         sealed class HeldExecutable : IDisposable { readonly IDisposable directory, file; internal HeldExecutable(IDisposable directory, IDisposable file) { this.directory = directory; this.file = file; } public void Dispose() { file.Dispose(); directory.Dispose(); } }
-        internal StartupSnapshot Inspect() { try { return new StartupSnapshot(store.Read(), command); } catch (Exception ex) { return new StartupSnapshot(null, command, ex.Message); } }
+        internal StartupSnapshot Inspect() { try { return new StartupSnapshot(store.Read(), command, modern: modern); } catch (Exception ex) { return new StartupSnapshot(null, command, ex.Message, modern); } }
         internal StartupSnapshot Apply(StartupSnapshot expected, bool enable) {
             if (expected == null || !expected.Available || expected.Conflict) throw new SafetyException("Login registration is unavailable or belongs to an unrecognized command. Nothing was changed.");
+            if (expected.Modern != modern || expected.CurrentCommand != command) throw new SafetyException("This login review belongs to a different copy. Open fresh Settings; nothing was changed.");
             if (!store.Read().Same(expected.Value)) throw new SafetyException("Login registration changed while Settings was open. Review its current status first.");
             if (!enable && !expected.Owned || enable && expected.Here) return Inspect();
             using (var held = enable ? hold(executable) : null) {

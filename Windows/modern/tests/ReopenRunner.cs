@@ -28,6 +28,7 @@ namespace EasyEject {
             ResumeOperationTests();
             SettingsOperationTests();
             GroupedOperationTests();
+            StartupOperationTests();
             Console.WriteLine(passed + " passed, " + failed + " failed");
             return failed == 0 ? 0 : 1;
         }

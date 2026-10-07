@@ -100,7 +100,7 @@ namespace EasyEject.Modern {
             NotifyImport(outcome.HistoryWarning == null ? result.HasSelectedMedia ? "Import complete" : "No matching media" : "Import verified; history needs attention", outcome.Message, outcome.HistoryWarning != null);
             // The worker has ended and released folders before any completion action.
             working = false; UpdateActions();
-            if (completion != null && CompletionPresentation.ShowChoice(options.AskToEject, AppWindow.IsVisible, settings.NotificationsEnabled)) await ReviewImportCompletion(completion.Id);
+            if (completion != null && CompletionPresentation.ShowChoice(options.AskToEject, AppWindow.IsVisible, settings.NotificationsEnabled)) { await EnsureVisible(); await ReviewImportCompletion(completion.Id); }
             else if (AppWindow.IsVisible) {
                 working = true; confirmation = MessageDialog(result.HasSelectedMedia ? "Import complete" : "No matching media", outcome.Message, null);
                 UpdateActions(); await confirmation.ShowAsync(); confirmation = null;

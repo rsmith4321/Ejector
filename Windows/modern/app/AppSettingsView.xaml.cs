@@ -5,7 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace EasyEject.Modern {
     public sealed partial class AppSettingsView : UserControl {
-        AppSettingsEdit editor; bool active, loading, saving, confirming, updating;
+        AppSettingsEdit editor; StartupEdit login; string loginNote; bool active, loading, saving, confirming, updating;
         internal event Action<AppSettings> Saved;
         internal event Action<string> Completed;
         internal Func<string> ShortcutDescription;
@@ -13,17 +13,30 @@ namespace EasyEject.Modern {
         public AppSettingsView() { InitializeComponent(); Letter.ItemsSource = GlobalHotkey.Letters; }
         internal async Task StartEdit() {
             if (Busy) return; loading = true; active = true; Render();
-            try { var value = await Task.Run(() => AppSettings.Load()); if (active) editor = new AppSettingsEdit(value, AppSettings.Save); Status.Text = "Changes stay in this draft until Save. Cancel keeps saved settings."; }
+            try {
+                var values = await Task.Run(() => {
+                    var settings = AppSettings.Load(); StartupEdit draft = null; string note = null;
+                    try { draft = new StartupEdit(new StartupRegistration(new WindowsStartupStore(), Environment.ProcessPath, modern: true)); }
+                    catch (Exception ex) { note = "Login registration could not be checked. " + ex.Message; }
+                    return Tuple.Create(settings, draft, note);
+                });
+                if (active) { editor = new AppSettingsEdit(values.Item1, AppSettings.Save); login = values.Item2; loginNote = values.Item3; }
+                Status.Text = "Changes stay in this draft until Save. Cancel keeps saved settings and login registration.";
+            }
             catch (Exception ex) { editor = null; Status.Text = "Settings could not be read. Existing records were retained. " + ex.Message; }
             finally { loading = false; Render(); }
         }
-        internal bool TryLeave() { if (Busy) return false; active = false; if (editor != null) editor.Cancel(); editor = null; return true; }
+        internal bool TryLeave() { if (Busy) return false; active = false; if (editor != null) editor.Cancel(); if (login != null) login.Cancel(); editor = null; login = null; return true; }
         void Render() {
             updating = true;
             try {
                 var p = editor == null ? new AppSettings() : editor.Snapshot();
                 Notifications.IsChecked = p.NotificationsEnabled; Cleanup.IsChecked = p.CleanupCardsEnabled; WarnOther.IsChecked = p.WarnOtherEnabled;
                 Debug.IsChecked = p.DebugEnabled; Shortcut.IsChecked = p.ShortcutEnabled; Letter.SelectedItem = p.ShortcutKey; Updates.IsChecked = p.AutomaticUpdatesEnabled;
+                Login.IsChecked = login != null && login.Enabled; Login.IsEnabled = login != null && login.Available && !Busy;
+                UseThisCopy.Visibility = login != null && login.CanRetarget ? Visibility.Visible : Visibility.Collapsed;
+                UseThisCopy.IsEnabled = !Busy;
+                LoginStatus.Text = (loginNote ?? (login == null ? "Login registration is not checked." : login.Snapshot.Message)) + "\n\nThis copy:\n" + Environment.ProcessPath;
                 Scroll.IsEnabled = editor != null && editor.Open && !Busy; Letter.IsEnabled = p.ShortcutEnabled;
                 Save.IsEnabled = editor != null && editor.Open && !Busy; Cancel.IsEnabled = !Busy;
                 ShortcutStatus.Text = ShortcutDescription == null ? "Shortcut is off until saved and enabled." : ShortcutDescription();
@@ -51,18 +64,30 @@ namespace EasyEject.Modern {
         }
         async void Save_Click(object sender, RoutedEventArgs args) {
             if (Busy || editor == null || !editor.Open) return; var owner = editor; saving = true; Render(); Status.Text = "Saving reviewed settings…";
-            AppSettings result = null;
-            try { result = await Task.Run(() => owner.Save()); }
+            AppSettings result = null; var loginOwner = login; string loginMessage = null; bool? loginChoice = loginOwner == null ? null : loginOwner.Change;
+            try {
+                var saved = await Task.Run(() => {
+                    var settings = owner.Save(); string message = null;
+                    if (loginOwner != null) {
+                        try { message = loginOwner.SaveReviewed(loginChoice).Message; }
+                        catch (Exception ex) { message = "Other application settings were saved, but login registration needs review. " + ex.Message; }
+                    }
+                    return Tuple.Create(settings, message);
+                });
+                result = saved.Item1; loginMessage = saved.Item2;
+            }
             catch (Exception ex) { Status.Text = "Could not finish saving. Close and reopen Settings to review saved choices before retrying. " + ex.Message; }
             finally { saving = false; Render(); }
             if (result != null) {
-                active = false; string message = "Application settings saved. No import, cleanup or device removal started.";
+                active = false; string message = "Application settings saved. No import, cleanup or device removal started." + (loginMessage == null ? "" : "\n" + loginMessage);
                 try { if (Saved != null) Saved(result); }
-                catch (Exception ex) { message = "Settings saved; runtime application needs review. " + ex.Message; }
+                catch (Exception ex) { message += "\nSettings saved; runtime application needs review. " + ex.Message; }
                 if (Completed != null) Completed(message);
             }
         }
         void Cancel_Click(object sender, RoutedEventArgs args) { if (TryLeave() && Completed != null) Completed("Settings draft discarded. Saved settings were not changed."); }
+        void Login_Changed(object sender, RoutedEventArgs args) { if (updating || Busy || login == null || !login.Available) return; login.Set(Login.IsChecked == true); loginNote = "Login choice will be applied only when you Save settings."; Render(); }
+        void UseThisCopy_Click(object sender, RoutedEventArgs args) { if (Busy || login == null || !login.CanRetarget) return; login.UseThisCopy(); loginNote = "This copy will replace the reviewed Easy Eject login command only when you Save settings."; Render(); }
         void Startup_Click(object sender, RoutedEventArgs args) {
             if (Busy) return;
             try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:startupapps") { UseShellExecute = true }); }

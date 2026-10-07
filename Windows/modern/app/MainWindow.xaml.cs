@@ -32,15 +32,18 @@ namespace EasyEject.Modern {
         ContentDialog confirmation;
         CancellationTokenSource operationCancel;
         bool quitting, working, closed, started, returnToProfile;
+        readonly System.Threading.Tasks.TaskCompletionSource<bool> visibleRoot = new System.Threading.Tasks.TaskCompletionSource<bool>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
+        Task runtimeStart; readonly WindowReopenRequests reopen;
         bool UiBusy { get { return working || automaticReading || DefaultsPanel.Busy || ProfilesPanel.Busy || SettingsPanel.Busy; } }
         bool StorageBusy { get { return UiBusy || DefaultsPanel.Visibility == Visibility.Visible || ProfilesPanel.Visibility == Visibility.Visible || SettingsPanel.Visibility == Visibility.Visible; } }
         public MainWindow() {
             InitializeComponent(); SystemBackdrop = new MicaBackdrop();
+            reopen = new WindowReopenRequests(action => DispatcherQueue.TryEnqueue(() => action()), () => { if (!closed) { AppWindow.Show(); Activate(); } });
             AppWindow.SetIcon(Microsoft.UI.Win32Interop.GetIconIdFromIcon(appIcon.Handle));
             shortcut = new HotkeyMessageWindow(() => StorageBusy || closed || inventory == null || inventory.Scanning || !notifications.Available, action => DispatcherQueue.TryEnqueue(() => action()), () => { Reveal(); ReviewCards(); });
             SettingsPanel.ShortcutDescription = () => shortcutWarning ?? shortcut.Status;
             SettingsPanel.Saved += SettingsSaved;
-            SettingsPanel.Completed += delegate(string message) { ShowStorage(); Summary.Text = settingsRuntimeMessage ?? message; settingsRuntimeMessage = null; UpdateActions(); };
+            SettingsPanel.Completed += delegate(string message) { ShowStorage(); Summary.Text = settingsRuntimeMessage == null ? message : settingsRuntimeMessage + "\n" + message; settingsRuntimeMessage = null; UpdateActions(); };
             inventory = new StorageInventorySession(discovery);
             notifications = new StorageNotificationWindow(discovery, () => StorageBusy);
             pulse = DispatcherQueue.CreateTimer(); pulse.Interval = TimeSpan.FromMilliseconds(500);
@@ -82,6 +85,7 @@ namespace EasyEject.Modern {
             };
             Closed += delegate {
                 closed = true; pulse.Stop(); inventory.Dispose(); notifications.Dispose();
+                reopen.Dispose(); visibleRoot.TrySetCanceled();
                 DefaultsPanel.TryLeave(); ProfilesPanel.TryLeave(); SettingsPanel.TryLeave(); shortcut.Dispose(); tray.Dispose(); trayIcons.Dispose(); appIcon.Dispose(); menu.Dispose();
             };
             DefaultsPanel.Saved += delegate { automatic.SettingsSaved(); };
@@ -103,12 +107,21 @@ namespace EasyEject.Modern {
             ProfilesPanel.Changed += delegate(string message) { automatic.SettingsSaved(); Summary.Text = message; };
             ProfilesPanel.Completed += delegate(string message) { ShowStorage(); Summary.Text = message; UpdateActions(); };
             Root.Loaded += async delegate {
-                if (started) return; started = true;
-                try { notifications.Start(); } catch (Exception ex) { Summary.Text = "Connection monitoring unavailable. Device actions are blocked. " + ex.Message; }
-                pulse.Start(); await ReadInventory();
+                visibleRoot.TrySetResult(true); await StartRuntime();
             };
         }
-        internal void Reveal() { DispatcherQueue.TryEnqueue(delegate { if (!closed) { AppWindow.Show(); Activate(); } }); }
+        internal void Reveal() { reopen.Request(); }
+        internal Task StartRuntime() { return runtimeStart ?? (runtimeStart = StartRuntimeCore()); }
+        async Task StartRuntimeCore() {
+            if (closed || started) return; started = true;
+            try { notifications.Start(); } catch (Exception ex) { Summary.Text = "Connection monitoring unavailable. Device actions are blocked. " + ex.Message; }
+            pulse.Start(); await ReadInventory();
+        }
+        async Task EnsureVisible() {
+            if (closed) throw new OperationCanceledException("Easy Eject closed.");
+            AppWindow.Show(); Activate(); if (Root.XamlRoot == null) await visibleRoot.Task;
+            if (closed) throw new OperationCanceledException("Easy Eject closed.");
+        }
         async void OpenDefaults() {
             if (UiBusy || inventory.Scanning || DefaultsPanel.Visibility == Visibility.Visible || (!ProfilesPanel.TryLeave() || !SettingsPanel.TryLeave())) return;
             returnToProfile = false; ProfilesPanel.Visibility = SettingsPanel.Visibility = Visibility.Collapsed;

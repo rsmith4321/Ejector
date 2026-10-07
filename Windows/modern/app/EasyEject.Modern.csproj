@@ -10,6 +10,8 @@
     <PlatformTarget>x64</PlatformTarget>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>EasyEject.Modern</AssemblyName>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <StartupObject>EasyEject.Modern.Program</StartupObject>
     <ApplicationIcon>..\..\assets\EasyEject.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>

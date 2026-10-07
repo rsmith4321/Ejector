@@ -7,7 +7,10 @@
   <ScrollViewer x:Name="Scroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
    <StackPanel x:Name="Choices" Spacing="18">
     <TextBlock Text="General" FontSize="16" FontWeight="SemiBold"/>
-    <TextBlock Text="Launch at login is unavailable in this preview. Your Windows Startup apps remain available below." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <CheckBox x:Name="Login" Content="Launch at login for this Windows user" Checked="Login_Changed" Unchecked="Login_Changed"/>
+    <TextBlock x:Name="LoginStatus" TextWrapping="Wrap" IsTextSelectionEnabled="True" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <Button x:Name="UseThisCopy" Content="Use this copy at login" Click="UseThisCopy_Click" Visibility="Collapsed"/>
+    <TextBlock Text="Login starts Easy Eject in the tray. It does not enable automatic import. Saving starts no app or import. If you move this copy, explicitly update its registration." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
     <Button Content="Windows Startup apps…" Click="Startup_Click"/>
     <CheckBox x:Name="Notifications" Content="Show operation notifications" Tag="Notifications" Checked="Choice_Changed" Unchecked="Choice_Changed"/>
     <TextBlock Text="Windows notification and quiet-hour settings may hide alerts. Completed imports remain available in Easy Eject." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
