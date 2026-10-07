@@ -4,6 +4,14 @@ Overnight checkpoint: at **08:00 America/New_York**, paused `easy-eject-overnigh
 
 ## Full-port scope and latest software milestone
 
+### Desktop recovery and actual reopen acceptance · October 7, 08:48–08:52 EDT
+
+Ryan replied ready after waking/unlocking the laptop, and the access task granted a fresh quiet slot. The exact tested `9b38cc6` isolated build/hash launched normally as PID 18784 at 08:48:58.475. Actual Alt+F4 hid its window while the same process remained alive; an ordinary second launch restored the exact window ID 3605682/PID/start time, without the former duplicate notice or manual activation afterward. Opening it again with Settings modal open retained the same dialog/control identities and disabled owner, with only the original process present. This closes the ordinary second-launch/modal-reveal observation gap under the current Windows policy; [FOREGROUND_ACCEPTANCE.md](FOREGROUND_ACCEPTANCE.md) records scope and limits.
+
+Settings scroll reached Quick Share tools/automatic-release controls with fixed Save/Cancel; the final explanation remained partly clipped, so full-tail reachability is not passed. Coordinate Cancel closed the dialog, settings/login value remained absent, no preferences were saved or registrations installed. App remains visible with no modal/operation, control released at 08:52. No source/test/build change or repeat suite; retained **1214/0**, terminal **4501** exit zero. No media/device/security/power operation. Goal API still reported blocked at the start of this user-directed session; desktop-control blocker has now cleared, while the other acceptance requirements remain outstanding. No unsupported goal status change was attempted.
+
+Ryan reports the current Windows Forms interface looks ancient and asks about a modern Windows API. Recommended [WinUI 3](https://learn.microsoft.com/en-us/windows/apps/winui/winui3/) for modern Windows Fluent presentation; [Gyroflow uses Qt/QML](https://github.com/gyroflow/gyroflow#used-languages-and-technologies). No framework migration or final UI design has been implemented; a modern presentation review is still needed, alongside remaining lifecycle/keyboard/notifications, supplied real tools/official LUT, identified disposable hardware/filesystems and trusted direct distribution proof.
+
 ### Blocked acceptance checkpoint after the reopen milestone · October 7, 07:27 EDT
 
 The goal API confirmed **blocked** after the same acceptance blockers persisted across three consecutive goal turns, including the first control failure after the verified milestone and the two following readiness checks. This is not completion or a narrowed objective. Source `9b38cc69f1714d43bb473566bc4c106fffaf39de` and evidence commit `6a189a8` remain locally saved; retained full **1214/0**, terminal **4501** exit zero. No app/test process is live; the completed suite was not restarted merely to produce activity.
