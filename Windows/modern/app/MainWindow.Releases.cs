@@ -74,6 +74,7 @@ namespace EasyEject.Modern {
                     try {
                         var result = await operation; if (closed || releaseEnding || confirmation != dialog) return;
                         if (result == null) { status.Text = "Choice cancelled. No new action started."; return; }
+                        if (!result.TryPresent()) { status.Text = "Review ended after activity or ownership changed. Any already published restrictive history is retained; reread before another manual action."; return; }
                         status.Text = result.Message;
                         if (result.Action == WindowsReleaseReviewAction.Backup || result.Action == WindowsReleaseReviewAction.Restore) { backupText.Text = result.Description.Length == 0 ? result.Message : result.Description; releaseText.Text = "Check release metadata again before reviewing release files."; }
                         else { releaseText.Text = result.Description.Length == 0 ? result.Message : result.Description; backupText.Text = "No history backup is selected. Restore requires a fresh manual review."; }

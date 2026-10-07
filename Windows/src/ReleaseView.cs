@@ -51,7 +51,7 @@ namespace EasyEject {
     // revokes delivery immediately, but does not release their owned lifetime early.
     internal sealed class ReleaseView : IDisposable {
         readonly object sync = new object(); readonly IReleaseViewBackend backend; readonly InstallationFolders folders;
-        bool available; int phase; long epoch; ReleaseViewChoice choice;
+        bool available; int phase; long epoch, request; ReleaseViewChoice choice;
         internal ReleaseView(IReleaseViewBackend backend, InstallationFolders folders) { if (backend == null || folders == null) throw new ArgumentNullException("release view"); this.backend = backend; this.folders = folders; }
         internal bool Open { get { lock (sync) return phase != 4; } }
         internal bool Busy { get { lock (sync) return phase == 1 || phase == 3 || backend.Busy; } }
@@ -99,20 +99,33 @@ namespace EasyEject {
         }
         internal Task<ReleaseViewResult> Check() { return Start(WindowsReleaseReviewAction.Check, null, 0); }
         Task<ReleaseViewResult> Start(WindowsReleaseReviewAction action, string path, long confirmation) {
-            long captured;
-            lock (sync) { if (!Can(action)) throw new SafetyException("This release action is unavailable or another action still owns the view."); captured = epoch; phase = 3; Publish(); }
-            return Run(action, path, confirmation, captured);
+            long captured, capturedRequest;
+            lock (sync) { if (!Can(action)) throw new SafetyException("This release action is unavailable or another action still owns the view."); captured = epoch; capturedRequest = ++request; phase = 3; Publish(); }
+            return Run(action, path, confirmation, captured, capturedRequest);
         }
         bool Current(long captured) { lock (sync) return available && phase == 3 && epoch == captured; }
-        async Task<ReleaseViewResult> Run(WindowsReleaseReviewAction action, string path, long confirmation, long captured) {
+        bool Deliver(ReleaseViewResult result, long captured, long capturedRequest) {
+            lock (sync) {
+                if (!available || phase != 0 || backend.Busy || epoch != captured || request != capturedRequest) {
+                    // Release only this terminal request's pending evidence. An old
+                    // queued callback must never cancel a newer active request.
+                    if (phase == 0 && !backend.Busy && request == capturedRequest) backend.Cancel();
+                    return false;
+                }
+                bool shown = result == null || result.TryPresent(); if (!shown) backend.Cancel(); return shown;
+            }
+        }
+        async Task<ReleaseViewResult> Run(WindowsReleaseReviewAction action, string path, long confirmation, long captured, long capturedRequest) {
             try {
                 if (!Current(captured)) throw new OperationCanceledException(); var operation = backend.Run(action, path, confirmation);
                 if (operation == null) throw new SafetyException("The release backend returned no owned worker.");
                 var result = await operation.ConfigureAwait(false);
                 if (result == null) throw new SafetyException("The release backend returned no review result.");
-                if (!Current(captured) || !result.TryPresent()) { backend.Cancel(); return new ReleaseViewResult(action, false, "Review ended after its activity changed. Any already published restrictive history is retained; reread before another manual action.", "", null); }
-                return result;
-            } catch (Exception ex) { backend.Cancel(); return new ReleaseViewResult(action, false, "Release action did not finish. Review current saved history before another manual action. " + ex.Message, "", null); }
+                if (!Current(captured)) { backend.Cancel(); return new ReleaseViewResult(action, false, "Review ended after its activity changed. Any already published restrictive history is retained; reread before another manual action.", "", null); }
+                // A worker finishing is not permission to present a queued result.
+                // The UI consumes this gate after its await, in the current epoch.
+                return new ReleaseViewResult(result.Action, result.Accepted, result.Message, result.Description, () => Deliver(result, captured, capturedRequest));
+            } catch (Exception ex) { backend.Cancel(); return new ReleaseViewResult(action, false, "Release action did not finish. Review current saved history before another manual action. " + ex.Message, "", () => Deliver(null, captured, capturedRequest)); }
             finally { lock (sync) { phase = 0; Publish(); } }
         }
         internal void Cancel() { lock (sync) { if (phase == 4) return; epoch++; backend.Cancel(); } }

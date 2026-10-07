@@ -80,6 +80,7 @@ namespace EasyEject {
             Test("modern release selected file is consumed once with exact immutable action", delegate {
                 foreach (var action in new[] { WindowsReleaseReviewAction.Archive, WindowsReleaseReviewAction.Extracted, WindowsReleaseReviewAction.Backup }) using (var f = new ReleaseViewFixture()) {
                     var choice = f.View.BeginChoice(action); var result = f.View.FinishSelection(choice, f.App).GetAwaiter().GetResult();
+                    Check(f.Backend.Presentations == 0 && result.TryPresent(), "Worker presented before UI delivery");
                     Check(result.Accepted && f.Backend.Runs == 1 && f.Backend.Last == action && f.Backend.Path == f.App && f.Backend.Presentations == 1 && !result.TryPresent(), "Choice changed or replayed");
                     Throws<SafetyException>(() => f.View.FinishSelection(choice, f.Settings));
                 }
@@ -149,6 +150,33 @@ namespace EasyEject {
                     f.Backend.Fail = !missing; f.Backend.ReturnNull = missing; var result = f.View.Check().GetAwaiter().GetResult();
                     Check(!result.Accepted && result.Message.Contains("Review current saved history") && f.Backend.Runs == 1 && f.View.CanClose, "Failure retried or claimed rollback");
                     f.Backend.Fail = f.Backend.ReturnNull = false; Check(f.View.Check().GetAwaiter().GetResult().Accepted && f.Backend.Runs == 2, "Explicit retry unavailable");
+                }
+            });
+            Test("modern release queued result is revoked by activity after worker completion", delegate {
+                using (var f = new ReleaseViewFixture()) {
+                    var result = f.View.Check().GetAwaiter().GetResult(); Check(f.Backend.Presentations == 0, "Worker presented eagerly");
+                    f.View.SetAvailable(false); f.View.SetAvailable(true);
+                    Check(!result.TryPresent() && f.Backend.Presentations == 0 && f.Backend.Cancels == 1, "Queued result survived activity or retained pending evidence");
+                }
+            });
+            Test("modern release queued result cannot be presented after a newer request", delegate {
+                using (var f = new ReleaseViewFixture()) {
+                    var old = f.View.Check().GetAwaiter().GetResult(); var fresh = f.View.Check().GetAwaiter().GetResult();
+                    Check(!old.TryPresent() && fresh.TryPresent() && f.Backend.Presentations == 1 && !fresh.TryPresent(), "Queue replay or replaced request admitted");
+                }
+            });
+            Test("modern release close revokes a completed queued result without presenting it", delegate {
+                using (var f = new ReleaseViewFixture()) {
+                    var result = f.View.Check().GetAwaiter().GetResult(); f.View.Dispose();
+                    Check(!result.TryPresent() && f.Backend.Presentations == 0 && f.Backend.Closed, "Closed queued result admitted");
+                }
+            });
+            Test("modern release old queued delivery cannot cancel a newer active worker", delegate {
+                using (var f = new ReleaseViewFixture()) {
+                    var old = f.View.Check().GetAwaiter().GetResult(); f.Backend.Deferred = new TaskCompletionSource<ReleaseViewResult>(); var fresh = f.View.Check();
+                    Check(!old.TryPresent() && f.Backend.Cancels == 0 && f.View.Busy, "Old delivery cancelled new worker");
+                    f.Backend.Deferred.SetResult(f.Backend.Result(WindowsReleaseReviewAction.Check));
+                    Check(fresh.GetAwaiter().GetResult().TryPresent() && f.Backend.Presentations == 1, "Fresh worker presentation lost");
                 }
             });
             Test("modern release unconfigured backend leaves folders available with no remote action", delegate {
