@@ -1,5 +1,9 @@
 # Windows progress · October 7, 2026
 
+## Runtime-inclusive local review folder · October 7
+
+A new modern build-review command prepares a fresh outside-OneDrive x64 local folder, with .NET and Windows App SDK files, separate native dependencies, no launch/install/startup/signing/public release, and measured local hashes. Executable metadata now says Easy Eject / 0.1.0-dev instead of default project/1.0.0. Final isolated source 71d1743 plus only helper/metadata edits builds warning-free, terminal 45168 exit zero: **600 files, 268.9 MiB**, .NET **10.0.12**, Windows App SDK **2.5.1**, all payload hashes and icon matched. Bundled Release selected runner passes **158/0**; exact final review runtime copied into an owned duplicate runner also passes **158/0**, terminal 26817 exit zero. Counts overlap; no coreclr module sample/WinUI app launch/full-suite claim. Existing-output/source/OneDrive refusal preserves existing files. [modern/REVIEW_BUILD.md](modern/REVIEW_BUILD.md) binds source/log/artifact hashes and readme-only refinement. Native clean-computer/foreground/version switching, complete modern release/trusted distribution, official LUT/genuine media and identified disposable hardware/filesystems/travel remain open; goal active.
+
 ## Persisted issue recovery · October 7
 
 Source **`886f0fa`** adds exact folder/file snapshots, exclusive comparison/publication/readback, consumed manual saves and fresh persisted-state reconciliation after uncertain acknowledgement/clear. Later identical-payload live revisions retain attention. Save current explanation is explicit, preserves acknowledgement status and retries no media action; divergent explanations are both shown. Invalid/protected/aliased/external records are retained. Modern View issue rereads even an empty previous state; actual foreground/restart acceptance remains open.
