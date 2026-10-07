@@ -1,5 +1,7 @@
 # Full Windows port · parity and acceptance
 
+Windows branding/foreground checkpoint: **`4a865b6`** uses the existing Easy Eject icon throughout both Windows builds and fixes initial DPI sizing/action wrapping. Exact-commit selected software **124/0**, existing modern full-suite **1214/0**, final hidden native subset **84/0**, plus actual title/header and safe Cancel/draft/empty-state checks. This is not complete foreground or hardware parity; narrower resizing, tray interaction, physical-device workflows and remaining modern integration/distribution gates remain open. See [icon acceptance](modern/ICON_ACCEPTANCE.md). Ongoing startup work is preserved separately.
+
 Ryan's final October 6 scope: **port the full current Easy Eject project to Windows**, not an Insta360-only or travel MVP. Baseline: `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c` (website 1.7.8 preview), including Luna information and manual Quick Share. Vacation is roughly one month away, so the Insta360 workflow leads the work order without reducing feature scope. The exact camera model, reader and destination are still unknown; source/fixture tests do not establish compatibility. Distribution is direct download; Microsoft Store packaging/certification is out of scope. Preserve the Mac editions.
 
 ## Staged delivery
