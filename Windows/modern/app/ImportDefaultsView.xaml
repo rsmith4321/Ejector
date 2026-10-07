@@ -1,0 +1,23 @@
+<UserControl x:Class="EasyEject.Modern.ImportDefaultsView"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <Grid Padding="36,28,36,24" RowSpacing="20">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel Spacing="8"><TextBlock Text="Import defaults" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="Profiles using defaults follow these choices on their next import. Custom profiles keep their own choices. Saving never starts an import." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+  <ScrollViewer x:Name="Options" Grid.Row="1" IsEnabled="False" HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Import defaults options">
+   <StackPanel Spacing="18">
+    <StackPanel Spacing="6"><CheckBox x:Name="Videos" Content="Videos only" Tag="VideosOnly" Checked="Choice_Changed" Unchecked="Choice_Changed"/><TextBlock Text="Leave photos and unfamiliar files on the device. Required package audio and metadata stay with recordings." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+    <StackPanel Spacing="6"><CheckBox x:Name="Previews" Content="Include camera previews" Tag="IncludePreviews" Checked="Choice_Changed" Unchecked="Choice_Changed"/><TextBlock Text="Include optional LRV, LRF, THM and camera proxy files." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+    <StackPanel Spacing="6"><CheckBox x:Name="Clean" Content="Clean folder layout" Tag="CleanLayout" Checked="Choice_Changed" Unchecked="Choice_Changed"/><TextBlock Text="Save ordinary media directly in dated folders. Camera packages and unfamiliar media keep their folder tree; conflicting groups keep unchanged filenames." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+    <StackPanel Spacing="6"><CheckBox x:Name="Automatic" Content="Import automatically when connected" Tag="AutomaticImport" Checked="Choice_Changed" Unchecked="Choice_Changed"/><TextBlock Text="Uses these choices, including any acknowledged removal or recovery, on the next source connection and at app launch. Saving starts no work on devices already connected. Sharing and eject always require a manual choice." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+    <CheckBox x:Name="AskEject" Content="Ask to eject after import" Tag="AskToEject" Checked="Choice_Changed" Unchecked="Choice_Changed"/>
+    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+    <TextBlock Text="Originals on devices using defaults" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
+    <StackPanel Spacing="6"><CheckBox x:Name="Remove" Content="Permanently remove verified imported originals" Tag="remove" Checked="Removal_Changed" Unchecked="Removal_Changed"/><TextBlock x:Name="OriginalsNote" Text="Keep originals is on (recommended)." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+    <StackPanel Spacing="6"><CheckBox x:Name="Recover" Content="Recover and clear selected device Trash" Tag="recover" Checked="Removal_Changed" Unchecked="Removal_Changed"/><TextBlock Text="Copy and verify matching Trash files before permanently clearing them. Windows uses only the current user's Trash; Mac uses only an explicitly selected owner in each device profile. Other owners are never guessed." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+    <TextBlock Text="These shared choices apply to EVERY device using defaults, including future profiles. Switching from Videos only to All media turns original removal and Trash recovery off for a fresh review." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+   </StackPanel>
+  </ScrollViewer>
+  <StackPanel Grid.Row="2" Spacing="12"><TextBlock x:Name="Status" Text="Reading saved choices…" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/><StackPanel Orientation="Horizontal" Spacing="12"><Button x:Name="Save" Content="Save defaults" Style="{StaticResource AccentButtonStyle}" IsEnabled="False" Click="Save_Click"/><Button x:Name="Cancel" Content="Cancel" IsEnabled="False" Click="Cancel_Click"/></StackPanel></StackPanel>
+ </Grid>
+</UserControl>

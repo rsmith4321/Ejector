@@ -19,6 +19,7 @@ namespace EasyEject {
             if (args.Length > 0 && args[0] == "--reopen-signal-fixture") return ReopenSignalFixture(args);
             if (args.Length != 0) return 2;
             WindowReopenTests();
+            DefaultsEditTests();
             Console.WriteLine(passed + " passed, " + failed + " failed");
             return failed == 0 ? 0 : 1;
         }

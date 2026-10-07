@@ -3,11 +3,12 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:local="using:EasyEject.Modern" Title="Easy Eject">
  <Grid x:Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-  <NavigationView IsBackButtonVisible="Collapsed" PaneDisplayMode="Left" IsSettingsVisible="False" IsPaneToggleButtonVisible="False" OpenPaneLength="218" AlwaysShowHeader="False">
+  <NavigationView x:Name="Navigation" ItemInvoked="Navigation_ItemInvoked" IsBackButtonVisible="Collapsed" PaneDisplayMode="Left" IsSettingsVisible="False" IsPaneToggleButtonVisible="False" OpenPaneLength="218" AlwaysShowHeader="False">
    <NavigationView.PaneHeader><StackPanel Margin="20,24,0,24" Spacing="6"><TextBlock Text="Easy Eject" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Storage, safely handled" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel></NavigationView.PaneHeader>
-   <NavigationView.MenuItems><NavigationViewItem Content="Connected storage" IsSelected="True"><NavigationViewItem.Icon><FontIcon Glyph="&#xE7F1;"/></NavigationViewItem.Icon></NavigationViewItem></NavigationView.MenuItems>
+   <NavigationView.MenuItems><NavigationViewItem x:Name="StorageNavigation" Content="Connected storage" Tag="storage" IsSelected="True"><NavigationViewItem.Icon><FontIcon Glyph="&#xE7F1;"/></NavigationViewItem.Icon></NavigationViewItem><NavigationViewItem x:Name="DefaultsNavigation" Content="Import defaults" Tag="defaults"><NavigationViewItem.Icon><FontIcon Glyph="&#xE713;"/></NavigationViewItem.Icon></NavigationViewItem></NavigationView.MenuItems>
    <NavigationView.PaneFooter><StackPanel Margin="20,12,16,24" Spacing="8"><TextBlock Text="Interface preview" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/><TextBlock Text="No imports or device changes" TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel></NavigationView.PaneFooter>
-   <Grid Padding="36,28,36,24" RowSpacing="24">
+   <Grid>
+   <Grid x:Name="StorageView" Padding="36,28,36,24" RowSpacing="24">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Grid ColumnSpacing="24"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
      <StackPanel Spacing="8"><TextBlock Text="Connected storage" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="Summary" Text="Checking your connected drives…" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
@@ -23,6 +24,8 @@
      </Border>
     </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
     <Border Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="16"><Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><FontIcon Glyph="&#xE946;" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="Close this window to keep Easy Eject in the tray beside the clock." TextWrapping="Wrap" VerticalAlignment="Center"/></Grid></Border>
+   </Grid>
+   <local:ImportDefaultsView x:Name="DefaultsPanel" Visibility="Collapsed"/>
    </Grid>
   </NavigationView>
  </Grid>

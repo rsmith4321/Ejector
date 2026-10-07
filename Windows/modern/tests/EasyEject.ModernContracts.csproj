@@ -9,8 +9,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\RuntimePlatform.cs" />
-    <Compile Include="..\..\src\WindowReopen.cs" />
     <Compile Include="..\..\tests\WindowReopenTests.cs" />
+    <Compile Include="DefaultsEditTests.cs" />
     <Compile Include="ReopenRunner.cs" />
+    <ProjectReference Include="..\EasyEject.Runtime.csproj" />
   </ItemGroup>
 </Project>
