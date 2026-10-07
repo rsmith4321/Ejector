@@ -2,6 +2,14 @@
 
 This records actual foreground observations separately from hidden renders and fixture tests. The full scope remains [PARITY.md](PARITY.md), against Mac baseline `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c`. The Windows port is not complete.
 
+## Modern import/completion acceptance pending · October 7
+
+Source `6202749fd6fe74a7eb6998b4c2dafc90e6b90902`; ModernImportsBuild passes both warnings-as-errors builds and **72/0** selected .NET 10 runtime contracts, terminal **98706** exit **0**, `modern-imports-verified.log`. Eighteen new fixtures use owned generated files/fake devices, including explicitly acknowledged removal of a verified disposable original, excluded-media retention, cancellation/reuse/history/completion/scheduler cases. Classic final shared-source compilation is warning-free; retained full classic 1214/0 is separate. This does not prove foreground behavior or physical hardware.
+
+No native launch/input was attempted this import milestone. Previous profile launch denial below remains historical; latest profile/import/progress/Stop/completion/folder-picker/busy/modal/notification/tray/DPI behavior remains unrun. ModernImportsBuild payload SHA-256: `EasyEject.Modern.dll` `A5F1BBD3DB5E8C8AAB79CF4183B97DBC6B2C52EC7FAE9CF886B1D95E2FD48F88`; adjacent `EasyEject.Runtime.dll` `6B5B657C282BEB0D016AC4ACF115F88E5D6C840E7FEB03C49CFAE3EC386E2C8D`. Outputs are under `%USERPROFILE%\.codex\EasyEjectBuildTools\ModernImportsBuild`, outside OneDrive.
+
+No actual profile Save/Forget/import/eject/cleanup, user-media deletion, tool/LUT installation, system settings/startup installation or publishing. Full source/runtime/UI/tool/hardware/direct-distribution gates remain open. Goal active, expired heartbeat paused.
+
 ## Modern profile preview launch blocked · October 7
 
 Source `602f67c6224f342c8f7e2fc84acc4564d3ec2837`; `ModernProfilesBuild` passes both warnings-as-errors builds and **54/0** selected .NET 10 contracts, terminal **81337** exit **0**, log `modern-profiles-verified.log`. Twelve new profile fixtures use exact production guarded persistence, fake discovery/disks and owned generated data. Classic app/test compilation passes warnings as errors; retained full classic 1214/0 was not rerun or counted as modern full regression.
