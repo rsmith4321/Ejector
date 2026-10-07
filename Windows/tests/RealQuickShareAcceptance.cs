@@ -39,6 +39,8 @@ namespace EasyEject {
                     Test("real tools: changed saved original and destination refuse before tools run", () => RealShareRefusals(tools));
                     Test("real tools: silent 720x1280 portrait 60 fps keeps framing and earlier HD copy", () => RealShareSilentPortrait(tools));
                     Test("real tools: corrupt receipt retains real encoded copy and fresh retry is reusable", () => RealShareCorruptReceipt(tools));
+                    Test("real tools: rotated landscape applies both display-matrix directions once", () => RealShareRotation(tools));
+                    Test("real tools: generated PQ and HLG tags refuse before encoding or publication", () => RealShareHdrRefusal(tools));
                     if (tools.Lut != null) {
                         Test("real tools: official LUT transform produces validated 1080p output", () => RealShareCase(tools, 1920, 1080, 30, true, QuickSharePreset.Hd, QuickShareColor.LunaILog, 1920, 1080, 30));
                         Test("real tools: official LUT transform produces validated 4K output", () => RealShareCase(tools, 3840, 2160, 30, true, QuickSharePreset.Uhd, QuickShareColor.LunaILog, 3840, 2160, 30));
@@ -69,13 +71,19 @@ namespace EasyEject {
             }
         }
 
-        static CompletedBatch GenerateRealShareBatch(Fixture f, QuickShareTools tools, int width, int height, int rate, bool audio) {
+        static CompletedBatch GenerateRealShareBatch(Fixture f, QuickShareTools tools, int width, int height, int rate, bool audio, int? rotation = null, string transfer = "bt709") {
             string path = Path.Combine(f.Source, "VID_generated.mp4");
+            string generated = rotation.HasValue ? Path.Combine(f.Root, "generated-unrotated.mp4") : path;
+            Check(transfer == "bt709" || transfer == "smpte2084" || transfer == "arib-std-b67", "Unsupported generated transfer tag");
             var args = new List<string> { "-nostdin", "-hide_banner", "-v", "error", "-xerror", "-f", "lavfi", "-i", "testsrc2=size=" + width.ToString(CultureInfo.InvariantCulture) + "x" + height.ToString(CultureInfo.InvariantCulture) + ":rate=" + rate.ToString(CultureInfo.InvariantCulture) };
             if (audio) args.AddRange(new[] { "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000", "-map", "0:v:0", "-map", "1:a:0", "-c:a", "aac", "-ac", "1" });
             else args.AddRange(new[] { "-map", "0:v:0", "-an" });
-            args.AddRange(new[] { "-t", "1", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-threads", "2", "-pix_fmt", "yuv420p", "-color_range", "tv", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-movflags", "+faststart", "-n", path });
+            // Tag the frames too: output codec options alone do not retain these
+            // declared transfer/primaries on the selected FFmpeg 9 test generator.
+            if (transfer != "bt709") args.AddRange(new[] { "-vf", "setparams=range=limited:color_primaries=bt2020:color_trc=" + transfer + ":colorspace=bt2020nc" });
+            args.AddRange(new[] { "-t", "1", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-threads", "2", "-pix_fmt", "yuv420p", "-color_range", "tv", "-colorspace", transfer == "bt709" ? "bt709" : "bt2020nc", "-color_primaries", transfer == "bt709" ? "bt709" : "bt2020", "-color_trc", transfer, "-movflags", "+faststart", "-n", generated });
             new WindowsQuickShareProcess().Run(tools.Ffmpeg, args.ToArray(), f.Root, 180, CancellationToken.None, () => {});
+            if (rotation.HasValue) new WindowsQuickShareProcess().Run(tools.Ffmpeg, new[] { "-nostdin", "-hide_banner", "-v", "error", "-xerror", "-display_rotation:v:0", rotation.Value.ToString(CultureInfo.InvariantCulture), "-i", generated, "-map", "0:v:0", "-map", "0:a:0?", "-c", "copy", "-n", path }, f.Root, 30, CancellationToken.None, () => {});
             // A valid ignorable MP4 box models only the existing tail-selection rule.
             // It does not certify real Luna media or I-Log exposure/color accuracy.
             byte[] identity = Encoding.UTF8.GetBytes("Generated acceptance fixture: Insta360 Luna Ultra");
@@ -191,6 +199,50 @@ namespace EasyEject {
                 Check(retry.Created == 1 && retry.Reused == 0 && retry.Outputs.Single() != first && process.Encodes == 2 && process.Decodes == 2 && IndependentFileHash(first) == outputHash && IndependentFileHash(receipt) == damagedHash, "Corrupt receipt reused or replaced the earlier encoded copy/receipt");
                 var reused = RunRealShare(RealShares(root, process, operations), ImportHistory.Load(root).Single());
                 Check(reused.Reused == 1 && reused.Created == 0 && reused.Outputs.Single() == retry.Outputs.Single() && process.Encodes == 2 && IndependentFileHash(first) == outputHash && IndependentFileHash(receipt) == damagedHash, "Fresh retry did not retain the damaged entry and reuse the exact valid new copy");
+                VerifyShareOriginals(batch); CheckSharePrivateGone(batch); using (operations.Reserve(new[] { 700, 701 })) {}
+            }
+        }
+        static byte[] RotationFrame(QuickShareTools tools, string path, string directory, string transform = null) {
+            // Independent display reference: explicitly ignore the matrix, transpose
+            // in the requested direction, then compare a bounded RGB first frame.
+            string filter = (transform == null ? "" : transform + ",") + "scale=32:32:flags=area,format=rgb24";
+            return new WindowsQuickShareProcess().Run(tools.Ffmpeg, new[] { "-nostdin", "-hide_banner", "-v", "error", "-xerror", "-noautorotate", "-i", path, "-map", "0:v:0", "-an", "-vf", filter, "-frames:v", "1", "-f", "rawvideo", "-" }, directory, 30, CancellationToken.None, () => {});
+        }
+        static double FrameDifference(byte[] expected, byte[] actual) {
+            Check(expected.Length == 32 * 32 * 3 && actual.Length == expected.Length, "Rotation comparison frame is incomplete");
+            return expected.Zip(actual, (a, b) => Math.Abs((int)a - b)).Average();
+        }
+        static void RealShareRotation(QuickShareTools tools) {
+            foreach (int rotation in new[] { 90, -90 }) using (var f = new Fixture()) {
+                var batch = GenerateRealShareBatch(f, tools, 1280, 720, 30, true, rotation); string root = RealShareSetup(f, batch, tools);
+                string original = batch.Originals.Single().Path;
+                var input = QuickShareProbe.Parse(new WindowsQuickShareProcess().Run(tools.Ffprobe, QuickSharePlan.ProbeArguments(original), f.Root, 30, CancellationToken.None, () => {}));
+                Check(input.Video.Width == 1280 && input.Video.Height == 720 && input.Video.SideData != null && input.Video.SideData.Any(s => s.Rotation == rotation), "Generated display matrix or encoded geometry differs");
+                var operations = new Operations(); var process = new ObservedRealShareProcess(); var service = RealShares(root, process, operations);
+                var result = RunRealShare(service, batch); string output = result.Outputs.Single();
+                var probe = QuickShareProbe.Parse(new WindowsQuickShareProcess().Run(tools.Ffprobe, QuickSharePlan.ProbeArguments(output), f.Root, 30, CancellationToken.None, () => {}));
+                Check(probe.Video.Width == 720 && probe.Video.Height == 1280 && probe.Video.FrameRate == "30/1" && probe.Audio != null && probe.Audio.Channels == 2 && (probe.Video.SideData == null || probe.Video.SideData.All(s => s.Rotation.GetValueOrDefault() % 360 == 0)), "Output did not apply rotation once, clear its matrix and retain stereo audio");
+                byte[] actual = RotationFrame(tools, output, f.Root);
+                double correct = FrameDifference(RotationFrame(tools, original, f.Root, rotation > 0 ? "transpose=cclock" : "transpose=clock"), actual);
+                double wrong = FrameDifference(RotationFrame(tools, original, f.Root, rotation > 0 ? "transpose=clock" : "transpose=cclock"), actual);
+                Console.WriteLine("ROTATION " + rotation.ToString(CultureInfo.InvariantCulture) + " | RGB mean error correct=" + correct.ToString("F3", CultureInfo.InvariantCulture) + " opposite=" + wrong.ToString("F3", CultureInfo.InvariantCulture));
+                Check(correct < 4 && wrong > correct + 10, "Decoded image differs from the independent requested rotation or cannot distinguish the opposite direction");
+                Check(result.Created == 1 && result.PublishedReceipts == 1 && process.Encodes == 1 && process.Decodes == 1, "Rotated output bypassed validated publication");
+                var reuse = RunRealShare(RealShares(root, process, operations), ImportHistory.Load(root).Single());
+                Check(reuse.Reused == 1 && reuse.Outputs.Single() == output && process.Encodes == 1, "Rotated copy did not have exact fresh-service reuse");
+                VerifyShareOriginals(batch); CheckSharePrivateGone(batch); using (operations.Reserve(new[] { 700, 701 })) {}
+            }
+        }
+        static void RealShareHdrRefusal(QuickShareTools tools) {
+            foreach (string transfer in new[] { "smpte2084", "arib-std-b67" }) using (var f = new Fixture()) {
+                // Tagged test patterns prove admission refusal, not HDR exposure,
+                // bit depth, tone mapping, or a genuine camera/Dolby Vision stream.
+                var batch = GenerateRealShareBatch(f, tools, 640, 360, 30, false, transfer: transfer); string root = RealShareSetup(f, batch, tools);
+                var input = QuickShareProbe.Parse(new WindowsQuickShareProcess().Run(tools.Ffprobe, QuickSharePlan.ProbeArguments(batch.Originals.Single().Path), f.Root, 30, CancellationToken.None, () => {}));
+                Check(input.Video.Transfer == transfer && input.Video.Primaries == "bt2020", "Generated HDR refusal fixture lost its declared tags");
+                var operations = new Operations(); var process = new ObservedRealShareProcess();
+                var failure = Throws<QuickShareFailure>(() => RunRealShare(RealShares(root, process, operations), batch));
+                Check(failure.Message.Contains("HDR") && !failure.Cancelled && process.Probes == 1 && process.Encodes == 0 && process.Decodes == 0 && failure.Partial.PublishedCopies == 0 && failure.Partial.PublishedReceipts == 0, "Actual HDR probe tags reached an encoder or publication");
                 VerifyShareOriginals(batch); CheckSharePrivateGone(batch); using (operations.Reserve(new[] { 700, 701 })) {}
             }
         }
