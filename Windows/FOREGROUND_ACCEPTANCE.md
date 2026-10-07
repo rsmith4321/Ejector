@@ -2,6 +2,19 @@
 
 This records actual foreground observations separately from hidden renders and fixture tests. The full scope remains [PARITY.md](PARITY.md), against Mac baseline `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c`. The Windows port is not complete.
 
+## Modern profile preview launch blocked · October 7
+
+Source `602f67c6224f342c8f7e2fc84acc4564d3ec2837`; `ModernProfilesBuild` passes both warnings-as-errors builds and **54/0** selected .NET 10 contracts, terminal **81337** exit **0**, log `modern-profiles-verified.log`. Twelve new profile fixtures use exact production guarded persistence, fake discovery/disks and owned generated data. Classic app/test compilation passes warnings as errors; retained full classic 1214/0 was not rerun or counted as modern full regression.
+
+The access task granted a short non-mutating navigation slot and received explicit release afterward. Fresh prior-preview state was idle with internal-only inventory/no dialog. Only exact PID 4008/path/start/managed hash was stopped to replace that build; this is engineering cleanup, not Quit proof. `sky.launch_app` for the new exact build failed with `GetCursorPos failed: Access is denied. (0x80070005)`. Fresh enumeration/process inspection confirmed no modern window/process. A single supported retry after that inspection failed identically; post-retry process check remained absent. No stale-target input, alternate desktop automation/security/settings change or other-app input occurred. **New catalog/editor/picker/save/Forget/shared-default-return rendering and behavior remain unrun.** Both known live configuration JSON inventories are empty/unchanged in `modern-profiles-before.json` / `modern-profiles-after.json`. Older classic preview remains untouched.
+
+| Built payload (not launched) | SHA-256 |
+|---|---|
+| `ModernProfilesBuild/.../EasyEject.Modern.dll` | `f68c69f1752e942334f96e2ed4dd8801e9753ddcc4d46217ec1a7ef6b4aed901` |
+| Runtime DLL beside it | `b978bde8d7d77802f3a910a307e3aeb08d7c578195ece78634ac904bf6d40393` |
+
+No real media/device action, profile/preference save/forget, folder selection, startup installation or publishing. Safe modern controller/dialog source work remains available. Goal active; bounded heartbeat paused. Full foreground/tray/picker/busy/keyboard/theme/DPI, supplied tools/official LUT, explicitly identified disposable hardware/filesystems/travel and trusted direct-distribution acceptance remain required.
+
 ## Modern live storage selection and lifecycle · October 7, 09:55–09:56 EDT
 
 Source `c9d838e22b863e2db93831489e934e0d45c212a3`, isolated `ModernStorageBuild`, own **PID 4008**, start **09:55:53.8874251 EDT**, HWND **5964670**. The access task reserved this input slot and received explicit release afterward. The previous idle defaults-preview PID 9856 was stopped only after fresh idle accessibility observation and exact path/start/payload hash checks. This is engineering replacement, not tray Quit acceptance. Other apps/classic preview remained untouched.
