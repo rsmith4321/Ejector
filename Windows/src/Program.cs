@@ -775,9 +775,9 @@ namespace EasyEject {
                 }
                 if (result != DialogResult.OK) return null;
                 ImportProfile draft = dialog.Draft;
-                string source = SafePaths.Normalize(Path.Combine(root, draft.RelativeSource));
-                await Task.Run(() => { using (SafePaths.LockDirectories(source, draft.Destination)) { var guard = new VolumeImportGuard(discovery, source, draft.Destination, volume, disk, epoch); if (!dialog.DestinationWasChosen) ProfileDestination.Require(draft, guard.DestinationIdentity, false); guard.Validate(); draft.SavedDestination = guard.DestinationIdentity; } });
-                Profiles.SaveConnected(reviewed, draft); automatic.SettingsSaved(); status.Text = "Import profile saved. No import started. Choose Verified import or reconnect for enabled automatic import.";
+                bool destinationChosen = dialog.DestinationWasChosen;
+                draft = await Task.Run(() => Profiles.SaveConnectedSelection(reviewed, draft, volume, disk, epoch, root, discovery, destinationChosen));
+                automatic.SettingsSaved(); status.Text = "Import profile saved. No import started. Choose Verified import or reconnect for enabled automatic import.";
                 return draft;
             }
         }
