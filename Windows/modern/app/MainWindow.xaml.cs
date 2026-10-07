@@ -163,7 +163,7 @@ namespace EasyEject.Modern {
             CancelOperation.Content = quickShareSetupSaving ? "Stop setup" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Share ? "Stop export" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Verify ? "Stop verification" : groupedReview != null ? "Stop removal" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Resume ? "Stop resume" : importOperationActive ? "Stop import" : "Stop cleanup";
             CancelOperation.IsEnabled = operationCancel != null && !operationCancel.IsCancellationRequested;
             bool canReview = !StorageBusy && !inventory.Scanning;
-            IssueButton.IsEnabled = issueMenu.Enabled = canReview && appIssue.HasIssue;
+            IssueButton.IsEnabled = issueMenu.Enabled = canReview && (issueLoaded || appIssue.HasIssue);
             DebugButton.Visibility = settings != null && settings.DebugEnabled ? Visibility.Visible : Visibility.Collapsed;
             debugMenu.Visible = DebugButton.Visibility == Visibility.Visible; DebugButton.IsEnabled = debugMenu.Enabled = canReview;
             HelpButton.IsEnabled = AboutButton.IsEnabled = helpMenu.Enabled = aboutMenu.Enabled = canReview;
@@ -184,12 +184,12 @@ namespace EasyEject.Modern {
             if (settings == null || !issueLoaded) {
                 try {
                     var loaded = await Task.Run(() => {
-                        var value = AppSettings.Load(); AppIssue issue; string error = null;
-                        try { issue = AppIssue.Load(); } catch (Exception ex) { issue = new AppIssue(); issue.Record("Saved issue state could not be read and was retained. " + ex.Message); error = ex.Message; }
-                        return Tuple.Create(value, issue, error);
+                        var value = AppSettings.Load(); IssuePersistenceState issue;
+                        try { issue = IssuePersistenceState.Load(Profiles.Root); } catch (Exception ex) { issue = IssuePersistenceState.Unavailable(ex.Message); }
+                        return Tuple.Create(value, issue);
                     });
                     if (closed) return;
-                    settings = loaded.Item1; appIssue = loaded.Item2; issueLoaded = true; issuePersistenceAvailable = loaded.Item3 == null; ConfigureShortcut();
+                    settings = loaded.Item1; issueState = loaded.Item2; issueLoaded = true; ConfigureShortcut();
                 }
                 catch (Exception ex) { if (!closed) { Summary.Text = "Saved app settings could not be read. Device actions are blocked. " + ex.Message; RecordModernIssue(Summary.Text); } }
             }

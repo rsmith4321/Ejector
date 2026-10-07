@@ -8,14 +8,18 @@ namespace EasyEject {
         internal static AppIssue Copy(AppIssue issue) { return new AppIssue { Message = issue.Message, ObservedUtc = issue.ObservedUtc, Dismissed = issue.Dismissed }; }
         internal string Description { get { return expected.Message + "\n\nObserved: " + expected.ObservedUtc + "\n\n" + (expected.Dismissed ? "This issue was acknowledged. " : "") + "Dismiss acknowledges only this issue. It never retries an import, export or eject. Later failures restore attention."; } }
         internal bool CanDismiss { get { return Volatile.Read(ref phase) == 0 && expected.HasIssue && !expected.Dismissed && Current; } }
+        internal bool CanSaveCurrent { get { return Volatile.Read(ref phase) == 0 && expected.HasIssue && Current; } }
         bool Current { get { return live.Revision == revision && live.Message == expected.Message && live.ObservedUtc == expected.ObservedUtc && live.Dismissed == expected.Dismissed; } }
-        internal void Dismiss() {
+        internal void ValidateCurrent() { if (Volatile.Read(ref phase) == 2 || !Current) throw new SafetyException("The issue changed. Open a fresh review; the current issue was not acknowledged."); }
+        internal void Dismiss() { Publish(true); }
+        internal void SaveCurrent() { Publish(false); }
+        void Publish(bool dismiss) {
             if (Interlocked.CompareExchange(ref phase, 1, 0) != 0) throw new SafetyException("This issue review already closed. Open a fresh review.");
             try {
-                if (!expected.HasIssue || expected.Dismissed || !Current) throw new SafetyException("The issue changed. Open a fresh review; the current issue was not acknowledged.");
-                var choice = Copy(expected); choice.Dismiss(); save(choice);
+                if (!expected.HasIssue || dismiss && expected.Dismissed || !Current) throw new SafetyException("The issue changed. Open a fresh review; the current issue was not acknowledged.");
+                var choice = Copy(expected); if (dismiss) choice.Dismiss(); save(choice);
                 if (!Current) throw new SafetyException("Acknowledgement was saved, but a newer issue appeared. Its attention was retained; open a fresh review.");
-                live.Dismiss();
+                if (dismiss) live.Dismiss();
             } finally { Interlocked.Exchange(ref phase, 2); }
         }
         internal void Cancel() { if (Interlocked.CompareExchange(ref phase, 2, 0) == 1) throw new InvalidOperationException("The issue save still owns this review."); }

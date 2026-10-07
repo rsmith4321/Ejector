@@ -7,7 +7,8 @@ using Forms = System.Windows.Forms;
 
 namespace EasyEject.Modern {
     public sealed partial class MainWindow {
-        AppIssue appIssue = new AppIssue(); bool issueLoaded, issuePersistenceAvailable;
+        IssuePersistenceState issueState = new IssuePersistenceState(); bool issueLoaded;
+        AppIssue appIssue { get { return issueState.Live; } }
         long? discoveryIssueEpoch; string discoveryIssueText;
         readonly Forms.ToolStripMenuItem issueMenu = new Forms.ToolStripMenuItem("View issue…");
         readonly Forms.ToolStripMenuItem debugMenu = new Forms.ToolStripMenuItem("View debug log…");
@@ -15,20 +16,15 @@ namespace EasyEject.Modern {
         readonly Forms.ToolStripMenuItem aboutMenu = new Forms.ToolStripMenuItem("About Easy Eject…");
         string RecordModernIssue(string message) {
             if (closed) return null;
-            appIssue.Record(message); string warning = null;
-            try { SaveModernIssue(IssueReview.Copy(appIssue)); }
+            string warning = null;
+            try { issueState.Record(message, () => Profiles.Root); }
             catch (Exception ex) { warning = "Issue remains available here, but could not be saved. " + ex.Message; }
             if (warning != null) Summary.Text += "\n" + warning;
             UpdateImportTray(); return warning;
         }
-        void SaveModernIssue(AppIssue value) {
-            if (!issuePersistenceAvailable) throw new SafetyException("Saved issue state is unavailable; its existing record was retained.");
-            AppIssue.Save(value);
-        }
         void ClearModernIssue() {
             if (closed || !appIssue.HasIssue) return;
-            var cleared = IssueReview.Copy(appIssue); cleared.Clear();
-            try { SaveModernIssue(cleared); appIssue.Clear(); }
+            try { issueState.Clear(Profiles.Root); }
             catch (Exception ex) { Summary.Text += "\nEarlier issue remains available; clearing its saved status failed. " + ex.Message; }
             UpdateImportTray();
         }
@@ -41,14 +37,33 @@ namespace EasyEject.Modern {
         void Help_Click(object sender, RoutedEventArgs args) { ViewModernInformation(false); }
         void About_Click(object sender, RoutedEventArgs args) { ViewModernInformation(true); }
         async void ViewModernIssue() {
-            if (!appIssue.HasIssue || !BeginSavedReview()) return;
-            IssueReview owner = null;
+            if (!BeginSavedReview()) return;
+            IssueReview owner = null; IssueRecordReview record = null; Task pendingWork = null;
             try {
-                await EnsureVisible(); owner = new IssueReview(appIssue, SaveModernIssue);
-                confirmation = MessageDialog(appIssue.NeedsAttention ? "Needs attention" : "Last issue (acknowledged)", owner.Description, owner.CanDismiss ? "Dismiss issue" : null);
-                if (await confirmation.ShowAsync() == ContentDialogResult.Primary) { owner.Dismiss(); Summary.Text = "Issue acknowledged. No import, export or removal was retried."; }
-            } catch (Exception ex) { Summary.Text = "Issue acknowledgement did not finish. " + ex.Message; }
-            finally { if (owner != null) owner.Cancel(); FinishSavedReview(); }
+                await EnsureVisible();
+                var read = Task.Run(() => new IssueRecordReview(Profiles.Root)); pendingWork = read; record = await read;
+                if (closed) return;
+                string recovery = issueState.Refresh(record); bool saveCurrent = issueState.RequiresSave;
+                owner = new IssueReview(appIssue, value => issueState.SaveReviewed(record, value, owner.ValidateCurrent));
+                string description = appIssue.HasIssue ? owner.Description : "No saved issue needs attention.";
+                if (recovery.Length != 0) description += "\n\n" + recovery;
+                confirmation = MessageDialog(appIssue.NeedsAttention ? "Needs attention" : appIssue.HasIssue ? "Last issue (acknowledged)" : "Saved issue status", description,
+                    saveCurrent && owner.CanSaveCurrent ? "Save current explanation" : owner.CanDismiss ? "Dismiss issue" : null);
+                if (await confirmation.ShowAsync() == ContentDialogResult.Primary) {
+                    pendingWork = Task.Run(() => { if (closed) throw new SafetyException("The issue view closed before saving."); if (saveCurrent) owner.SaveCurrent(); else owner.Dismiss(); });
+                    await pendingWork;
+                    if (!closed) Summary.Text = saveCurrent ? "Current explanation saved. Its acknowledgement status is unchanged; no operation was retried." : "Issue acknowledged. No import, export or removal was retried.";
+                }
+            } catch (Exception ex) {
+                if (!closed) {
+                    Summary.Text = "Issue review did not finish. Existing explanations were retained. " + ex.Message;
+                    // An unreadable record never grants a save action, but its live explanation remains viewable.
+                    if (record == null && appIssue.HasIssue) try { confirmation = MessageDialog("Issue state unavailable", appIssue.Message + "\n\n" + Summary.Text, null); await confirmation.ShowAsync(); } catch { }
+                }
+            } finally {
+                if (pendingWork != null) try { await pendingWork; } catch { }
+                if (owner != null) owner.Cancel(); if (record != null) record.Dispose(); FinishSavedReview();
+            }
         }
         async void ViewModernInformation(bool about) {
             if (!BeginSavedReview()) return;

@@ -64,10 +64,13 @@ namespace EasyEject {
         internal static AppIssue Load() { return Load(Profiles.Root); }
         internal static AppIssue Load(string root, Action<string> checkpoint = null) {
             var value = Configuration.Read<AppIssue>(root, "issue-state.json", checkpoint) ?? new AppIssue();
-            DateTime date;
-            if (value.Message == null || value.Message.Length > 4096 || (value.HasIssue && !DateTime.TryParse(value.ObservedUtc, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out date))) throw new SafetyException("Saved issue state is invalid.");
-            return value;
+            value.Validate(); return value;
         }
+        internal void Validate() {
+            DateTime date;
+            if (Message == null || Message.Length > 4096 || (HasIssue && !DateTime.TryParse(ObservedUtc, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out date))) throw new SafetyException("Saved issue state is invalid.");
+        }
+        internal void Adopt(AppIssue value) { Message = value.Message; ObservedUtc = value.ObservedUtc; Dismissed = value.Dismissed; System.Threading.Interlocked.Increment(ref revision); }
         internal static void Save(AppIssue issue) { Save(issue, Profiles.Root); }
         internal static void Save(AppIssue issue, string root) { Profiles.WriteJson(issue, typeof(AppIssue), root, "issue-state.json"); }
     }

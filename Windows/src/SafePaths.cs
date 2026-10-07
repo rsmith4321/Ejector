@@ -58,6 +58,11 @@ namespace EasyEject {
                     }
                 }
             }
+            internal Native.FileInfo Identity(string path) {
+                Validate(); path = Normalize(path);
+                foreach (var entry in entries) if (entry.Path.Equals(path, StringComparison.OrdinalIgnoreCase)) return entry.Identity;
+                throw new SafetyException("The directory is not owned by this review.");
+            }
             static void Check(SafeFileHandle handle, Entry entry) {
                 var info = Native.Info(handle);
                 if ((info.Attributes & 0x10) == 0 || info.VolumeSerial != entry.Identity.VolumeSerial || info.IndexHigh != entry.Identity.IndexHigh || info.IndexLow != entry.Identity.IndexLow || !Native.FinalPath(handle).TrimEnd('\\').Equals(entry.Path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
