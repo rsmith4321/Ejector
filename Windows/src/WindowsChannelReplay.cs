@@ -56,12 +56,12 @@ namespace EasyEject {
         [DataMember(Name = "protectedFloor")] internal readonly string ProtectedFloor;
         internal WindowsChannelReplayRecord(byte[] bytes) { ProtectedFloor = Convert.ToBase64String(bytes); }
     }
-    internal sealed class WindowsChannelReplayStore : IWindowsChannelReplayStore {
+    internal sealed partial class WindowsChannelReplayStore : IWindowsChannelReplayStore {
         internal const string FileName = "windows-channel-replay.json";
         internal const int MaximumPlaintext = 1024, MaximumProtected = 16384, MaximumRecord = 32768;
         readonly string root; readonly IWindowsReplayProtection protection; readonly Action<string, string> checkpoint;
         readonly object sync = new object(); WindowsChannelReplayFloor seen; bool observed;
-        sealed class Snapshot { internal WindowsChannelReplayFloor Floor; internal string Hash; internal Native.FileInfo Stamp; internal bool Exists; }
+        internal sealed class Snapshot { internal WindowsChannelReplayFloor Floor; internal string Hash; internal Native.FileInfo Stamp; internal bool Exists; internal byte[] Encrypted; }
         internal WindowsChannelReplayStore(string root) : this(root, new WindowsReplayProtection(), null) { }
         internal WindowsChannelReplayStore(string root, IWindowsReplayProtection protection, Action<string, string> checkpoint = null) {
             this.root = SafePaths.Normalize(root); if (protection == null) throw new ArgumentNullException("protection"); this.protection = protection; this.checkpoint = checkpoint ?? ((stage, path) => {});
@@ -84,16 +84,17 @@ namespace EasyEject {
         }
         Snapshot Read(string path, string policy, CancellationToken cancel) {
             try { if ((File.GetAttributes(path) & (FileAttributes.ReadOnly | FileAttributes.System | FileAttributes.Directory | FileAttributes.Offline | FileAttributes.ReparsePoint)) != 0) throw new SafetyException("Windows replay state is protected, redirected or is a directory. Existing state is retained."); } catch (FileNotFoundException) { return new Snapshot(); }
-            using (var stream = SafePaths.ReadFile(path, 4096)) {
-                byte[] bytes = ReadBytes(stream, path, cancel); var fields = WindowsReleaseManifest.Fields(WindowsReleaseManifest.ReadJson(bytes), new[] { "format", "protectedFloor" });
-                if (WindowsReleaseManifest.Number(fields["format"]) != 1) throw new SafetyException("Saved Windows replay envelope format is unsupported."); string encoded = WindowsReleaseManifest.Text(fields["protectedFloor"]); byte[] encrypted;
-                try { encrypted = Convert.FromBase64String(encoded); } catch (FormatException) { throw new SafetyException("Saved Windows replay envelope is not canonical bounded base64."); }
-                if (encoded.Length == 0 || encoded.Length > (MaximumProtected + 2) / 3 * 4 || encrypted.Length == 0 || encrypted.Length > MaximumProtected || Convert.ToBase64String(encrypted) != encoded) throw new SafetyException("Saved Windows replay envelope is not canonical bounded base64.");
-                var floor = Unprotect(encrypted, policy); cancel.ThrowIfCancellationRequested();
-                // Protection can invoke native work; recheck file identity/stream aliases afterward.
-                var stamp = Native.Info(stream.SafeFileHandle); if ((stamp.Attributes & 0x1415) != 0 || stamp.Links != 1 || stream.Length != bytes.Length || !Native.FinalPath(stream.SafeFileHandle).Equals(path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Windows replay state changed while authenticating it."); WindowsPackageStreams.Require(path, stream.Length);
-                return new Snapshot { Floor = floor, Hash = WindowsSignerEvidence.Hash(bytes), Stamp = stamp, Exists = true };
-            }
+            using (var stream = SafePaths.ReadFile(path, 4096)) return ReadHeld(stream, path, policy, cancel);
+        }
+        Snapshot ReadHeld(FileStream stream, string path, string policy, CancellationToken cancel) {
+            byte[] bytes = ReadBytes(stream, path, cancel); var fields = WindowsReleaseManifest.Fields(WindowsReleaseManifest.ReadJson(bytes), new[] { "format", "protectedFloor" });
+            if (WindowsReleaseManifest.Number(fields["format"]) != 1) throw new SafetyException("Saved Windows replay envelope format is unsupported."); string encoded = WindowsReleaseManifest.Text(fields["protectedFloor"]); byte[] encrypted;
+            try { encrypted = Convert.FromBase64String(encoded); } catch (FormatException) { throw new SafetyException("Saved Windows replay envelope is not canonical bounded base64."); }
+            if (encoded.Length == 0 || encoded.Length > (MaximumProtected + 2) / 3 * 4 || encrypted.Length == 0 || encrypted.Length > MaximumProtected || Convert.ToBase64String(encrypted) != encoded) throw new SafetyException("Saved Windows replay envelope is not canonical bounded base64.");
+            var floor = Unprotect(encrypted, policy); cancel.ThrowIfCancellationRequested();
+            // Protection can invoke native work; recheck file identity/stream aliases afterward.
+            var stamp = Native.Info(stream.SafeFileHandle); if ((stamp.Attributes & 0x1415) != 0 || stamp.Links != 1 || stream.Length != bytes.Length || !Native.FinalPath(stream.SafeFileHandle).Equals(path, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Windows replay state changed while authenticating it."); WindowsPackageStreams.Require(path, stream.Length);
+            return new Snapshot { Floor = floor, Hash = WindowsSignerEvidence.Hash(bytes), Stamp = stamp, Exists = true, Encrypted = encrypted };
         }
         public void Accept(ApprovedWindowsChannel channel, WindowsChannelOffer offer, CancellationToken cancel, Func<bool> stillAllowed) {
             if (channel == null || offer == null) throw new ArgumentNullException("channel/offer"); cancel.ThrowIfCancellationRequested(); if (!offer.IsFor(channel)) throw new SafetyException("Persistent Windows replay acceptance requires the exact approved channel policy."); Guard(offer, cancel, stillAllowed); offer.Revalidate(cancel); Guard(offer, cancel, stillAllowed);
