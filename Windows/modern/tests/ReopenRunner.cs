@@ -24,6 +24,7 @@ namespace EasyEject {
             StorageControllerTests();
             ProfileEditTests();
             ImportOperationTests();
+            SavedProfileImportTests();
             SharingOperationTests();
             ResumeOperationTests();
             SettingsOperationTests();

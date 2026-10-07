@@ -45,7 +45,21 @@ namespace EasyEject.Modern {
                 }
             } finally { automaticPumping = false; }
         }
-        async Task RunImport(AutomaticConnection connection, AutomaticImportRequest request) {
+        async Task ImportSavedProfile(SavedProfile entry, Action handoff) {
+            if (closed || working || inventory.Scanning || !notifications.Available || ProfilesPanel.Visibility != Visibility.Visible)
+                throw new SafetyException("Wait for current work and connection monitoring, then choose Import now again.");
+            var state = inventory.Current; var choice = SavedProfileImportChoice.Capture(entry, state, discovery.Epoch);
+            automatic.MarkManual(state, choice.Connection.Volume);
+            StorageCards.SelectedItem = StorageCards.Items.Cast<StorageCard>().SingleOrDefault(card => card.Connection != null && card.Connection.Token == choice.Connection.Token);
+            bool transferred = false; ShowStorage();
+            try {
+                await RunImport(choice.Connection, null, choice, () => { transferred = true; handoff(); }); await ReadInventory();
+            } catch (Exception ex) {
+                if (!transferred) throw;
+                if (!closed) { Summary.Text = "Saved-profile import status needs attention. Review Connected storage and Import history. " + ex.Message; RecordModernIssue(Summary.Text); UpdateActions(); }
+            }
+        }
+        async Task RunImport(AutomaticConnection connection, AutomaticImportRequest request, SavedProfileImportChoice savedChoice = null, Action handoff = null) {
             if (closed || working) return;
             working = true; importOperationActive = true; operationCancel = new CancellationTokenSource(); importTerminal = null;
             ImportProgress.Visibility = Visibility.Visible; ImportProgress.IsIndeterminate = true;
@@ -53,14 +67,17 @@ namespace EasyEject.Modern {
             long observedEpoch = connection.Epoch; ImportedOutcome outcome = null; ImportOperationReview owner = null;
             UpdateActions();
             try {
+                if (handoff != null) handoff();
                 if (request == null) {
                     owner = await Task.Run(() => {
+                        if (savedChoice != null) return savedChoice.Prepare(discovery, ImportDefaults.Load(), Profiles.Root);
                         var reviewed = Profiles.ReviewConnected(connection.Volume, connection.Disk); var choices = ImportDefaults.Load();
                         return ImportOperationReview.Manual(connection, reviewed, choices, discovery);
                     });
                 } else owner = await Task.Run(() => ImportOperationReview.AutomaticRequest(request, discovery, epoch => Interlocked.Exchange(ref observedEpoch, epoch)));
                 importing = owner;
                 if (!owner.Automatic) {
+                    await EnsureVisible(); operationCancel.Token.ThrowIfCancellationRequested(); owner.ValidateForPresentation();
                     confirmation = MessageDialog("Verified import", owner.Description, "Start verified import"); UpdateActions();
                     var answer = await confirmation.ShowAsync(); confirmation = null;
                     if (answer != ContentDialogResult.Primary) { Summary.Text = "Import review cancelled. No import started."; return; }

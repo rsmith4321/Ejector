@@ -16,6 +16,8 @@ namespace EasyEject.Modern {
         internal event Action<string> Changed;
         internal event Action<string> Completed;
         internal event Action RequestDefaults;
+        internal event Func<SavedProfile, Action, Task> RequestImport;
+        internal event Action ActivityChanged;
         public ProfilesView() { InitializeComponent(); }
         internal void Initialize(IDiscovery discovery, Func<string, Task<string>> choose) { this.discovery = discovery; this.choose = choose; }
         internal bool TryLeave() { if (busy || editor != null && !editor.Cancel()) return false; active = false; lifetime++; editor = null; return true; }
@@ -25,7 +27,7 @@ namespace EasyEject.Modern {
             catch (Exception ex) { editor.Cancel(); Status.Text = "Shared defaults could not be reloaded. Cancel and reopen the profile before saving. " + ex.Message; }
             finally { busy = false; Render(); }
         }
-        internal async Task StartCatalog() {
+        internal async Task StartCatalog(string selectedVolume = null) {
             if (busy) return; if (editor != null) editor.Cancel(); editor = null; active = true;
             int generation = ++lifetime; busy = true; Render(); Status.Text = "Reading saved profiles…";
             try {
@@ -34,7 +36,9 @@ namespace EasyEject.Modern {
                 Records.SelectedItem = null; Records.ItemsSource = loaded.Item1.Select(entry => new ProfileCard { Entry = entry, DisplayName = entry.Display,
                     ChoiceSummary = entry.CanEdit ? (entry.Profile.FollowsDefaults ? "Uses defaults" : "Custom") + " · " + (entry.Profile.AutomaticEnabled(defaults) ? "Automatic" : "Manual") : "Needs review",
                     TargetPath = entry.CanEdit ? entry.Profile.Destination : "Saved record retained" }).ToArray();
-                Status.Text = "Saving or forgetting preferences never starts an import."; UpdateDetail();
+                if (selectedVolume != null) Records.SelectedItem = Records.Items.Cast<ProfileCard>().SingleOrDefault(card => card.Entry.CanEdit && card.Entry.Profile.VolumeId == selectedVolume);
+                Status.Text = selectedVolume == null ? "Saving or forgetting preferences never starts an import. Import now opens a separate review of the original connected device."
+                    : "Profile saved. Review its saved choices below; Import now opens a separate manual import review."; UpdateDetail();
             } catch (Exception ex) { if (active && generation == lifetime) { Records.ItemsSource = null; Detail.Text = ex.Message; Status.Text = "Saved profiles could not be read. Existing records were retained."; } }
             finally { if (generation == lifetime) { busy = false; Render(); } }
         }
@@ -76,6 +80,7 @@ namespace EasyEject.Modern {
                 Heading.Text = editing ? "Import profile" : "Saved profiles"; EditorBody.IsEnabled = editing && !busy && !editor.Closed;
                 Records.IsEnabled = Refresh.IsEnabled = active && !busy; var selected = Records.SelectedItem as ProfileCard;
                 Edit.IsEnabled = Forget.IsEnabled = !busy && selected != null && selected.Entry.CanEdit;
+                ImportNow.IsEnabled = active && !busy && !editing && selected != null && selected.Entry.CanEdit && RequestImport != null;
                 Save.IsEnabled = editing && !busy && !editor.Closed; Cancel.IsEnabled = !busy; ForgetDraft.IsEnabled = Save.IsEnabled && editor.CanForget;
                 if (!editing) return;
                 var p = editor.Snapshot(); var options = editor.Options;
@@ -99,6 +104,20 @@ namespace EasyEject.Modern {
         void Records_SelectionChanged(object sender, SelectionChangedEventArgs args) { if (Records == null || busy) return; UpdateDetail(); Render(); }
         async void Refresh_Click(object sender, RoutedEventArgs args) { await StartCatalog(); }
         async void Edit_Click(object sender, RoutedEventArgs args) { await EditSelected(); }
+        async void ImportNow_Click(object sender, RoutedEventArgs args) {
+            var selected = Records.SelectedItem as ProfileCard;
+            if (!active || busy || editor != null || selected == null || !selected.Entry.CanEdit || RequestImport == null) return;
+            bool transferred = false; int generation = lifetime;
+            busy = true; Render(); if (ActivityChanged != null) ActivityChanged();
+            try { await RequestImport(selected.Entry, () => {
+                if (transferred || !active || generation != lifetime || !busy || editor != null) throw new SafetyException("The saved-profile import handoff expired. Choose Import now again.");
+                // MainWindow already owns work/Stop/shutdown. Release this page's
+                // busy scope so the existing completion/eject/share flow can run.
+                transferred = true; busy = false; Render(); if (ActivityChanged != null) ActivityChanged();
+            }); }
+            catch (Exception ex) { if (!transferred && active && generation == lifetime) Status.Text = "Import review could not open. No import started. " + ex.Message; }
+            finally { if (!transferred) { busy = false; Render(); if (ActivityChanged != null) ActivityChanged(); } }
+        }
         void Defaults_Click(object sender, RoutedEventArgs args) { if (!busy && editor != null && !editor.Closed && RequestDefaults != null) RequestDefaults(); }
         void Name_Changed(object sender, TextChangedEventArgs args) { if (!updating && !busy && editor != null) editor.SetName(DeviceName.Text.Trim()); }
         void Mode_Changed(object sender, SelectionChangedEventArgs args) { if (!updating && !busy && editor != null) { editor.SetFollowing(Mode.SelectedIndex == 0); Render(); } }
@@ -132,11 +151,11 @@ namespace EasyEject.Modern {
             finally { busy = false; Render(); }
         }
         async void Save_Click(object sender, RoutedEventArgs args) {
-            if (busy || editor == null || editor.Closed) return; var owner = editor; busy = true; Render(); bool saved = false;
+            if (busy || editor == null || editor.Closed) return; var owner = editor; string savedVolume = owner.Snapshot().VolumeId; busy = true; Render(); bool saved = false;
             try { await Task.Run(() => owner.Save()); saved = true; }
             catch (Exception ex) { owner.Cancel(); Status.Text = "Saving could not finish. Cancel and reopen the profile to review its saved state before retrying. " + ex.Message; }
             finally { busy = false; Render(); }
-            if (saved) { if (Changed != null) Changed("Import profile saved. No import started."); await StartCatalog(); }
+            if (saved) { if (Changed != null) Changed("Import profile saved. No import started."); await StartCatalog(savedVolume); }
         }
         async void Forget_Click(object sender, RoutedEventArgs args) {
             if (busy) return; if (editor == null) await EditSelected(); if (editor == null || editor.Closed || !editor.CanForget) return;

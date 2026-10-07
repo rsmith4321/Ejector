@@ -111,6 +111,8 @@ namespace EasyEject.Modern {
                 var selected = await picker.PickSingleFolderAsync(); return selected == null ? null : selected.Path;
             });
             ProfilesPanel.Changed += delegate(string message) { automatic.SettingsSaved(); Summary.Text = message; };
+            ProfilesPanel.RequestImport += ImportSavedProfile;
+            ProfilesPanel.ActivityChanged += UpdateActions;
             ProfilesPanel.Completed += delegate(string message) { ShowStorage(); Summary.Text = message; UpdateActions(); };
             Root.Loaded += async delegate {
                 visibleRoot.TrySetResult(true); await StartRuntime();

@@ -37,8 +37,8 @@
    </StackPanel>
   </ScrollViewer>
   <StackPanel Grid.Row="2" Spacing="12"><TextBlock x:Name="Status" Text="Reading saved profiles…" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-   <StackPanel x:Name="CatalogButtons" Orientation="Horizontal" Spacing="10"><Button x:Name="Refresh" Content="Refresh profiles" Click="Refresh_Click"/><Button x:Name="Edit" Content="Edit profile…" IsEnabled="False" Click="Edit_Click"/><Button x:Name="Forget" Content="Forget profile…" IsEnabled="False" Click="Forget_Click"/></StackPanel>
-   <StackPanel x:Name="EditButtons" Orientation="Horizontal" Spacing="10" Visibility="Collapsed"><Button x:Name="Save" Content="Save profile" Style="{StaticResource AccentButtonStyle}" Click="Save_Click"/><Button x:Name="Cancel" Content="Cancel" Click="Cancel_Click"/><Button x:Name="ForgetDraft" Content="Forget profile…" Click="Forget_Click"/></StackPanel>
+   <local:ActionWrapPanel x:Name="CatalogButtons"><Button x:Name="ImportNow" Content="Import now…" IsEnabled="False" Click="ImportNow_Click"/><Button x:Name="Refresh" Content="Refresh profiles" Click="Refresh_Click"/><Button x:Name="Edit" Content="Edit profile…" IsEnabled="False" Click="Edit_Click"/><Button x:Name="Forget" Content="Forget profile…" IsEnabled="False" Click="Forget_Click"/></local:ActionWrapPanel>
+   <local:ActionWrapPanel x:Name="EditButtons" Visibility="Collapsed"><Button x:Name="Save" Content="Save profile" Style="{StaticResource AccentButtonStyle}" Click="Save_Click"/><Button x:Name="Cancel" Content="Cancel" Click="Cancel_Click"/><Button x:Name="ForgetDraft" Content="Forget profile…" Click="Forget_Click"/></local:ActionWrapPanel>
   </StackPanel>
  </Grid>
 </UserControl>

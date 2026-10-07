@@ -50,6 +50,11 @@ namespace EasyEject {
             if (connection == null || profile.VolumeId != connection.Volume.Id || profile.VolumeSerial != connection.Volume.Serial || profile.DiskInstance != connection.Disk.InstanceId) throw new SafetyException("The frozen profile does not match this selected device.");
             Profiles.ValidateStoredFolders(profile);
         }
+        internal void ValidateForPresentation() {
+            if (!Current) throw new SafetyException("This import review expired. Refresh and review the device again.");
+            selection.Validate();
+            if (!Current) throw new SafetyException("Storage changed before the import review could be displayed. Refresh and review again.");
+        }
         internal void Confirm() { if (!Current || Interlocked.CompareExchange(ref phase, 1, 0) != 0) throw new SafetyException("This import review expired. Refresh and review the device again."); }
         internal ImportResult Execute(VerifiedImporter importer, CancellationToken cancel, Action<string> report, Action<ImportWorkProgress> progress = null) {
             if (Interlocked.CompareExchange(ref phase, 2, 1) != 1) throw new SafetyException("A fresh confirmed manual import or enabled automatic request is required.");
