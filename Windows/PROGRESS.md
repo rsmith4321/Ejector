@@ -1,5 +1,13 @@
 # Windows progress · October 7, 2026
 
+## Real Quick Share conversion checkpoint · October 7
+
+Seven standard-color cases pass separately on the installed Framework runner and modern .NET 10 runtime: landscape 60→30 fps 1080p, full-frame 4K, portrait, small silent/no-upscale, foreign-output preservation and exact reuse, encoder-progress cancellation/private cleanup/reservation release/fresh retry, and changed-original/fake-destination refusal before tools. Actual FFmpeg/FFprobe, generated clips, production manual sharing and real probes/full decoding were exercised; originals retained. No downloads, user footage, live settings or native device action. Official Luna LUT conversion and real camera/foreground/physical/filesystem/restart/trusted distribution remain open. Overlapping 7/0 runs are not summed. [QUICK_SHARE_ACCEPTANCE.md](QUICK_SHARE_ACCEPTANCE.md) records exact retained binaries/logs/hashes and mixed working-checkout scope. Full goal active.
+
+## Manual dialog visibility ordering · October 7
+
+Source `c662e52` adds visible XAML readiness to eight modern manual dialog/picker paths, preserving existing operation/confirmation checks. Final app build is warning/error free; existing selected contracts **139/0** precede the final two UI-only await additions. Foreground control returned access denied twice, so input stopped; first tray action after hidden startup remains unrun. [modern/VISIBLE_REVIEW_WORKFLOW.md](modern/VISIBLE_REVIEW_WORKFLOW.md) records build/source scope. No live device/media or settings action; full goal active.
+
 ## Modern login draft and silent tray startup · October 7
 
 Source **`6d0b04b62b168d684e7c19a4dcc1e150cc25ebd4`**, preserving the separate icon/layout source `4a865b6`, connects explicit current-user login Save/Cancel/retarget to strict canonical modern executable identity. Existing classic commands remain unchanged unless explicitly retargeted; malformed/foreign values stay intact. Held executable/directory identity, exact reviewed value/policy/copy and confirmed readback remain required; uncertain writes are reported without automatic retry. The one-use draft rejects concurrent edit/cancel/duplicate workers and a choice altered during the independent settings save. An unchanged choice rereads current status without repairing a later entry. Settings results retain login and shortcut outcomes together. No Windows login value was installed or changed.
