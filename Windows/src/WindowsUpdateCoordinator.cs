@@ -32,11 +32,17 @@ namespace EasyEject {
     internal sealed class WindowsUpdateCoordinator : IDisposable {
         readonly object sync = new object(); readonly bool configured;
         readonly Func<WindowsUpdateCheckScope, Task<WindowsChannelOffer>> check; readonly Func<DateTime> clock; readonly TimeSpan interval;
+        readonly Func<WindowsChannelReplayStore> replay;
         bool enabled, started, idle, disposed, reviewOpen; long id, activityEpoch, preferenceEpoch;
         DateTime nextAutomatic = new DateTime(0, DateTimeKind.Utc); WindowsUpdateCheckScope active;
-        internal WindowsUpdateCoordinator(bool configured, Func<WindowsUpdateCheckScope, Task<WindowsChannelOffer>> check, Func<DateTime> clock, TimeSpan interval, bool automatic) {
+        internal WindowsUpdateCoordinator(bool configured, Func<WindowsUpdateCheckScope, Task<WindowsChannelOffer>> check, Func<DateTime> clock, TimeSpan interval, bool automatic, Func<WindowsChannelReplayStore> replay = null) {
             if (configured && check == null || clock == null || interval < TimeSpan.FromMinutes(1) || interval > TimeSpan.FromDays(7)) throw new ArgumentException("Windows release checks require an owned callback, UTC clock and bounded cadence.");
-            this.configured = configured; this.check = check; this.clock = clock; this.interval = interval; enabled = automatic;
+            this.configured = configured; this.check = check; this.clock = clock; this.interval = interval; enabled = automatic; this.replay = replay;
+        }
+        internal bool ReplayRecoveryConfigured { get { lock (sync) return !disposed && configured && replay != null; } }
+        internal WindowsChannelReplayStore ReplayStore() {
+            lock (sync) { if (disposed || !ReplayRecoveryConfigured) throw new SafetyException("Windows update-history recovery is not configured or is closed."); }
+            return replay();
         }
         internal bool Configured { get { return configured; } }
         internal bool Checking { get { lock (sync) return active != null; } }
@@ -123,12 +129,12 @@ namespace EasyEject {
         internal static WindowsUpdateCoordinator Create(bool readOnly, bool automatic) { return Create(readOnly ? null : ProductionChannel, () => Profiles.Root, new WindowsChannelHttpTransport(), new WindowsManifestTrust(), () => DateTime.UtcNow, automatic); }
         internal static WindowsUpdateCoordinator Create(ApprovedWindowsChannel channel, Func<string> root, IWindowsChannelTransport transport, IWindowsManifestEnvelopeTrust trust, Func<DateTime> clock, bool automatic) {
             if (root == null || transport == null || trust == null) throw new ArgumentNullException("Windows release dependencies");
-            var replay = new Lazy<IWindowsChannelReplayStore>(() => new WindowsChannelReplayStore(root()), LazyThreadSafetyMode.ExecutionAndPublication);
+            var replay = new Lazy<WindowsChannelReplayStore>(() => new WindowsChannelReplayStore(root()), LazyThreadSafetyMode.ExecutionAndPublication);
             Func<WindowsUpdateCheckScope, Task<WindowsChannelOffer>> action = channel == null ? null : (Func<WindowsUpdateCheckScope, Task<WindowsChannelOffer>>)(scope => Task.Run(async () => {
                 scope.Token.ThrowIfCancellationRequested(); if (!scope.Allowed) throw new SafetyException("Windows release scope was revoked before configuration access.");
                 var discovery = new WindowsChannelDiscovery(channel, transport, trust, clock, () => scope.Allowed, replay.Value); return await discovery.CheckAsync(scope.Token).ConfigureAwait(false);
             }));
-            return new WindowsUpdateCoordinator(channel != null, action, clock, TimeSpan.FromDays(1), automatic);
+            return new WindowsUpdateCoordinator(channel != null, action, clock, TimeSpan.FromDays(1), automatic, channel == null ? null : (Func<WindowsChannelReplayStore>)(() => replay.Value));
         }
     }
 }

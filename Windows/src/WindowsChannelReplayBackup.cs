@@ -8,7 +8,7 @@ namespace EasyEject {
         // installation authority, and cannot repair unknown/corrupt target history.
         internal sealed class BackupReview : IDisposable {
             internal readonly WindowsChannelReplayStore Owner;
-            internal readonly string SourcePath, Policy, SourceHash, CurrentHash;
+            internal readonly string SourcePath, Policy, SourceHash, CurrentHash, CurrentVersion;
             internal readonly Native.FileInfo SourceStamp, CurrentStamp;
             internal readonly bool CurrentExists;
             internal readonly WindowsChannelReplayFloor Floor;
@@ -17,9 +17,9 @@ namespace EasyEject {
             readonly byte[] encrypted; bool disposed, used;
             internal BackupReview(WindowsChannelReplayStore owner, string sourcePath, string policy, Snapshot backup, Snapshot current, SafePaths.DirectoryLease directories, FileStream source) {
                 Owner = owner; SourcePath = sourcePath; Policy = policy; SourceHash = backup.Hash; SourceStamp = backup.Stamp; Floor = backup.Floor;
-                CurrentExists = current.Exists; CurrentHash = current.Hash; CurrentStamp = current.Stamp; Directories = directories; Source = source; encrypted = (byte[])backup.Encrypted.Clone();
+                CurrentExists = current.Exists; CurrentHash = current.Hash; CurrentStamp = current.Stamp; CurrentVersion = current.Exists ? current.Floor.Version : "Missing file"; Directories = directories; Source = source; encrypted = (byte[])backup.Encrypted.Clone();
             }
-            internal string Description { get { return "Authenticated same-user, same-channel backup\r\n" + SourcePath + "\r\nVersion restriction: " + Floor.Version + "\r\nAccepted issue (UTC epoch seconds): " + Floor.IssuedUtc + "\r\nBackup SHA-256: " + SourceHash + "\r\n\r\nThis restores only the Windows update replay restriction. Other settings, media and the backup remain unchanged. A backup cannot prove that no later history was lost; no corrupted or foreign target is reset. Release checks still require fresh signed metadata and current native trust."; } }
+            internal string Description { get { return "Reviewed update-history backup for this Windows user and channel\r\n" + SourcePath + "\r\nLast accepted version in backup: " + Floor.Version + "\r\nAccepted metadata: " + new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(Floor.IssuedUtc).ToString("yyyy-MM-dd HH:mm:ss 'UTC'", System.Globalization.CultureInfo.InvariantCulture) + "\r\nBackup SHA-256: " + SourceHash + "\r\n\r\nRestore to: " + Path.Combine(Owner.root, FileName) + "\r\nCurrent update history: " + CurrentVersion + "\r\n\r\nThis restores only Windows update history. Other settings, media and the backup remain unchanged. A backup cannot prove that no later history was lost; no corrupted or foreign target is reset. Release checks still require fresh signed metadata and current native trust."; } }
             internal void Begin(WindowsChannelReplayStore owner) { if (Owner != owner || disposed || used) throw new SafetyException("This backup review is closed, already used or belongs to another settings store. Review it again."); used = true; }
             internal byte[] ProtectedCopy() { return (byte[])encrypted.Clone(); }
             public void Dispose() { lock (Owner.sync) { if (disposed) return; disposed = true; Source.Dispose(); Directories.Dispose(); } }
