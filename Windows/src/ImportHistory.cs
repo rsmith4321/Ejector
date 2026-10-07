@@ -40,10 +40,15 @@ namespace EasyEject {
         public bool AllowsUnrelatedOperations { get { return connection.Scoped && !connection.ProtectedConnectionChanged; } }
         internal WindowsDestinationGuard(IDiscovery discovery, string root, DestinationIdentity expected, Func<string, string> volumeId = null) {
             this.discovery = discovery; this.root = SafePaths.Normalize(root); this.expected = expected.Copy(); this.volumeId = volumeId ?? WindowsDiscovery.VolumeId;
-            var state = discovery.Scan(); CheckIdentity(state);
-            var volume = state.Volumes.Single(x => x.Id == expected.VolumeId); var disk = state.Disks.Single(x => x.Number == volume.Disks.Single());
-            disks = state.Disks.Where(x => x.Number == disk.Number || (disk.TargetId != "" && (x.InstanceId == disk.TargetId || x.Ancestors.Contains(disk.TargetId)))).Select(x => x.Number).ToArray();
-            connection = new StorageConnectionProof(discovery, state, disks);
+            // Device callbacks precede the caller's operation scope. Keep the root
+            // reviewed at entry, including when an empty directory can move.
+            using (var directories = SafePaths.HoldDirectories(this.root)) {
+                directories.Validate(); var state = discovery.Scan(); directories.Validate();
+                CheckIdentity(state); directories.Validate();
+                var volume = state.Volumes.Single(x => x.Id == this.expected.VolumeId); var disk = state.Disks.Single(x => x.Number == volume.Disks.Single());
+                disks = state.Disks.Where(x => x.Number == disk.Number || (disk.TargetId != "" && (x.InstanceId == disk.TargetId || x.Ancestors.Contains(disk.TargetId)))).Select(x => x.Number).ToArray();
+                connection = new StorageConnectionProof(discovery, state, disks); directories.Validate();
+            }
         }
         void CheckIdentity(Inventory state) {
             if (volumeId(root) != expected.VolumeId || !expected.Matches(DestinationIdentity.Capture(state, expected.VolumeId)))
