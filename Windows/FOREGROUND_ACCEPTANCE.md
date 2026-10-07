@@ -1,5 +1,7 @@
 # Windows foreground acceptance
 
+Latest resume source `c6370c087cad2ca6d8f03de613c17247b7cbaf0c` adds modern journal selection, exact Cancel-default resume review and shared durable completion presentation. App/runtime/selected builds are warning-free and **103/0** selected contracts pass, terminal 12178 exit zero. No native launch/input occurred this milestone. Actual resume picker/default Cancel/warning scrolling/Stop/changed source/busy close and tray/default/profile/import/history/sharing/tools/completion/keyboard/theme/DPI acceptance remain unrun. Earlier full existing **1214/0** is retained previous-source software evidence, not a new full rerun or foreground pass. See modern/RESUME_WORKFLOW.md for exact fixture scope and remaining gates. Full goal active; expired heartbeat paused.
+
 This records actual foreground observations separately from hidden renders and fixture tests. The full scope remains [PARITY.md](PARITY.md), against Mac baseline `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c`. The Windows port is not complete.
 
 ## Full modern-runtime tests; latest WinUI foreground still pending · October 7
