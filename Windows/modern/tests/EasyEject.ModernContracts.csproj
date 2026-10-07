@@ -18,6 +18,7 @@
     <Compile Include="ResumeOperationTests.cs" />
     <Compile Include="SettingsOperationTests.cs" />
     <Compile Include="StartupOperationTests.cs" />
+    <Compile Include="DiagnosticsOperationTests.cs" />
     <Compile Include="ReopenRunner.cs" />
     <ProjectReference Include="..\EasyEject.Runtime.csproj" />
   </ItemGroup>

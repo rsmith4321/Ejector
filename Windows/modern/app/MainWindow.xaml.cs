@@ -72,6 +72,9 @@ namespace EasyEject.Modern {
             menu.Items.Add("Completed imports…", null, delegate { Reveal(); ReviewPendingImports(); });
             menu.Items.Add("Import history…", null, delegate { Reveal(); ReviewHistory(); });
             menu.Items.Add("Quick Share tools…", null, delegate { Reveal(); OpenQuickShareTools(); });
+            issueMenu.Click += delegate { ViewModernIssue(); }; debugMenu.Click += delegate { ViewModernDebugLog(); };
+            helpMenu.Click += delegate { ViewModernInformation(false); }; aboutMenu.Click += delegate { ViewModernInformation(true); };
+            menu.Items.Add(issueMenu); menu.Items.Add(debugMenu); menu.Items.Add(helpMenu); menu.Items.Add(aboutMenu);
             menu.Items.Add("Stop current operation", null, delegate { RequestOperationStop(); });
             menu.Items.Add("Quit preview", null, delegate { if (StorageBusy) { Reveal(); return; } quitting = true; Close(); });
             menu.Opening += delegate { RebuildStorageMenu(); };
@@ -159,6 +162,11 @@ namespace EasyEject.Modern {
             CancelOperation.Visibility = working && operationCancel != null && confirmation == null ? Visibility.Visible : Visibility.Collapsed;
             CancelOperation.Content = quickShareSetupSaving ? "Stop setup" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Share ? "Stop export" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Verify ? "Stop verification" : groupedReview != null ? "Stop removal" : activity.Current != null && activity.Current.Kind == TrayOperationKind.Resume ? "Stop resume" : importOperationActive ? "Stop import" : "Stop cleanup";
             CancelOperation.IsEnabled = operationCancel != null && !operationCancel.IsCancellationRequested;
+            bool canReview = !StorageBusy && !inventory.Scanning;
+            IssueButton.IsEnabled = issueMenu.Enabled = canReview && appIssue.HasIssue;
+            DebugButton.Visibility = settings != null && settings.DebugEnabled ? Visibility.Visible : Visibility.Collapsed;
+            debugMenu.Visible = DebugButton.Visibility == Visibility.Visible; DebugButton.IsEnabled = debugMenu.Enabled = canReview;
+            HelpButton.IsEnabled = AboutButton.IsEnabled = helpMenu.Enabled = aboutMenu.Enabled = canReview;
             SelectionStatus.Text = StorageBusy ? "Finish the current review or operation first." : !fresh ? "Refresh the storage list before reviewing a device." : card == null ? "Select a device to review safe removal." : card.Choice.Error ?? "Safe removal affects this physical device and all its volumes. Review before unplugging.";
             if (tray != null) UpdateImportTray();
         }
@@ -173,9 +181,17 @@ namespace EasyEject.Modern {
         async Task ReadInventory() {
             if (closed || UiBusy || inventory.Scanning) return;
             var refresh = inventory.Refresh(); UpdateActions();
-            if (settings == null) {
-                try { settings = await Task.Run(() => AppSettings.Load()); ConfigureShortcut(); }
-                catch (Exception ex) { if (!closed) Summary.Text = "Saved app settings could not be read. Device actions are blocked. " + ex.Message; }
+            if (settings == null || !issueLoaded) {
+                try {
+                    var loaded = await Task.Run(() => {
+                        var value = AppSettings.Load(); AppIssue issue; string error = null;
+                        try { issue = AppIssue.Load(); } catch (Exception ex) { issue = new AppIssue(); issue.Record("Saved issue state could not be read and was retained. " + ex.Message); error = ex.Message; }
+                        return Tuple.Create(value, issue, error);
+                    });
+                    if (closed) return;
+                    settings = loaded.Item1; appIssue = loaded.Item2; issueLoaded = true; issuePersistenceAvailable = loaded.Item3 == null; ConfigureShortcut();
+                }
+                catch (Exception ex) { if (!closed) { Summary.Text = "Saved app settings could not be read. Device actions are blocked. " + ex.Message; RecordModernIssue(Summary.Text); } }
             }
             bool published = await refresh;
             if (closed) return;
@@ -194,6 +210,12 @@ namespace EasyEject.Modern {
                 automatic.Observe(state);
                 completions.Reconcile(state, WindowsDiscovery.VolumeId);
             } else if (inventory.Error != null) Summary.Text = "Storage could not be checked. " + inventory.Error;
+            string problem = !notifications.Available ? "Connection monitoring unavailable. Device actions are blocked." : null;
+            if (inventory.Error != null) problem = (problem == null ? "" : problem + "\n") + "Storage could not be checked. " + inventory.Error;
+            else if (state != null && !state.Complete) problem = (problem == null ? "" : problem + "\n") + "Storage cannot be safely acted on. " + string.Join(" ", state.Errors);
+            if (problem != null) RecordDiscoveryIssue(problem);
+            else { discoveryIssueEpoch = null; discoveryIssueText = null; }
+            if (appIssue.NeedsAttention) Summary.Text += "\nChoose View issue for the retained explanation.";
             UpdateActions();
             await PumpAutomaticImports();
         }
@@ -212,6 +234,7 @@ namespace EasyEject.Modern {
             working = true; UpdateActions();
             EjectResult terminal = null;
             try {
+                await EnsureVisible();
                 var reviewedSettings = await Task.Run(() => AppSettings.Load());
                 activeReview = new ManualEjectReview(inventory.Current, choice, reviewedSettings, forceClean, discovery, operations,
                     validate => new WindowsEjectApi(validate), WindowsDiscovery.VolumeId);
@@ -223,16 +246,17 @@ namespace EasyEject.Modern {
                 var result = await Task.Run(() => owner.Execute(operationCancel.Token, message => DispatcherQueue.TryEnqueue(delegate { if (!closed && activeReview == owner) Summary.Text = message; })));
                 terminal = result;
                 Summary.Text = result.Success ? "Windows accepted safe removal." : "Device removal stopped. Review the explanation.";
+                if (result.Success) ClearModernIssue(); else RecordModernIssue(result.Message);
                 string logWarning = LogModernOperation("Manual safe removal | " + result.Message); if (logWarning != null) Summary.Text += " " + logWarning;
                 if (reviewedSettings.NotificationsEnabled) tray.ShowBalloonTip(5000, result.Success ? "Safe removal accepted" : "Device still connected", result.Message.Length > 255 ? result.Message.Substring(0, 255) : result.Message, result.Success ? Forms.ToolTipIcon.Info : Forms.ToolTipIcon.Warning);
                 confirmation = MessageDialog(result.Success ? "Safe removal accepted" : "Device still connected", result.Message, null);
                 await confirmation.ShowAsync(); confirmation = null;
             } catch (OperationCanceledException ex) { Summary.Text = terminal == null ? ex.Message : terminal.Message; }
             catch (Exception ex) {
-                if (terminal != null) Summary.Text = terminal.Message + " Completion message unavailable: " + ex.Message;
+                if (terminal != null) { Summary.Text = terminal.Message + " Completion message unavailable: " + ex.Message; RecordModernIssue(Summary.Text); }
                 else {
                     Summary.Text = "Removal stopped. Refresh and review the device again.";
-                await EnsureVisible();
+                    RecordModernIssue(Summary.Text + " " + ex.Message);
                     try { confirmation = MessageDialog("Device still connected", ex.Message, null); await confirmation.ShowAsync(); }
                     catch (Exception displayError) { Summary.Text = "Removal stopped. Message unavailable: " + displayError.Message; }
                     finally { confirmation = null; }
@@ -247,7 +271,7 @@ namespace EasyEject.Modern {
         ContentDialog MessageDialog(string title, string message, string action) {
             return new ContentDialog { XamlRoot = Root.XamlRoot, Title = title, CloseButtonText = action == null ? "Close" : "Cancel",
                 PrimaryButtonText = action ?? "", DefaultButton = ContentDialogButton.Close,
-                Content = new ScrollViewer { MaxHeight = 360, Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap } } };
+                Content = new ScrollViewer { MaxHeight = 360, Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true } } };
         }
     }
 }

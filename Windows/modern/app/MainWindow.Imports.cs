@@ -31,12 +31,13 @@ namespace EasyEject.Modern {
                     automaticReading = true; UpdateActions();
                     try { saved = await Task.Run(() => Tuple.Create(Profiles.Catalog(), ImportDefaults.Load())); }
                     catch (Exception ex) {
-                        if (automaticConfigIssueEpoch != state.Epoch) { automaticConfigIssueEpoch = state.Epoch; Summary.Text = "Automatic import could not read saved choices. No import started. " + ex.Message; }
+                        if (automaticConfigIssueEpoch != state.Epoch) { automaticConfigIssueEpoch = state.Epoch; Summary.Text = "Automatic import could not read saved choices. No import started. " + ex.Message; RecordModernIssue(Summary.Text); }
                     } finally { automaticReading = false; UpdateActions(); }
                     if (saved == null || closed || StorageBusy) break;
                     state = inventory.Current; if (state == null || !state.Complete || state.Epoch != discovery.Epoch) break;
                     if (saved.Item1.Any(p => !p.CanEdit && state.Volumes.Any(v => Profiles.FileName(v.Id) == p.FileName)) && automaticConfigIssueEpoch != state.Epoch) {
                         automaticConfigIssueEpoch = state.Epoch; Summary.Text = "A connected device's saved profile needs review and was retained. Automatic import never uses an invalid record.";
+                        RecordModernIssue(Summary.Text);
                     }
                     var request = automatic.Take(state, saved.Item1.Where(p => p.CanEdit).Select(p => p.Profile), saved.Item2, StorageBusy || inventory.Scanning);
                     if (request == null) break;
@@ -97,7 +98,7 @@ namespace EasyEject.Modern {
                     destination, guard.DestinationIdentity, result.HasSelectedMedia, outcome.Message, outcome.Batch);
                 completions.Insert(completion);
             }
-            NotifyImport(outcome.HistoryWarning == null ? result.HasSelectedMedia ? "Import complete" : "No matching media" : "Import verified; history needs attention", outcome.Message, outcome.HistoryWarning != null);
+            NotifyImport(outcome.HistoryWarning == null ? result.HasSelectedMedia ? "Import complete" : "No matching media" : "Import verified; history needs attention", outcome.Message, outcome.HistoryWarning != null, outcome.HistoryWarning == null);
             // The worker has ended and released folders before any completion action.
             working = false; UpdateActions();
             if (completion != null && CompletionPresentation.ShowChoice(options.AskToEject, AppWindow.IsVisible, settings.NotificationsEnabled)) { await EnsureVisible(); await ReviewImportCompletion(completion.Id); }
@@ -117,8 +118,8 @@ namespace EasyEject.Modern {
         }
         void UpdateImportTray() {
             if (closed) return;
-            var presentation = TrayPresentation.Create(activity, UiBusy, inventory.Scanning, inventory.Current == null ? 0 : inventory.Current.Volumes.Count(v => v.IsCard), false);
-            tray.Text = presentation.Tooltip; tray.Icon = presentation.Busy ? trayIcons.Busy : appIcon;
+            var presentation = TrayPresentation.Create(activity, UiBusy, inventory.Scanning, TrayPresentation.CardCount(inventory.Current), appIssue.NeedsAttention);
+            tray.Text = presentation.Tooltip; tray.Icon = presentation.Busy ? trayIcons.Busy : presentation.Attention ? trayIcons.Attention : appIcon;
         }
         void RequestOperationStop() {
             if (operationCancel == null) return; operationCancel.Cancel(); activity.RequestStop();
@@ -130,7 +131,8 @@ namespace EasyEject.Modern {
                 : importOperationActive ? "Stopping after the current check. Verified copies and remaining source/Trash data are retained." : "Stopping cleanup before removal. Ordinary media and remaining metadata are retained.";
             UpdateImportTray(); UpdateActions();
         }
-        void NotifyImport(string title, string message, bool warning) {
+        void NotifyImport(string title, string message, bool warning, bool resolved = false) {
+            if (warning) RecordModernIssue(message); else if (resolved) ClearModernIssue();
             string warningText = LogModernOperation(title + " | " + message); if (warningText != null) Summary.Text += " " + warningText;
             if (settings == null || !settings.NotificationsEnabled || closed) return;
             try { tray.ShowBalloonTip(5000, title.Length > 63 ? title.Substring(0, 63) : title, message.Length > 255 ? message.Substring(0, 255) : message, warning ? Forms.ToolTipIcon.Warning : Forms.ToolTipIcon.Info); }
@@ -141,9 +143,9 @@ namespace EasyEject.Modern {
             if (values.Length == 0) { Summary.Text = "No current import eject choices. Exact saved batches remain in Import history."; return; }
             working = true; string selected = null;
             try {
+                await EnsureVisible();
                 var list = new ListView { ItemsSource = values.Select(v => v.DeviceName + " · " + v.Message).ToArray(), SelectionMode = ListViewSelectionMode.Single, MaxHeight = 300 };
                 confirmation = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Completed imports", Content = list, PrimaryButtonText = "Review import", CloseButtonText = "Close", DefaultButton = ContentDialogButton.Close, IsPrimaryButtonEnabled = false };
-                await EnsureVisible();
                 list.SelectionChanged += delegate { confirmation.IsPrimaryButtonEnabled = list.SelectedIndex >= 0; };
                 UpdateActions(); if (await confirmation.ShowAsync() == ContentDialogResult.Primary && list.SelectedIndex >= 0) selected = values[list.SelectedIndex].Id;
             } catch (Exception ex) { Summary.Text = "Completion list unavailable. " + ex.Message; }
@@ -155,9 +157,9 @@ namespace EasyEject.Modern {
             if (entry == null) { Summary.Text = "This import eject choice expired. Refresh and review the connected device."; return; }
             working = true; activeCompletionId = id; EjectResult terminal = null; CleanupCounts completionCounts = null; UpdateActions();
             try {
+                await EnsureVisible();
                 string shareMessage = "";
                 while (true) {
-                await EnsureVisible();
                     var freshSettings = await Task.Run(() => AppSettings.Load()); MetadataCleanupPlan cleanup = null;
                     bool canShare = false; string sharingNote = "";
                     if (entry.Batch != null) {
@@ -203,7 +205,7 @@ namespace EasyEject.Modern {
                         cleanup.Clean(validate, WindowsDiscovery.VolumeId, operationCancel.Token, counts, messageText => DispatcherQueue.TryEnqueue(delegate { if (!closed) Summary.Text = messageText; }));
                     }, operationCancel.Token));
                     if (cleanup != null) terminal.CleanupMessage = counts.Message;
-                    Summary.Text = terminal.Message; NotifyImport(terminal.Success ? "Safe removal accepted" : "Device still connected", terminal.Message, !terminal.Success);
+                    Summary.Text = terminal.Message; NotifyImport(terminal.Success ? "Safe removal accepted" : "Device still connected", terminal.Message, !terminal.Success, terminal.Success);
                     confirmation = MessageDialog(terminal.Success ? "Safe removal accepted" : "Device still connected", terminal.Message, null); await confirmation.ShowAsync(); confirmation = null; break;
                 }
             } catch (Exception ex) { Summary.Text = terminal == null ? "Import remains verified. Completion action stopped. " + ex.Message + (completionCounts == null ? "" : " " + completionCounts.Message) : terminal.Message + " Completion display unavailable: " + ex.Message; }

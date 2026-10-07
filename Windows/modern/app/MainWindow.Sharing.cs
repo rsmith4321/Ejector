@@ -34,7 +34,7 @@ namespace EasyEject.Modern {
                 await EnsureVisible();
                 var batches = await Task.Run(() => ImportHistory.Load()); SavedProfile[] profiles = null; string profileWarning = "";
                 try { profiles = await Task.Run(() => Profiles.Catalog()); }
-                catch (Exception ex) { profileWarning = "Sharing choices could not be read. Saved-file verification remains available. " + ex.Message; }
+                catch (Exception ex) { profileWarning = "Sharing choices could not be read. Saved-file verification remains available. " + ex.Message; RecordModernIssue(profileWarning); }
                 var list = new ListView { MaxHeight = 180, SelectionMode = ListViewSelectionMode.Single,
                     ItemsSource = batches.Select(b => DateTime.Parse(b.CompletedUtc, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToLocalTime().ToString("g") + " · " + b.DeviceName + " · " + b.Originals.Count + " files").ToArray() };
                 var details = Wrapped(batches.Count == 0 ? "No completed media batches yet. Index-only and failed imports create no sharing history." : "Select a batch. The source device is not needed to verify these saved originals.");
@@ -64,7 +64,7 @@ namespace EasyEject.Modern {
                 operationCancel.Dispose(); operationCancel = null; activity.End(Summary.Text); UpdateActions();
                 confirmation = MessageDialog("Saved batch verified", Summary.Text, null); await confirmation.ShowAsync(); confirmation = null;
             } catch (OperationCanceledException) { Summary.Text = "Saved-file verification cancelled. Files unchanged."; }
-            catch (Exception ex) { Summary.Text = verified == null ? "History review stopped. Saved originals remain unchanged. " + ex.Message : verified + "\nCompletion display unavailable: " + ex.Message; }
+            catch (Exception ex) { Summary.Text = verified == null ? "History review stopped. Saved originals remain unchanged. " + ex.Message : verified + "\nCompletion display unavailable: " + ex.Message; RecordModernIssue(Summary.Text); }
             finally { FinishSavedReview(); }
         }
         async Task<bool> PerformQuickShare(CompletedBatch expected) {
@@ -87,7 +87,7 @@ namespace EasyEject.Modern {
                 Summary.Text = "Creating sharing copies from exact verified saved originals…"; UpdateActions();
                 terminal = await Task.Run(() => SharingService.Run(request, operationCancel.Token, message => QueueImportProgress(token, message)));
                 success = QuickSharePresentation.Success(request.Batch, request.Preset, terminal); Summary.Text = success; StopSavedCancellation();
-                NotifyImport(terminal.CleanupWarnings.Count == 0 ? "Sharing copies ready" : "Sharing copies ready; needs attention", success, terminal.CleanupWarnings.Count != 0);
+                NotifyImport(terminal.CleanupWarnings.Count == 0 ? "Sharing copies ready" : "Sharing copies ready; needs attention", success, terminal.CleanupWarnings.Count != 0, terminal.CleanupWarnings.Count == 0);
                 if (AppWindow.IsVisible) { confirmation = MessageDialog("Quick Share", success, null); await confirmation.ShowAsync(); confirmation = null; }
                 return true;
             } catch (QuickShareFailure ex) {
@@ -158,7 +158,8 @@ namespace EasyEject.Modern {
                 };
                 confirmation = dialog; UpdateActions(); await dialog.ShowAsync(); confirmation = null;
                 Summary.Text = saved ?? (failed ? status.Text : "Quick Share setup draft discarded. Previous selections kept.");
-            } catch (Exception ex) { Summary.Text = "Quick Share setup unavailable. " + ex.Message; }
+                if (failed) RecordModernIssue(Summary.Text);
+            } catch (Exception ex) { Summary.Text = "Quick Share setup unavailable. " + ex.Message; RecordModernIssue(Summary.Text); }
             finally { FinishSavedReview(); }
         }
     }

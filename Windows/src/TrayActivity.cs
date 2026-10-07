@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace EasyEject {
@@ -47,6 +48,7 @@ namespace EasyEject {
     internal sealed class TrayPresentation {
         internal readonly string Tooltip, Heading;
         internal readonly bool Busy, Attention;
+        internal static int CardCount(Inventory state) { return state == null ? 0 : state.Disks.Where(d => state.Volumes.Any(v => v.IsCard && v.Disks.Contains(d.Number))).Select(d => String.IsNullOrEmpty(d.TargetId) ? "disk:" + d.Number : d.TargetId).Distinct(StringComparer.OrdinalIgnoreCase).Count(); }
         TrayPresentation(string tooltip, string heading, bool busy, bool attention) { Tooltip = tooltip; Heading = heading; Busy = busy; Attention = attention; }
         internal static TrayPresentation Create(TrayActivity activity, bool working, bool scanning, int cards, bool attention) {
             string caption, heading;

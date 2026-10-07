@@ -19,7 +19,7 @@ namespace EasyEject.Modern {
             if (settings == null || closed) return shortcut.Status;
             try { shortcutWarning = shortcut.Configure(settings.ShortcutEnabled, settings.ShortcutKey) ? null : shortcut.Status; }
             catch (Exception ex) { shortcutWarning = "Settings remain saved; shortcut unavailable. " + ex.Message; }
-            if (shortcutWarning != null) Summary.Text = shortcutWarning;
+            if (shortcutWarning != null) { Summary.Text = shortcutWarning; RecordModernIssue(shortcutWarning); }
             return shortcutWarning ?? shortcut.Status;
         }
         void SettingsSaved(AppSettings value) {
@@ -52,7 +52,7 @@ namespace EasyEject.Modern {
                 Summary.Text = "Requesting and verifying grouped card removal…"; LogModernOperation("User confirmed grouped card removal | " + owner.Description); UpdateActions();
                 terminal = await Task.Run(() => owner.Execute(operationCancel.Token, counts, message => QueueImportProgress(token, message)));
                 operationCancel.Dispose(); operationCancel = null;
-                Summary.Text = terminal.Message; NotifyImport(terminal.Success ? "Cards safely removed" : "Card removal stopped", terminal.Message, !terminal.Success);
+                Summary.Text = terminal.Message; NotifyImport(terminal.Success ? "Cards safely removed" : "Card removal stopped", terminal.Message, !terminal.Success, terminal.Success);
                 if (AppWindow.IsVisible) { confirmation = MessageDialog(terminal.Success ? "Cards safely removed" : "Card removal stopped", terminal.Message, null); await confirmation.ShowAsync(); confirmation = null; }
             } catch (Exception ex) {
                 Summary.Text = terminal == null ? "Grouped removal stopped. " + ex.Message + " " + counts.Message : terminal.Message + " Result display unavailable: " + ex.Message;

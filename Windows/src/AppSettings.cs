@@ -54,11 +54,13 @@ namespace EasyEject {
     [DataContract] internal sealed class AppIssue {
         [DataMember] internal string Message = "", ObservedUtc = "";
         [DataMember] internal bool Dismissed;
+        [IgnoreDataMember] long revision;
+        internal long Revision { get { return System.Threading.Interlocked.Read(ref revision); } }
         internal bool HasIssue { get { return !String.IsNullOrEmpty(Message); } }
         internal bool NeedsAttention { get { return HasIssue && !Dismissed; } }
-        internal void Record(string message) { Message = message.Length > 4096 ? message.Substring(0, 4096) : message; ObservedUtc = DateTime.UtcNow.ToString("o"); Dismissed = false; }
-        internal void Dismiss() { Dismissed = true; }
-        internal void Clear() { Message = ""; ObservedUtc = ""; Dismissed = false; }
+        internal void Record(string message) { Message = message.Length > 4096 ? message.Substring(0, 4096) : message; ObservedUtc = DateTime.UtcNow.ToString("o"); Dismissed = false; System.Threading.Interlocked.Increment(ref revision); }
+        internal void Dismiss() { Dismissed = true; System.Threading.Interlocked.Increment(ref revision); }
+        internal void Clear() { Message = ""; ObservedUtc = ""; Dismissed = false; System.Threading.Interlocked.Increment(ref revision); }
         internal static AppIssue Load() { return Load(Profiles.Root); }
         internal static AppIssue Load(string root, Action<string> checkpoint = null) {
             var value = Configuration.Read<AppIssue>(root, "issue-state.json", checkpoint) ?? new AppIssue();
