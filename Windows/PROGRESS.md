@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Native late-Stop timing and restoration · October 8
+
+One native 1 GiB owned hashing fixture exposes **Stop validation** on corrected PID25172, but Save commits before the subsequent Stop input. Actual cancellation remains unproved. Fresh native selection/Save restores the exact original 486-byte tool setup and unchanged supplied executable hashes; guarded recovery moves only the fixture into external evidence storage, with no execution/export/device action. [Timing evidence](modern/QUICK_SHARE_SETUP_SCROLL.md) binds the late committed record, restored record and **18:54:43.3004239Z** receipt. Code/candidate unchanged, no new suite count; busy cancellation/close and remaining full-port acceptance stay open, goal active.
+
 ## Readable native Quick Share setup failures · October 8
 
 Actual zero-byte tool refusal exposed a disabled ScrollViewer hiding the error below the initial fold. The owned UI correction disables choices inside a ContentControl while keeping the viewer active. Warning-free isolated **e1f307c** plus one app-file overlay passes **242/0 selected**, terminal **1755 exit0**; corrected native **PID25172/window7472742** scrolls the full refusal into view while Save/choices stay disabled and Close reachable. Reopen restores valid paths; explicit manual Save succeeds with no export, preserving exact setup bytes. Later issue attention/acknowledgement and guarded recovery of only the temporary zero-byte fixture pass. [Scroll correction evidence](modern/QUICK_SHARE_SETUP_SCROLL.md) binds hashes/commands/receipts, all601 unchanged files/76 matching loaded modules, retained failed first build/helper limits and exact idle-only stop of original PID6148. No new full/current-vendor/tray/busy-Stop/media/device/LUT/trust claim. Saved setup plus acknowledged test issue remain; other native/hardware/distribution acceptance stays open, full goal active.
