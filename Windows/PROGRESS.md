@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Modern busy close-to-tray · October 8
+
+Source **ee7fcc5** corrects a source-discovered mismatch: ordinary Closing now hides the modern window while preserving active work/dialog/tray ownership; actual Quit remains busy-protected and a refused Quit revokes its flag. This matches existing Help/footer and the classic close handler, with Mac lifetime/termination contracts inspected. Fresh isolated eb0470a plus only MainWindow.xaml.cs produces **601-file** `ReviewCloseTrayVerified-20261008/app`; warning-free exact-backend selected **236/0**, terminal 70409 and durable parent 2004 exit zero. Source/payload hashes match; 102 runtime source files match prior full-test source after newline-only normalization. Prior **1289/0** retains its separate byte scope and was not rerun for this UI-only edit. [Close-to-tray evidence](modern/CLOSE_TO_TRAY.md) records source/commands/hashes and the retained initial newline comparison refusal. Native busy close/reveal/modal/Stop/Quit/session acceptance remains unrun with desktop input paused. Other dirty sharing work, Mac/website/user data and all remaining full-port device/LUT/distribution gates are preserved; goal active.
+
 ## Modern startup resource fix · October 8
 
 Verified source/evidence commit: **e4e6874**. Only the ten owned Windows files are committed; the other task's two dirty real-sharing files remain preserved and excluded.
