@@ -50,6 +50,7 @@ foreach ($required in @('EasyEject.Modern.exe', 'EasyEject.Modern.dll', 'EasyEje
 }
 $runtime = Get-Content -LiteralPath (Join-Path $payload 'EasyEject.Modern.runtimeconfig.json') -Raw | ConvertFrom-Json
 if ($runtime.runtimeOptions.framework -or $runtime.runtimeOptions.frameworks -or !$runtime.runtimeOptions.includedFrameworks) { throw 'Review output still requires an installed .NET framework.' }
+& (Join-Path $PSScriptRoot 'preserve-vendor-notices.ps1') -AssetsPath (Join-Path $reviewRoot 'build/obj/EasyEject.Modern/project.assets.json') -PackageRoot (Join-Path $CacheRoot 'nuget') -PayloadRoot $payload -ReportPath (Join-Path $reviewRoot 'vendor-notices.json')
 & (Join-Path $PSScriptRoot 'inspect-native-dependencies.ps1') -PayloadRoot $payload -ReportPath (Join-Path $reviewRoot 'native-imports.json')
 $readme = @'
 Easy Eject local Windows review
@@ -73,6 +74,10 @@ opt-in per device and manual per action. The complete full-quality copies remain
 
 review-build.json in the parent folder records local hashes, not a signature or
 trusted release proof.
+
+ThirdPartyNotices preserves existing package license/notice texts and metadata.
+vendor-notices.json records their exact source pins. Final publication license
+and notice review is still pending; this is not permission to redistribute.
 '@
 [IO.File]::WriteAllText((Join-Path $payload 'README-REVIEW.txt'), $readme, [Text.UTF8Encoding]::new($false))
 $files = @(Get-ChildItem -LiteralPath $payload -Recurse -File | Sort-Object FullName | ForEach-Object {
@@ -84,6 +89,7 @@ $evidence = [ordered]@{
     sdk = $sdkVersion.Trim(); architecture = 'win-x64'; configuration = 'Release'
     installedFrameworkRequired = $false; includedFrameworks = $runtime.runtimeOptions.includedFrameworks
     nativeImportObservation = 'native-imports.json (static names only; not loader or clean-computer proof)'
+    vendorNoticeObservation = 'vendor-notices.json (exact pinned package texts/metadata; final publication acceptance pending)'
     nativeCleanComputerAcceptance = 'pending'; foregroundAcceptance = 'pending'
     generatedUtc = [DateTime]::UtcNow.ToString('o'); files = $files
 }

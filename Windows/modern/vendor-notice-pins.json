@@ -1,0 +1,439 @@
+{
+  "format": 1,
+  "kind": "existing-microsoft-package-notice-pins",
+  "dotnet": "10.0.12",
+  "windowsAppSdk": "2.5.1",
+  "sourceObservationSha256": "ef7251bf755c2661b26ff6842bdeb49f8e183680928f71d1fcae2b80811bac0f",
+  "authorFingerprint": "566A31882BE208BE4422F7CFD66ED09F5D4524A5994F50CCC8B05EC0528C1353",
+  "productionApproval": false,
+  "packages": [
+    {
+      "identity": "Microsoft.AspNetCore.App.Runtime.win-x64/10.0.12",
+      "packageSha256": "59025d88c8f5178e8569f91c7cbc56ad3ead3d83a777477d17fade3f9cdd8103",
+      "sourceRole": "downloadDependency",
+      "entries": [
+        {
+          "entry": "Microsoft.AspNetCore.App.Runtime.win-x64.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1269,
+          "sha256": "6f3d800ff6669f05fab40d3c9fcfe3ab162c2d36717d78ef39d6e1baa0eabc59"
+        },
+        {
+          "entry": "LICENSE.txt",
+          "destination": "LICENSE.txt",
+          "length": 1139,
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b"
+        },
+        {
+          "entry": "THIRD-PARTY-NOTICES.TXT",
+          "destination": "THIRD-PARTY-NOTICES.TXT",
+          "length": 56748,
+          "sha256": "307d014f65d8482314f1400ddeae7a0cbabb96c2207bcc77f6233cc10588e5d9"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.NETCore.App.Runtime.win-x64/10.0.12",
+      "packageSha256": "0f63dee7ca4383cb16848966f81e439399e2058e1671ebe27e5eaf4b200e8691",
+      "sourceRole": "downloadDependency",
+      "entries": [
+        {
+          "entry": "Microsoft.NETCore.App.Runtime.win-x64.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1022,
+          "sha256": "2649fc5fcb95c80f991b6d47ad8e10b772923249e87d98f409ca54cee548c379"
+        },
+        {
+          "entry": "LICENSE.TXT",
+          "destination": "LICENSE.TXT",
+          "length": 1139,
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b"
+        },
+        {
+          "entry": "THIRD-PARTY-NOTICES.TXT",
+          "destination": "THIRD-PARTY-NOTICES.TXT",
+          "length": 78041,
+          "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.Web.WebView2/1.0.3719.77",
+      "packageSha256": "2f6be3a10a1a8d6d1fde986af4131dab344f8181fffe75590824e0f4b037ed73",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "LICENSE.txt",
+          "destination": "LICENSE.txt",
+          "length": 1487,
+          "sha256": "0af8f1b807512aae39c2ac1aa4d0cae65cabecb6fd554b8439a5162a0d6eca55"
+        },
+        {
+          "entry": "Microsoft.Web.WebView2.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1367,
+          "sha256": "8664509b904eec16bf806dede9297b87649f8e8e2e391083a57cc7ed6a4f873e"
+        },
+        {
+          "entry": "NOTICE.txt",
+          "destination": "NOTICE.txt",
+          "length": 3894,
+          "sha256": "106423785c5b7eba0a8e61d1837f2132e9c828e20ad530f565d981c1df60dd90"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.Windows.AI.MachineLearning/2.1.74",
+      "packageSha256": "691165fa3c07a04b752cbf4a07e93ed13a418e9dea1ee89eb163d2225e2ba3af",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.Windows.AI.MachineLearning.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1255,
+          "sha256": "b68a2fe2d575cb8e1f703b69614eda0e23b5da8a65ce187f08a4ec797a6924db"
+        },
+        {
+          "entry": "license.txt",
+          "destination": "license.txt",
+          "length": 13996,
+          "sha256": "66395f8cb219087fae2bd025010bd9076b736c14f03b48f20295471c0c376814"
+        },
+        {
+          "entry": "ThirdPartyNotices.txt",
+          "destination": "ThirdPartyNotices.txt",
+          "length": 331175,
+          "sha256": "fb0af774b4d7cffc5b9d046f2aaeade2f37df2f80abf8033c95dfffcc77a8866"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.Windows.SDK.BuildTools.MSIX/1.7.251221100",
+      "packageSha256": "e61c560805029f5ae15433be52e153f3862b6faaf725292638a9ece592f7a060",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.Windows.SDK.BuildTools.MSIX.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 851,
+          "sha256": "8450430fbd207eb0a0cd876bb3b5f553a43c2aa85c6ae79d916df1acce77e07c"
+        },
+        {
+          "entry": "NOTICE.txt",
+          "destination": "NOTICE.txt",
+          "length": 2061,
+          "sha256": "f09ebf5de6a5c8e7ebc900bb2e52af2f75e13610a1cf91e1514530e448d956c3"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.Windows.SDK.BuildTools/10.0.26100.4654",
+      "packageSha256": "5f5783658a200f83ea2addfd406e2303a901b27ad7c49b0347c34aefcc21883d",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.Windows.SDK.BuildTools.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 914,
+          "sha256": "aac383f40ed26caedb6b748ae1470722380039baec34923bb37006517cada5a7"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.Windows.SDK.NET.Ref/10.0.26100.57",
+      "packageSha256": "eaa0e3b938319f75beac5c046c84ef57212c2743e9263e0db33b2019ab70b524",
+      "sourceRole": "downloadDependency",
+      "entries": [
+        {
+          "entry": "Microsoft.Windows.SDK.NET.Ref.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1345,
+          "sha256": "29b749b945199a2d0d2dd8a21e342c3283c06a19938d4b418ef99c26839a36e8"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.WindowsAppSDK.AI/2.5.5",
+      "packageSha256": "108143ad35b20c8df7a885995ce4258e7c2e6ba74c9b60d2d819cbc46980b6fb",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.WindowsAppSDK.AI.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1095,
+          "sha256": "774dedb94b03a04a95b3f917717331bf3625e3d61f96879ac28375eb1525e74a"
+        },
+        {
+          "entry": "license.txt",
+          "destination": "license.txt",
+          "length": 12637,
+          "sha256": "5b11e6347756e40fe0274bc08c97f89201b94f0d50181a09a00f1f4740840501"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.WindowsAppSDK.Base/2.0.4",
+      "packageSha256": "e3e13478c4c80c59ed5f8f89542fe49a2985daa484753e93a5858e90c2d46a4d",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.WindowsAppSDK.Base.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1580,
+          "sha256": "7cd50be2ac8b9d3d7e376573cce153498070f825bf1c3580062880b4b63f98bc"
+        },
+        {
+          "entry": "NOTICE.txt",
+          "destination": "NOTICE.txt",
+          "length": 340893,
+          "sha256": "572b43d41dea717dae7dc5de69acb20a74df025e8f5a3c0aa6f7bca02615e23c"
+        },
+        {
+          "entry": "license.txt",
+          "destination": "license.txt",
+          "length": 12637,
+          "sha256": "5b11e6347756e40fe0274bc08c97f89201b94f0d50181a09a00f1f4740840501"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.WindowsAppSDK.DWrite/2.1.0",
+      "packageSha256": "91746abd6a780b84001f9c465507830d5a24c79912bc4aa0d35938c71c1c6b5f",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.WindowsAppSDK.DWrite.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1020,
+          "sha256": "ee369333210804e69b6a90a75f9d4a12dc43e8f37ac2558f33cdf1ce131add62"
+        },
+        {
+          "entry": "license.txt",
+          "destination": "license.txt",
+          "length": 12637,
+          "sha256": "5b11e6347756e40fe0274bc08c97f89201b94f0d50181a09a00f1f4740840501"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.WindowsAppSDK.Foundation/2.3.12",
+      "packageSha256": "ce04d01d68cb16b5dc85a5c9efb8162dba876bc2e5b766b5968979899d4efa9e",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.WindowsAppSDK.Foundation.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 945,
+          "sha256": "545c5836830bb3aaefdc7c38d72229acd3e617cef36ad3776c767579cdd1a9dc"
+        },
+        {
+          "entry": "license.txt",
+          "destination": "license.txt",
+          "length": 12637,
+          "sha256": "5b11e6347756e40fe0274bc08c97f89201b94f0d50181a09a00f1f4740840501"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.WindowsAppSDK.InteractiveExperiences/2.1.9",
+      "packageSha256": "f9159d73e3e46717f159606e43b4acf8336aaff5bdd4d395fe3a93fdb41437ac",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.WindowsAppSDK.InteractiveExperiences.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1121,
+          "sha256": "2acb520fdad10bb986fc710b436fa9c2ed6d480a206026d52ba8d506510a5ce1"
+        },
+        {
+          "entry": "license.txt",
+          "destination": "license.txt",
+          "length": 12637,
+          "sha256": "5b11e6347756e40fe0274bc08c97f89201b94f0d50181a09a00f1f4740840501"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.WindowsAppSDK.ML/2.1.94",
+      "packageSha256": "549e92cd397b9d90ea9f08334db6c79dfa78fc49b47bd3d26a53eb1df2f21191",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.WindowsAppSDK.ML.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 2073,
+          "sha256": "1ae38b80e7180220741ee9ce1fe70850d35f898eb04a2006baab2c8ccfe16491"
+        },
+        {
+          "entry": "license.txt",
+          "destination": "license.txt",
+          "length": 14033,
+          "sha256": "656aab74c15aa9f9964bcdcc993eb2755cbdb4822d5e0e3bc61d2e281897f758"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.WindowsAppSDK.Runtime/2.5.1",
+      "packageSha256": "2fbd27012291be50cafed6942306964281d37167af6a6af3887e1163ec5cf063",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.WindowsAppSDK.Runtime.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1473,
+          "sha256": "90b3a29e4e987258bbf8c993025045b8db69a937b7580780302afa65659760ef"
+        },
+        {
+          "entry": "license.txt",
+          "destination": "license.txt",
+          "length": 12637,
+          "sha256": "5b11e6347756e40fe0274bc08c97f89201b94f0d50181a09a00f1f4740840501"
+        },
+        {
+          "entry": "NOTICE.txt",
+          "destination": "NOTICE.txt",
+          "length": 340893,
+          "sha256": "572b43d41dea717dae7dc5de69acb20a74df025e8f5a3c0aa6f7bca02615e23c"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.WindowsAppSDK.Search/2.5.5",
+      "packageSha256": "b5876fe0091a6a14c34e46b5bc898621e80b5ed598f45574b90deb84bf33f023",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.WindowsAppSDK.Search.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1184,
+          "sha256": "da9003c7d294261d11646644699fcf7f72400c8e80ca91e12fb92d7a4144df9c"
+        },
+        {
+          "entry": "license.txt",
+          "destination": "license.txt",
+          "length": 12637,
+          "sha256": "5b11e6347756e40fe0274bc08c97f89201b94f0d50181a09a00f1f4740840501"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.WindowsAppSDK.Widgets/2.0.5",
+      "packageSha256": "7f1b585ef8f012784d2cb91b86e809814ceccab74183a5979ef45db141779cb5",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.WindowsAppSDK.Widgets.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1123,
+          "sha256": "c5aeb6cad1f91a8e025944ceee3f4ac1ca306e432b3afae23a7fbac70b07dea7"
+        },
+        {
+          "entry": "license.txt",
+          "destination": "license.txt",
+          "length": 12637,
+          "sha256": "5b11e6347756e40fe0274bc08c97f89201b94f0d50181a09a00f1f4740840501"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.WindowsAppSDK.WinUI/2.3.9",
+      "packageSha256": "d36145bd6c0f46fc04e07fb4af365d093fb42c39b625948d0ead07a0b26fce96",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.WindowsAppSDK.WinUI.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1524,
+          "sha256": "ad7f25039df5a4097713aeddb736df8484bacb917b47969229f0e63e55da032a"
+        },
+        {
+          "entry": "license.txt",
+          "destination": "license.txt",
+          "length": 12637,
+          "sha256": "5b11e6347756e40fe0274bc08c97f89201b94f0d50181a09a00f1f4740840501"
+        },
+        {
+          "entry": "NOTICE.txt",
+          "destination": "NOTICE.txt",
+          "length": 2061,
+          "sha256": "e25393c0d340a1821827b093fa4dbbfcccd8feb7bf769e7fa773e3955cd5314b"
+        },
+        {
+          "entry": "tools/NOTICE.txt",
+          "destination": "tools/NOTICE.txt",
+          "length": 638,
+          "sha256": "4a9321fd173ebf4e8bbc79130794d4c3fe233acccbf7db8765e0addb8fbfb8ca"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.WindowsAppSDK/2.5.1",
+      "packageSha256": "2e26de1253e2e2a288a75387523e2f8b402c05f117d42013df9875887a70933a",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "Microsoft.WindowsAppSDK.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 2010,
+          "sha256": "42f06606c3d4ba5c49c0ad7fe76ad200bb6ddbffa5f4aa04bf9f2a61b8c55394"
+        },
+        {
+          "entry": "license.txt",
+          "destination": "license.txt",
+          "length": 12637,
+          "sha256": "5b11e6347756e40fe0274bc08c97f89201b94f0d50181a09a00f1f4740840501"
+        },
+        {
+          "entry": "NOTICE.txt",
+          "destination": "NOTICE.txt",
+          "length": 340893,
+          "sha256": "572b43d41dea717dae7dc5de69acb20a74df025e8f5a3c0aa6f7bca02615e23c"
+        }
+      ]
+    },
+    {
+      "identity": "Microsoft.WindowsDesktop.App.Runtime.win-x64/10.0.12",
+      "packageSha256": "68bce56d2402969d82ac77fbd2b2a54f55fda86ea060366e6ddb832353dab80a",
+      "sourceRole": "downloadDependency",
+      "entries": [
+        {
+          "entry": "Microsoft.WindowsDesktop.App.Runtime.win-x64.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 916,
+          "sha256": "07565a5cd782179e3b8c356ceca851796d8353c10a1ef14a400d43ac1add00cf"
+        },
+        {
+          "entry": "LICENSE",
+          "destination": "LICENSE.txt",
+          "length": 1137,
+          "sha256": "a89886665765362eb77e0f8e26602c924520041d1711b2eedc136434fe4d01ab"
+        }
+      ]
+    },
+    {
+      "identity": "System.Numerics.Tensors/9.0.0",
+      "packageSha256": "b750243c36002a62b28b1ac5d3fbc284ad340ba1494cc36aca110611a0b1f959",
+      "sourceRole": "dependency",
+      "entries": [
+        {
+          "entry": "System.Numerics.Tensors.nuspec",
+          "destination": "PACKAGE-METADATA.txt",
+          "length": 1482,
+          "sha256": "52f3ac41d9235ca1e544e27145aeeef36c2dc2159c33936932d5f9c34267a14e"
+        },
+        {
+          "entry": "LICENSE.TXT",
+          "destination": "LICENSE.TXT",
+          "length": 1139,
+          "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b"
+        },
+        {
+          "entry": "THIRD-PARTY-NOTICES.TXT",
+          "destination": "THIRD-PARTY-NOTICES.TXT",
+          "length": 75640,
+          "sha256": "40686c6447a7d5b5d3693068e4571b5f483d7ed335aeee773ef662440de4c5d5"
+        }
+      ]
+    }
+  ]
+}
