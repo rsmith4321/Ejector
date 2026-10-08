@@ -22,6 +22,8 @@ Each boundary is injected at the second recorded-file report, after the first fi
 
 This is opt-in integration evidence, not a new default-suite count. Production source/review app and the last **1415/0** modern defaults are unchanged. Actual app history UI, restart, physical sleep/device/filesystem/media/LUT and trusted distribution acceptance remain open.
 
+Local milestone **fb9cad4060abfae95f00f77c3fa3e39be45bdd9c** independently matches the compiled helper/project Git blobs, with unchanged production/default-test source. Thirteen completed evidence files are pinned in `completed-evidence-pins.json`; configuration hashes are also freshly rechecked in `independent-configuration-check.json`. No push/public delivery.
+
 ## Earlier verified preparation
 
 The successful packet is `C:/Users/rsmit/.codex/EasyEjectBuildTools/NativeHistoryVerified-20261008`. Its frozen source/project, cleared-source NuGet configuration, complete publish arguments, compile log, admission logs, preparation result, fixture receipt and independent verification remain there. The helper compiles with warnings as errors under the existing .NET SDK 10.0.401; publish exits zero at **19:57:14.4057504Z**. No tools are installed or downloaded.

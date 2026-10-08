@@ -2,6 +2,8 @@
 
 ## Verify native saved-history interruption on the current backend · October 8
 
+Local helper milestone **fb9cad4060abfae95f00f77c3fa3e39be45bdd9c** matches both compiled helper/project Git blobs in `committed-source-conformance.json`. Thirteen evidence files are pinned. Production/default-test source is unchanged; no push or public delivery.
+
 The separately opt-in [power-aware history preparation](modern/tools/NATIVE_HISTORY_FIXTURE.md) now uses the unchanged exact review backend **F810DFB7…F35FAD** and all seven matching backend/runtime pairs. Owned native notification registration/read-only internal destination plus a genuine generated-file import/receipt prove source-absent verification, changed-original/destination/cancel refusal and fresh retry; three owned managed power boundaries stop old history proof, preserve saved hashes/release reservations, and require fresh verification without paired-resume double expiry. Parent7868 terminal **22:39:37.9584779Z exit0**, warning-free; three distinct admission controls also pass. Independent source/copy/receipt/runtime/process checks retained outside OneDrive. No default count increase or production change: **1415/0** stays the previous modern default run. Prepared profile/history remain private/unseeded; existing configuration/preview/peer pending file preserved. Actual foreground/restart/real power/hardware/media/LUT/filesystem/travel/trust and full goal remain open.
 
 ## Check sleep/wake during manual sharing, cleanup and recovery · October 8
