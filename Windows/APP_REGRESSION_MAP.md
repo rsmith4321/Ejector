@@ -58,6 +58,8 @@ Defaults test-source commit `778268d8afb5b30da881ba545c2f8568b5424c5c`; `--defau
 
 ## Completion, notification and prompt properties
 
+Grouped-source explanation source **8f34d85** adds the Mac selected-source result/other-storage warning to classic and modern reviews, with the modern Eject Device label matching classic. [GROUPED_COMPLETION_PROMPT.md](GROUPED_COMPLETION_PROMPT.md): **0/2 before, 2/0 each fixed**, generated partition/LUN cases and captured display/retained-file/default-button checks; existing **2/17/4 each**, warning-free WinUI/selected **242/0**. Removal planning/authority is unchanged. Actual grouped foreground and physical removal remain Partial.
+
 Saved prompt routing source **2b87e5b** now honors the actual Mac manager's current-source opt-in branch even when Windows is hidden and notifications enabled. Before **0/2**, focused **2/0**, both defaults **1363/0**, warning-free WinUI/selected **242/0**; see [COMPLETION_PROMPT_CONTRACT.md](COMPLETION_PROMPT_CONTRACT.md). This corrects the prior Windows visibility/notification suppression policy; it does not turn Apple notification permission tests or hidden control fixtures into live foreground acceptance.
 
 | Exact Mac property | Inspected Windows evidence | Status |

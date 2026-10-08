@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Explain selected-source results before grouped eject · October 8
+
+Source **8f34d85** brings the Mac grouped prompt's captured-source result and **other storage may still have files to import** warning into both interfaces; modern grouped Eject Device now matches classic. New **0/2 before → 2/0 each runtime**, generated partition/LUN selected/filtered fixtures preserve source/sibling bytes and Keep Connected; existing prompt/connections/defaults **2/17/4 each**, warning-free WinUI/selected **242/0**, terminal **10908 exit0**. [Grouped prompt evidence](GROUPED_COMPLETION_PROMPT.md) binds six compiled/committed files, immutable display, equal runtime copies and zero owned processes. No removal-scope/authority change, real device/media/input/configuration action or fresh full-default claim. Concurrent native tools preserved; remaining foreground/physical/media/LUT/filesystem/travel/trust gates and full goal stay open.
+
 ## Preserve saved eject prompting while Windows is hidden · October 8
 
 Source **2b87e5b** fixes the actual Mac-manager contract mismatch where a hidden window plus notifications-on suppressed an eligible import's frozen ask-to-eject opt-in. New groups **0/2 before → 2/0 fixed**, both full suites **1363/0**, warning-free WinUI/selected **242/0**, full terminals **2854/77230 exit0**. Persisted/generated selected and filtered imports retain originals/copy, frozen ask-on through later preference changes, Keep Connected default and one-use explicit fake eject. [Prompt evidence](COMPLETION_PROMPT_CONTRACT.md) binds unchanged Mac manager, three compiled/committed sources, identical runtime copies and zero owned processes. No live app/input/device/tool/normal-settings action; actual hidden reveal/foreground/dialog/notification and remaining media/LUT/hardware/trust gates stay open. Concurrent native evidence preserved; full goal active.
