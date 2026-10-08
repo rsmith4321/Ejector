@@ -20,9 +20,17 @@ namespace EasyEject {
             if (Name != "EasyEject.Windows" || Version != version || Product != "Easy Eject" || Title != "Easy Eject for Windows" || FileVersion != version || InformationalVersion != version)
                 throw new SafetyException("The actual managed Windows application/version identity does not match the authenticated release and native resources.");
         }
+        internal void RequireModern(string version) {
+            if (!WindowsReleaseManifest.StableVersion(version) || Name != "EasyEject.Modern" || Version != version || Product != "Easy Eject" || Title != "Easy Eject for Windows" || FileVersion != version || InformationalVersion != version)
+                throw new SafetyException("The actual managed modern Windows application/version identity does not match the authenticated release.");
+        }
         internal static WindowsManagedIdentity Read(FileStream stream) {
             byte[] bytes = WindowsExecutableIdentity.ReadMetadata(stream);
             return NativeManagedMetadata.Read(bytes);
+        }
+        internal static WindowsManagedIdentity ReadModern(FileStream stream) {
+            uint entryPoint; byte[] bytes = WindowsExecutableIdentity.ReadModernMetadata(stream, out entryPoint);
+            return NativeManagedMetadata.ReadModern(bytes, entryPoint);
         }
     }
     internal static class NativeManagedMetadata {
@@ -39,12 +47,21 @@ namespace EasyEject {
         [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate int AttributeProps(IntPtr self, uint token, out uint owner, out uint constructor, out IntPtr data, out uint size);
         [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)] delegate int MemberProps(IntPtr self, uint token, out uint type, [Out] StringBuilder name, uint capacity, out uint count, out IntPtr signature, out uint size);
         [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)] delegate int TypeProps(IntPtr self, uint token, out uint scope, [Out] StringBuilder name, uint capacity, out uint count);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)] delegate int MethodDefinitionProps(IntPtr self, uint token, out uint owner, [Out] StringBuilder name, uint capacity, out uint count, out uint attributes, out IntPtr signature, out uint size, out uint rva, out uint implementation);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)] delegate int TypeDefinitionProps(IntPtr self, uint token, [Out] StringBuilder name, uint capacity, out uint count, out uint attributes, out uint parent);
         [StructLayout(LayoutKind.Sequential)] internal struct AssemblyMetadata {
             internal ushort Major, Minor, Build, Revision; internal IntPtr Locale; internal uint LocaleCount;
             internal IntPtr Processors; internal uint ProcessorCount; internal IntPtr Systems; internal uint SystemCount;
             internal string Version { get { return new Version(Major, Minor, Build, Revision).ToString(4); } }
         }
         internal static WindowsManagedIdentity Read(byte[] bytes) {
+            return Read(bytes, false, 0);
+        }
+        internal static WindowsManagedIdentity ReadModern(byte[] bytes, uint entryPoint) {
+            if ((entryPoint & 0xff000000) != 0x06000000 || (entryPoint & 0x00ffffff) == 0) throw new SafetyException("The modern managed application has no supported method entry point.");
+            return Read(bytes, true, entryPoint);
+        }
+        static WindowsManagedIdentity Read(byte[] bytes, bool modern, uint entryPoint) {
             if (bytes == null || bytes.Length < 16 || bytes.Length > 16777216 || BitConverter.ToUInt32(bytes, 0) != 0x424a5342) throw new SafetyException("Missing or unsupported bounded CLR metadata snapshot.");
             var pin = GCHandle.Alloc(bytes, GCHandleType.Pinned); IntPtr dispenser = IntPtr.Zero, importer = IntPtr.Zero, assemblies = IntPtr.Zero, enumeration = IntPtr.Zero, locale = IntPtr.Zero;
             try {
@@ -78,22 +95,32 @@ namespace EasyEject {
                         string member = name.ToString(); name.Clear(); Status(Method<TypeProps>(importer, 14)(importer, type, out scope, name, 256, out count), "type properties"); CheckName(count); string attribute = name.ToString();
                         if (!Wanted.Contains(attribute)) continue;
                         if (member != ".ctor" || keySize != 4 || !Copy(signature, keySize, 4).SequenceEqual(new byte[] { 0x20, 1, 1, 0x0e })) throw new SafetyException("The managed identity attribute has an unsupported constructor signature.");
-                        RequireCoreReference(assemblies, scope, locale);
+                        RequireCoreReference(assemblies, scope, locale, modern);
                         if (values.ContainsKey(attribute)) throw new SafetyException("Duplicate managed Windows identity attributes."); values.Add(attribute, StringAttribute(Copy(data, size, 1024)));
                     }
                     if (result == 1 || fetched == 0) break;
                 }
+                if (modern) RequireModernEntryPoint(importer, entryPoint);
                 return new WindowsManagedIdentity(assemblyName, version, values);
             } finally {
                 try { if (enumeration != IntPtr.Zero && importer != IntPtr.Zero) Method<CloseEnumeration>(importer, 3)(importer, enumeration); }
                 finally { if (assemblies != IntPtr.Zero) Marshal.Release(assemblies); if (importer != IntPtr.Zero) Marshal.Release(importer); if (dispenser != IntPtr.Zero) Marshal.Release(dispenser); if (locale != IntPtr.Zero) Marshal.FreeHGlobal(locale); pin.Free(); }
             }
         }
-        static void RequireCoreReference(IntPtr assemblies, uint token, IntPtr locale) {
+        static void RequireCoreReference(IntPtr assemblies, uint token, IntPtr locale, bool modern) {
             if ((token & 0xff000000) != 0x23000000) throw new SafetyException("The managed identity attribute does not come from the Framework core assembly.");
             Marshal.WriteInt16(locale, 0); var metadata = new AssemblyMetadata { Locale = locale, LocaleCount = 256 }; var name = new StringBuilder(256); IntPtr key, hash; uint keySize, count, hashSize, flags;
             Status(Method<ReferenceProps>(assemblies, 4)(assemblies, token, out key, out keySize, name, 256, out count, ref metadata, out hash, out hashSize, out flags), "assembly properties"); CheckName(count); RequireNeutral(metadata);
-            if (name.ToString() != "mscorlib" || metadata.Version != "4.0.0.0" || flags != 0 || keySize != 8 || !Copy(key, keySize, 8).SequenceEqual(new byte[] { 0xb7, 0x7a, 0x5c, 0x56, 0x19, 0x34, 0xe0, 0x89 })) throw new SafetyException("The managed identity attribute references an unexpected core assembly.");
+            byte[] expectedKey = modern ? new byte[] { 0xb0, 0x3f, 0x5f, 0x7f, 0x11, 0xd5, 0x0a, 0x3a } : new byte[] { 0xb7, 0x7a, 0x5c, 0x56, 0x19, 0x34, 0xe0, 0x89 };
+            if (name.ToString() != (modern ? "System.Runtime" : "mscorlib") || metadata.Version != (modern ? "10.0.0.0" : "4.0.0.0") || flags != 0 || keySize != 8 || !Copy(key, keySize, 8).SequenceEqual(expectedKey)) throw new SafetyException("The managed identity attribute references an unexpected core assembly.");
+        }
+        static void RequireModernEntryPoint(IntPtr importer, uint token) {
+            var name = new StringBuilder(256); uint owner, count, attributes, size, rva, implementation; IntPtr signature;
+            Status(Method<MethodDefinitionProps>(importer, 30)(importer, token, out owner, name, 256, out count, out attributes, out signature, out size, out rva, out implementation), "modern entry point"); CheckName(count);
+            if (name.ToString() != "Main" || attributes != 0x91 || implementation != 0 || rva == 0 || (owner & 0xff000000) != 0x02000000 || size != 5 || !Copy(signature, size, 5).SequenceEqual(new byte[] { 0, 1, 1, 0x1d, 0x0e }))
+                throw new SafetyException("The modern managed application has an unsupported entry point contract.");
+            uint parent; name.Clear(); Status(Method<TypeDefinitionProps>(importer, 12)(importer, owner, name, 256, out count, out attributes, out parent), "modern entry point owner"); CheckName(count);
+            if (name.ToString() != "EasyEject.Modern.Program") throw new SafetyException("The modern managed application has an unexpected entry point owner.");
         }
         static void RequireNeutral(AssemblyMetadata metadata) { if (metadata.LocaleCount > 256 || metadata.ProcessorCount != 0 || metadata.SystemCount != 0 || Marshal.PtrToStringUni(metadata.Locale) != "") throw new SafetyException("Unsupported managed assembly culture or platform metadata."); }
         static T Method<T>(IntPtr pointer, int slot) { RequirePointer(pointer); return (T)(object)Marshal.GetDelegateForFunctionPointer(Marshal.ReadIntPtr(Marshal.ReadIntPtr(pointer), slot * IntPtr.Size), typeof(T)); }

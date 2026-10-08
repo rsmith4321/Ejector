@@ -17,6 +17,13 @@ namespace EasyEject {
         }
         internal static void ValidatePe(FileStream stream) { ReadMetadata(stream); }
         internal static byte[] ReadMetadata(FileStream stream) {
+            uint ignored; return ReadMetadata(stream, false, out ignored);
+        }
+        internal static byte[] ReadModernMetadata(FileStream stream, out uint entryPoint) {
+            return ReadMetadata(stream, true, out entryPoint);
+        }
+        static byte[] ReadMetadata(FileStream stream, bool modern, out uint entryPoint) {
+            entryPoint = 0;
             byte[] dos = Read(stream, 0, 64); if (BitConverter.ToUInt16(dos, 0) != 0x5a4d) Fail();
             uint offset = BitConverter.ToUInt32(dos, 60); if (offset < 64 || offset > 1048576) Fail(); byte[] header = Read(stream, offset, 24);
             ushort sections = BitConverter.ToUInt16(header, 6), optionalSize = BitConverter.ToUInt16(header, 20), flags = BitConverter.ToUInt16(header, 22);
@@ -32,6 +39,8 @@ namespace EasyEject {
             }
             if (clrOffset < 0) Fail(); byte[] clr = Read(stream, clrOffset, 72); uint clrFlags = BitConverter.ToUInt32(clr, 16);
             if (BitConverter.ToUInt32(clr, 0) != 72 || (clrFlags & 1) == 0 || (clrFlags & ~9U) != 0) Fail();
+            entryPoint = BitConverter.ToUInt32(clr, 20);
+            if (modern && ((entryPoint & 0xff000000) != 0x06000000 || (entryPoint & 0x00ffffff) == 0)) Fail();
             uint metadataRva = BitConverter.ToUInt32(clr, 8), metadataSize = BitConverter.ToUInt32(clr, 12); long metadataOffset = -1;
             if (metadataRva == 0 || metadataSize < 16 || metadataSize > 16777216) Fail();
             for (int i = 0; i < sections; i++) {
