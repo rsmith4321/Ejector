@@ -68,7 +68,9 @@ namespace EasyEject.Modern {
                             if (result != null && !closed) {
                                 OtherStorageStatus.Text = result.Message;
                                 if (!result.Success && !result.Cancelled) { concurrentIssuePending = true; RecordModernIssue("Other storage action: " + result.Message); }
-                                if (settings != null && settings.NotificationsEnabled) { tray.BalloonTipTitle = result.Success ? "Safe removal accepted" : result.Cancelled ? "Other-device action cancelled" : "Other device still connected"; tray.BalloonTipText = result.Message.Substring(0, Math.Min(240, result.Message.Length)); tray.ShowBalloonTip(5000); }
+                                string deliveryWarning = TryModernNotification(result.Success ? "Safe removal accepted" : result.Cancelled ? "Other-device action cancelled" : "Other device still connected",
+                                    result.Message, !result.Success && !result.Cancelled, settings != null && settings.NotificationsEnabled);
+                                if (deliveryWarning != null) OtherStorageStatus.Text += "\n" + deliveryWarning;
                             }
                         } finally { view.Dispose(); }
                     }

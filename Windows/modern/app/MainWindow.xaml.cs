@@ -268,7 +268,8 @@ namespace EasyEject.Modern {
                 Summary.Text = result.Success ? "Windows accepted safe removal." : "Device removal stopped. Review the explanation.";
                 if (result.Success) ClearModernIssue(); else RecordModernIssue(result.Message);
                 string logWarning = LogModernOperation("Manual safe removal | " + result.Message); if (logWarning != null) Summary.Text += " " + logWarning;
-                if (reviewedSettings.NotificationsEnabled) tray.ShowBalloonTip(5000, result.Success ? "Safe removal accepted" : "Device still connected", result.Message.Length > 255 ? result.Message.Substring(0, 255) : result.Message, result.Success ? Forms.ToolTipIcon.Info : Forms.ToolTipIcon.Warning);
+                string deliveryWarning = TryModernNotification(result.Success ? "Safe removal accepted" : "Device still connected", result.Message, !result.Success, reviewedSettings.NotificationsEnabled);
+                if (deliveryWarning != null) Summary.Text += " " + deliveryWarning;
                 confirmation = MessageDialog(result.Success ? "Safe removal accepted" : "Device still connected", result.Message, null);
                 await confirmation.ShowAsync(); confirmation = null;
             } catch (OperationCanceledException ex) { Summary.Text = terminal == null ? ex.Message : terminal.Message; }

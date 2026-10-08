@@ -24,7 +24,10 @@ namespace EasyEject.Modern {
                 if (closed || !releaseChecks.TryPresent(result)) return;
                 releaseStatus = result.Message; releaseMenu.ToolTipText = releaseStatus;
                 if (result.Outcome == WindowsUpdateCheckOutcome.Accepted && result.Offer.Release.Compare(ApplicationInformation.Version) == WindowsReleaseComparison.NewerAvailable && settings != null && settings.NotificationsEnabled)
-                    tray.ShowBalloonTip(5000, "Windows release available", "Open Windows updates & installation to review signed release " + result.Offer.Release.Version + ". Installation remains manual.", Forms.ToolTipIcon.Info);
+                {
+                    string deliveryWarning = TryModernNotification("Windows release available", "Open Windows updates & installation to review signed release " + result.Offer.Release.Version + ". Installation remains manual.", false, true);
+                    if (deliveryWarning != null) { releaseStatus += "\n" + deliveryWarning; releaseMenu.ToolTipText = releaseStatus; }
+                }
             } catch (Exception ex) { if (!closed) { releaseStatus = "Windows release check unavailable. " + ex.Message; releaseMenu.ToolTipText = releaseStatus; } }
         }
         void Releases_Click(object sender, RoutedEventArgs args) { ViewModernReleases(); }

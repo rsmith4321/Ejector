@@ -153,9 +153,8 @@ namespace EasyEject.Modern {
         void NotifyImport(string title, string message, bool warning, bool resolved = false) {
             if (warning) RecordModernIssue(message); else if (resolved) ClearModernIssue();
             string warningText = LogModernOperation(title + " | " + message); if (warningText != null) Summary.Text += " " + warningText;
-            if (settings == null || !settings.NotificationsEnabled || closed) return;
-            try { tray.ShowBalloonTip(5000, title.Length > 63 ? title.Substring(0, 63) : title, message.Length > 255 ? message.Substring(0, 255) : message, warning ? Forms.ToolTipIcon.Warning : Forms.ToolTipIcon.Info); }
-            catch (Exception ex) { Summary.Text += " Notification unavailable: " + ex.Message + " Review the result in Easy Eject."; }
+            string deliveryWarning = TryModernNotification(title, message, warning, settings != null && settings.NotificationsEnabled);
+            if (deliveryWarning != null) Summary.Text += " " + deliveryWarning;
         }
         async void ReviewPendingImports() {
             if (StorageBusy || inventory.Scanning) return; var values = completions.Entries;

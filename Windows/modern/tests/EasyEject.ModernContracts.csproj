@@ -22,6 +22,7 @@
     <Compile Include="StartupOperationTests.cs" />
     <Compile Include="DiagnosticsOperationTests.cs" />
     <Compile Include="IssuePersistenceTests.cs" />
+    <Compile Include="NotificationOperationTests.cs" />
     <Compile Include="ReleaseOperationTests.cs" />
     <Compile Include="ReopenRunner.cs" />
     <ProjectReference Include="..\EasyEject.Runtime.csproj" />
