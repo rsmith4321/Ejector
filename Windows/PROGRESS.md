@@ -2,6 +2,8 @@
 
 ## Check sleep/wake during manual sharing, cleanup and recovery · October 8
 
+Local milestone commit **4b7abc989d04f75dcf4f359366c23fb3ea0ce681** independently matches both tested Git-normalized test inputs in `committed-test-conformance.json`. Production source is unchanged from parentf882f72; ten completed evidence inputs are pinned. No push or public delivery.
+
 Test-only follow-up against unchanged production source adds [27 named operation cases](POWER_OPERATION_ACCEPTANCE.md). Warnings-as-errors focused runs pass **27/0 new, 23/0 connection and 8/0 recovery-completion in each runtime**, parent4200 terminal **22:05:34.2333600Z exit0**. Exact current review backend **F810DFB7…F35FAD**, six matching bundled runtime pairs and observed loaded core modules now pass **1415/0 modern defaults**, parent18952 terminal **22:13:18.1697557Z exit0**; Framework uses the same frozen production source for focused checks, with prior1388/0 full evidence separate. Commands `run-focused.ps1` / `run-full-modern.ps1` and both test-input hashes/blobs are retained in the isolated parentf882f72-plus-two-test-overlay packet. Generated originals/copies/history/receipts and interrupted journal/audit evidence remain retained, reservations release and retries require fresh manual action. Initial **12/15** fixture-admission error is preserved separately; no production policy change. Live configuration/original preview unchanged. Actual OS/foreground/device/media/LUT/filesystem/travel/trust gates and full goal remain open. No real power/device/configuration action; peer pending document untouched.
 
 ## Retire sleep/wake storage proofs in both interfaces · October 8

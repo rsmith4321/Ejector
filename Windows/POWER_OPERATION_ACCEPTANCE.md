@@ -25,6 +25,8 @@ The first packet `PowerOperations-20261008` retains **12/15** and its frozen sou
 
 `test-input-conformance.json` records both test inputs' exact frozen/worktree raw hashes and Git-normalized blobs. Source archive, two overlays, first failed packet, all generated fixture roots, compile logs, runtime pairs and terminal result receipts remain retained outside OneDrive.
 
+Local milestone **4b7abc989d04f75dcf4f359366c23fb3ea0ce681** independently matches both tested Git blobs, with unchanged production source, in `committed-test-conformance.json`. Ten completed evidence files are pinned in `completed-evidence-pins.json`; the six focused logs also have hashes in the focused receipt. No push/public delivery occurred.
+
 ## Remaining acceptance
 
 Named generated-operation coverage does not prove real OS message delivery, Modern Standby/hibernation/lid behavior, current-copy foreground/notification/cold lifecycle, actual camera/tool/LUT/filesystem/hardware/travel behavior or trusted distribution. Those full-port gates remain open. Live configuration and the original preview are preserved; no settings, power/security policy, public delivery or real device operation is authorized by this evidence.
