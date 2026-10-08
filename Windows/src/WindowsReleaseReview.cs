@@ -27,6 +27,7 @@ namespace EasyEject {
         internal WindowsReleaseReviewSession(WindowsUpdateCoordinator checks, ApprovedWindowsChannel channel,
             Func<string, CancellationToken, WindowsArchiveReview> archive = null, Func<string, CancellationToken, WindowsPackageReview> package = null) {
             if (checks == null || checks.Configured != (channel != null)) throw new ArgumentException("Release review requires the same configured channel as its check coordinator.");
+            if (channel != null && channel.IsModern) throw new SafetyException("The classic release-review session cannot approve modern application packages.");
             this.checks = checks; this.channel = channel;
             this.archive = archive ?? ((path, cancel) => new WindowsArchiveReview(path, channel.Publisher, new WindowsManifestTrust(), cancel));
             this.package = package ?? ((path, cancel) => new WindowsPackageReview(path, channel.Publisher, new WindowsAuthenticode(), new WindowsManifestTrust(), cancel));

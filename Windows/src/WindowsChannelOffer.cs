@@ -7,7 +7,12 @@ namespace EasyEject {
     // There is deliberately no configured production publisher or endpoint in this build.
     internal sealed class ApprovedWindowsChannel {
         internal readonly Uri Metadata, Signature, Archives; internal readonly ApprovedWindowsPublisher Publisher;
-        internal ApprovedWindowsChannel(string metadata, string signature, string archives, ApprovedWindowsPublisher publisher) {
+        internal readonly bool IsModern;
+        internal string Application { get { return IsModern ? ModernWindowsReleaseManifest.Application : WindowsReleaseManifest.Application; } }
+        internal ApprovedWindowsChannel(string metadata, string signature, string archives, ApprovedWindowsPublisher publisher) : this(metadata, signature, archives, publisher, false) { }
+        internal static ApprovedWindowsChannel Modern(string metadata, string signature, string archives, ApprovedWindowsPublisher publisher) { return new ApprovedWindowsChannel(metadata, signature, archives, publisher, true); }
+        ApprovedWindowsChannel(string metadata, string signature, string archives, ApprovedWindowsPublisher publisher, bool modern) {
+            IsModern = modern;
             if (publisher == null) throw new ArgumentNullException("publisher"); Publisher = publisher;
             Metadata = CanonicalHttps(metadata); Signature = CanonicalHttps(signature); Archives = CanonicalHttps(archives);
             if (!Metadata.AbsolutePath.EndsWith(".json", StringComparison.Ordinal) || Signature.AbsoluteUri != Metadata.AbsoluteUri + ".p7s" || !Archives.AbsolutePath.EndsWith("/", StringComparison.Ordinal)) throw new SafetyException("Approved Windows channel endpoints must use an exact JSON/signature pair and archive-directory base.");
@@ -19,10 +24,10 @@ namespace EasyEject {
             return uri;
         }
         internal Uri Archive(string version, string name, string url) {
-            if (!WindowsReleaseManifest.StableVersion(version) || name != "EasyEject.Windows-" + version + "-x64.zip") throw new SafetyException("The signed channel offered an unsupported Windows archive name/version.");
+            if (!WindowsReleaseManifest.StableVersion(version) || name != Application + "-" + version + "-x64.zip") throw new SafetyException("The signed channel offered an unsupported Windows archive name/version.");
             Uri candidate = CanonicalHttps(url); if (candidate.AbsoluteUri != Archives.AbsoluteUri + version + "/" + name) throw new SafetyException("The signed Windows archive URL is outside the explicitly approved versioned archive location."); return candidate;
         }
-        internal bool Same(ApprovedWindowsChannel other) { return other != null && Metadata.AbsoluteUri == other.Metadata.AbsoluteUri && Signature.AbsoluteUri == other.Signature.AbsoluteUri && Archives.AbsoluteUri == other.Archives.AbsoluteUri && Publisher.SubjectHash == other.Publisher.SubjectHash && Publisher.IssuerCertificateHash == other.Publisher.IssuerCertificateHash; }
+        internal bool Same(ApprovedWindowsChannel other) { return other != null && IsModern == other.IsModern && Metadata.AbsoluteUri == other.Metadata.AbsoluteUri && Signature.AbsoluteUri == other.Signature.AbsoluteUri && Archives.AbsoluteUri == other.Archives.AbsoluteUri && Publisher.SubjectHash == other.Publisher.SubjectHash && Publisher.IssuerCertificateHash == other.Publisher.IssuerCertificateHash; }
     }
     internal enum WindowsReleaseComparison { NewerAvailable, SameStableVersion, ChannelOlder, UncomparableLocalVersion }
     internal sealed class WindowsChannelRelease {
@@ -50,7 +55,7 @@ namespace EasyEject {
             if (bytes == null || bytes.Length == 0 || bytes.Length > WindowsManifestTrust.MaximumManifest || encoded == null || encoded.Length == 0 || encoded.Length > WindowsManifestTrust.MaximumSignature) throw new SafetyException("Signed Windows channel metadata/signature exceeds its supported bounds.");
             body = (byte[])bytes.Clone(); signature = (byte[])encoded.Clone(); signatureHash = WindowsSignerEvidence.Hash(signature); Authenticated = Authenticate(cancel);
             var root = WindowsReleaseManifest.Fields(WindowsReleaseManifest.ReadJson(Authenticated.CopyBytes()), new[] { "format", "kind", "application", "platform", "channel", "issuedUtc", "expiresUtc", "release" });
-            if (WindowsReleaseManifest.Number(root["format"]) != 1 || WindowsReleaseManifest.Text(root["kind"]) != "windows-channel" || WindowsReleaseManifest.Text(root["application"]) != WindowsReleaseManifest.Application || WindowsReleaseManifest.Text(root["platform"]) != WindowsReleaseManifest.Platform || WindowsReleaseManifest.Text(root["channel"]) != "stable") throw new SafetyException("This is not the approved Easy Eject Windows x64 stable channel format.");
+            if (WindowsReleaseManifest.Number(root["format"]) != (channel.IsModern ? 2 : 1) || WindowsReleaseManifest.Text(root["kind"]) != (channel.IsModern ? "windows-modern-channel" : "windows-channel") || WindowsReleaseManifest.Text(root["application"]) != channel.Application || WindowsReleaseManifest.Text(root["platform"]) != WindowsReleaseManifest.Platform || WindowsReleaseManifest.Text(root["channel"]) != "stable") throw new SafetyException("This is not the approved Easy Eject Windows x64 stable channel format.");
             IssuedUtc = WindowsReleaseManifest.Number(root["issuedUtc"]); ExpiresUtc = WindowsReleaseManifest.Number(root["expiresUtc"]); RequireTime();
             var release = WindowsReleaseManifest.Fields(root["release"], new[] { "version", "sourceRevision", "manifestSha256", "manifestSignatureSha256", "certificateSha256", "archive" });
             string version = WindowsReleaseManifest.Text(release["version"]), source = WindowsReleaseManifest.Text(release["sourceRevision"]), manifest = WindowsReleaseManifest.Text(release["manifestSha256"]), sig = WindowsReleaseManifest.Text(release["manifestSignatureSha256"]), certificate = WindowsReleaseManifest.Text(release["certificateSha256"]);
@@ -72,11 +77,17 @@ namespace EasyEject {
             cancel.ThrowIfCancellationRequested(); RequireTime(); var fresh = Authenticate(cancel); if (fresh.Signer.CertificateHash != Authenticated.Signer.CertificateHash || fresh.Signer.DigestOid != Authenticated.Signer.DigestOid) throw new SafetyException("The signed Windows channel signer changed during review."); RequireTime();
         }
         internal void VerifyArchive(WindowsArchiveReview archive, CancellationToken cancel) {
-            if (archive == null) throw new ArgumentNullException("archive"); Revalidate(cancel); archive.Revalidate(cancel); channel.Publisher.Require(archive.Authenticated.Signer);
+            if (archive == null) throw new ArgumentNullException("archive"); if (channel.IsModern) throw new SafetyException("A modern channel cannot approve a classic Windows archive."); Revalidate(cancel); archive.Revalidate(cancel); channel.Publisher.Require(archive.Authenticated.Signer);
             if (archive.Hash != Release.ArchiveHash || archive.Length != Release.ArchiveLength || archive.Release.Version != Release.Version || archive.Release.SourceRevision != Release.SourceRevision || archive.Authenticated.BodyHash != Release.ManifestHash || archive.Authenticated.SignatureHash != Release.ManifestSignatureHash || archive.Authenticated.Signer.CertificateHash != Release.CertificateHash) throw new SafetyException("The held Windows ZIP does not match the signed channel's exact archive, manifest, release and signer.");
             Revalidate(cancel);
         }
         internal void VerifyExtracted(WindowsArchiveReview archive, WindowsPackageReview package, CancellationToken cancel) { VerifyArchive(archive, cancel); archive.VerifyExtractedPackage(package, cancel); Revalidate(cancel); }
+        internal void VerifyArchive(ModernWindowsArchiveReview archive, CancellationToken cancel) {
+            if (archive == null) throw new ArgumentNullException("archive"); if (!channel.IsModern) throw new SafetyException("A classic channel cannot approve a modern Windows archive."); Revalidate(cancel); archive.Revalidate(cancel); channel.Publisher.Require(archive.Authenticated.Signer);
+            if (archive.Hash != Release.ArchiveHash || archive.Length != Release.ArchiveLength || archive.Release.Version != Release.Version || archive.Release.SourceRevision != Release.SourceRevision || archive.Authenticated.BodyHash != Release.ManifestHash || archive.Authenticated.SignatureHash != Release.ManifestSignatureHash || archive.Authenticated.Signer.CertificateHash != Release.CertificateHash) throw new SafetyException("The held modern Windows ZIP does not match the signed channel's exact archive, manifest, release and signer.");
+            Revalidate(cancel);
+        }
+        internal void VerifyExtracted(ModernWindowsArchiveReview archive, ModernWindowsApplicationPackageReview package, CancellationToken cancel) { VerifyArchive(archive, cancel); archive.VerifyExtractedPackage(package, cancel); Revalidate(cancel); }
     }
     // Process high water, optionally composed with guarded persistent replay state.
     // Neither state grants installation, launch or cached release approval.

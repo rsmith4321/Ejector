@@ -32,10 +32,10 @@ namespace EasyEject {
         internal static string IdentityHash(params string[] fields) {
             using (var bytes = new MemoryStream()) { using (var writer = new BinaryWriter(bytes, new UTF8Encoding(false, true), true)) { foreach (string field in fields) writer.Write(field); writer.Flush(); } return WindowsSignerEvidence.Hash(bytes.ToArray()); }
         }
-        internal static string Policy(ApprovedWindowsChannel channel) { return IdentityHash("EasyEject.Windows/channel-replay/policy/v1", channel.Metadata.AbsoluteUri, channel.Signature.AbsoluteUri, channel.Archives.AbsoluteUri, channel.Publisher.SubjectHash, channel.Publisher.IssuerCertificateHash); }
+        internal static string Policy(ApprovedWindowsChannel channel) { return IdentityHash(channel.Application + "/channel-replay/policy/v1", channel.Metadata.AbsoluteUri, channel.Signature.AbsoluteUri, channel.Archives.AbsoluteUri, channel.Publisher.SubjectHash, channel.Publisher.IssuerCertificateHash); }
         internal static WindowsChannelReplayFloor From(ApprovedWindowsChannel channel, WindowsChannelOffer offer) {
             var r = offer.Release;
-            return new WindowsChannelReplayFloor(Policy(channel), offer.IssuedUtc, offer.Authenticated.BodyHash, r.Version, IdentityHash("EasyEject.Windows/channel-replay/release/v1", r.Version, r.SourceRevision, r.ManifestHash, r.ManifestSignatureHash, r.CertificateHash, r.ArchiveName, r.ArchiveHash, r.ArchiveLength.ToString(System.Globalization.CultureInfo.InvariantCulture), r.ArchiveUrl.AbsoluteUri));
+            return new WindowsChannelReplayFloor(Policy(channel), offer.IssuedUtc, offer.Authenticated.BodyHash, r.Version, IdentityHash(channel.Application + "/channel-replay/release/v1", r.Version, r.SourceRevision, r.ManifestHash, r.ManifestSignatureHash, r.CertificateHash, r.ArchiveName, r.ArchiveHash, r.ArchiveLength.ToString(System.Globalization.CultureInfo.InvariantCulture), r.ArchiveUrl.AbsoluteUri));
         }
         internal void RequireAtLeast(WindowsChannelReplayFloor previous) {
             if (previous == null) return;

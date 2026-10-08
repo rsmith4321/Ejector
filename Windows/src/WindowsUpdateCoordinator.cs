@@ -129,7 +129,13 @@ namespace EasyEject {
         // A modern multi-file artifact needs its own approved package/publisher policy.
         // It must never silently inherit the classic six-file Framework channel.
         internal static ApprovedWindowsChannel ModernProductionChannel { get { return null; } }
-        internal static WindowsUpdateCoordinator CreateModern(bool automatic) { return Create(ModernProductionChannel, () => Profiles.Root, new WindowsChannelHttpTransport(), new WindowsManifestTrust(), () => DateTime.UtcNow, automatic); }
+        internal const string ModernHistoryDirectory = "modern-update-history";
+        internal static WindowsUpdateCoordinator CreateModern(bool automatic) { return CreateModern(ModernProductionChannel, () => Profiles.Root, new WindowsChannelHttpTransport(), new WindowsManifestTrust(), () => DateTime.UtcNow, automatic); }
+        internal static WindowsUpdateCoordinator CreateModern(ApprovedWindowsChannel channel, Func<string> root, IWindowsChannelTransport transport, IWindowsManifestEnvelopeTrust trust, Func<DateTime> clock, bool automatic) {
+            if (root == null) throw new ArgumentNullException("root");
+            if (channel != null && !channel.IsModern) throw new SafetyException("Modern update checks require an independently approved modern channel policy.");
+            return Create(channel, () => System.IO.Path.Combine(root(), ModernHistoryDirectory), transport, trust, clock, automatic);
+        }
         internal static WindowsUpdateCoordinator Create(bool readOnly, bool automatic) { return Create(readOnly ? null : ProductionChannel, () => Profiles.Root, new WindowsChannelHttpTransport(), new WindowsManifestTrust(), () => DateTime.UtcNow, automatic); }
         internal static WindowsUpdateCoordinator Create(ApprovedWindowsChannel channel, Func<string> root, IWindowsChannelTransport transport, IWindowsManifestEnvelopeTrust trust, Func<DateTime> clock, bool automatic) {
             if (root == null || transport == null || trust == null) throw new ArgumentNullException("Windows release dependencies");
