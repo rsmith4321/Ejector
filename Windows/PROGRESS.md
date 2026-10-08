@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Native shared-default Save and retained profile draft · October 8
+
+Corrected PID25172 now saves safe all-media/skipped-preview/preserved-folder defaults from a following profile's editor, returns to that retained draft, reloads its effective import choices and preserves its unsaved sharing-off change. Profile Cancel discards only that draft; the saved following row inherits defaults and retains stored4K/Standard, while the custom row keeps videos/previews/clean/1080p. Both profile files remain byte-identical. Fresh defaults reopen reads the152-byte saved record; guarded recovery moves only the three owned records, restores original absent-store defaults/empty catalog and keeps config/login/all601 candidate bytes exact. [Native defaults evidence](modern/NATIVE_ACCEPTANCE_20261008.md) binds **19:25:14.8155439Z**, copies/recovery and retained verification correction. No code/build/new suite/device/media/removal/trust proof; full goal active.
+
 ## Native offline profile defaults and manual sharing · October 8
 
 Corrected PID25172 now reads a nonempty owned synthetic offline profile, refuses Import now without its exact connected source, and saves shared defaults plus independent manual 4K/Standard sharing. Only UsesImportDefaults and SharingPreset change; identity/folders/media/retention remain exact. Native reopen reads the saved offer/size/LUT-off and disabled custom controls; Cancel starts no import. Guarded recovery moves only the nonce profile into external evidence, restores the empty catalog/disabled actions and preserves existing config/login/all601 candidate bytes. [Native profile evidence](modern/NATIVE_ACCEPTANCE_20261008.md) binds **19:16:42.2328557Z**, saved copies and recoverable fixture. No code/build/new suite, real media/device/export/eject/cleanup, connected enrollment/destination change, cold restart or trusted distribution proof. Full goal remains active.
