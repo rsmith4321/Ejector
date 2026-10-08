@@ -27,7 +27,8 @@ internal static class NativeHistoryFixture {
         }
         public void Dispose() { monitor.Dispose(); }
     }
-    static string[] Verify(CompletedBatch batch, DestinationIdentity current, WindowsDiscovery discovery, CancellationToken cancel) {
+    static string[] Verify(CompletedBatch batch, DestinationIdentity current, WindowsDiscovery discovery, CancellationToken cancel,
+        Action<string> checkpoint = null, Action<IImportGuard> ready = null, Operations operations = null) {
         var backend = typeof(VerifiedImporter).Assembly;
         var guardType = backend.GetType("EasyEject.WindowsDestinationGuard", true);
         Func<CompletedBatch, IImportGuard> makeGuard = saved => (IImportGuard)Activator.CreateInstance(guardType,
@@ -37,8 +38,51 @@ internal static class NativeHistoryFixture {
             null, new[] { typeof(CompletedBatch), typeof(DestinationIdentity), typeof(Func<CompletedBatch, IImportGuard>),
                 typeof(Operations), typeof(CancellationToken), typeof(Action<string>), typeof(Action<IImportGuard>) }, null);
         var messages = new List<string>();
-        method.Invoke(null, new object[] { batch, current, makeGuard, new Operations(), cancel, new Action<string>(messages.Add), null });
+        method.Invoke(null, new object[] { batch, current, makeGuard, operations ?? new Operations(), cancel,
+            new Action<string>(line => { messages.Add(line); checkpoint?.Invoke(line); }), ready });
         return messages.ToArray();
+    }
+    static object[] VerifyPowerBoundaries(CompletedBatch batch, DestinationIdentity current, WindowsDiscovery discovery) {
+        var power = typeof(WindowsDiscovery).GetMethod("HandlePowerEvent", BindingFlags.Instance | BindingFlags.NonPublic);
+        if (power == null) throw new IOException("The exact backend has no owned power-boundary handler.");
+        Action<int> boundary = value => { if (!(bool)power.Invoke(discovery, new object[] { (long)value })) throw new IOException("Owned power boundary was not recognized."); };
+        var results = new List<object>();
+        foreach (int value in new[] { 4, 18, 7 }) {
+            if (!discovery.Scan().Complete) throw new IOException("Fresh pre-boundary native inventory is incomplete.");
+            var originals = batch.Originals.ToDictionary(x => x.Path, x => Hash(x.Path)); string receipt = Hash(batch.ReceiptPath);
+            long before = discovery.Epoch; int reports = 0; bool injected = false; IImportGuard oldGuard = null;
+            var operations = new Operations(); string stopped;
+            try {
+                Verify(batch, current, discovery, CancellationToken.None, line => {
+                    if (++reports == 2) { injected = true; boundary(value); }
+                }, guard => oldGuard = guard, operations);
+                throw new IOException("Saved verification accepted a retired destination proof.");
+            } catch (TargetInvocationException ex) when (ex.InnerException is SafetyException) { stopped = ex.InnerException.Message; }
+            if (!injected || oldGuard == null || reports != 2 || discovery.Epoch <= before) throw new IOException("Verification did not reach the owned power boundary after its first recorded file.");
+            long retired = discovery.Epoch; bool suspended = value == 4;
+            if (suspended && discovery.Scan().Complete) throw new IOException("Suspended native inventory still permits admission.");
+            if (suspended) boundary(18);
+            string oldRefusal;
+            try { oldGuard.Validate(); throw new IOException("The old guard healed after resume."); }
+            catch (SafetyException ex) { oldRefusal = ex.Message; }
+            using (operations.Reserve(oldGuard.ProtectedDisks)) {}
+            IImportGuard freshGuard = null;
+            var retry = Verify(batch, current, discovery, CancellationToken.None, ready: guard => freshGuard = guard, operations: operations);
+            if (retry.Length != 2 || retry.Any(line => line.Contains("unrelated.mov")) || freshGuard == null) throw new IOException("Fresh exact-history retry failed.");
+            long freshEpoch = discovery.Epoch;
+            if (value != 7) {
+                boundary(7);
+                if (discovery.Epoch != freshEpoch) throw new IOException("Paired user resume retired fresh history proof twice.");
+                freshGuard.Validate();
+            }
+            using (operations.Reserve(freshGuard.ProtectedDisks)) {}
+            if (Hash(batch.ReceiptPath) != receipt || originals.Any(x => Hash(x.Key) != x.Value)) throw new IOException("Owned power check changed saved originals or receipt.");
+            results.Add(new { PowerEvent = value, EpochBefore = before, EpochRetired = retired, FreshEpoch = freshEpoch,
+                InterruptedAfterFirstRecordedFile = true, ReportsBeforeRefusal = reports, SuspendedInventoryRejected = suspended,
+                Refusal = stopped, OldGuardAfterResumeRefusal = oldRefusal, FreshRetryVerifiedFiles = retry.Length,
+                PairedResumePreservedFreshProof = value != 7, SavedHashesUnchanged = true, ReservationsReleased = true });
+        }
+        return results.ToArray();
     }
     sealed class OwnedGuard : IImportGuard {
         readonly string source, destination;
@@ -65,8 +109,9 @@ internal static class NativeHistoryFixture {
     }
     [STAThread] static int Main(string[] args) {
         try {
-            if (args.Length != 4 || args[0] != "--seed-owned-native-history" && args[0] != "--prepare-owned-native-history") throw new ArgumentException("Usage: --prepare-owned-native-history (or explicit --seed-owned-native-history) NEW_FIXTURE_ROOT EXACT_CONFIG_ROOT EXPECTED_BACKEND_SHA256");
+            if (args.Length != 4 || args[0] != "--seed-owned-native-history" && args[0] != "--prepare-owned-native-history" && args[0] != "--prepare-owned-native-history-power") throw new ArgumentException("Usage: --prepare-owned-native-history (or explicit --prepare-owned-native-history-power / --seed-owned-native-history) NEW_FIXTURE_ROOT EXACT_CONFIG_ROOT EXPECTED_BACKEND_SHA256");
             bool seed = args[0] == "--seed-owned-native-history";
+            bool powerCheck = args[0] == "--prepare-owned-native-history-power";
             string backend = typeof(VerifiedImporter).Assembly.Location;
             if (!String.Equals(Hash(backend), args[3], StringComparison.OrdinalIgnoreCase)) throw new IOException("Loaded backend does not match the reviewed hash.");
             string root = Path.GetFullPath(args[1]);
@@ -146,6 +191,7 @@ internal static class NativeHistoryFixture {
                 catch (TargetInvocationException ex) when (ex.InnerException is OperationCanceledException) { cancellationRefusal = ex.InnerException.Message; }
             }
             if (Verify(batch, identity, discovery, CancellationToken.None).Length != 2) throw new IOException("Fresh verification retry failed.");
+            var powerVerification = powerCheck ? VerifyPowerBoundaries(batch, identity, discovery) : Array.Empty<object>();
             foreach (var path in beforePaths) if (Hash(path) != beforeHashes[path]) throw new IOException("Existing configuration changed; do not seed.");
             if (Directory.GetFiles(config).Length != beforePaths.Length) throw new IOException("Configuration gained unrelated files; do not seed.");
             byte[] profileBytes = Json(profile), historyBytes = Json(new List<CompletedBatch> { batch });
@@ -166,6 +212,7 @@ internal static class NativeHistoryFixture {
                 NotificationsAvailable = discovery.NotificationsAvailable, InventoryComplete = state.Complete,
                 Verification = verification, ChangedDestinationRefusal = destinationRefusal, ChangedOriginalRefusal = originalRefusal,
                 RejectedChangedOriginal = Identity(rejectedOriginal), CancellationRefusal = cancellationRefusal, FreshRetryVerifiedFiles = 2,
+                PowerVerification = powerVerification, PowerScope = powerCheck ? "Managed calls to this helper's owned discovery handler only; no OS broadcast, real sleep or existing-preview input" : null,
                 BeforeFiles = beforePaths.Select(x => Identity(x)).ToArray(), Scope = "Generated text fixtures; fake source guard/reservations; read-only current internal destination identity; no source eject authority or real camera/video claim" };
             byte[] evidenceBytes = JsonSerializer.SerializeToUtf8Bytes(evidence, new JsonSerializerOptions { WriteIndented = true, IncludeFields = true });
             Create(Path.Combine(root, "fixture-receipt.json"), evidenceBytes);

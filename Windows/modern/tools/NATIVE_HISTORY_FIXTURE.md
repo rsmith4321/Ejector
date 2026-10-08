@@ -2,6 +2,28 @@
 
 `NativeHistoryFixture.csproj` is an opt-in fixture utility, excluded from the default application and contract builds. It requires an explicitly supplied existing review backend and a matching SHA-256 at execution. It prepares generated text files, a genuine production import receipt, and synthetic profile/history records outside OneDrive. These `.mov` files are deliberately plain text, not playable footage.
 
+## Current power-aware preparation · October 8
+
+The separate explicit mode `--prepare-owned-native-history-power NEW_FIXTURE_ROOT EXACT_CONFIG_ROOT EXPECTED_BACKEND_SHA256` additionally checks saved-history interruption against this helper's owned discovery handler. It cannot select seed mode. Existing prepare/seed modes do not run the power checks; seed remains unexecuted here.
+
+Packet `C:/Users/rsmit/.codex/EasyEjectBuildTools/NativeHistoryPower-20261008` freezes parent167e367 plus the owned helper change. Helper source SHA-256 **807D29799C109100AEF2CF5261C0BEE5700635E655F958D60241795FB81E0EC6**; project hash remains **1DC66B04845E1E6E1E11F34FE534AA9F2F181D0D12B8E56BAE2EFF8DC3A9825F**. `run-probe.ps1` compiles warning-free with the existing SDK/cache and a private build root, then runs the new mode against exact current review backend **F810DFB734CF47AE09FA8A9558DA5F819056FE059692CE31857ABE2AF1F35FAD**. All seven backend/Core/Desktop file hashes match the app. No new app build or launch occurs.
+
+Parent **7868**, **22:39:32.8636212Z–22:39:37.9584779Z**, terminal exit0/failure null. Preparation creates the genuine generated import/receipt, retains the two 44-byte originals after moving its source folder, excludes the unrecorded file, refuses changed destination/original and pre-cancellation, and retries successfully. Three distinct admission controls refuse with exit1: missing explicit mode, wrong backend hash before fixture creation, and occupied root.
+
+| Owned event | Epoch before / retired / fresh | Verified result |
+| --- | --- | --- |
+| Suspend4, then automatic18/user7 | 1 /2 /3 | Incomplete suspended inventory, old proof remains refused after resume, fresh exact two-file verification succeeds; paired7 preserves fresh proof |
+| Automatic resume18, then user7 | 3 /4 /4 | Old proof refuses, fresh exact verification succeeds; paired7 preserves fresh proof |
+| Standalone user resume7 | 4 /5 /5 | Old proof refuses and fresh exact verification succeeds |
+
+Each boundary is injected at the second recorded-file report, after the first file was checked. Verification cannot return success on the old destination proof. The same operation coordinator's reservation can be acquired after refusal and retry; saved original/receipt hashes stay exact. These are managed calls to this helper's discovery instance, **not OS broadcasts or physical sleep**, and do not establish real notification delivery. Native monitor registration and current protected internal-destination discovery are real read-only APIs. No real source guard/eject API is constructed.
+
+`probe-result.json` and `fixture/fixture-receipt.json` retain actual refusal reasons, epoch/counts, native destination and source/copy/receipt records. Fixture receipt SHA-256 **333C281B871FA976A06F2A6C61A3229E6E4B818B968D0F8808CFEFC1180A4153**. Independent22:42:21.6686278Z readback confirms exact retained-source/copy bytes, receipt hash, all seven runner pins, logical source absence, no live profile/history, zero helper/validation processes and the original preview25172/start/path. Both existing configuration hashes remain unchanged in the driver; prepared records stay inside the fixture with `Seeded=false`.
+
+This is opt-in integration evidence, not a new default-suite count. Production source/review app and the last **1415/0** modern defaults are unchanged. Actual app history UI, restart, physical sleep/device/filesystem/media/LUT and trusted distribution acceptance remain open.
+
+## Earlier verified preparation
+
 The successful packet is `C:/Users/rsmit/.codex/EasyEjectBuildTools/NativeHistoryVerified-20261008`. Its frozen source/project, cleared-source NuGet configuration, complete publish arguments, compile log, admission logs, preparation result, fixture receipt and independent verification remain there. The helper compiles with warnings as errors under the existing .NET SDK 10.0.401; publish exits zero at **19:57:14.4057504Z**. No tools are installed or downloaded.
 
 | Binding | SHA-256 |

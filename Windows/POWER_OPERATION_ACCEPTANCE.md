@@ -29,4 +29,6 @@ Local milestone **4b7abc989d04f75dcf4f359366c23fb3ea0ce681** independently match
 
 ## Remaining acceptance
 
+The separate opt-in [native history follow-up](modern/tools/NATIVE_HISTORY_FIXTURE.md) now checks real read-only notification/destination integration, generated source-absent exact receipt verification and owned managed power refusal/fresh retry on this same backend. It leaves normal history/profile configuration untouched and does not increase the default count.
+
 Named generated-operation coverage does not prove real OS message delivery, Modern Standby/hibernation/lid behavior, current-copy foreground/notification/cold lifecycle, actual camera/tool/LUT/filesystem/hardware/travel behavior or trusted distribution. Those full-port gates remain open. Live configuration and the original preview are preserved; no settings, power/security policy, public delivery or real device operation is authorized by this evidence.
