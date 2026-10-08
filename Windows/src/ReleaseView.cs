@@ -22,8 +22,8 @@ namespace EasyEject {
         readonly WindowsUpdateCoordinator checks; readonly WindowsReleaseReviewSession session; readonly string version;
         internal WindowsReleaseViewBackend(WindowsUpdateCoordinator checks, ApprovedWindowsChannel channel, string version) : this(checks, new WindowsReleaseReviewSession(checks, channel), version) { }
         internal static WindowsReleaseViewBackend ForModern(WindowsUpdateCoordinator checks, ApprovedWindowsChannel channel, string version,
-            Func<string, CancellationToken, ModernWindowsArchiveReview> archive = null, Func<string, CancellationToken, ModernWindowsApplicationPackageReview> package = null) {
-            return new WindowsReleaseViewBackend(checks, WindowsReleaseReviewSession.ForModern(checks, channel, archive, package), version);
+            Func<string, CancellationToken, ModernWindowsArchiveReview> archive = null, Func<string, CancellationToken, ModernWindowsApplicationPackageReview> package = null, ApprovedModernWindowsComponents components = null) {
+            return new WindowsReleaseViewBackend(checks, WindowsReleaseReviewSession.ForModern(checks, channel, archive, package, components), version);
         }
         WindowsReleaseViewBackend(WindowsUpdateCoordinator checks, WindowsReleaseReviewSession session, string version) { this.checks = checks; this.session = session; this.version = version; }
         public bool Configured { get { return session.Configured; } } public bool Busy { get { return session.Busy; } }

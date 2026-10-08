@@ -1,17 +1,21 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 
 namespace EasyEject {
     public static partial class Tests {
-        static ModernWindowsApplicationPackageReview ApplicationPackage(ModernPackageFixture fixture, CancellationToken cancel = default(CancellationToken)) {
-            return new ModernWindowsApplicationPackageReview(fixture.Root, fixture.Signing.Publisher(), fixture.Executable, new WindowsManifestTrust(fixture.Certificate), cancel);
+        static ApprovedModernWindowsComponents FakeComponentApproval(ModernPackageFixture fixture) {
+            return new ApprovedModernWindowsComponents(new string('f', 64), fixture.Metadata.DotNet, fixture.Metadata.Sdk, fixture.Metadata.Minimum, fixture.Metadata.Files.Where(file => !ApprovedModernWindowsComponents.IsApplicationFile(file.Name)));
+        }
+        static ModernWindowsApplicationPackageReview ApplicationPackage(ModernPackageFixture fixture, CancellationToken cancel = default(CancellationToken), ApprovedModernWindowsComponents components = null) {
+            return new ModernWindowsApplicationPackageReview(fixture.Root, fixture.Signing.Publisher(), fixture.Executable, new WindowsManifestTrust(fixture.Certificate), cancel, components ?? FakeComponentApproval(fixture));
         }
         static void ModernWindowsApplicationPackageTests() {
             Test("modern composed application review refuses absent publisher without acquiring files", delegate {
                 using (var fixture = new ModernPackageFixture()) {
-                    Throws<SafetyException>(() => new ModernWindowsApplicationPackageReview(fixture.Root, null, fixture.Executable, new WindowsManifestTrust(fixture.Certificate), CancellationToken.None));
+                    Throws<SafetyException>(() => new ModernWindowsApplicationPackageReview(fixture.Root, null, fixture.Executable, new WindowsManifestTrust(fixture.Certificate), CancellationToken.None, FakeComponentApproval(fixture)));
                     fixture.RequireReleased();
                 }
             });
@@ -122,6 +126,23 @@ namespace EasyEject {
                     int sdk = deps.IndexOf("lib/net6.0/Microsoft.WindowsAppRuntime.dll", StringComparison.Ordinal); Check(sdk > 0, "Fixture SDK asset absent");
                     deps = deps.Substring(0, sdk) + deps.Substring(sdk).Replace("\"assemblyVersion\":\"0.1.0.0\"", "\"assemblyVersion\":\"0.1.0.1\""); DependencyPublish(fixture, deps);
                     Throws<SafetyException>(() => { using (var unexpected = ApplicationPackage(fixture)) { } }); fixture.RequireReleased();
+                }
+            });
+            Test("modern composed application requires independent component approval before file or trust access", delegate {
+                using (var fixture = new ModernPackageFixture()) {
+                    ApplicationPackageFixture(fixture, host, managed, backendBytes); int calls = 0;
+                    fixture.Executable.During = (path, held) => calls++; fixture.Certificate.During = () => calls++;
+                    Throws<SafetyException>(() => { using (var unexpected = new ModernWindowsApplicationPackageReview(fixture.Root, fixture.Signing.Publisher(), fixture.Executable, new WindowsManifestTrust(fixture.Certificate), CancellationToken.None)) { } });
+                    Check(calls == 0, "Absent approval acquired candidate trust"); fixture.RequireReleased();
+                }
+            });
+            Test("modern composed application refuses independently unapproved component bytes despite fresh authenticated inventory", delegate {
+                using (var fixture = new ModernPackageFixture()) {
+                    ApplicationPackageFixture(fixture, host, managed, backendBytes); var approval = FakeComponentApproval(fixture);
+                    byte[] original = File.ReadAllBytes(fixture.PathFor("coreclr.dll")); ComponentPublish(fixture, "coreclr.dll", Encoding.UTF8.GetBytes("retained changed component"));
+                    Throws<SafetyException>(() => { using (var unexpected = ApplicationPackage(fixture, CancellationToken.None, approval)) { } }); fixture.RequireReleased();
+                    Check(File.ReadAllText(fixture.PathFor("coreclr.dll")) == "retained changed component", "Refusal cleaned content");
+                    ComponentPublish(fixture, "coreclr.dll", original); using (var retry = ApplicationPackage(fixture, CancellationToken.None, approval)) retry.Revalidate(CancellationToken.None);
                 }
             });
             Console.WriteLine(passed + " passed, " + failed + " failed"); return failed == 0 ? 0 : 1;

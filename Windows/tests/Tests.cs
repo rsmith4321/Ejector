@@ -129,6 +129,7 @@ namespace EasyEject {
             if (args.Length == 2 && args[0] == "--modern-windows-managed-sample") return ModernManagedIdentitySample(args[1]);
             if (args.Length == 1 && args[0] == "--modern-windows-backend") { ModernWindowsBackendIdentityTests(); Console.WriteLine(passed + " passed, " + failed + " failed"); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--modern-windows-component-versions") { ModernWindowsComponentVersionsTests(); Console.WriteLine(passed + " passed, " + failed + " failed"); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--modern-windows-component-approval") { ApprovedModernWindowsComponentsTests(); Console.WriteLine(passed + " passed, " + failed + " failed"); return failed == 0 ? 0 : 1; }
             if (args.Length == 2 && args[0] == "--modern-windows-component-versions-sample") return ModernComponentVersionsSample(args[1]);
             if (args.Length == 2 && args[0] == "--modern-windows-backend-sample") return ModernBackendIdentitySample(args[1]);
             if (args.Length == 1 && args[0] == "--modern-windows-apphost") { ModernWindowsAppHostIdentityTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Basic native host policy only; positive native layout requires an explicit read-only sample."); return failed == 0 ? 0 : 1; }
@@ -804,6 +805,7 @@ namespace EasyEject {
             ModernWindowsManagedIdentityTests();
             ModernWindowsBackendIdentityTests();
             ModernWindowsComponentVersionsTests();
+            ApprovedModernWindowsComponentsTests();
             ModernWindowsAppHostIdentityTests();
             ModernWindowsDependencyConfigurationTests();
             ModernWindowsReleaseReviewTests(); ModernWindowsChannelTests(); ModernWindowsArchiveTests(); ModernWindowsApplicationPackageTests();

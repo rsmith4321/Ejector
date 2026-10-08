@@ -18,7 +18,7 @@ namespace EasyEject {
                 Checks.Start(); Checks.SetReviewOpen(true); Checks.PublishIdle(true); Review.PublishAvailable(true);
             }
             internal ModernWindowsArchiveReview Archive(string path, CancellationToken cancel) { ArchiveCalls++; if (BeforeArchive != null) BeforeArchive(cancel); return new ModernWindowsArchiveReview(path, Source.Channel.Publisher, new WindowsManifestTrust(Source.Archive.Package.Certificate), IgnoreArchiveCancellation ? CancellationToken.None : cancel); }
-            internal ModernWindowsApplicationPackageReview Package(string path, CancellationToken cancel) { PackageCalls++; if (BeforePackage != null) BeforePackage(cancel); return new ModernWindowsApplicationPackageReview(path, Source.Channel.Publisher, Source.Archive.Package.Executable, new WindowsManifestTrust(Source.Archive.Package.Certificate), cancel); }
+            internal ModernWindowsApplicationPackageReview Package(string path, CancellationToken cancel) { PackageCalls++; if (BeforePackage != null) BeforePackage(cancel); return new ModernWindowsApplicationPackageReview(path, Source.Channel.Publisher, Source.Archive.Package.Executable, new WindowsManifestTrust(Source.Archive.Package.Certificate), cancel, FakeComponentApproval(Source.Archive.Package)); }
             internal WindowsReleaseReviewResult CheckRelease() { var result = ChannelAwait(() => Review.CheckAsync(CancellationToken.None)); Check(Review.TryPresent(result), "Current metadata delivery failed"); return result; }
             internal WindowsReleaseReviewResult Zip(string path = null) { var result = ChannelAwait(() => Review.ArchiveAsync(path ?? Source.Archive.Path, CancellationToken.None)); Check(Review.TryPresent(result), "Current ZIP delivery failed"); return result; }
             internal WindowsReleaseReviewResult Folder() { var result = ChannelAwait(() => Review.ExtractedAsync(Source.Archive.Package.Root, CancellationToken.None)); Check(Review.TryPresent(result), "Current folder delivery failed"); return result; }
@@ -144,7 +144,7 @@ namespace EasyEject {
                     ApplicationPackageFixture(f.Source.Archive.Package, host, managed, backendBytes); f.Source.Archive.Write(); Check(f.CheckRelease().Accepted, "Metadata failed");
                     var before = Directory.GetFiles(f.Source.Archive.Package.Owned.Root, "*", SearchOption.AllDirectories).ToDictionary(path => path, path => WindowsSignerEvidence.Hash(File.ReadAllBytes(path)));
                     Check(f.Zip().Accepted, "ZIP failed"); var result = f.Folder();
-                    Check(result.Accepted && result.Message.Contains("application/launch declarations") && result.Message.Contains("component/catalog") && !result.Message.Contains("all six") && result.Message.Contains("No installation or launch permission") && f.ArchiveCalls == 2 && f.PackageCalls == 1, "Modern result overstated or omitted policy scope");
+                    Check(result.Accepted && result.Message.Contains("application/launch declarations") && result.Message.Contains("approved component catalog") && !result.Message.Contains("all six") && result.Message.Contains("No installation or launch permission") && f.ArchiveCalls == 2 && f.PackageCalls == 1, "Modern result overstated or omitted policy scope");
                     Check(before.Count == Directory.GetFiles(f.Source.Archive.Package.Owned.Root, "*", SearchOption.AllDirectories).Length && before.All(pair => pair.Value == WindowsSignerEvidence.Hash(File.ReadAllBytes(pair.Key))), "File review wrote/extracted content"); f.Source.Archive.Released();
                 }
             });
@@ -156,7 +156,7 @@ namespace EasyEject {
                         view.SetAvailable(true); var check = ChannelAwait(() => view.Check()); Check(check.Accepted && check.TryPresent(), "Metadata failed");
                         var zip = ChannelAwait(() => view.FinishSelection(view.BeginChoice(WindowsReleaseReviewAction.Archive), f.Source.Archive.Path)); Check(zip.Accepted && zip.TryPresent(), "ZIP failed");
                         var result = ChannelAwait(() => view.FinishSelection(view.BeginChoice(WindowsReleaseReviewAction.Extracted), f.Source.Archive.Package.Root));
-                        Check(result.Accepted && result.TryPresent() && !result.TryPresent() && result.Description.Contains("component/catalog") && result.Description.Contains("cannot be compared") && view.CanClose, "Presenter misreported incomplete acceptance or replayed result");
+                        Check(result.Accepted && result.TryPresent() && !result.TryPresent() && result.Description.Contains("approved component catalog") && result.Description.Contains("cannot be compared") && view.CanClose, "Presenter misreported incomplete acceptance or replayed result");
                     }
                     f.Source.Archive.Released();
                 }

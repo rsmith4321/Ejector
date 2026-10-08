@@ -6,12 +6,16 @@ namespace EasyEject {
     // archive/channel approval and permission to execute/install remain separate.
     internal sealed class ModernWindowsApplicationPackageReview : IDisposable {
         readonly ModernWindowsPackageContentReview content;
+        readonly ApprovedModernWindowsComponents components;
         internal readonly string Folder;
         internal readonly ModernWindowsReleaseManifest Release;
         bool disposed;
         internal ModernWindowsApplicationPackageReview(string folder, ApprovedWindowsPublisher publisher,
-            IWindowsExecutableTrust executableTrust, IWindowsManifestTrust manifestTrust, CancellationToken cancel) {
+            IWindowsExecutableTrust executableTrust, IWindowsManifestTrust manifestTrust, CancellationToken cancel, ApprovedModernWindowsComponents components = null) {
             try {
+                cancel.ThrowIfCancellationRequested();
+                if (components == null) throw new SafetyException("No independently approved modern vendor component catalog is configured. The application folder is not approved.");
+                this.components = components;
                 content = new ModernWindowsPackageContentReview(folder, publisher, executableTrust, manifestTrust, cancel);
                 RequireApplication(cancel);
                 Folder = content.Folder; Release = content.Release;
@@ -19,6 +23,7 @@ namespace EasyEject {
         }
         void RequireApplication(CancellationToken cancel) {
             cancel.ThrowIfCancellationRequested();
+            components.Require(content, cancel);
             ModernWindowsAppHostIdentity.Require(content, cancel);
             ModernWindowsManagedApplicationIdentity.Require(content, cancel);
             ModernWindowsBackendIdentity.Require(content, cancel);

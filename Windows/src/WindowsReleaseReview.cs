@@ -27,8 +27,8 @@ namespace EasyEject {
             Func<string, CancellationToken, WindowsArchiveReview> archive = null, Func<string, CancellationToken, WindowsPackageReview> package = null)
             : this(checks, channel, WindowsReleasePackagePolicy.Classic(channel, archive, package)) { }
         internal static WindowsReleaseReviewSession ForModern(WindowsUpdateCoordinator checks, ApprovedWindowsChannel channel,
-            Func<string, CancellationToken, ModernWindowsArchiveReview> archive = null, Func<string, CancellationToken, ModernWindowsApplicationPackageReview> package = null) {
-            return new WindowsReleaseReviewSession(checks, channel, WindowsReleasePackagePolicy.Modern(channel, archive, package));
+            Func<string, CancellationToken, ModernWindowsArchiveReview> archive = null, Func<string, CancellationToken, ModernWindowsApplicationPackageReview> package = null, ApprovedModernWindowsComponents components = null) {
+            return new WindowsReleaseReviewSession(checks, channel, WindowsReleasePackagePolicy.Modern(channel, archive, package, components));
         }
         WindowsReleaseReviewSession(WindowsUpdateCoordinator checks, ApprovedWindowsChannel channel, WindowsReleasePackagePolicy packages) {
             if (checks == null || checks.Configured != (channel != null)) throw new ArgumentException("Release review requires the same configured channel as its check coordinator.");

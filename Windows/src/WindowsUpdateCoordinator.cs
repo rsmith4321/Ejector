@@ -129,6 +129,7 @@ namespace EasyEject {
         // A modern multi-file artifact needs its own approved package/publisher policy.
         // It must never silently inherit the classic six-file Framework channel.
         internal static ApprovedWindowsChannel ModernProductionChannel { get { return null; } }
+        internal static ApprovedModernWindowsComponents ModernProductionComponents { get { return null; } }
         internal const string ModernHistoryDirectory = "modern-update-history";
         internal static WindowsUpdateCoordinator CreateModern(bool automatic) { return CreateModern(ModernProductionChannel, () => Profiles.Root, new WindowsChannelHttpTransport(), new WindowsManifestTrust(), () => DateTime.UtcNow, automatic); }
         internal static WindowsUpdateCoordinator CreateModern(ApprovedWindowsChannel channel, Func<string> root, IWindowsChannelTransport transport, IWindowsManifestEnvelopeTrust trust, Func<DateTime> clock, bool automatic) {

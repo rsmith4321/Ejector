@@ -29,16 +29,16 @@ namespace EasyEject {
                 }
             });
         }
-        internal static WindowsReleasePackagePolicy Modern(ApprovedWindowsChannel channel, Func<string, CancellationToken, ModernWindowsArchiveReview> archive, Func<string, CancellationToken, ModernWindowsApplicationPackageReview> package) {
+        internal static WindowsReleasePackagePolicy Modern(ApprovedWindowsChannel channel, Func<string, CancellationToken, ModernWindowsArchiveReview> archive, Func<string, CancellationToken, ModernWindowsApplicationPackageReview> package, ApprovedModernWindowsComponents components = null) {
             archive = archive ?? ((path, cancel) => new ModernWindowsArchiveReview(path, channel.Publisher, new WindowsManifestTrust(), cancel));
-            package = package ?? ((path, cancel) => new ModernWindowsApplicationPackageReview(path, channel.Publisher, new WindowsAuthenticode(), new WindowsManifestTrust(), cancel));
+            package = package ?? ((path, cancel) => new ModernWindowsApplicationPackageReview(path, channel.Publisher, new WindowsAuthenticode(), new WindowsManifestTrust(), cancel, components));
             return new WindowsReleasePackagePolicy(true, (offer, path, folder, extracted, cancel, guard) => {
                 using (var zip = archive(path, cancel)) {
                     guard(); offer.VerifyArchive(zip, cancel); guard();
                     if (!extracted) return new WindowsReleaseFilesReview(zip.Path, ArchiveMessage);
                     using (var contents = package(folder, cancel)) {
                         guard(); offer.VerifyExtracted(zip, contents, cancel); guard();
-                        return new WindowsReleaseFilesReview(null, "Selected extracted folder matches the freshly verified ZIP, signed release, trusted apphost publisher, complete file inventory and application/launch declarations.\r\nFolder: " + contents.Folder + "\r\nComplete component/catalog and distribution acceptance is still required before installation." + FinalMessage);
+                        return new WindowsReleaseFilesReview(null, "Selected extracted folder matches the freshly verified ZIP, signed release, trusted apphost publisher, complete file inventory, independently approved component catalog and application/launch declarations.\r\nFolder: " + contents.Folder + "\r\nNative loader and trusted distribution acceptance is still required before installation." + FinalMessage);
                     }
                 }
             });
