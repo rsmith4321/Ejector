@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Native settings keyboard and cleanup cancellation · October 8
+
+Corrected PID25172 now passes actual cleanup-confirmation **Return→Cancel**, keeps cleanup off, and accepts shortcut-list **Down E→F / Return** in an unsaved draft. Cancel/reopen restores shortcut-off/disabled E and original cleanup; fixed footer remains reachable. [Keyboard evidence](modern/NATIVE_ACCEPTANCE_20261008.md) binds **18:58:43.1652089Z**, all601 exact files, unchanged two configuration records, absent app-settings/login and capture/focus limitations. Code/build unchanged; no new suite, live shortcut registration/delivery, settings Save, device/media or trust proof. Remaining acceptance gates/full goal stay open.
+
 ## Native late-Stop timing and restoration · October 8
 
 One native 1 GiB owned hashing fixture exposes **Stop validation** on corrected PID25172, but Save commits before the subsequent Stop input. Actual cancellation remains unproved. Fresh native selection/Save restores the exact original 486-byte tool setup and unchanged supplied executable hashes; guarded recovery moves only the fixture into external evidence storage, with no execution/export/device action. [Timing evidence](modern/QUICK_SHARE_SETUP_SCROLL.md) binds the late committed record, restored record and **18:54:43.3004239Z** receipt. Code/candidate unchanged, no new suite count; busy cancellation/close and remaining full-port acceptance stay open, goal active.
