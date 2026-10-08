@@ -16,7 +16,7 @@ namespace EasyEject {
                 Guid nonce;
                 Check(args.Length == 9 && Guid.TryParseExact(args[3], "N", out nonce)
                     && args.Skip(4).Take(3).All(ImportHistory.ValidHash)
-                    && new[] { "prepare", "create", "reuse", "changed" }.Contains(args[7])
+                    && new[] { "prepare", "create", "reuse", "changed", "partial", "retry", "reuseall" }.Contains(args[7])
                     && (args[8] == "hd" || args[8] == "uhd"), "Invalid real cold-sharing challenge");
                 string root = SafePaths.Normalize(args[2]);
                 string allowed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectFixtures");
@@ -40,6 +40,7 @@ namespace EasyEject {
                         batch = (CompletedBatch)new DataContractJsonSerializer(typeof(CompletedBatch)).ReadObject(input);
                     }
                     CheckColdShareBatch(batch, destination);
+                    Check(batch.Originals.Count == (new[] { "partial", "retry", "reuseall" }.Contains(args[7]) ? 2 : 1), "Real cold-sharing batch size differs from its reviewed action");
                     var history = ImportHistory.Load(config);
                     Check(history.Count == 1 && history[0].Id == batch.Id, "Real cold sharing did not restore the exact generated batch");
                     CheckColdShareBatch(history[0], destination);
@@ -53,16 +54,26 @@ namespace EasyEject {
                     if (args[7] == "changed") {
                         Throws<QuickShareFailure>(() => service.Run(offer.Choose(preset, QuickShareColor.Standard), CancellationToken.None, _ => {}));
                         Check(media.Calls == 0, "Changed original reached real tools");
+                    } else if (args[7] == "partial") {
+                        using (var stop = new CancellationTokenSource()) {
+                            media.StopAtEncoderProgress = stop; media.StopAtEncodeNumber = 2;
+                            var failure = Throws<QuickShareFailure>(() => service.Run(offer.Choose(preset, QuickShareColor.Standard), stop.Token, _ => {}));
+                            Check(media.CancelledAtProgress && failure.Cancelled && failure.Partial.Created == 1 && failure.Partial.Reused == 0
+                                && failure.Partial.PublishedCopies == 1 && failure.Partial.PublishedReceipts == 1 && failure.Partial.Outputs.Count == 1,
+                                "Cold cancellation lost or overstated partial publication");
+                            Check(media.Encodes == 2 && media.Decodes == 1 && media.Probes == 3, "Cold cancellation did not stop the second actual encode");
+                        }
+                        VerifyShareOriginals(batch); CheckSharePrivateGone(batch);
                     } else if (args[7] != "prepare") {
                         var result = service.Run(offer.Choose(preset, QuickShareColor.Standard), CancellationToken.None, _ => {});
-                        bool reuse = args[7] == "reuse";
-                        Check(result.Created == (reuse ? 0 : 1) && result.Reused == (reuse ? 1 : 0)
-                            && result.Outputs.Single().EndsWith(preset == QuickSharePreset.Hd ? "-sharing-1080p.mp4" : "-sharing-4K.mp4"), "Cold real size/publication/reuse differs");
-                        Check(media.Encodes == (reuse ? 0 : 1) && media.Decodes == (reuse ? 0 : 1)
-                            && media.Probes == (reuse ? 1 : 2), "Cold real export omitted validation or re-encoded verified output");
-                        using (var receiptFile = SafePaths.ReadFile(QuickShareEngine.ReceiptPath(result.Outputs.Single()))) {
+                        bool reuse = args[7] == "reuse" || args[7] == "reuseall";
+                        int created = reuse ? 0 : 1, reused = reuse ? batch.Originals.Count : args[7] == "retry" ? 1 : 0;
+                        Check(result.Created == created && result.Reused == reused && result.Outputs.Count == batch.Originals.Count
+                            && result.Outputs.All(output => output.EndsWith(preset == QuickSharePreset.Hd ? "-sharing-1080p.mp4" : "-sharing-4K.mp4")), "Cold real size/publication/reuse differs");
+                        Check(media.Encodes == created && media.Decodes == created && media.Probes == reused + 2 * created, "Cold real export omitted validation or re-encoded verified output");
+                        foreach (string output in result.Outputs) using (var receiptFile = SafePaths.ReadFile(QuickShareEngine.ReceiptPath(output))) {
                             var receipt = JsonDocuments.Read<QuickShareReceipt>(receiptFile, 31999);
-                            Check(receipt.SourceSha256 == batch.Originals.Single().Sha256 && receipt.OutputSha256 == IndependentFileHash(result.Outputs.Single())
+                            Check(batch.Originals.Any(original => original.Sha256 == receipt.SourceSha256) && receipt.OutputSha256 == IndependentFileHash(output)
                                 && receipt.Width == 640 && receipt.Height == 360 && receipt.LutSha256 == null, "Cold real receipt differs from generated source/output");
                         }
                         VerifyShareOriginals(batch); CheckSharePrivateGone(batch);
@@ -122,6 +133,24 @@ namespace EasyEject {
                 Check(retained.All(pair => IndependentFileHash(pair.Key) == pair.Value), "Refusal changed a retained export or receipt");
                 File.WriteAllBytes(original, prior); RunColdRealShare(f, batch, "reuse");
                 Check(IndependentFileHash(Path.Combine(config, "completed-imports.json")) == historyHash && !Directory.Exists(f.Source), "Cold sharing changed saved history or restored source");
+                VerifyShareOriginals(batch); CheckSharePrivateGone(batch);
+            }
+        }
+
+        static void RealShareColdPartial(QuickShareTools tools) {
+            using (var f = new Fixture()) {
+                var batch = GenerateRealShareBatch(f, tools, 640, 360, 30, true, clips: 2); string config = RealShareSetup(f, batch, tools);
+                string historyHash = IndependentFileHash(Path.Combine(config, "completed-imports.json"));
+                RunColdRealShare(f, batch, "partial");
+                string folder = Path.Combine(batch.Folder, "Sharing Copies"), first = Directory.GetFiles(folder, "*.mp4").Single();
+                string firstHash = IndependentFileHash(first), receiptHash = IndependentFileHash(QuickShareEngine.ReceiptPath(first));
+                RunColdRealShare(f, batch, "retry");
+                Check(Directory.GetFiles(folder, "*.mp4").Length == 2 && IndependentFileHash(first) == firstHash
+                    && IndependentFileHash(QuickShareEngine.ReceiptPath(first)) == receiptHash, "Fresh cold retry replaced the earlier copy or skipped the remaining original");
+                var retained = Directory.GetFiles(folder, "*.mp4").SelectMany(output => new[] { output, QuickShareEngine.ReceiptPath(output) }).ToDictionary(path => path, IndependentFileHash);
+                RunColdRealShare(f, batch, "reuseall");
+                Check(retained.All(pair => IndependentFileHash(pair.Key) == pair.Value), "Cold reuse changed either completed output/receipt");
+                Check(IndependentFileHash(Path.Combine(config, "completed-imports.json")) == historyHash && !Directory.Exists(f.Source), "Cold partial retry changed history or restored source");
                 VerifyShareOriginals(batch); CheckSharePrivateGone(batch);
             }
         }

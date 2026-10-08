@@ -43,6 +43,7 @@ namespace EasyEject {
                     Test("real tools: rotated landscape applies both display-matrix directions once", () => RealShareRotation(tools));
                     Test("real tools: generated PQ and HLG tags refuse before encoding or publication", () => RealShareHdrRefusal(tools));
                     Test("real tools: separate cold processes prepare create reuse and refuse changed originals", () => RealShareColdRestart(tools));
+                    Test("real tools: cold cancellation retains a published copy and fresh retry finishes only the remainder", () => RealShareColdPartial(tools));
                     if (tools.Lut != null) {
                         Test("real tools: official LUT transform produces validated 1080p output", () => RealShareCase(tools, 1920, 1080, 30, true, QuickSharePreset.Hd, QuickShareColor.LunaILog, 1920, 1080, 30));
                         Test("real tools: official LUT transform produces validated 4K output", () => RealShareCase(tools, 3840, 2160, 30, true, QuickSharePreset.Uhd, QuickShareColor.LunaILog, 3840, 2160, 30));
@@ -57,6 +58,7 @@ namespace EasyEject {
             readonly WindowsQuickShareProcess inner = new WindowsQuickShareProcess();
             internal int Calls, Encodes, Probes, Decodes;
             internal CancellationTokenSource StopAtEncoderProgress;
+            internal int StopAtEncodeNumber = 1;
             internal bool CancelledAtProgress;
             public byte[] Run(string executable, string[] arguments, string directory, double timeout, CancellationToken cancel, Action validate, Action<string> progress = null) {
                 Calls++; bool encode = arguments.Contains("-progress");
@@ -64,7 +66,7 @@ namespace EasyEject {
                 if (arguments.Contains("-show_streams")) Probes++;
                 if (arguments.Contains("-f") && arguments.Contains("null")) Decodes++;
                 Action<string> observe = line => {
-                    if (encode && StopAtEncoderProgress != null && !CancelledAtProgress && line.StartsWith("frame=", StringComparison.Ordinal)) {
+                    if (encode && Encodes == StopAtEncodeNumber && StopAtEncoderProgress != null && !CancelledAtProgress && line.StartsWith("frame=", StringComparison.Ordinal)) {
                         CancelledAtProgress = true; StopAtEncoderProgress.Cancel();
                     }
                     if (progress != null) progress(line);
@@ -73,7 +75,8 @@ namespace EasyEject {
             }
         }
 
-        static CompletedBatch GenerateRealShareBatch(Fixture f, QuickShareTools tools, int width, int height, int rate, bool audio, int? rotation = null, string transfer = "bt709") {
+        static CompletedBatch GenerateRealShareBatch(Fixture f, QuickShareTools tools, int width, int height, int rate, bool audio, int? rotation = null, string transfer = "bt709", int clips = 1) {
+            Check(clips == 1 || clips == 2, "Generated rehearsal supports only one or two owned clips");
             string path = Path.Combine(f.Source, "VID_generated.mp4");
             string generated = rotation.HasValue ? Path.Combine(f.Root, "generated-unrotated.mp4") : path;
             Check(transfer == "bt709" || transfer == "smpte2084" || transfer == "arib-std-b67", "Unsupported generated transfer tag");
@@ -94,8 +97,9 @@ namespace EasyEject {
                 int size = identity.Length + 8; stream.Write(new[] { (byte)(size >> 24), (byte)(size >> 16), (byte)(size >> 8), (byte)size, (byte)'f', (byte)'r', (byte)'e', (byte)'e' }, 0, 8);
                 stream.Write(identity, 0, identity.Length); stream.Flush(true);
             }
+            if (clips == 2) File.Copy(path, Path.Combine(f.Source, "VID_generated_second.mp4"));
             string hash = IndependentFileHash(path); var result = f.Run(_ => {}); var batch = Batch(f, result);
-            Check(batch.Originals.Count == 1 && batch.Originals[0].Sha256 == hash && IndependentFileHash(batch.Originals[0].Path) == hash, "Generated import changed the original bytes");
+            Check(batch.Originals.Count == clips && batch.Originals.All(original => original.Sha256 == hash && IndependentFileHash(original.Path) == hash), "Generated import changed the original bytes");
             return batch;
         }
 
