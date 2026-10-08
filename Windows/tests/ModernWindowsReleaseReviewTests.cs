@@ -7,18 +7,20 @@ using System.Threading.Tasks;
 namespace EasyEject {
     public static partial class Tests {
         sealed class ModernReviewFixture : IDisposable {
-            internal readonly ModernChannelFixture Source = new ModernChannelFixture();
+            internal readonly ModernChannelFixture Source;
+            readonly ApprovedModernWindowsComponents components;
             internal readonly WindowsUpdateCoordinator Checks; internal readonly WindowsReleaseReviewSession Review;
             internal int ArchiveCalls, PackageCalls; internal Action<CancellationToken> BeforeArchive, BeforePackage;
             internal bool IgnoreArchiveCancellation;
             internal Func<WindowsUpdateCheckScope, Task<WindowsChannelOffer>> Operation;
-            internal ModernReviewFixture() {
+            internal ModernReviewFixture(ModernChannelFixture source = null, ApprovedModernWindowsComponents components = null) {
+                Source = source ?? new ModernChannelFixture(); this.components = components;
                 Checks = new WindowsUpdateCoordinator(true, scope => Operation == null ? Task.FromResult(Source.Offer()) : Operation(scope), () => Source.Now, TimeSpan.FromDays(1), false);
                 Review = WindowsReleaseReviewSession.ForModern(Checks, Source.Channel, Archive, Package);
                 Checks.Start(); Checks.SetReviewOpen(true); Checks.PublishIdle(true); Review.PublishAvailable(true);
             }
             internal ModernWindowsArchiveReview Archive(string path, CancellationToken cancel) { ArchiveCalls++; if (BeforeArchive != null) BeforeArchive(cancel); return new ModernWindowsArchiveReview(path, Source.Channel.Publisher, new WindowsManifestTrust(Source.Archive.Package.Certificate), IgnoreArchiveCancellation ? CancellationToken.None : cancel); }
-            internal ModernWindowsApplicationPackageReview Package(string path, CancellationToken cancel) { PackageCalls++; if (BeforePackage != null) BeforePackage(cancel); return new ModernWindowsApplicationPackageReview(path, Source.Channel.Publisher, Source.Archive.Package.Executable, new WindowsManifestTrust(Source.Archive.Package.Certificate), cancel, FakeComponentApproval(Source.Archive.Package)); }
+            internal ModernWindowsApplicationPackageReview Package(string path, CancellationToken cancel) { PackageCalls++; if (BeforePackage != null) BeforePackage(cancel); return new ModernWindowsApplicationPackageReview(path, Source.Channel.Publisher, Source.Archive.Package.Executable, new WindowsManifestTrust(Source.Archive.Package.Certificate), cancel, components ?? FakeComponentApproval(Source.Archive.Package)); }
             internal WindowsReleaseReviewResult CheckRelease() { var result = ChannelAwait(() => Review.CheckAsync(CancellationToken.None)); Check(Review.TryPresent(result), "Current metadata delivery failed"); return result; }
             internal WindowsReleaseReviewResult Zip(string path = null) { var result = ChannelAwait(() => Review.ArchiveAsync(path ?? Source.Archive.Path, CancellationToken.None)); Check(Review.TryPresent(result), "Current ZIP delivery failed"); return result; }
             internal WindowsReleaseReviewResult Folder() { var result = ChannelAwait(() => Review.ExtractedAsync(Source.Archive.Package.Root, CancellationToken.None)); Check(Review.TryPresent(result), "Current folder delivery failed"); return result; }

@@ -9,9 +9,9 @@ using System.Threading;
 namespace EasyEject {
     public static partial class Tests {
         sealed class ModernArchiveFixture : IDisposable {
-            internal readonly ModernPackageFixture Package = new ModernPackageFixture();
+            internal readonly ModernPackageFixture Package;
             internal string Path { get { return System.IO.Path.Combine(Package.Owned.Destination, "modern.zip"); } }
-            internal ModernArchiveFixture() { Write(); }
+            internal ModernArchiveFixture(ModernPackageFixture package = null) { Package = package ?? new ModernPackageFixture(); if (package == null) Write(); }
             // Independent bounded fixture writer exercises stored and both descriptor forms.
             internal void Write(bool stored = false, int descriptor = 0, Func<string, string> rename = null, string omit = null, string extra = null) {
                 var data = new Dictionary<string, byte[]>(StringComparer.Ordinal);

@@ -8,12 +8,14 @@ using System.Threading.Tasks;
 namespace EasyEject {
     public static partial class Tests {
         sealed class ModernChannelFixture : IDisposable {
-            internal readonly ModernArchiveFixture Archive = new ModernArchiveFixture();
+            internal readonly ModernArchiveFixture Archive;
             internal readonly ApprovedWindowsChannel Channel; internal DateTime Now = DateTime.UtcNow;
             internal long Seconds { get { return (Now.Ticks - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks) / TimeSpan.TicksPerSecond; } }
             internal string History { get { return Path.Combine(Archive.Package.Owned.Destination, WindowsReleaseChecks.ModernHistoryDirectory); } }
-            internal ModernChannelFixture() {
-                Archive.Package.Metadata.Version = "0.1.0.0"; Archive.Package.Publish(); Archive.Write();
+            internal ModernChannelFixture(ModernArchiveFixture archive = null) {
+                Archive = archive ?? new ModernArchiveFixture();
+                if (archive == null) { Archive.Package.Metadata.Version = "0.1.0.0"; Archive.Package.Publish(); Archive.Write(); }
+                else Check(Archive.Package.Metadata.Version == "0.1.0.0" && File.Exists(Archive.Path), "Supplied channel fixture must already contain its stable ZIP");
                 Channel = ApprovedWindowsChannel.Modern("https://example.invalid/modern/channel.json", "https://example.invalid/modern/channel.json.p7s", "https://downloads.example.invalid/modern/releases/", Archive.Package.Signing.Publisher());
             }
             internal string Text(string version = "0.1.0.0", long? issued = null, long? expires = null) {
