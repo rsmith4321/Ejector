@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Audit remaining sleep/wake connection proof · October 8
+
+Source **cf9e1a7** inspection finds no suspend/resume handling in either storage message bridge; scoped proof intentionally accepts global-epoch changes when protected fingerprints/stamps stay equal. [Power audit](POWER_CONNECTION_AUDIT.md) records the exact source contract/Microsoft event definitions and a focused generated-message reproduction plan. Missed-callback/stale-authority behavior remains an inference requiring proof, not a reproduced device failure. No production change/new test/settings/device action. Current1365/242 review evidence remains scoped; desktop/physical acceptance and full goal stay open. Desktop/heavy-build use is yielded only for the separately coordinated bounded read-only Gyroflow audit; no Easy Eject goal transfer or pause.
+
 ## Current committed-source review and full bundled checks · October 8
 
 Isolated **a7afd34** now produces a fresh unsigned **649-file/286246084-byte** review folder containing the icon/notices and latest completion fixes. Exact app backend passes **1365/0 full /242/0 selected**, actual-byte sample **9/0 /15/0** with fake positive trust, native read-only registration/protected inventory/disposal and generated history/source-absence/refusal/cancel/retry preparation. Warning-free builds; terminal24728 exit0, all payload/48 notice pins match, actual bundled10.0.12 modules observed and zero owned runners. [Current review evidence](modern/CURRENT_REVIEW_ACCEPTANCE_20261008.md) retains commands/source/archive/runtime/logs, unchanged live configuration and original preview. New folder unlaunched; foreground desktop/normal Quit-switch, identified hardware and full-port media/LUT/filesystem/travel/trust acceptance stay open, goal active.
