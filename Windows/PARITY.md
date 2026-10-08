@@ -2,6 +2,8 @@
 
 Sleep/wake **software authority** now has [reproduced/fixed evidence](POWER_CONNECTION_ACCEPTANCE.md): prior owned **9/6**, final **23/0 focused each /15/0 owned**, both final full runtimes **1388/0**, selected **242/0**, exact runtime/payload/native monitor/disposal and unchanged configuration/original preview. Power subscriptions fail closed, suspend blocks admission, resume retires old proofs without automatic retry or fault healing. Real delivery/Modern Standby, foreground/disposable hardware and operation-specific Quick Share/resume/cleanup boundary coverage remain open; no complete-port or trusted-distribution claim.
 
+Implementation commit **3ccf740856c853abe361f1472e0183b106546172** has eleven tested code/project inputs independently matched to its Git blobs. Ten evidence pins, zero active validation processes and the retained original preview are recorded; the separate peer document stays untracked.
+
 An [independent primary-thread evidence check](modern/COMBINED_REVIEW_INDEPENDENT_AUDIT.md) now revalidates the peer combined review's 649 payload files/four backend copies/eight exact logs, including both **1365/0** runtimes and generated actual-tool **16/0**. This is retained-test evidence, not a rerun or current-copy foreground/physical/LUT/trust acceptance; earlier failures and pending peer edits are preserved. Full goal remains open.
 
 The separately opt-in [owned power-message probe](modern/tools/POWER_CONNECTION_PROBE.md) began as source-only preparation during the coordinated laptop audit; the later software results are above. Actual sleep/Modern Standby/device acceptance is not closed by synthetic dispatch.

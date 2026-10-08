@@ -2,6 +2,8 @@
 
 ## Retire sleep/wake storage proofs in both interfaces · October 8
 
+Local implementation commit **3ccf740856c853abe361f1472e0183b106546172** matches all eleven tested C#/project inputs through Git attributes (`committed-code-conformance.json`); ten completed evidence logs/receipts are hash-pinned. Postcommit census finds zero validation runners and the original preview retained. No push or public delivery. The peer's untracked document is preserved.
+
 The owned probe reproduces **9/6** on the prior exact backend. Both bridges now own suspend/resume subscriptions and retire epoch/stamps together, block suspended admission, require fresh resumed proof, preserve tracking faults/ordinary charger status, pair automatic/user resume and suppress automatic repeat on the initial resumed inventory. [Power acceptance](POWER_CONNECTION_ACCEPTANCE.md): **23/0 focused each runtime /15/0 owned native**, warning-free WinUI, final exact-app .NET **1388/0 full /242/0 selected /15/0 probe**, same-source Framework **1388/0**, native protected inventory/disposal, eighteen matching runtime pairs and all **649/286249164** payload bytes exact; parent23648 terminal **21:38:47.0411164Z exit0**. Originals/copies/receipts, configuration, old preview and peer pending edits retained. Actual OS/Modern Standby/foreground/device/media/LUT/filesystem/travel/trust and remaining operation-specific boundary coverage still gate the full goal. Testing-slot recovery and explicit brokered handback are retained outside the repo; no real sleep/settings/device action.
 
 ## Independently check the completed peer review evidence · October 8
