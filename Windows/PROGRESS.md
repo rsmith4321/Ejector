@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Independently derived local vendor layout · October 8
+
+Source **3a1bb7e** supplies explicit local component review with immutable compiled **639-file** vendor pins and an exact independent source dossier. Paths/bytes derive from twenty authenticated package archives and inspected SDK profile/culture/projection/resource/conflict rules before reading the candidate; comparison **639/639**, no missing/extra/changed entry. Production channel/catalog remain null. Warning-free isolated **9aee6b3** plus four overlays passes selected **242/0**, Framework/modern defaults **1361/0 each** without real eject, approval **11/0 each** and existing focused/version/composed samples; terminals **40965/53080/99074 exit0**, exact backend/source/blob hashes, prior601/649 unchanged and owned processes zero. [INDEPENDENT_VENDOR_LAYOUT.md](modern/INDEPENDENT_VENDOR_LAYOUT.md) retains corrected audit-harness failures and synthetic release/fake-composed scopes. Concurrent older-source native evidence is preserved/separate. Genuine-pin held composition, final notices/catalog/publisher/loader/distribution/remaining native UI/LUT/genuine footage/identified hardware/filesystem/travel remain; goal active.
+
 ## Fresh bundled native acceptance · October 8
 
 Further native defaults checks on **e1f307c/PID6148** cancel videos-only/all-media original-removal reviews and device Trash recovery review, verify their shared-device/media/current-user scope wording, and restore Videos only/previews/clean layout after whole-draft Cancel. Original process remains idle; the **18:10:33.7783447Z** receipt binds all601 exact files, empty configuration/profiles and absent login registration. [Native acknowledgement evidence](modern/NATIVE_ACCEPTANCE_20261008.md) retains limits: no Enable/Save/Enter-default test, positive destructive reset/workflow, new software count or newer vendor-layout approval. Full goal active; real device actions remain unrun.
