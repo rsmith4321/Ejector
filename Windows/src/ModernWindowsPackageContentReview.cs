@@ -160,6 +160,23 @@ namespace EasyEject {
             try { inspect(file.Stream); CheckFiles(cancel); }
             finally { if (file.Stream.CanSeek) file.Stream.Position = position; }
         }
+        internal void InspectMany(IEnumerable<string> names, Action<string, FileStream> inspect, CancellationToken cancel) {
+            if (disposed) throw new ObjectDisposedException("ModernWindowsPackageContentReview");
+            if (names == null || inspect == null) throw new ArgumentNullException("inspect");
+            cancel.ThrowIfCancellationRequested(); var selected = new List<string>(); var unique = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string name in names) {
+                cancel.ThrowIfCancellationRequested();
+                if (name == null || !unique.Add(name) || selected.Count >= ModernWindowsReleaseManifest.MaximumFiles || !files.ContainsKey(name)) throw new SafetyException("Batch inspection needs unique held modern package files.");
+                selected.Add(name);
+            }
+            CheckFiles(cancel);
+            foreach (string name in selected) {
+                cancel.ThrowIfCancellationRequested(); var file = files[name]; file.Validate(); long position = file.Stream.Position;
+                try { inspect(name, file.Stream); file.Validate(); cancel.ThrowIfCancellationRequested(); }
+                finally { if (file.Stream.CanSeek) file.Stream.Position = position; }
+            }
+            CheckFiles(cancel);
+        }
         public void Dispose() { if (disposed) return; disposed = true; if (executable != null) executable.Dispose(); foreach (var file in files.Values) file.Dispose(); files.Clear(); if (directories != null) directories.Dispose(); }
     }
 }

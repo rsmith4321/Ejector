@@ -24,6 +24,7 @@ namespace EasyEject {
             ModernWindowsBackendIdentity.Require(content, cancel);
             ModernWindowsRuntimeConfiguration.Require(content, cancel);
             ModernWindowsDependencyConfiguration.Require(content, cancel);
+            ModernWindowsComponentVersions.Require(content, cancel);
             content.Revalidate(cancel);
         }
         internal void Revalidate(CancellationToken cancel) {

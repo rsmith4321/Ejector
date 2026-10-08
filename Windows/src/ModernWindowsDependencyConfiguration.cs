@@ -12,6 +12,10 @@ namespace EasyEject {
     // Read-only declarations for the reviewed flattened self-contained layout.
     // Not component/code identity, NuGet authenticity or permission to execute.
     internal static class ModernWindowsDependencyConfiguration {
+        internal sealed class AssetVersions {
+            internal readonly string Name, AssemblyVersion, FileVersion;
+            internal AssetVersions(string name, string assemblyVersion, string fileVersion) { Name = name; AssemblyVersion = assemblyVersion; FileVersion = fileVersion; }
+        }
         internal const string Name = "EasyEject.Modern.deps.json";
         internal const int MaximumBytes = 524288;
         const string Framework = ".NETCoreApp,Version=v10.0", Target = Framework + "/win-x64";
@@ -26,7 +30,7 @@ namespace EasyEject {
             }, cancel);
             content.Revalidate(cancel);
         }
-        internal static void Validate(byte[] supplied, ModernWindowsReleaseManifest release) {
+        internal static AssetVersions[] Validate(byte[] supplied, ModernWindowsReleaseManifest release) {
             if (release == null) Fail("Dependency configuration requires authenticated release metadata.");
             var root = Exact(Read(supplied), "runtimeTarget", "compilationOptions", "targets", "libraries", "runtimes");
             var runtime = Exact(root["runtimeTarget"], "name", "signature");
@@ -43,6 +47,7 @@ namespace EasyEject {
             foreach (string required in new[] { main, backend, core, desktop, sdk }) if (!graph.ContainsKey(required)) Fail("Required dependency identity differs from the authenticated release.");
             var identities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var assets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var versions = new List<AssetVersions>();
             var inventory = new HashSet<string>(release.Files.Select(file => file.Name), StringComparer.Ordinal);
             foreach (var library in graph) {
                 string[] id = library.Key.Split('/');
@@ -72,6 +77,7 @@ namespace EasyEject {
                     var attributes = Object(asset.Value);
                     if (attributes.Keys.Any(key => key != "fileVersion" && (key != "assemblyVersion" || role != "runtime")) || attributes.Values.Any(value => !ComponentVersion(Text(value)))) Fail("Unsupported dependency asset version metadata.");
                     assets.Add(basename, library.Key + ":" + role);
+                    versions.Add(new AssetVersions(basename, attributes.ContainsKey("assemblyVersion") ? Text(attributes["assemblyVersion"]) : null, attributes.ContainsKey("fileVersion") ? Text(attributes["fileVersion"]) : null));
                 }
             }
             var application = Exact(graph[main], "dependencies", "runtime"); var dependencies = Object(application["dependencies"]);
@@ -104,6 +110,7 @@ namespace EasyEject {
                 if (project == main) Exact(declared["EasyEject.Modern.dll"]);
                 else { var metadata = Exact(declared["EasyEject.Runtime.dll"], "assemblyVersion", "fileVersion"); if (Text(metadata["assemblyVersion"]) != release.Version || Text(metadata["fileVersion"]) != release.Version) Fail("Backend declared assembly/file version differs from release."); }
             }
+            return versions.ToArray();
         }
         static void RequireAsset(Dictionary<string, string> assets, string name, string library, string role) { string owner; if (!assets.TryGetValue(name, out owner) || owner != library + ":" + role) Fail("Required dependency asset has a substituted owner or role."); }
         internal static string PackageVersion(string version) { return version.EndsWith(".0", StringComparison.Ordinal) ? version.Substring(0, version.Length - 2) : version; }
