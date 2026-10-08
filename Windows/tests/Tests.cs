@@ -143,6 +143,7 @@ namespace EasyEject {
             if (args.Length == 2 && args[0] == "--modern-windows-archive-application-sample") return ModernArchiveApplicationSample(args[1]);
             if (args.Length == 1 && args[0] == "--modern-windows-archives") { ModernWindowsArchiveTests(); Console.WriteLine(passed + " passed, " + failed + " failed"); return failed == 0 ? 0 : 1; }
             if (args.Length == 2 && args[0] == "--modern-windows-application-package-sample") return ModernApplicationPackageSample(args[1]);
+            if (args.Length == 2 && args[0] == "--modern-windows-pinned-vendor-sample") return ModernPinnedVendorSample(args[1]);
             if (args.Length == 1 && args[0] == "--modern-windows-application-package") { ModernWindowsApplicationPackageTests(); Console.WriteLine(passed + " passed, " + failed + " failed"); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-managed-identity") { WindowsManagedIdentityTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Existing native classic identity fixtures only; no candidate loading or release/device action."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-manifests") { WindowsManifestTrustTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Ephemeral fixture keys, fake positive chain trust and real native untrusted refusals only; no trust-store import or release signing."); return failed == 0 ? 0 : 1; }

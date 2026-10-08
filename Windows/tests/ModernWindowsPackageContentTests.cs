@@ -12,9 +12,10 @@ namespace EasyEject {
             internal readonly FakeExecutableTrust Executable; internal readonly FakeManifestCertificateTrust Certificate;
             internal string Root { get { return Owned.Source; } }
             internal string PathFor(string name) { return Path.Combine(Root, name.Replace('/', '\\')); }
-            internal ModernPackageFixture() {
+            internal ModernPackageFixture(bool synthetic = true) {
                 Executable = new FakeExecutableTrust { Evidence = Signing.Evidence() }; Certificate = new FakeManifestCertificateTrust { Evidence = Signing.Evidence() };
                 Metadata.Files.Clear();
+                if (!synthetic) return;
                 foreach (string name in ModernWindowsReleaseManifest.RequiredFiles.Concat(new[] { "en-US/fixture.dll.mui", "nested/fixture.json" })) {
                     string path = PathFor(name); Directory.CreateDirectory(Path.GetDirectoryName(path));
                     byte[] bytes = name == "EasyEject.Modern.exe" ? File.ReadAllBytes(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EasyEject.Windows.exe")) : Encoding.UTF8.GetBytes("Owned synthetic content: " + name);
