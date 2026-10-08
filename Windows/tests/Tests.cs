@@ -131,6 +131,8 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--modern-windows-deps") { ModernWindowsDependencyConfigurationTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Generated dependency graphs and owned content with fake positive trust only; no component loading, execution or device action."); return failed == 0 ? 0 : 1; }
             if (args.Length == 2 && args[0] == "--modern-windows-deps-sample") return ModernDependencySample(args[1]);
             if (args.Length == 2 && args[0] == "--modern-windows-apphost-sample") return ModernWindowsAppHostSample(args[1]);
+            if (args.Length == 2 && args[0] == "--modern-windows-application-package-sample") return ModernApplicationPackageSample(args[1]);
+            if (args.Length == 1 && args[0] == "--modern-windows-application-package") { ModernWindowsApplicationPackageTests(); Console.WriteLine(passed + " passed, " + failed + " failed"); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-managed-identity") { WindowsManagedIdentityTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Existing native classic identity fixtures only; no candidate loading or release/device action."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-manifests") { WindowsManifestTrustTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Ephemeral fixture keys, fake positive chain trust and real native untrusted refusals only; no trust-store import or release signing."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--windows-update-coordinator") { WindowsUpdateCoordinatorTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned fake checks, disposable settings/replay and hidden native controls only; no production channel request."); return failed == 0 ? 0 : 1; }
@@ -792,6 +794,7 @@ namespace EasyEject {
             ModernWindowsManagedIdentityTests();
             ModernWindowsAppHostIdentityTests();
             ModernWindowsDependencyConfigurationTests();
+            ModernWindowsApplicationPackageTests();
             ManualImportReviewTests(); ColdHistoryTests(); JsonSyntaxTests(); JsonDocumentTests(); ConnectedReviewTests(); ConnectedForgetTests(); ConfigurationValidationTests(); ProfilePublicationTests(); QuickShareConfigurationOwnershipTests(); ImportConfigurationReadTests(); ConfigurationReadTests(); HistoryPublicationTests(); WindowsReplayRecoveryTests(); WindowsReplayBackupTests(); ProfileCatalogOwnershipTests(); OriginalOwnershipTests(); ResumeOwnershipTests(); TrashOwnershipTests(); QuickShareContractTests(); DefaultsContractTests(); BulkFinalTests(); PathOwnershipTests(); WindowsReleaseReviewTests(); WindowsUpdateCoordinatorTests(); WindowsChannelReplayTests(); WindowsChannelDiscoveryTests(); WindowsChannelTests(); WindowsArchiveTests(); WindowsManagedIdentityTests(); WindowsPackageTests(); WindowsManifestTrustTests(); ModernWindowsReleaseManifestTests(); WindowsAuthenticodeTests(); ManualInstallationTests(); ConfigurationWriterTests(); DirectoryLeaseTests(); QuickShareEngineTests();
             QuickShareDialogTests();
             QuickShareConfigurationTests();
