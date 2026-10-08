@@ -16,7 +16,7 @@ namespace EasyEject {
                 Guid nonce;
                 Check(args.Length == 9 && Guid.TryParseExact(args[3], "N", out nonce)
                     && args.Skip(4).Take(3).All(ImportHistory.ValidHash)
-                    && new[] { "prepare", "create", "reuse", "changed", "partial", "retry", "reuseall" }.Contains(args[7])
+                    && new[] { "prepare", "create", "reuse", "changed", "partial", "retry", "reuseall", "crash", "crashretry", "crashreuseall" }.Contains(args[7])
                     && (args[8] == "hd" || args[8] == "uhd"), "Invalid real cold-sharing challenge");
                 string root = SafePaths.Normalize(args[2]);
                 string allowed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectFixtures");
@@ -40,7 +40,7 @@ namespace EasyEject {
                         batch = (CompletedBatch)new DataContractJsonSerializer(typeof(CompletedBatch)).ReadObject(input);
                     }
                     CheckColdShareBatch(batch, destination);
-                    Check(batch.Originals.Count == (new[] { "partial", "retry", "reuseall" }.Contains(args[7]) ? 2 : 1), "Real cold-sharing batch size differs from its reviewed action");
+                    Check(batch.Originals.Count == (new[] { "partial", "retry", "reuseall", "crash", "crashretry", "crashreuseall" }.Contains(args[7]) ? 2 : 1), "Real cold-sharing batch size differs from its reviewed action");
                     var history = ImportHistory.Load(config);
                     Check(history.Count == 1 && history[0].Id == batch.Id, "Real cold sharing did not restore the exact generated batch");
                     CheckColdShareBatch(history[0], destination);
@@ -51,6 +51,20 @@ namespace EasyEject {
                     var offer = service.Prepare(batch);
                     Check(media.Calls == 0 && completions.Entries.Length == 0, "Cold preparation ran tools or restored eject authority");
                     var preset = args[8] == "hd" ? QuickSharePreset.Hd : QuickSharePreset.Uhd;
+                    var retainedWork = args[7] == "crashretry" || args[7] == "crashreuseall" ? SnapshotCrashPrivateWork(batch) : null;
+                    if (args[7] == "crash") {
+                        media.AfterEncode = path => {
+                            if (media.Encodes != 2) return;
+                            Check(media.Decodes == 1 && media.Probes == 3 && completions.Entries.Length == 0, "Crash checkpoint precedes exact first publication/second encode");
+                            string folder = Path.Combine(batch.Folder, "Sharing Copies");
+                            Check(Directory.GetFiles(folder, "*.mp4").Length == 1 && File.Exists(QuickShareEngine.ReceiptPath(Directory.GetFiles(folder, "*.mp4").Single())), "Crash checkpoint lost validated first copy/receipt");
+                            Check(Path.GetFileName(path) == "output.mp4" && SafePaths.Within(path, folder), "Crash checkpoint is outside private output");
+                            Console.WriteLine("OWNED_CRASH_READY " + args[3]); Console.Out.Flush();
+                            // Parent owns this exact process handle. No finally cleanup
+                            // may run: it will terminate only this challenged child.
+                            using (var wait = new ManualResetEvent(false)) Check(wait.WaitOne(120000), "Owned crash parent failed to terminate its paused child");
+                        };
+                    }
                     if (args[7] == "changed") {
                         Throws<QuickShareFailure>(() => service.Run(offer.Choose(preset, QuickShareColor.Standard), CancellationToken.None, _ => {}));
                         Check(media.Calls == 0, "Changed original reached real tools");
@@ -66,8 +80,8 @@ namespace EasyEject {
                         VerifyShareOriginals(batch); CheckSharePrivateGone(batch);
                     } else if (args[7] != "prepare") {
                         var result = service.Run(offer.Choose(preset, QuickShareColor.Standard), CancellationToken.None, _ => {});
-                        bool reuse = args[7] == "reuse" || args[7] == "reuseall";
-                        int created = reuse ? 0 : 1, reused = reuse ? batch.Originals.Count : args[7] == "retry" ? 1 : 0;
+                        bool reuse = args[7] == "reuse" || args[7] == "reuseall" || args[7] == "crashreuseall";
+                        int created = reuse ? 0 : 1, reused = reuse ? batch.Originals.Count : args[7] == "retry" || args[7] == "crashretry" ? 1 : 0;
                         Check(result.Created == created && result.Reused == reused && result.Outputs.Count == batch.Originals.Count
                             && result.Outputs.All(output => output.EndsWith(preset == QuickSharePreset.Hd ? "-sharing-1080p.mp4" : "-sharing-4K.mp4")), "Cold real size/publication/reuse differs");
                         Check(media.Encodes == created && media.Decodes == created && media.Probes == reused + 2 * created, "Cold real export omitted validation or re-encoded verified output");
@@ -76,7 +90,8 @@ namespace EasyEject {
                             Check(batch.Originals.Any(original => original.Sha256 == receipt.SourceSha256) && receipt.OutputSha256 == IndependentFileHash(output)
                                 && receipt.Width == 640 && receipt.Height == 360 && receipt.LutSha256 == null, "Cold real receipt differs from generated source/output");
                         }
-                        VerifyShareOriginals(batch); CheckSharePrivateGone(batch);
+                        VerifyShareOriginals(batch);
+                        if (retainedWork == null) CheckSharePrivateGone(batch); else RequireCrashPrivateWork(batch, retainedWork);
                     }
                     Check(completions.Entries.Length == 0 && completions.Get(batch.Id) == null, "Cold real sharing acquired eject authority");
                     using (operations.Reserve(new[] { 700, 701 })) { }
@@ -104,6 +119,16 @@ namespace EasyEject {
             };
             using (var child = Process.Start(start)) {
                 Check(child != null && child.Id != Process.GetCurrentProcess().Id, "Real sharing did not create a separate process");
+                if (mode == "crash") {
+                    var ready = child.StandardOutput.ReadLineAsync();
+                    try {
+                        Check(ready.Wait(120000) && ready.GetAwaiter().GetResult() == "OWNED_CRASH_READY " + nonce, "Exact owned crash checkpoint was not reached");
+                        Check(!child.HasExited, "Owned crash worker terminated before parent action");
+                        child.Kill(); Check(child.WaitForExit(30000) && child.ExitCode != 0, "Owned process loss was not observed");
+                        Console.WriteLine("Owned real sharing child " + child.Id + ": abrupt termination at second encoded private output; eject tokens=0 at checkpoint");
+                        return;
+                    } finally { if (!child.HasExited) { child.Kill(); child.WaitForExit(); } }
+                }
                 var output = child.StandardOutput.ReadToEndAsync(); var error = child.StandardError.ReadToEndAsync();
                 if (!child.WaitForExit(300000)) { child.Kill(); child.WaitForExit(); throw new Exception("Owned real cold-sharing child timed out"); }
                 string stdout = output.GetAwaiter().GetResult(), stderr = error.GetAwaiter().GetResult();

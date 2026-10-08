@@ -13,6 +13,8 @@ namespace EasyEject {
         static int RealQuickShareAcceptance(string[] args) {
             if (args.Length > 1 && args[1] == "--owned-cold") return OwnedRealShareProbe(args);
             try {
+                bool restartOnly = args.Length == 4 && args[1] == "--restart-only";
+                if (restartOnly) args = new[] { args[0], args[2], args[3] };
                 if (args.Length != 3 && args.Length != 4) throw new SafetyException("Usage: --share-real-tools <ffmpeg.exe> <ffprobe.exe> [official Luna LUT.cube]. This executes the explicitly supplied tools on generated disposable clips only.");
                 var tools = new QuickShareTools(args[1], args[2], args.Length == 4 ? args[3] : null);
                 if (tools.Ffmpeg.Equals(tools.Ffprobe, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Select separate FFmpeg and FFprobe executables.");
@@ -31,6 +33,7 @@ namespace EasyEject {
                         }
                         if (tools.Lut != null) Console.WriteLine("LUT SHA256 " + IndependentFileHash(tools.Lut));
                     }
+                    if (!restartOnly) {
                     Test("real tools: landscape 60 fps stereo export at 1080p with exact receipts and reuse", () => RealShareCase(tools, 3840, 2160, 60, true, QuickSharePreset.Hd, QuickShareColor.Standard, 1920, 1080, 30));
                     Test("real tools: 4K export preserves full frame", () => RealShareCase(tools, 3840, 2160, 30, true, QuickSharePreset.Uhd, QuickShareColor.Standard, 3840, 2160, 30));
                     Test("real tools: portrait export preserves framing at 1080p", () => RealShareCase(tools, 2160, 3840, 30, true, QuickSharePreset.Hd, QuickShareColor.Standard, 1080, 1920, 30));
@@ -42,13 +45,18 @@ namespace EasyEject {
                     Test("real tools: corrupt receipt retains real encoded copy and fresh retry is reusable", () => RealShareCorruptReceipt(tools));
                     Test("real tools: rotated landscape applies both display-matrix directions once", () => RealShareRotation(tools));
                     Test("real tools: generated PQ and HLG tags refuse before encoding or publication", () => RealShareHdrRefusal(tools));
+                    }
                     Test("real tools: separate cold processes prepare create reuse and refuse changed originals", () => RealShareColdRestart(tools));
                     Test("real tools: cold cancellation retains a published copy and fresh retry finishes only the remainder", () => RealShareColdPartial(tools));
+                    Test("real tools: abrupt owned process loss retains verified publication and untrusted private work through manual retry", () => RealShareColdCrash(tools));
+                    if (!restartOnly) {
                     Test("real tools: valid output metadata cannot bypass corrupt frame decode and fresh manual retry", () => RealShareDecodeFailure(tools));
                     if (tools.Lut != null) {
                         Test("real tools: official LUT transform produces validated 1080p output", () => RealShareCase(tools, 1920, 1080, 30, true, QuickSharePreset.Hd, QuickShareColor.LunaILog, 1920, 1080, 30));
                         Test("real tools: official LUT transform produces validated 4K output", () => RealShareCase(tools, 3840, 2160, 30, true, QuickSharePreset.Uhd, QuickShareColor.LunaILog, 3840, 2160, 30));
                     } else Console.WriteLine("NOT RUN: positive official LUT conversion; that acceptance gate remains open.");
+                    }
+                    else Console.WriteLine("Restart-only rehearsal; other media/official LUT groups were not run.");
                 }
                 Console.WriteLine(passed + " passed; " + failed + " failed. Actual selected tools on generated clips; Luna identity is injected into an MP4 free box. Fake device guards and same-host storage do not prove camera identity, physical removal, foreground UI, complete app restart, or destination filesystem compatibility.");
                 return failed == 0 ? 0 : 1;
