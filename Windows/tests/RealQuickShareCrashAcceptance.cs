@@ -23,14 +23,20 @@ namespace EasyEject {
             var current = SnapshotCrashPrivateWork(batch);
             Check(current.Count == snapshot.Count && snapshot.All(pair => current.ContainsKey(pair.Key) && current[pair.Key] == pair.Value), "Manual retry changed or trusted old private crash work");
         }
-        static void RealShareColdCrash(QuickShareTools tools) {
+        static void RealShareColdCrash(QuickShareTools tools, bool busy = false) {
             using (var f = new Fixture()) {
-                var batch = GenerateRealShareBatch(f, tools, 640, 360, 30, true, clips: 2); string config = RealShareSetup(f, batch, tools);
+                var batch = GenerateRealShareBatch(f, tools, 640, 360, 30, true, clips: 2, seconds: busy ? 4 : 1); string config = RealShareSetup(f, batch, tools);
                 string history = Path.Combine(config, "completed-imports.json"), historyHash = IndependentFileHash(history);
-                RunColdRealShare(f, batch, "crash");
+                RunColdRealShare(f, batch, busy ? "busycrash" : "crash");
                 string folder = Path.Combine(batch.Folder, "Sharing Copies"), first = Directory.GetFiles(folder, "*.mp4").Single();
                 string firstHash = IndependentFileHash(first), receiptHash = IndependentFileHash(QuickShareEngine.ReceiptPath(first));
                 var privateWork = SnapshotCrashPrivateWork(batch);
+                if (busy) {
+                    Throws<SafetyException>(() => new WindowsQuickShareProcess().Run(tools.Ffprobe,
+                        QuickSharePlan.ProbeArguments(privateWork.Keys.Single()), f.Root, 30,
+                        System.Threading.CancellationToken.None, () => {}));
+                    RequireCrashPrivateWork(batch, privateWork);
+                }
                 VerifyShareOriginals(batch);
                 Check(IndependentFileHash(history) == historyHash && !Directory.Exists(f.Source), "Abrupt process loss changed history or source absence");
                 RunColdRealShare(f, batch, "crashretry");
@@ -42,7 +48,7 @@ namespace EasyEject {
                 Check(published.All(pair => IndependentFileHash(pair.Key) == pair.Value), "Later fresh reuse changed either exact copy or receipt");
                 RequireCrashPrivateWork(batch, privateWork); VerifyShareOriginals(batch);
                 Check(IndependentFileHash(history) == historyHash && !Directory.Exists(f.Source), "Crash recovery changed history or restored source");
-                Console.WriteLine("Crash rehearsal: first validated publication retained; second untrusted private output unchanged; manual retry creates only remainder; fresh reuse verifies both.");
+                Console.WriteLine((busy ? "Live encoder" : "Post-encode") + " crash rehearsal: first validated publication retained; second untrusted private output unchanged; manual retry creates only remainder; fresh reuse verifies both.");
             }
         }
     }

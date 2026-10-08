@@ -16,7 +16,7 @@ namespace EasyEject {
                 Guid nonce;
                 Check(args.Length == 9 && Guid.TryParseExact(args[3], "N", out nonce)
                     && args.Skip(4).Take(3).All(ImportHistory.ValidHash)
-                    && new[] { "prepare", "create", "reuse", "changed", "partial", "retry", "reuseall", "crash", "crashretry", "crashreuseall" }.Contains(args[7])
+                    && new[] { "prepare", "create", "reuse", "changed", "partial", "retry", "reuseall", "crash", "busycrash", "crashretry", "crashreuseall" }.Contains(args[7])
                     && (args[8] == "hd" || args[8] == "uhd"), "Invalid real cold-sharing challenge");
                 string root = SafePaths.Normalize(args[2]);
                 string allowed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectFixtures");
@@ -40,7 +40,7 @@ namespace EasyEject {
                         batch = (CompletedBatch)new DataContractJsonSerializer(typeof(CompletedBatch)).ReadObject(input);
                     }
                     CheckColdShareBatch(batch, destination);
-                    Check(batch.Originals.Count == (new[] { "partial", "retry", "reuseall", "crash", "crashretry", "crashreuseall" }.Contains(args[7]) ? 2 : 1), "Real cold-sharing batch size differs from its reviewed action");
+                    Check(batch.Originals.Count == (new[] { "partial", "retry", "reuseall", "crash", "busycrash", "crashretry", "crashreuseall" }.Contains(args[7]) ? 2 : 1), "Real cold-sharing batch size differs from its reviewed action");
                     var history = ImportHistory.Load(config);
                     Check(history.Count == 1 && history[0].Id == batch.Id, "Real cold sharing did not restore the exact generated batch");
                     CheckColdShareBatch(history[0], destination);
@@ -52,6 +52,23 @@ namespace EasyEject {
                     Check(media.Calls == 0 && completions.Entries.Length == 0, "Cold preparation ran tools or restored eject authority");
                     var preset = args[8] == "hd" ? QuickSharePreset.Hd : QuickSharePreset.Uhd;
                     var retainedWork = args[7] == "crashretry" || args[7] == "crashreuseall" ? SnapshotCrashPrivateWork(batch) : null;
+                    if (args[7] == "busycrash") {
+                        media.PaceSecondEncode = true;
+                        media.EncoderProgress = line => {
+                            if (media.Encodes != 2) return;
+                            int frame;
+                            if (!Int32.TryParse(line.Substring(6), out frame) || frame < 1 || frame >= 90) return;
+                            Check(media.Decodes == 1 && media.Probes == 3 && completions.Entries.Length == 0, "Live crash checkpoint precedes exact first publication/second encode");
+                            string folder = Path.Combine(batch.Folder, "Sharing Copies");
+                            Check(Directory.GetFiles(folder, "*.mp4").Length == 1 && File.Exists(QuickShareEngine.ReceiptPath(Directory.GetFiles(folder, "*.mp4").Single())), "Live crash checkpoint lost the first validated copy/receipt");
+                            using (var tool = BusyShareTool(Process.GetCurrentProcess().Id, setup.Ffmpeg.Path)) {
+                                Console.WriteLine("OWNED_BUSY_CRASH_READY " + args[3] + " " + tool.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                                    + " " + tool.StartTime.ToUniversalTime().Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                                    + " " + frame.ToString(System.Globalization.CultureInfo.InvariantCulture)); Console.Out.Flush();
+                                using (var wait = new ManualResetEvent(false)) Check(wait.WaitOne(30000), "Owned busy-crash parent did not terminate its paused child");
+                            }
+                        };
+                    }
                     if (args[7] == "crash") {
                         media.AfterEncode = path => {
                             if (media.Encodes != 2) return;
@@ -119,6 +136,10 @@ namespace EasyEject {
             };
             using (var child = Process.Start(start)) {
                 Check(child != null && child.Id != Process.GetCurrentProcess().Id, "Real sharing did not create a separate process");
+                if (mode == "busycrash") {
+                    var setup = QuickShareConfiguration.Load(config).Value;
+                    StopBusyShareOwner(child, nonce, setup.Ffmpeg.Path); return;
+                }
                 if (mode == "crash") {
                     var ready = child.StandardOutput.ReadLineAsync();
                     try {

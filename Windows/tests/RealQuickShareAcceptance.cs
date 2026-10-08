@@ -49,6 +49,7 @@ namespace EasyEject {
                     Test("real tools: separate cold processes prepare create reuse and refuse changed originals", () => RealShareColdRestart(tools));
                     Test("real tools: cold cancellation retains a published copy and fresh retry finishes only the remainder", () => RealShareColdPartial(tools));
                     Test("real tools: abrupt owned process loss retains verified publication and untrusted private work through manual retry", () => RealShareColdCrash(tools));
+                    Test("real tools: abrupt owner loss stops its live encoder and manual retry preserves verified publication", () => RealShareColdCrash(tools, busy: true));
                     if (!restartOnly) {
                     Test("real tools: valid output metadata cannot bypass corrupt frame decode and fresh manual retry", () => RealShareDecodeFailure(tools));
                     if (tools.Lut != null) {
@@ -70,12 +71,22 @@ namespace EasyEject {
             internal int StopAtEncodeNumber = 1;
             internal bool CancelledAtProgress;
             internal Action<string> AfterEncode;
+            internal Action<string> EncoderProgress;
+            internal bool PaceSecondEncode;
             public byte[] Run(string executable, string[] arguments, string directory, double timeout, CancellationToken cancel, Action validate, Action<string> progress = null) {
                 Calls++; bool encode = arguments.Contains("-progress");
                 if (encode) Encodes++;
                 if (arguments.Contains("-show_streams")) Probes++;
                 if (arguments.Contains("-f") && arguments.Contains("null")) Decodes++;
+                if (encode && Encodes == 2 && PaceSecondEncode) {
+                    // Test-only input pacing holds a generated four-second clip
+                    // open long enough to observe the actual live worker.
+                    var paced = arguments.ToList(); int input = paced.IndexOf("-i");
+                    Check(input >= 0, "Owned paced encode has no input");
+                    paced.InsertRange(input, new[] { "-readrate", "1" }); arguments = paced.ToArray();
+                }
                 Action<string> observe = line => {
+                    if (encode && EncoderProgress != null && line.StartsWith("frame=", StringComparison.Ordinal)) EncoderProgress(line);
                     if (encode && Encodes == StopAtEncodeNumber && StopAtEncoderProgress != null && !CancelledAtProgress && line.StartsWith("frame=", StringComparison.Ordinal)) {
                         CancelledAtProgress = true; StopAtEncoderProgress.Cancel();
                     }
@@ -87,8 +98,9 @@ namespace EasyEject {
             }
         }
 
-        static CompletedBatch GenerateRealShareBatch(Fixture f, QuickShareTools tools, int width, int height, int rate, bool audio, int? rotation = null, string transfer = "bt709", int clips = 1) {
+        static CompletedBatch GenerateRealShareBatch(Fixture f, QuickShareTools tools, int width, int height, int rate, bool audio, int? rotation = null, string transfer = "bt709", int clips = 1, int seconds = 1) {
             Check(clips == 1 || clips == 2, "Generated rehearsal supports only one or two owned clips");
+            Check(seconds == 1 || seconds == 4, "Generated rehearsal duration must remain bounded");
             string path = Path.Combine(f.Source, "VID_generated.mp4");
             string generated = rotation.HasValue ? Path.Combine(f.Root, "generated-unrotated.mp4") : path;
             Check(transfer == "bt709" || transfer == "smpte2084" || transfer == "arib-std-b67", "Unsupported generated transfer tag");
@@ -98,7 +110,7 @@ namespace EasyEject {
             // Tag the frames too: output codec options alone do not retain these
             // declared transfer/primaries on the selected FFmpeg 9 test generator.
             if (transfer != "bt709") args.AddRange(new[] { "-vf", "setparams=range=limited:color_primaries=bt2020:color_trc=" + transfer + ":colorspace=bt2020nc" });
-            args.AddRange(new[] { "-t", "1", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-threads", "2", "-pix_fmt", "yuv420p", "-color_range", "tv", "-colorspace", transfer == "bt709" ? "bt709" : "bt2020nc", "-color_primaries", transfer == "bt709" ? "bt709" : "bt2020", "-color_trc", transfer, "-movflags", "+faststart", "-n", generated });
+            args.AddRange(new[] { "-t", seconds.ToString(CultureInfo.InvariantCulture), "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-threads", "2", "-pix_fmt", "yuv420p", "-color_range", "tv", "-colorspace", transfer == "bt709" ? "bt709" : "bt2020nc", "-color_primaries", transfer == "bt709" ? "bt709" : "bt2020", "-color_trc", transfer, "-movflags", "+faststart", "-n", generated });
             new WindowsQuickShareProcess().Run(tools.Ffmpeg, args.ToArray(), f.Root, 180, CancellationToken.None, () => {});
             if (rotation.HasValue) new WindowsQuickShareProcess().Run(tools.Ffmpeg, new[] { "-nostdin", "-hide_banner", "-v", "error", "-xerror", "-display_rotation:v:0", rotation.Value.ToString(CultureInfo.InvariantCulture), "-i", generated, "-map", "0:v:0", "-map", "0:a:0?", "-c", "copy", "-n", path }, f.Root, 30, CancellationToken.None, () => {});
             // A valid ignorable MP4 box models only the existing tail-selection rule.
