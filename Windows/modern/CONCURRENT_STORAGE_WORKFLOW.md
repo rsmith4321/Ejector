@@ -1,5 +1,21 @@
 # Other storage during a transfer · October 7, 2026
 
+## Expired connection proof follow-up · source 70cd73f
+
+An open other-device review now expires permanently when its inventory epoch changes or its optional primary connection proof becomes unavailable or throws. Refresh disables confirmation and explains that Cancel/fresh manual review is required; recovered tracking cannot revive that old choice. Expiry retains the review session and exact primary worker without cancelling either worker or touching files. A tracking read failure inside confirmed execution retains its truthful failed outcome before display, constructs no removal API, and requires a separate fresh manual retry. Actual UI rendering/interaction remains NOT RUN.
+
+Two new generated-file/fake-device groups cover both false and throwing availability, recovery/old-choice refusal, original preservation, primary/session ownership, fresh manual retry and failed execution proof. The isolated snapshot `C:/Users/rsmit/.codex/EasyEjectBuildTools/ModernConcurrentExpirySource` is Git archive **3f64541** plus only the final three owned source/test files, bound by `modern-concurrent-expiry-source-hashes.json`. It excludes the separately committed **91bd0bf** package-content work; these counts do not assert a combined current-worktree pass. Before correction, terminal **43866**, exit one, passes **235/1**: restored proof re-enables the earlier review. The execution-read-failure control already passes. No assertions were weakened.
+
+Final maintained command:
+
+```powershell
+& C:/Users/rsmit/.codex/EasyEjectBuildTools/ModernConcurrentExpirySource/Windows/modern/build.ps1 -Test -FullTest -BuildRoot C:/Users/rsmit/.codex/EasyEjectBuildTools/ModernConcurrentExpiryVerified
+```
+
+Final terminal **31096**, exit zero: **236/0 selected and 1228/0 full**, app/runtime/runners and Framework fixtures **0 warnings/0 errors**. Counts overlap. The live full runner was PID **4688**, start **21:21:55 EDT**, using installed .NET **10.0.0** CoreCLR, recorded in `modern-concurrent-expiry-modules.json`. After terminal all four runtime project/app/selected/full copies match SHA-256 **55BE7018187E6A42290DBF7D5D81961FF68F80FF5CF78460FA2D29952F0AFE9F**; managed app SHA is **B7661D5C7181629DFBD63A17EC3C195F19F6C7D2B122590D290054A10B241F3A**, in `modern-concurrent-expiry-final-hashes.json`. Both owned before/final roots have zero live app/runners. Logs and manifests are under `C:/Users/rsmit/.codex/EasyEjectWindowsPreview`, named `modern-concurrent-expiry-before.log` and `modern-concurrent-expiry-verified.log`.
+
+Only generated fixtures/fake device APIs were used; existing full-suite nonce-profile scope remains separate. No app launch/native input, real media/device/tool/LUT action, system-setting/startup/trust change, tool installation or publication occurred. All foreground/tray, official LUT/genuine-camera/disposable hardware/filesystem/travel, complete modern artifact/publisher/channel and trusted-distribution gates remain open. The full goal remains active; the expired overnight schedule stays paused.
+
 ## Contracts and integration
 
 Mac baseline `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c`, `EjectorApp.swift`, reserves manual removal through `DroneImportManager.reserveManualEject` and refuses a disk busy importing/ejecting. The tested classic Windows implementation already has `ConcurrentStorageState`, `ConcurrentEjectService`, per-physical-disk reservations and scoped connection proof. This milestone connects that policy to the modern interface; it introduces no parallel import, automatic export or automatic eject.
