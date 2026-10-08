@@ -78,7 +78,9 @@ namespace EasyEject {
         internal static string HistoryFailure(Exception failure) {
             return "Import verified; saving its history did not finish: " + failure.Message + Environment.NewLine + "The history action did not change saved media. Review the destination and Import history before retrying.";
         }
-        internal static bool ShowChoice(bool askToEject, bool foreground, bool notifications) { return askToEject && (foreground || !notifications); }
+        // The saved ask choice requests a fresh dialog even when the app is hidden.
+        // Optional notifications and current visibility cannot suppress that choice.
+        internal static bool ShowChoice(bool askToEject, bool foreground, bool notifications) { return askToEject; }
         internal static string Notification(bool hasMedia, int removed = 0, int clearedTrash = 0) {
             return (hasMedia ? "Selected files imported and verified." : "No media matches your import options. Photos or skipped files may remain.") + (removed > 0 ? " Permanently removed " + removed + " verified originals." : "") + (clearedTrash > 0 ? " Cleared " + clearedTrash + " verified Trash files." : "") + " Device remains connected. Open Easy Eject to review the import and choose whether to eject.";
         }

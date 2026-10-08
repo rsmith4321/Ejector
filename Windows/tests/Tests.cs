@@ -109,6 +109,7 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--media-parity") { MediaParityTests(); MediaMatrixTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable files and native read-only path resolution only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--storage-connections") { StorageConnectionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake notifications, fake eject and disposable files only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--completion-connections") { CompletionConnectionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake removal and owned disposable files only."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--completion-prompt-contract") { CompletionPromptContractTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Generated files and fake devices; no real eject or foreground notification proof."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--concurrent-storage") { ConcurrentStorageTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake eject, owned disposable files and hidden controls only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--automatic-admission") { AutomaticAdmissionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake storage evidence and disposable files only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--share-directories") { DirectoryLeaseTests(); QuickShareEngineTests(); QuickShareProcessTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable directories, fake exports and contained synthetic child processes only."); return failed == 0 ? 0 : 1; }
@@ -722,7 +723,7 @@ namespace EasyEject {
             } });
             Test("notification route keeps completion choices manual with opt-in eject prompting", delegate {
                 foreach (bool ask in new[] { true, false }) foreach (bool foreground in new[] { true, false }) foreach (bool notifications in new[] { true, false })
-                    Check(CompletionPresentation.ShowChoice(ask, foreground, notifications) == (ask && (foreground || !notifications)), "Wrong foreground/background completion route");
+                    Check(CompletionPresentation.ShowChoice(ask, foreground, notifications) == ask, "Window/notification state overrode the saved completion choice");
                 Check(CompletionPresentation.Notification(false).Contains("Photos or skipped files") && CompletionPresentation.Notification(true).Contains("Device remains connected") && !CompletionPresentation.Notification(true).Contains("volume-a"), "Notification contains authority or misleading outcome");
             });
             Test("ask-to-eject defaults start off and preserve custom legacy and frozen choices", delegate { using (var f = new Fixture()) {
@@ -823,6 +824,7 @@ namespace EasyEject {
             MediaMatrixTests();
             StorageConnectionTests();
             CompletionConnectionTests();
+            CompletionPromptContractTests();
             ConcurrentStorageTests();
             AutomaticAdmissionTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;
