@@ -1,5 +1,7 @@
 # Import/notification integration assertion map · October 8, 2026
 
+Follow-up source **2b87e5b** corrects the Windows hidden-window/notifications-on route to preserve the saved eject-prompt opt-in used by the actual Mac manager. New generated-file/persisted-choice groups reproduce **0/2** before and pass **2/0**; both full suites **1363/0**, selected modern **242/0** with warning-free app build. [Prompt contract](COMPLETION_PROMPT_CONTRACT.md) binds exact before/final sources and separates this software fix from pending native reveal/dialog/notification/device acceptance. The focused replay and documentation-only audit below retain their earlier source scope.
+
 Baseline `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c`, `Tests/ImportNotificationIntegrationTests.swift`: **17 precondition sites**, including two fixture-isolation guards, and **seven reported outcome groups**. Its current normalized Git blob is unchanged: `8708b938e5895d43c195ae68ccc5377379807b55`. This accounts for every assertion in that harness; it does not establish physical or foreground integration equivalence.
 
 Inspected Windows sources: `DefaultsContractTests.cs`, the completion/history assertions in `Tests.cs`, `CompletionConnectionTests.cs`, `ImportCompletion.cs`, `CompletionDialogs.cs`, and modern `MainWindow.Imports.cs`, `MainWindow.Notifications.cs`, `MainWindow.xaml.cs`. Windows uses explicit process-only pending choices and a window-only balloon click rather than Apple notification action payloads.

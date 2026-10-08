@@ -58,6 +58,8 @@ Defaults test-source commit `778268d8afb5b30da881ba545c2f8568b5424c5c`; `--defau
 
 ## Completion, notification and prompt properties
 
+Saved prompt routing source **2b87e5b** now honors the actual Mac manager's current-source opt-in branch even when Windows is hidden and notifications enabled. Before **0/2**, focused **2/0**, both defaults **1363/0**, warning-free WinUI/selected **242/0**; see [COMPLETION_PROMPT_CONTRACT.md](COMPLETION_PROMPT_CONTRACT.md). This corrects the prior Windows visibility/notification suppression policy; it does not turn Apple notification permission tests or hidden control fixtures into live foreground acceptance.
+
 | Exact Mac property | Inspected Windows evidence | Status |
 | --- | --- | --- |
 | Same connected volume/root/physical disk/generation accepted; replacement, missing/unmounted root, reconnect and unknown token refused | `Tests.cs`: completion identity matrix; changed source path/topology; immutable removal plan. `CompletionConnectionTests.cs`: reconnect, missing source, unreadable root, mount/serial/hidden sibling, tracking loss | Fixture |

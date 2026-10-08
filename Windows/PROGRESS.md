@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Preserve saved eject prompting while Windows is hidden · October 8
+
+Source **2b87e5b** fixes the actual Mac-manager contract mismatch where a hidden window plus notifications-on suppressed an eligible import's frozen ask-to-eject opt-in. New groups **0/2 before → 2/0 fixed**, both full suites **1363/0**, warning-free WinUI/selected **242/0**, full terminals **2854/77230 exit0**. Persisted/generated selected and filtered imports retain originals/copy, frozen ask-on through later preference changes, Keep Connected default and one-use explicit fake eject. [Prompt evidence](COMPLETION_PROMPT_CONTRACT.md) binds unchanged Mac manager, three compiled/committed sources, identical runtime copies and zero owned processes. No live app/input/device/tool/normal-settings action; actual hidden reveal/foreground/dialog/notification and remaining media/LUT/hardware/trust gates stay open. Concurrent native evidence preserved; full goal active.
+
 ## Native shared-default Save and retained profile draft · October 8
 
 Corrected PID25172 now saves safe all-media/skipped-preview/preserved-folder defaults from a following profile's editor, returns to that retained draft, reloads its effective import choices and preserves its unsaved sharing-off change. Profile Cancel discards only that draft; the saved following row inherits defaults and retains stored4K/Standard, while the custom row keeps videos/previews/clean/1080p. Both profile files remain byte-identical. Fresh defaults reopen reads the152-byte saved record; guarded recovery moves only the three owned records, restores original absent-store defaults/empty catalog and keeps config/login/all601 candidate bytes exact. [Native defaults evidence](modern/NATIVE_ACCEPTANCE_20261008.md) binds **19:25:14.8155439Z**, copies/recovery and retained verification correction. No code/build/new suite/device/media/removal/trust proof; full goal active.
