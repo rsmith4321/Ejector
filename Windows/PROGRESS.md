@@ -1,5 +1,13 @@
 # Windows progress · October 7, 2026
 
+## Modern native launcher identity · October 7
+
+Source **fa5b190** adds held-content native apphost layout/resources checks: bounded x64 GUI PE/native entry point, unambiguous sections, the reviewed .NET 10 non-bundle/default-search/exact-app binding slots and stable matching native version/resources. Native resource reads bind their path to the held final path; candidate native/managed code is never executed. This is a declared-layout layer, not native code-body verification or integrated installation/channel approval.
+
+Final isolated archive **5ffc8ed** plus only three owned files compiles warning-free and passes Framework **9/0** actual-sample groups plus modern **236/0 selected /1276/0 full default /9/0 actual sample**. Durable parent **14812** result records **03:12:22Z–03:18:35Z October 8**, exit zero; all owned processes are absent. Four runtime copies match SHA **446eb3e6e2e00efa9cc79886e6c2c939ea6153fa1d82b84db6297bf1076a5805**, three source hashes match; actual full PID **11368** loads installed .NET **10.0.0**. Counts overlap; another task's dirty real-sharing work is excluded/preserved. [modern/APPHOST_IDENTITY_CONTRACT.md](modern/APPHOST_IDENTITY_CONTRACT.md) records commands/logs/hashes and two retained 8/1 iterations (native-handle Name path corrected, then synthetic manifest-version corrected without weakened assertions). Both old/new native samples remain SHA **786ad10735f65bbc544b76e1f6ea5dc6e1e8d34153eda6165b048b245c434e2e**, unchanged.
+
+Fresh read-only discovery maps one internal disk/five volumes and no external test candidate; no notification window/action authority. No WinUI launch, actual device/media/settings/security/power/display/startup/installation/publication action. Foreground helper's post-restart timeout remains recorded, with no further retry or alternate input. Component/deps/archive/channel/publisher/integration/trusted startup/delivery, foreground/lifecycle, official Luna LUT/genuine footage and identified disposable hardware/filesystems/travel remain open. Full goal active; expired heartbeat paused.
+
 ## Modern managed PE/metadata identity · October 7
 
 Source **12c7e73** adds held-content managed identity: exact app/title/product/stable versions, System.Runtime identity/token, bounded x64 GUI IL-only metadata and declared Program.Main(string[]) contract without candidate loading/execution. Classic policy remains separate. Native apphost/resources/components/deps/archive/channel integration and actual trusted startup/delivery remain required; production channel stays null.
