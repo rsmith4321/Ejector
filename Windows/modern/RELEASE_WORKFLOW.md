@@ -1,5 +1,7 @@
 # Modern Windows release, update-history and installation review
 
+Subsequent [modern package integration](RELEASE_PACKAGE_INTEGRATION.md) connects the existing presenter and WinUI entry point to a typed modern metadata/ZIP/application review policy. The original source/evidence below remains separately scoped. Both production channels remain unconfigured, and actual native UI, complete component/catalog and trusted distribution acceptance remain open.
+
 Source **`12f3e49`**, final delivery follow-up **`df62195`**, connects the WinUI window/tray to WindowsUpdateCoordinator and WindowsReleaseReviewSession. Mac baseline `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c` UpdateChannel.swift was inspected: saved automatic checks, idle import/eject/dialog admission, manual installation, no automatic downloads or system profile. Classic Program/WindowsReleaseReviewDialog, exact channel/replay/package contracts and existing update/recovery/installation tests were inspected. Classic instructions and policies are preserved.
 
 ## Current behavior and approval boundary

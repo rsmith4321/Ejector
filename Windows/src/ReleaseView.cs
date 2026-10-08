@@ -20,7 +20,12 @@ namespace EasyEject {
     }
     internal sealed class WindowsReleaseViewBackend : IReleaseViewBackend {
         readonly WindowsUpdateCoordinator checks; readonly WindowsReleaseReviewSession session; readonly string version;
-        internal WindowsReleaseViewBackend(WindowsUpdateCoordinator checks, ApprovedWindowsChannel channel, string version) { this.checks = checks; session = new WindowsReleaseReviewSession(checks, channel); this.version = version; }
+        internal WindowsReleaseViewBackend(WindowsUpdateCoordinator checks, ApprovedWindowsChannel channel, string version) : this(checks, new WindowsReleaseReviewSession(checks, channel), version) { }
+        internal static WindowsReleaseViewBackend ForModern(WindowsUpdateCoordinator checks, ApprovedWindowsChannel channel, string version,
+            Func<string, CancellationToken, ModernWindowsArchiveReview> archive = null, Func<string, CancellationToken, ModernWindowsApplicationPackageReview> package = null) {
+            return new WindowsReleaseViewBackend(checks, WindowsReleaseReviewSession.ForModern(checks, channel, archive, package), version);
+        }
+        WindowsReleaseViewBackend(WindowsUpdateCoordinator checks, WindowsReleaseReviewSession session, string version) { this.checks = checks; this.session = session; this.version = version; }
         public bool Configured { get { return session.Configured; } } public bool Busy { get { return session.Busy; } }
         public bool CanCheck { get { return session.CanCheck; } } public bool CanArchive { get { return session.CanArchive; } } public bool CanExtracted { get { return session.CanExtracted; } }
         public bool CanBackup { get { return session.CanBackup; } } public bool CanRestore { get { return session.CanRestoreBackup; } }

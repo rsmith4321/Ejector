@@ -36,7 +36,7 @@ namespace EasyEject {
             Test("modern release production remains unconfigured and never accesses replay or network", delegate {
                 Check(WindowsReleaseChecks.ModernProductionChannel == null, "Modern approval invented"); int calls = 0;
                 using (var checks = new WindowsUpdateCoordinator(false, null, () => DateTime.UtcNow, TimeSpan.FromDays(1), true, () => { calls++; throw new Exception("Unrequested store"); }))
-                using (var backend = new WindowsReleaseViewBackend(checks, null, ApplicationInformation.Version)) {
+                using (var backend = WindowsReleaseViewBackend.ForModern(checks, null, ApplicationInformation.Version)) {
                     checks.Start(); backend.SetAvailable(true); Check(checks.PulseAsync().GetAwaiter().GetResult() == null && !backend.CanCheck && !backend.CanArchive && !backend.CanBackup && !backend.CanRestore && calls == 0, "Unavailable channel accessed state");
                     Throws<SafetyException>(() => backend.Run(WindowsReleaseReviewAction.Check, null, 0).GetAwaiter().GetResult());
                 }

@@ -19,18 +19,21 @@ namespace EasyEject {
     // next explicit action; no handles or trust verdict survive as launch authority.
     internal sealed class WindowsReleaseReviewSession : IDisposable {
         readonly object sync = new object(); readonly WindowsUpdateCoordinator checks; readonly ApprovedWindowsChannel channel;
-        readonly Func<string, CancellationToken, WindowsArchiveReview> archive;
-        readonly Func<string, CancellationToken, WindowsPackageReview> package;
+        readonly WindowsReleasePackagePolicy packages;
         bool available, disposed; long id, epoch; WindowsUpdateCheckScope active;
         WindowsChannelOffer offer; string archivePath;
         WindowsChannelReplayStore.BackupReview backup; long backupId; bool backupPresented;
         internal WindowsReleaseReviewSession(WindowsUpdateCoordinator checks, ApprovedWindowsChannel channel,
-            Func<string, CancellationToken, WindowsArchiveReview> archive = null, Func<string, CancellationToken, WindowsPackageReview> package = null) {
+            Func<string, CancellationToken, WindowsArchiveReview> archive = null, Func<string, CancellationToken, WindowsPackageReview> package = null)
+            : this(checks, channel, WindowsReleasePackagePolicy.Classic(channel, archive, package)) { }
+        internal static WindowsReleaseReviewSession ForModern(WindowsUpdateCoordinator checks, ApprovedWindowsChannel channel,
+            Func<string, CancellationToken, ModernWindowsArchiveReview> archive = null, Func<string, CancellationToken, ModernWindowsApplicationPackageReview> package = null) {
+            return new WindowsReleaseReviewSession(checks, channel, WindowsReleasePackagePolicy.Modern(channel, archive, package));
+        }
+        WindowsReleaseReviewSession(WindowsUpdateCoordinator checks, ApprovedWindowsChannel channel, WindowsReleasePackagePolicy packages) {
             if (checks == null || checks.Configured != (channel != null)) throw new ArgumentException("Release review requires the same configured channel as its check coordinator.");
-            if (channel != null && channel.IsModern) throw new SafetyException("The classic release-review session cannot approve modern application packages.");
-            this.checks = checks; this.channel = channel;
-            this.archive = archive ?? ((path, cancel) => new WindowsArchiveReview(path, channel.Publisher, new WindowsManifestTrust(), cancel));
-            this.package = package ?? ((path, cancel) => new WindowsPackageReview(path, channel.Publisher, new WindowsAuthenticode(), new WindowsManifestTrust(), cancel));
+            if (channel != null && channel.IsModern != packages.IsModern) throw new SafetyException("The release-review package policy does not match the independently approved application channel.");
+            this.checks = checks; this.channel = channel; this.packages = packages;
         }
         internal bool Configured { get { return channel != null; } }
         internal bool RecoveryConfigured { get { return Configured && checks.ReplayRecoveryConfigured; } }
@@ -100,11 +103,9 @@ namespace EasyEject {
                 } else {
                     message = await Task.Run(() => {
                         Guard(scope); checkedOffer.Revalidate(scope.Token); Guard(scope);
-                        using (var zip = archive(action == WindowsReleaseReviewAction.Archive ? path : capturedArchive, scope.Token)) {
-                            Guard(scope); checkedOffer.VerifyArchive(zip, scope.Token); Guard(scope);
-                            if (action == WindowsReleaseReviewAction.Archive) { verifiedArchive = zip.Path; return "Selected ZIP matches the fresh signed release and exact archive hash. Extract it manually into a separate versioned folder, then select that folder for executable and package verification."; }
-                            using (var extracted = package(path, scope.Token)) { Guard(scope); checkedOffer.VerifyExtracted(zip, extracted, scope.Token); Guard(scope); return "Selected extracted folder matches the freshly verified ZIP, signed release, trusted executable publisher and all six package files.\r\nFolder: " + extracted.Folder + "\r\n\r\nThis is a read-only result for these files at this time. Finish work and Quit before manually switching app folders. No installation or launch permission is retained."; }
-                        }
+                        var files = packages.Review(checkedOffer, action == WindowsReleaseReviewAction.Archive ? path : capturedArchive, path,
+                            action == WindowsReleaseReviewAction.Extracted, scope.Token, () => Guard(scope));
+                        verifiedArchive = files.ArchivePath; return files.Message;
                     }).ConfigureAwait(false);
                 }
                 Guard(scope);

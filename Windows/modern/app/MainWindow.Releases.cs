@@ -34,7 +34,7 @@ namespace EasyEject.Modern {
             bool selecting = false; Action render = () => {};
             try {
                 await EnsureVisible(); var folders = new InstallationFolders(Path.GetDirectoryName(Environment.ProcessPath), Profiles.Root);
-                try { owner = new ReleaseView(new WindowsReleaseViewBackend(releaseChecks, WindowsReleaseChecks.ModernProductionChannel, ApplicationInformation.Version), folders); }
+                try { owner = new ReleaseView(WindowsReleaseViewBackend.ForModern(releaseChecks, WindowsReleaseChecks.ModernProductionChannel, ApplicationInformation.Version), folders); }
                 catch { folders.Dispose(); throw; }
                 releaseView = owner;
                 var body = new StackPanel { Spacing = 12 };
