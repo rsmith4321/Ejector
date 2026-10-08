@@ -1,5 +1,13 @@
 # Windows progress · October 7, 2026
 
+## Modern managed PE/metadata identity · October 7
+
+Source **12c7e73** adds held-content managed identity: exact app/title/product/stable versions, System.Runtime identity/token, bounded x64 GUI IL-only metadata and declared Program.Main(string[]) contract without candidate loading/execution. Classic policy remains separate. Native apphost/resources/components/deps/archive/channel integration and actual trusted startup/delivery remain required; production channel stays null.
+
+Final isolated archive **51e052c** plus only five owned files passes warning-free Framework **15/0** actual-sample checks, terminal **77366 exit zero**, and modern **236/0 selected /1273/0 full default /15/0 actual sample**. Durable result records parent **14812**, start **02:37:24Z October 8**, finish **02:43:48Z**, exit zero; parent/observed child absent afterward. Four runtime copies match SHA **7a7d8626fc2df8b489b58e02d2defc6edb7a2d8c91372af5d74523a2c806083b**, five source hashes match. Counts overlap; later 6582d52 UI callbacks/other task dirty sharing tests are excluded/preserved. [modern/MANAGED_IDENTITY_CONTRACT.md](modern/MANAGED_IDENTITY_CONTRACT.md) records commands/logs/fake-trust limits, fixture corrections and the reboot-interrupted earlier full run (no terminal claim). No loaded-module or actual native startup proof is claimed.
+
+Read-only post-restart diagnosis found healthy current RAM/commit/disk samples and a boot-persisted firmware error record containing Intel crash-log payloads. Protected WER report access was denied/preserved. Root cause remains unknown; no resource-exhaustion/specific-component blame. Raw diagnostic data/report remain private outside the repository. No system settings, permissions, security or process-kill action. Tests use fake devices/owned files, no real eject. Foreground/lifecycle, official Luna LUT/genuine camera, identified disposable hardware/filesystems/travel and trusted distribution remain open. Full goal active; expired heartbeat paused.
+
 ## Modern completion/history dialog ownership · October 7
 
 Source **6582d52** binds completed-import and saved-history selection callbacks to their exact open dialog, bounds-checks the frozen list selection, and detaches handlers on every exit. The completion Quick Share button likewise acts only during its own review and detaches before returning; existing separate manual sharing and connection-bound eject authority remain unchanged. This is source hardening, not a reproduced native UI failure.
