@@ -93,22 +93,39 @@ namespace EasyEject {
     }
     internal static class WindowsZipLayout {
         internal static List<WindowsZipEntry> Read(FileStream stream, CancellationToken cancel) {
+            return Read(stream, cancel, 6, 6, 64, 1024, StringComparer.Ordinal,
+                name => WindowsReleaseManifest.PayloadNames.Concat(new[] { WindowsReleaseManifest.ManifestName, WindowsReleaseManifest.SignatureName }).Contains(name)
+                    ? WindowsReleaseManifest.MaximumLength(name) : 0, WindowsArchiveReview.MaximumArchive * 6);
+        }
+        internal static List<WindowsZipEntry> ReadModern(FileStream stream, CancellationToken cancel) {
+            return Read(stream, cancel, ModernWindowsReleaseManifest.RequiredFiles.Count + 3, ModernWindowsReleaseManifest.MaximumFiles + 3,
+                200, (ModernWindowsReleaseManifest.MaximumFiles + 3) * 246, StringComparer.OrdinalIgnoreCase,
+                name => name == ModernWindowsReleaseManifest.ManifestName ? WindowsManifestTrust.MaximumManifest
+                    : name == ModernWindowsReleaseManifest.SignatureName ? WindowsManifestTrust.MaximumSignature
+                    : name == ModernWindowsReleaseManifest.IndexName ? ModernWindowsReleaseManifest.MaximumIndex
+                    : ModernWindowsReleaseManifest.ValidPath(name) ? ModernWindowsReleaseManifest.MaximumFile : 0,
+                ModernWindowsReleaseManifest.MaximumTotal + WindowsManifestTrust.MaximumManifest + WindowsManifestTrust.MaximumSignature + ModernWindowsReleaseManifest.MaximumIndex);
+        }
+        static List<WindowsZipEntry> Read(FileStream stream, CancellationToken cancel, int minimumCount, int maximumCount,
+            int maximumName, int maximumCentral, StringComparer comparer, Func<string, long> maximumLength, long maximumTotal) {
             long end = stream.Length - 22; byte[] tail = ReadAt(stream, end, 22);
-            if (WindowsZipEntry.U32(tail, 0) != 0x06054b50 || WindowsZipEntry.U16(tail, 4) != 0 || WindowsZipEntry.U16(tail, 6) != 0 || WindowsZipEntry.U16(tail, 8) != 6 || WindowsZipEntry.U16(tail, 10) != 6 || WindowsZipEntry.U16(tail, 20) != 0) Fail();
+            int count = WindowsZipEntry.U16(tail, 10);
+            if (WindowsZipEntry.U32(tail, 0) != 0x06054b50 || WindowsZipEntry.U16(tail, 4) != 0 || WindowsZipEntry.U16(tail, 6) != 0 || WindowsZipEntry.U16(tail, 8) != count || count < minimumCount || count > maximumCount || WindowsZipEntry.U16(tail, 20) != 0) Fail();
             long size = WindowsZipEntry.U32(tail, 12), central = WindowsZipEntry.U32(tail, 16), cursor = central;
-            if (central == 0 || size < 6 * 46 || size > 1024 || central + size != end) Fail();
-            var names = new HashSet<string>(StringComparer.Ordinal); var entries = new List<WindowsZipEntry>();
-            for (int i = 0; i < 6; i++) {
+            if (central == 0 || size < count * 46 || size > maximumCentral || central + size != end) Fail();
+            var names = new HashSet<string>(comparer); var entries = new List<WindowsZipEntry>(); long total = 0;
+            for (int i = 0; i < count; i++) {
                 cancel.ThrowIfCancellationRequested(); byte[] header = ReadAt(stream, cursor, 46);
                 if (WindowsZipEntry.U32(header, 0) != 0x02014b50 || WindowsZipEntry.U16(header, 30) != 0 || WindowsZipEntry.U16(header, 32) != 0 || WindowsZipEntry.U16(header, 34) != 0 || WindowsZipEntry.U16(header, 36) != 0) Fail();
-                int nameLength = WindowsZipEntry.U16(header, 28); if (nameLength == 0 || nameLength > 64 || cursor + 46 + nameLength > end) Fail();
+                int nameLength = WindowsZipEntry.U16(header, 28); if (nameLength == 0 || nameLength > maximumName || cursor + 46 + nameLength > end) Fail();
                 byte[] nameBytes = ReadAt(stream, cursor + 46, nameLength); if (nameBytes.Any(b => b > 127)) Fail(); string name = Encoding.ASCII.GetString(nameBytes);
-                if (!WindowsReleaseManifest.PayloadNames.Concat(new[] { WindowsReleaseManifest.ManifestName, WindowsReleaseManifest.SignatureName }).Contains(name) || !names.Add(name)) Fail();
+                long maximum = maximumLength(name); if (maximum == 0 || !names.Add(name)) Fail();
                 var entry = new WindowsZipEntry(name, header); uint attributes = WindowsZipEntry.U32(header, 38); int host = header[5];
                 if ((host != 0 && host != 3) || (attributes & 0xffff & ~0x21U) != 0) Fail();
                 uint mode = attributes >> 16; if (host == 0 && mode != 0 || host == 3 && mode != 0 && ((mode & 0xf000) != 0x8000 || (mode & ~0x81ffU) != 0)) Fail();
                 if ((entry.Version != 10 && entry.Version != 20) || (entry.Method != 0 && entry.Method != 8) || (entry.Method == 8 && entry.Version != 20) || (entry.Flags & ~0x80e) != 0 || (entry.Method == 0 && (entry.Flags & 6) != 0)) Fail();
-                if (entry.Length == 0 || entry.Length > WindowsReleaseManifest.MaximumLength(name) || entry.Compressed == 0 || entry.Compressed > WindowsArchiveReview.MaximumArchive || (entry.Method == 0 && entry.Compressed != entry.Length)) Fail();
+                if (entry.Length == 0 || entry.Length > maximum || entry.Compressed == 0 || entry.Compressed > WindowsArchiveReview.MaximumArchive || (entry.Method == 0 && entry.Compressed != entry.Length)) Fail();
+                total += entry.Length; if (total > maximumTotal) Fail();
                 RequireDate(entry); entries.Add(entry); cursor += 46 + nameLength;
             }
             if (cursor != end) Fail(); cursor = 0; var ordered = entries.OrderBy(e => e.Local).ToArray();
@@ -140,7 +157,7 @@ namespace EasyEject {
             if (offset < 0 || length < 0 || offset > stream.Length - length) Fail(); stream.Position = offset; var bytes = new byte[length]; int done = 0, count;
             while (done < length && (count = stream.Read(bytes, done, length - done)) > 0) done += count; if (done != length) Fail(); return bytes;
         }
-        static void Fail() { throw new SafetyException("The ZIP is not a supported bounded six-file Windows release archive with consistent regular-file headers."); }
+        static void Fail() { throw new SafetyException("The ZIP is not a supported bounded Windows release archive with consistent regular-file headers."); }
     }
     internal sealed class WindowsZipRange : Stream {
         readonly Stream stream; long remaining;
