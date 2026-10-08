@@ -1,0 +1,40 @@
+# Windows device testing
+
+The latest local review is:
+
+`C:\Users\rsmit\.codex\EasyEjectBuildTools\ReviewCloseTrayVerified-20261008\app\EasyEject.Modern.exe`
+
+Keep the complete app folder together. Finish any active work, then use **Quit preview** in the running preview's tray menu before opening this copy. Closing the window keeps that copy running; launching another version reveals it rather than switching versions. This unsigned review uses the normal Windows settings and history folders.
+
+The Easy Eject artwork is included in the executable, window, header and tray. The startup resource fix passed **1289 software tests**. The subsequent close-to-tray source change passed **236 focused tests**; that build has not yet had foreground acceptance. These counts overlap. See [review build evidence](modern/REVIEW_BUILD.md) and [icon observations](modern/ICON_ACCEPTANCE.md).
+
+## First pass: detection and interface
+
+Identify the spare USB drive, reader/card or camera and whether its contents are disposable before testing. Device operations need an agreed scope. Begin with detection only.
+
+1. Open the latest preview. Check the header/window icon, complete action labels and internal storage's disabled removal actions.
+2. Confirm automatic import is off for the test device. Connect it and compare its model, capacity, volumes and drive letters with Windows Disk Management. A multi-volume device must show the entire physical group.
+3. Open the device's removal review and choose **Cancel**. Check that Enter/Escape use the safe default and nothing is removed.
+4. Close the main window and reopen it from the Easy Eject tray icon. Check the icon/menu, double-click and **Quit preview** while idle. Restart and confirm saved choices remain.
+
+Record the build, device/reader model, source filesystem, destination filesystem, steps and observed result. Do not call an unperformed check a pass. A camera exposing only MTP/PTP storage is outside the mounted-volume importer contract.
+
+## Second pass: copying and safe removal
+
+After Ryan identifies disposable files and an existing destination on another physical disk, agree to the following operations individually:
+
+1. Save an import profile with automatic import, original removal, Trash recovery and cleanup off. Saving must start no transfer.
+2. Review **Videos only**, previews and clean/preserved layout, then explicitly start copying. Check copied names, hashes, selection, package companions and that every original remains unchanged. Repeating the import must reuse only verified matching copies.
+3. During a sufficiently long test copy, use **Stop**. Check that no partial file appears as a completed copy, originals remain intact, reservations release and an explicit retry works. Test disconnect/reconnect separately after agreeing to interrupt only this disposable transfer; stale choices must expire.
+4. Check completion, saved history after restart and opening the exact destination. Eject must remain a separate choice unless the profile explicitly enables an eject prompt; **Keep Connected** remains its safe default.
+5. Explicitly test plain eject on the identified spare device. Confirm success before unplugging. Separately test a held-file veto and reconnection; report any refusal honestly and never force removal.
+
+Deletion, metadata cleanup and Trash recovery require a separate disposable-files scope. Do not enable them for the basic copy/eject pass.
+
+## Remaining full-port checks
+
+The foreground pass also covers defaults/profile editing, narrow layout/DPI/theme, notifications, hotkey registration, silent login/single-instance behavior, busy close/reveal/Quit, interruption/resume and unrelated-device operation during a transfer. See [foreground acceptance](FOREGROUND_ACCEPTANCE.md) for the detailed unrun cases.
+
+Manual Quick Share needs separately selected existing FFmpeg/FFprobe and an explicitly chosen official LUT for a positive Luna test. It remains opt-in per device and manual per action. Validate 1080p/4K, LUT choice, real probe/full decode, cancellation/retry and exact last-20 history reuse after source removal/restart without changing full-quality originals.
+
+Full completion also requires genuine camera/package and destination-filesystem acceptance, clean-computer startup and trusted direct-download delivery. A local unsigned build and fake/disposable-file tests do not establish those results.
