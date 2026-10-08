@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Correct the foreground review entry point · October 8
+
+[Current review acceptance](modern/CURRENT_REVIEW_ACCEPTANCE_20261008.md) now leads with the newer `PowerConnectionAtomic-20261008/review/app` folder, exact application/backend/icon hashes and a concrete foreground/lifecycle/history/manual-sharing checklist. Fresh readback confirms the manifest and four application assets; current production source/build helper is unchanged from implementation3ccf740. The earlier a7afd34 folder remains an explicitly historical checkpoint. No build/test/app launch/live configuration or hardware action; the review application is still unlaunched and the full goal remains active.
+
 ## Verify native saved-history interruption on the current backend · October 8
 
 Local helper milestone **fb9cad4060abfae95f00f77c3fa3e39be45bdd9c** matches both compiled helper/project Git blobs in `committed-source-conformance.json`. Thirteen evidence files are pinned. Production/default-test source is unchanged; no push or public delivery.

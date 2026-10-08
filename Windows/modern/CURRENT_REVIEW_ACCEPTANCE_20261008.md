@@ -1,5 +1,34 @@
 # Current local review acceptance · October 8, 2026
 
+## Current review folder and next foreground checks
+
+Use **`C:/Users/rsmit/.codex/EasyEjectBuildTools/PowerConnectionAtomic-20261008/review/app`** for the next foreground review. Keep its entire self-contained folder together. The `ReviewHistoryReadyPacket-20261008` folder described below is an earlier checkpoint, before the sleep/wake proof correction.
+
+The current review manifest SHA-256 is **76F6D2C0109ED12C7D6042D6DFA504AC32B1AE3F4A7B4538856C5B551169A7A2**. Its complete verification records **649 files /286249164 bytes**, including the existing Easy Eject icon and 48 preserved notice/metadata files. A fresh October 8 readback confirms these exact application bindings:
+
+| File | SHA-256 |
+| --- | --- |
+| `EasyEject.Runtime.dll` | `F810DFB734CF47AE09FA8A9558DA5F819056FE059692CE31857ABE2AF1F35FAD` |
+| `EasyEject.Modern.dll` | `92164AE11791CD36758575A0B2E9E47EBD339731C0BB245F397A865858CB2699` |
+| `EasyEject.Modern.exe` | `786AD10735F65BBC544B76E1F6EA5DC6E1E8D34153EDA6165B048B245C434E2E` |
+| `Assets/EasyEject.png` | `995FE39FBABE0588BFD0B6E45236814DED731079A0339DC4876F6B931E975E5B` |
+
+The manifest deliberately leaves `declaredSourceRevision` empty: this was an isolated parent archive plus explicit owned overlays. Eleven compiled C#/project inputs were subsequently matched to implementation **3ccf740856c853abe361f1472e0183b106546172**. Current `Windows/src`, `Windows/modern/app` and `Windows/modern/build-review.ps1` have no changes from that implementation. Later commits add tests, the standalone history helper and documentation; they do not require switching to a different application backend. [Complete build and power evidence](../POWER_CONNECTION_ACCEPTANCE.md) retains that distinction.
+
+Evidence on this exact backend includes warning-free WinUI compilation, **1388/0** earlier full defaults in both runtimes, **242/0** selected contracts and **15/0** owned native power-handler checks. Later [operation checks](../POWER_OPERATION_ACCEPTANCE.md) pass **27/0** in both runtimes and **1415/0** modern defaults. The [separate native history helper](tools/NATIVE_HISTORY_FIXTURE.md) passes generated-file verification and three managed power-boundary checks using real read-only destination monitoring. Counts overlap. Neither direct handler invocation nor monitor registration proves physical sleep/wake delivery or foreground behavior.
+
+The current review application remains **unlaunched**. The retained older preview is PID25172/start18:38:52.3954229Z, from `QuickShareReadableFailure-20261008-Final/review/app`; its native UI evidence belongs to that older copy. Use an accessible desktop and an agreed computer-use slot for the following remaining checks:
+
+1. Finish or cancel the older preview's open work, use its normal **Quit preview** action, and confirm that exact process exits. Launch the current review copy and record its path, start time and loaded application/backend. Engineering process termination does not establish normal Quit behavior.
+2. Check the existing icon in the window/taskbar/tray, tray menu placement, close-to-tray, same-instance reveal and duplicate normal launch. Repeat with a retained modal and an owned operation to verify state survives hiding and Quit refuses active work. Test keyboard defaults, reachable scrolling controls, themes and the laptop's actual display scaling.
+3. Recheck Settings, shared defaults and custom/following profile behavior on this copy. Any temporary generated configuration must have a fresh before-state and an exclusive ownership ledger, and be recovered without overwriting unrelated changes. Keep launch-at-login off during development.
+4. Use the opt-in history helper's prepared generated records only after fresh idle/configuration/backend checks. Verify exact recorded selection after logical source absence, cancellation, changed-copy refusal and restored retry; then normal Quit/restart must reload history without restoring source-eject authority. The retained 44-byte `.mov` fixtures prove file/history behavior only and cannot prove video decoding or Quick Share export.
+5. Review manual Quick Share with suitable owned generated clips and the explicitly configured tools: per-device opt-in, fresh 1080p/4K and LUT choices, cancellation/retry, retained originals, receipts/reuse, no automatic export/eject and return to the completion choice. Positive Luna LUT/color acceptance still requires the user-supplied official Luna LUT; a DJI O4 LUT from the separate Gyroflow work does not satisfy that requirement. Check actual notification delivery, suppression, click-to-review and busy/hidden timing.
+
+Actual OS sleep/wake delivery, camera/media/package behavior, separate destination filesystems, device interruption/eject/veto and travel rehearsal remain separate acceptance. Hardware-affecting tests require Ryan to identify the disposable source device and destination explicitly. Trusted signing/direct distribution and publishing are also open. This documentation update performs no application launch, live fixture publication, hardware operation, system change or new test run.
+
+## Earlier committed-source review checkpoint
+
 Review folder: **`C:/Users/rsmit/.codex/EasyEjectBuildTools/ReviewHistoryReadyPacket-20261008/review/app`**. Keep the entire folder together. It has not been launched, installed, signed or published. The older corrected preview remains PID25172/start18:38:52.3954229Z; finish its work and use its normal Quit action before switching copies when foreground access is available.
 
 This build freezes committed Windows source **a7afd3423c443d50ee1a492119d93154c5b0a968**, including the readable setup failure, close-to-tray behavior, retained notices and latest hidden/grouped completion-prompt fixes. The external packet retains `windows-source.zip`, SHA-256 **741A4E7E359B3A88DBDA4D298E78CE1803F3325F1AC4309C94B12D9B99B0BAAA**, extracted source and `source-scope.json`. The checkout was clean when archived. No subsequent shared-checkout changes are included.
