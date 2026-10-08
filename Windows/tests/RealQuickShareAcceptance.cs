@@ -44,6 +44,7 @@ namespace EasyEject {
                     Test("real tools: generated PQ and HLG tags refuse before encoding or publication", () => RealShareHdrRefusal(tools));
                     Test("real tools: separate cold processes prepare create reuse and refuse changed originals", () => RealShareColdRestart(tools));
                     Test("real tools: cold cancellation retains a published copy and fresh retry finishes only the remainder", () => RealShareColdPartial(tools));
+                    Test("real tools: valid output metadata cannot bypass corrupt frame decode and fresh manual retry", () => RealShareDecodeFailure(tools));
                     if (tools.Lut != null) {
                         Test("real tools: official LUT transform produces validated 1080p output", () => RealShareCase(tools, 1920, 1080, 30, true, QuickSharePreset.Hd, QuickShareColor.LunaILog, 1920, 1080, 30));
                         Test("real tools: official LUT transform produces validated 4K output", () => RealShareCase(tools, 3840, 2160, 30, true, QuickSharePreset.Uhd, QuickShareColor.LunaILog, 3840, 2160, 30));
@@ -60,6 +61,7 @@ namespace EasyEject {
             internal CancellationTokenSource StopAtEncoderProgress;
             internal int StopAtEncodeNumber = 1;
             internal bool CancelledAtProgress;
+            internal Action<string> AfterEncode;
             public byte[] Run(string executable, string[] arguments, string directory, double timeout, CancellationToken cancel, Action validate, Action<string> progress = null) {
                 Calls++; bool encode = arguments.Contains("-progress");
                 if (encode) Encodes++;
@@ -71,7 +73,9 @@ namespace EasyEject {
                     }
                     if (progress != null) progress(line);
                 };
-                return inner.Run(executable, arguments, directory, timeout, cancel, validate, observe);
+                byte[] result = inner.Run(executable, arguments, directory, timeout, cancel, validate, observe);
+                if (encode && AfterEncode != null) AfterEncode(arguments.Last());
+                return result;
             }
         }
 
@@ -168,6 +172,58 @@ namespace EasyEject {
                 Throws<QuickShareFailure>(() => new QuickShareEngine(process, operations).Run(batch, destination, new FakeGuard(), tools, QuickSharePreset.Hd, QuickShareColor.Standard, CancellationToken.None, _ => {}));
                 Check(process.Calls == 0 && !Directory.Exists(Path.Combine(batch.Folder, "Sharing Copies")), "Changed destination invoked tools or created sharing work");
                 var retry = RunRealShare(service, batch); Check(retry.Created == 1 && retry.PublishedReceipts == 1, "Fresh valid review did not retry"); VerifyShareOriginals(batch); CheckSharePrivateGone(batch); using (operations.Reserve(new[] { 700, 701 })) {}
+            }
+        }
+        static void RealShareDecodeFailure(QuickShareTools tools) {
+            using (var f = new Fixture()) {
+                var batch = GenerateRealShareBatch(f, tools, 640, 360, 30, false); string root = RealShareSetup(f, batch, tools);
+                string history = IndependentFileHash(Path.Combine(root, "completed-imports.json"));
+                var operations = new Operations(); var process = new ObservedRealShareProcess(); int damaged = 0;
+                process.AfterEncode = path => {
+                    string sharing = SafePaths.Normalize(Path.Combine(batch.Folder, "Sharing Copies"));
+                    path = SafePaths.Normalize(path);
+                    Check(SafePaths.Within(path, sharing) && Path.GetFileName(path) == "output.mp4"
+                        && Path.GetFileName(Path.GetDirectoryName(path)).StartsWith(".easy-share-", StringComparison.Ordinal), "Corruption fixture is not owned private encoded output");
+                    using (var stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) {
+                        Check(stream.Length > 8 && stream.Length < 64 * 1024 * 1024, "Owned encoded fixture is outside bounded size");
+                        var header = new byte[8]; long position = 0;
+                        while (position + 8 <= stream.Length) {
+                            stream.Position = position; Check(stream.Read(header, 0, 8) == 8, "Incomplete generated MP4 box");
+                            long size = ((long)header[0] << 24) | ((long)header[1] << 16) | ((long)header[2] << 8) | header[3];
+                            Check(size >= 8 && size <= stream.Length - position, "Unsupported generated MP4 box size");
+                            if (Encoding.ASCII.GetString(header, 4, 4) == "mdat") {
+                                Check(size > 8, "Generated media payload is empty");
+                                // Retain early frames so the real probe can resolve all
+                                // metadata, then invalidate later compressed packets.
+                                int tail = (int)(size - 8) / 4; Check(tail > 8, "Generated media tail is too short");
+                                stream.Position = position + size - tail;
+                                var zeros = new byte[tail]; stream.Write(zeros, 0, zeros.Length); stream.Flush(true); damaged++;
+                            }
+                            position += size;
+                        }
+                        Check(position == stream.Length && damaged == 1, "Expected exactly one complete owned MP4 media box");
+                    }
+                };
+                var failure = Throws<QuickShareFailure>(() => RunRealShare(RealShares(root, process, operations), batch));
+                Check(damaged == 1 && process.Encodes == 1 && process.Probes == 2 && process.Decodes == 1 && !failure.Cancelled,
+                    "Damaged encoded media did not pass metadata checks and fail actual full decoding: damaged=" + damaged
+                    + "; encode=" + process.Encodes + "; probe=" + process.Probes + "; decode=" + process.Decodes + "; " + failure.InnerException.Message);
+                Check(failure.Partial.Created == 0 && failure.Partial.Outputs.Count == 0 && failure.Partial.PublishedCopies == 0 && failure.Partial.PublishedReceipts == 0,
+                    "Undecodable frames acquired published output or receipt");
+                VerifyShareOriginals(batch); CheckSharePrivateGone(batch);
+                Check(IndependentFileHash(Path.Combine(root, "completed-imports.json")) == history, "Decode failure changed verified history");
+                using (operations.Reserve(new[] { 700, 701 })) { }
+                var retryProcess = new ObservedRealShareProcess(); var service = RealShares(root, retryProcess, operations);
+                var retry = RunRealShare(service, ImportHistory.Load(root).Single());
+                Check(retry.Created == 1 && retry.PublishedCopies == 1 && retry.PublishedReceipts == 1
+                    && retryProcess.Encodes == 1 && retryProcess.Probes == 2 && retryProcess.Decodes == 1, "Fresh manual retry did not validate and publish exactly once");
+                string output = retry.Outputs.Single(), outputHash = IndependentFileHash(output), receiptHash = IndependentFileHash(QuickShareEngine.ReceiptPath(output));
+                var reuse = RunRealShare(RealShares(root, retryProcess, operations), ImportHistory.Load(root).Single());
+                Check(reuse.Created == 0 && reuse.Reused == 1 && reuse.Outputs.Single() == output && retryProcess.Encodes == 1 && retryProcess.Decodes == 1
+                    && IndependentFileHash(output) == outputHash && IndependentFileHash(QuickShareEngine.ReceiptPath(output)) == receiptHash, "Retry output was not exactly reusable");
+                VerifyShareOriginals(batch); CheckSharePrivateGone(batch);
+                Check(IndependentFileHash(Path.Combine(root, "completed-imports.json")) == history, "Manual retry changed verified history");
+                using (operations.Reserve(new[] { 700, 701 })) { }
             }
         }
         static void RealShareSilentPortrait(QuickShareTools tools) {
