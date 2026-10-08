@@ -88,8 +88,10 @@ namespace EasyEject.Modern {
             tray.MouseClick += delegate(object sender, Forms.MouseEventArgs args) { if (args.Button == Forms.MouseButtons.Left) Reveal(); };
             tray.BalloonTipClicked += delegate { Reveal(); };
             AppWindow.Closing += delegate(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args) {
-                if (UiBusy) { args.Cancel = true; return; }
-                if (!quitting) { args.Cancel = true; AppWindow.Hide(); }
+                // Hiding the window keeps its dialogs, workers and tray alive.
+                // Busy protection belongs to actual Quit, not close-to-tray.
+                if (!quitting) { args.Cancel = true; AppWindow.Hide(); return; }
+                if (UiBusy) { args.Cancel = true; quitting = false; Reveal(); }
             };
             Closed += delegate {
                 closed = true; releaseChecks.Dispose(); pulse.Stop(); inventory.Dispose(); notifications.Dispose();
