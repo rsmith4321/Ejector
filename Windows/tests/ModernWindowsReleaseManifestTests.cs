@@ -44,7 +44,7 @@ namespace EasyEject {
                 var f = new ModernManifestFixture(); byte[] index = f.Index(); string body = f.Body(index);
                 byte[] altered = (byte[])index.Clone(); altered[altered.Length - 2] ^= 1;
                 Throws<SafetyException>(() => f.Parse(altered, body));
-                foreach (string changed in new[] { body.Replace("\"length\":" + index.Length, "\"length\":" + (index.Length + 1)), body.Replace(WindowsSignerEvidence.Hash(index), new string('f', 64)), body.Replace("\"count\":15", "\"count\":16"), body.Replace("\"totalLength\":15", "\"totalLength\":16"), body.Replace(ModernWindowsReleaseManifest.IndexName, "other.json") }) Throws<SafetyException>(() => f.Parse(index, changed));
+                foreach (string changed in new[] { body.Replace("\"length\":" + index.Length, "\"length\":" + (index.Length + 1)), body.Replace(WindowsSignerEvidence.Hash(index), new string('f', 64)), body.Replace("\"count\":" + f.Files.Count, "\"count\":" + (f.Files.Count + 1)), body.Replace("\"totalLength\":" + f.Files.Sum(file => file.Length), "\"totalLength\":" + (f.Files.Sum(file => file.Length) + 1)), body.Replace(ModernWindowsReleaseManifest.IndexName, "other.json") }) Throws<SafetyException>(() => f.Parse(index, changed));
             });
             Test("modern runtime and source declarations refuse unsupported families and unstable forms", delegate {
                 foreach (string dotnet in new[] { "9.0.1", "11.0.1", "10.0.0-preview", "10.00.12", "10.0.12.0" }) { var f = new ModernManifestFixture { DotNet = dotnet }; Throws<SafetyException>(() => f.Parse()); }
@@ -55,7 +55,7 @@ namespace EasyEject {
             });
             Test("modern schemas refuse unknown duplicate fields annotations and trailing documents", delegate {
                 var f = new ModernManifestFixture(); byte[] index = f.Index(); string body = f.Body(index);
-                foreach (string changed in new[] { body.Replace("\"format\":2", "\"format\":2,\"format\":2"), body.Replace("\"format\":2", "\"format\":2,\"unknown\":0"), body + "{}", body.Replace("\"count\":15", "\"count\":\"15\"") }) Throws<SafetyException>(() => f.Parse(index, changed));
+                foreach (string changed in new[] { body.Replace("\"format\":2", "\"format\":2,\"format\":2"), body.Replace("\"format\":2", "\"format\":2,\"unknown\":0"), body + "{}", body.Replace("\"count\":" + f.Files.Count, "\"count\":\"" + f.Files.Count + "\"") }) Throws<SafetyException>(() => f.Parse(index, changed));
                 foreach (string changed in new[] { f.IndexText().Replace("\"format\":1", "\"format\":1,\"format\":1"), f.IndexText().Replace("\"format\":1", "\"format\":1,\"extra\":0"), f.IndexText() + "{}", f.IndexText().Replace("\"length\":1", "\"length\":1,\"length\":1"), f.IndexText().Replace("\"format\":1", "\"format\":2") }) { byte[] bytes = Encoding.UTF8.GetBytes(changed); Throws<SafetyException>(() => f.Parse(bytes)); }
             });
             Test("modern payload paths refuse traversal absolute streams reserved devices and unsupported contents", delegate {
@@ -93,7 +93,7 @@ namespace EasyEject {
                 var f = new ModernManifestFixture(); byte[] index = f.Index(), body = Encoding.UTF8.GetBytes(f.Body(index));
                 var snapshot = new WindowsAuthenticatedManifest(body, new byte[] { 1 }, new WindowsSignerEvidence(new string('c',64),new string('d',64),new string('e',64),FixtureSha256Oid));
                 body[0] = 0; var release = ModernWindowsReleaseManifest.Parse(snapshot, index); string hash = release.IndexHash; index[0] = 0;
-                Check(release.Files.Count == 15 && release.IndexHash == hash && release.Version == "1.2.3.4", "Caller mutated the parsed release");
+                Check(release.Files.Count == f.Files.Count && release.IndexHash == hash && release.Version == "1.2.3.4", "Caller mutated the parsed release");
                 Throws<NotSupportedException>(() => ((IList<WindowsReleaseFile>)release.Files).Add(new WindowsReleaseFile("foreign.txt",1,new string('a',64))));
                 byte[] copy = snapshot.CopyBytes(); copy[0] = 0; Check(snapshot.CopyBytes()[0] == '{', "Authenticated body is mutable");
             });

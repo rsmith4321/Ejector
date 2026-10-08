@@ -17,7 +17,7 @@ namespace EasyEject {
         internal const int MaximumIndex = 524288, MaximumFiles = 2048;
         internal const long MaximumFile = 1073741824, MaximumTotal = 2147483648;
         internal static readonly ReadOnlyCollection<string> RequiredFiles = Array.AsReadOnly(new[] {
-            "EasyEject.Modern.exe", "EasyEject.Modern.dll", "EasyEject.Modern.deps.json", "EasyEject.Modern.runtimeconfig.json", "EasyEject.Runtime.dll",
+            "EasyEject.Modern.exe", "EasyEject.Modern.dll", "EasyEject.Modern.pri", "EasyEject.Modern.deps.json", "EasyEject.Modern.runtimeconfig.json", "EasyEject.Runtime.dll",
             "coreclr.dll", "hostfxr.dll", "hostpolicy.dll", "System.Private.CoreLib.dll", "System.Windows.Forms.dll",
             "Microsoft.ui.xaml.dll", "Microsoft.WindowsAppRuntime.dll", "Assets/EasyEject.png", "README.txt", "LICENSE.txt"
         });

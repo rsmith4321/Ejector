@@ -45,7 +45,7 @@ try {
 } finally {
     foreach ($name in $savedEnvironment.Keys) { [Environment]::SetEnvironmentVariable($name, $savedEnvironment[$name], 'Process') }
 }
-foreach ($required in @('EasyEject.Modern.exe', 'EasyEject.Modern.dll', 'EasyEject.Runtime.dll', 'EasyEject.Modern.runtimeconfig.json', 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll', 'System.Private.CoreLib.dll', 'System.Windows.Forms.dll', 'Microsoft.UI.Xaml.dll', 'Microsoft.WindowsAppRuntime.dll', 'Assets/EasyEject.png')) {
+foreach ($required in @('EasyEject.Modern.exe', 'EasyEject.Modern.dll', 'EasyEject.Runtime.dll', 'EasyEject.Modern.pri', 'EasyEject.Modern.runtimeconfig.json', 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll', 'System.Private.CoreLib.dll', 'System.Windows.Forms.dll', 'Microsoft.UI.Xaml.dll', 'Microsoft.WindowsAppRuntime.dll', 'Assets/EasyEject.png')) {
     if (!(Test-Path -LiteralPath (Join-Path $payload $required) -PathType Leaf)) { throw "Review output is incomplete: $required" }
 }
 $runtime = Get-Content -LiteralPath (Join-Path $payload 'EasyEject.Modern.runtimeconfig.json') -Raw | ConvertFrom-Json

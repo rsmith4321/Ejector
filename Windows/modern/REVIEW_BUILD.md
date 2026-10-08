@@ -1,5 +1,7 @@
 # Local Windows review build · October 7, 2026
 
+October 8 latest refresh: **`C:\Users\rsmit\.codex\EasyEjectBuildTools\ReviewPriFixed-20261008\app`**, **601 files /284307190 bytes**, now automatically includes the app's generated `EasyEject.Modern.pri`. The earlier 600-file folder crashes at XAML startup; a separate exact one-file clone opens with the icon. This fresh build passes warning-free exact-backend **1289/0 full /236/0 modern**, focused and read-only native checks, with all payload hashes retained and a tested missing-resource publish refusal. [Resource publishing evidence](PUBLISH_RESOURCES.md) records exact source, failed/successful native scope, commands and logs. This new folder has not been launched; Quit the running preview before switching copies. Desktop input is paused after physical Escape. All remaining full-port foreground/hardware/LUT/distribution gates remain; no trusted release or publication claim.
+
 October 8 source follow-up **9c8ca3c** adds separately verified [dependency declarations](DEPENDENCY_CONFIGURATION_CONTRACT.md), Framework and self-contained .NET 10 **17/0** plus adjacent manifest/content/runtime **14/20/11**. This source is not in the earlier app folder documented below; no new delivered-app or full-suite claim is made. Authenticated component/catalog identity and integrated trusted package/delivery still require work.
 
 ## Current source refresh · October 7 (UTC October 8)

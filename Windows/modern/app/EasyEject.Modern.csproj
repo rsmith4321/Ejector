@@ -27,4 +27,15 @@
     <ProjectReference Include="..\EasyEject.Runtime.csproj" />
     <Content Include="..\..\assets\EasyEject.png" Link="Assets\EasyEject.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <!-- WinUI generates this PRI in the build output, but the SDK's publish
+       list does not include it. Without it, unpackaged XAML startup fails. -->
+  <Target Name="PublishEasyEjectXamlResources" AfterTargets="ComputeResolvedFilesToPublishList">
+    <Error Condition="!Exists('$(TargetDir)$(TargetName).pri')" Text="The compiled Easy Eject XAML resource index is missing." />
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(TargetDir)$(TargetName).pri" Exclude="@(ResolvedFileToPublish)">
+        <RelativePath>$(TargetName).pri</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 </Project>

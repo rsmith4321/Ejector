@@ -1,5 +1,13 @@
 # Windows progress · October 8, 2026
 
+## Modern startup resource fix · October 8
+
+An actual unlocked-desktop launch reproduces the earlier review's XAML startup crash. An isolated copy retaining all 600 original files and adding only the generated `EasyEject.Modern.pri` opens successfully, with the Easy Eject title/header icon and internal-only inventory/actions observed. Publishing now includes that catalog automatically and refuses incomplete output; the modern inventory also requires it. Fresh unsigned `ReviewPriFixed-20261008/app` has **601 files /284307190 bytes** and unchanged artwork. The new folder has not been launched; the distinct earlier resource probe is the native evidence.
+
+Final isolated 9e4633d plus five owned files excludes/preserves dirty real-sharing work. Framework **14/0 manifest /20/0 content**; bundled .NET10.0.12 **14/20/11/17 focused /1289/0 full**, plus **236/0 modern** and actual read-only inventory/hidden notification smoke, all terminal/durable exit zero and zero compiler warnings/errors. Counts overlap. Exact app backend and 14 runtime file pairs match; all 601 payload hashes match. Actual no-build missing-catalog guard refuses specifically, creates no output files and restores the generated catalog exactly. Initial 13/1 and 18/2 fixture-size failures remain recorded and corrected without weakening held-file/cancellation checks. [Resource publishing evidence](modern/PUBLISH_RESOURCES.md) records source, commands, events, process/module/hash/log scopes.
+
+Physical Escape stopped desktop input, which remains paused. This supersedes the earlier helper-only startup blocker for the observed one-file clone; native lifecycle/dialog/tray/Quit/version switching/theme/DPI/current-folder acceptance remains incomplete. No real media import/cleanup/eject, settings/startup/security/power change or publication. Supplied official Luna LUT/genuine-camera, explicitly identified disposable hardware/filesystems/travel and remaining trusted distribution proof stay open. Full goal active.
+
 ## Modern dependency declarations · October 8
 
 Source **9c8ca3c** adds a separate bounded, read-only dependency graph policy. It binds project/runtime/SDK declarations, exact resolved edges and reachable libraries, package/reference metadata and unique asset destinations to the authenticated release inventory. The actual WebView package/projection relationship and legitimate zero component versions are covered without weakening stable application versions. Classic parser limits and normal production channel remain unchanged.

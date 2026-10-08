@@ -59,7 +59,7 @@ namespace EasyEject {
                 using (var f = new ModernPackageFixture()) {
                     string original = WindowsSignerEvidence.Hash(File.ReadAllBytes(f.PathFor("EasyEject.Runtime.dll")));
                     using (var review = f.Review()) {
-                        Check(review.Release.Files.Count == 17 && review.Authenticated.Signer.CertificateHash == f.Signing.Evidence().CertificateHash, "Actual inventory or signer lost");
+                        Check(review.Release.Files.Count == ModernWindowsReleaseManifest.RequiredFiles.Count + 2 && review.Authenticated.Signer.CertificateHash == f.Signing.Evidence().CertificateHash, "Actual inventory or signer lost");
                         review.Revalidate(CancellationToken.None);
                         review.Inspect("EasyEject.Runtime.dll", held => Check(VerifiedImporter.Hash(held, CancellationToken.None) == original, "Inspection changed held bytes"), CancellationToken.None);
                         foreach (var file in f.Metadata.Files) Throws<IOException>(() => File.WriteAllText(f.PathFor(file.Name), "replacement"));
@@ -86,7 +86,7 @@ namespace EasyEject {
                 }
             });
             Test("modern content missing metadata apphost or declared components refuse with old files retained", delegate {
-                foreach (string name in new[] { ModernWindowsReleaseManifest.ManifestName, ModernWindowsReleaseManifest.SignatureName, ModernWindowsReleaseManifest.IndexName, "EasyEject.Modern.exe", "hostpolicy.dll", "Assets/EasyEject.png" }) using (var f = new ModernPackageFixture()) {
+                foreach (string name in new[] { ModernWindowsReleaseManifest.ManifestName, ModernWindowsReleaseManifest.SignatureName, ModernWindowsReleaseManifest.IndexName, "EasyEject.Modern.exe", "EasyEject.Modern.pri", "hostpolicy.dll", "Assets/EasyEject.png" }) using (var f = new ModernPackageFixture()) {
                     string path = f.PathFor(name), moved = Path.Combine(f.Owned.Destination,"retained.bin"); File.Move(path,moved); RefuseModernContent(() => f.Review()); Check(File.Exists(moved),"Missing file was restored/deleted automatically"); f.RequireReleased(); File.Move(moved,path); using (var retry = f.Review()) { }
                 }
             });
@@ -99,7 +99,7 @@ namespace EasyEject {
                     int heldChecks = 0; f.Executable.During = (path,held) => {
                         foreach (string file in Directory.GetFiles(f.Root,"*",SearchOption.AllDirectories)) { Throws<IOException>(() => File.Move(file,file + ".replacement")); heldChecks++; }
                     };
-                    using (var review = f.Review()) { Check(heldChecks == 20,"Not every file was held before the callback"); } f.RequireReleased();
+                    using (var review = f.Review()) { Check(heldChecks == f.Metadata.Files.Count + 3,"Not every file was held before the callback"); } f.RequireReleased();
                 }
             });
             Test("modern content refuses manifest callback addition before returning reviewed metadata", delegate {
@@ -146,7 +146,7 @@ namespace EasyEject {
             Test("modern content cancellation in native manifest or executable callbacks releases every file", delegate {
                 foreach (bool duringManifest in new[] { false,true }) using (var f = new ModernPackageFixture()) using (var cancel = new CancellationTokenSource()) {
                     if (duringManifest) f.Certificate.During = cancel.Cancel; else f.Executable.During = (path,held) => cancel.Cancel();
-                    Throws<OperationCanceledException>(() => f.Review(cancel.Token)); f.RequireReleased(); Check(Directory.GetFiles(f.Root,"*",SearchOption.AllDirectories).Length == 20,"Cancellation deleted content");
+                    Throws<OperationCanceledException>(() => f.Review(cancel.Token)); f.RequireReleased(); Check(Directory.GetFiles(f.Root,"*",SearchOption.AllDirectories).Length == f.Metadata.Files.Count + 3,"Cancellation deleted content");
                 }
             });
             Test("modern content late extra directory and trust failures revoke revalidation", delegate {
