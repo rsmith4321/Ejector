@@ -1,0 +1,38 @@
+# Current local review acceptance · October 8, 2026
+
+Review folder: **`C:/Users/rsmit/.codex/EasyEjectBuildTools/ReviewHistoryReadyPacket-20261008/review/app`**. Keep the entire folder together. It has not been launched, installed, signed or published. The older corrected preview remains PID25172/start18:38:52.3954229Z; finish its work and use its normal Quit action before switching copies when foreground access is available.
+
+This build freezes committed Windows source **a7afd3423c443d50ee1a492119d93154c5b0a968**, including the readable setup failure, close-to-tray behavior, retained notices and latest hidden/grouped completion-prompt fixes. The external packet retains `windows-source.zip`, SHA-256 **741A4E7E359B3A88DBDA4D298E78CE1803F3325F1AC4309C94B12D9B99B0BAAA**, extracted source and `source-scope.json`. The checkout was clean when archived. No subsequent shared-checkout changes are included.
+
+`run-build.ps1` invokes the archived `Windows/modern/build-review.ps1 -BuildRoot .../review -SourceRevision a7afd3423c443d50ee1a492119d93154c5b0a968`, with the existing SDK 10.0.401 and private dependency cache. Build PID24212 runs **20:02:05.8611006Z–20:02:26.4241752Z**, exit zero. The complete unsigned x64 folder contains **649 files /286,246,084 bytes**, including bundled .NET Core/Desktop **10.0.12** and Windows App SDK **2.5.1**. All builds use warnings as errors; the app, both contract runners, Framework fixture binaries and standalone history helper compile without warning/error diagnostics.
+
+| Exact artifact | SHA-256 |
+| --- | --- |
+| `review/review-build.json` | `96299378E18AC34D2BA1EDACBE0E1DFD937AB976D464F9C01F2C4A40BF742E48` |
+| `app/EasyEject.Runtime.dll` | `464D8D10C474078D0BA4AC62B51A85BAC8E4DBBE2751001498E412F0D05B39A2` |
+| `app/EasyEject.Modern.dll` | `2AA890066BD29D98E88339152504BC8712303FFE1B37377E90225C11835DAF1B` |
+| `app/EasyEject.Modern.exe` | `786AD10735F65BBC544B76E1F6EA5DC6E1E8D34153EDA6165B048B245C434E2E` |
+| Existing `Assets/EasyEject.png` | `995FE39FBABE0588BFD0B6E45236814DED731079A0339DC4876F6B931E975E5B` |
+
+`run-contracts.ps1` publishes fresh self-contained Release runners from that same snapshot, with package sources cleared for their cached restore. Each runner receives the application's exact backend DLL. Both `*-runtime-hashes.json` files confirm all six app/runner pairs: backend, coreclr, hostfxr, hostpolicy, System.Private.CoreLib and System.Windows.Forms. Existing unsigned Framework package/protocol fixture tools are compiled into the owned runner only. Default tests use fakes/disposable generated files; no real eject API is invoked.
+
+| Check | Result | Retained log |
+| --- | --- | --- |
+| Selected modern contracts | **242/0**, terminal zero | `ModernContracts-tests.log` |
+| Full default contracts | **1365/0**, terminal zero | `FullContracts-tests.log` |
+| Actual native apphost sample | **9/0**, exit zero | `apphost-sample.log` |
+| Actual managed application sample | **15/0**, exit zero | `managed-sample.log` |
+| Explicit read-only native monitor | Exit zero | `monitor-native.log` |
+| Generated history preparation on this exact backend | Exit zero | `history-fixture-prepare.log` |
+
+Counts overlap; they are not 1,631 distinct tests. Sample checks read actual candidate bytes and patch only disposable copies, using fake positive publisher trust. They do not load the candidate, execute its entry point, approve a package or establish actual trusted signing. Contract orchestration PID24728 runs **20:03:47.9516218Z–20:11:00.3256856Z**, exit zero/failure null in `contracts-result.json`. Actual full runner PID12468/start20:04:18.3603144Z is observed at **20:04:52.1766870Z** loading this owned runner's hostfxr/hostpolicy/coreclr, native version10.0.1226.42308; `full-runtime-observed.json` retains paths/hashes.
+
+The explicit `ModernContracts/EasyEject.ModernContracts.exe --monitor-native` call at **20:10:24.2634946Z–20:10:24.4125739Z** registers the real hidden storage/instance notification monitor and sees complete read-only inventory of one internal disk/five volumes. Protected Windows volumes cannot become eject choices. Disposal removes readiness; a subsequent scan refuses operations. No device request or media access occurs. This is backend monitoring evidence, not WinUI foreground acceptance.
+
+The committed opt-in [history helper](tools/NATIVE_HISTORY_FIXTURE.md) is also compiled against this new exact backend. Preparation exits zero at **20:06:45.9867423Z**, retaining a new owned `history-fixture` with generated sources, two verified copies, genuine receipt and prepared synthetic profile/history records. Production saved-history verification succeeds after logical source-folder absence, checks only its two recorded files, refuses changed destination/original and pre-cancelled verification, and succeeds on fresh retry. Both versions of the changed generated file and all originals are retained. `Seeded=false`; no live profile/history is published. Helper source SHA-256 remains **359E35F34CB78EA05B041EBDE46830FC1B9BF5C745DB8706D9E3FA9EA5EC805D**. This reruns existing helper coverage on a different backend; it is not a new default-suite count or playable-video/export proof.
+
+Final independent `verify-payload.ps1` observation at **20:11:12.9647804Z** confirms **649/649** manifest lengths/hashes, the exact existing icon PNG and **48/48** preserved metadata/license/notice files against both payload and actual cached package source entries. Static inspection reports357 PE files/1500 import references/zero ordinary names absent locally. Notice preservation and static import names do not establish final redistribution license review, symbol/dynamic-loading resolution or clean-computer startup.
+
+The same observation retains unchanged live configuration:217-byte `issue-state.json`, SHA-256 **988E4535AEAA637C6C1D411AA6711E34559B5CD0CD7D970B592DCD0D10ADED42**, and486-byte `quick-share-tools.json`, SHA-256 **C366C5017700613C17F734FFC01C8AEACC0F386B61EF19558FD8DE57EE94728D**. No other direct records appear. `terminal-processes.json` at **20:11:13.1884528Z** confirms zero owned runners, zero new review application processes and the unchanged original preview PID/path/start.
+
+A fresh Computer Use observation still captures the animated screensaver rather than Easy Eject pixels. No input, foreground history action, live fixture publication or preview switch is attempted. Next acceptance needs an accessible desktop for normal Quit/switch, nonempty history selection/verification/failure/manual Quick Share review/Cancel, lifecycle and notification workflows, followed by explicitly identified disposable-device/filesystem testing. Official supplied LUT/genuine camera/codec/color, applicable clean-computer/travel behavior and actual trusted distribution remain unproved. Mac, website, original media, system security/power/display, login startup, signing and public channels are unchanged. This is a reviewable local software checkpoint, not completion of the full port; goal remains active.
