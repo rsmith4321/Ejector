@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Exact update-safety harness assertion audit · October 8
+
+[UPDATE_SAFETY_CONTRACT.md](UPDATE_SAFETY_CONTRACT.md) accounts for all **six** Mac assertion sites/**eleven** loop-and-sheet executions, idle/manual and busy-background paths. Existing coordinator **28/0 each runtime** and modern selected **242/0** including **22** release-view groups replay, terminal **55066 exit0**, exact source/backend/log/unchanged-Mac bindings. Metadata wait/one-use delivery stays distinct from platform-specific Sparkle relaunch and unexecuted live activity/unsaved-editor/picker conditions. Documentation only; concurrent sharing edits preserved/excluded. Real publisher/endpoint/install/rollback/loader/UI and remaining full-port hardware/LUT/travel gates stay open; goal active.
+
 ## Exact import/notification harness assertion audit · October 8
 
 [IMPORT_NOTIFICATION_CONTRACT.md](IMPORT_NOTIFICATION_CONTRACT.md) accounts for all **17** baseline Mac assertion sites and **seven** outcomes, distinguishing actual generated-file/software fixtures, inspected modern routing and unexecuted live UI/physical conditions. Existing defaults **4/0** and completion-connections **17/0** replay on Framework/modern, four exit0 results/log hashes in `import-notification-audit-result-20261008.json`; unchanged Mac blob/source bindings and concurrent sharing edits preserved. Documentation only, no new/default/native/device proof. Remaining source mappings, delivery/UI/LUT/genuine-camera/identified hardware/filesystem/travel/trust gates remain; full goal active.
