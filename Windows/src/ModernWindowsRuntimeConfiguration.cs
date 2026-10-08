@@ -10,6 +10,7 @@ namespace EasyEject {
     // process/environment policy, archive extraction or installation.
     internal static class ModernWindowsRuntimeConfiguration {
         internal const string Name = "EasyEject.Modern.runtimeconfig.json";
+        internal const string DevelopmentName = "EasyEject.Modern.runtimeconfig.dev.json";
         internal const int MaximumBytes = 8192;
         internal static void Require(ModernWindowsPackageContentReview content, CancellationToken cancel) {
             if (content == null) throw new ArgumentNullException("content");
@@ -28,6 +29,8 @@ namespace EasyEject {
         }
         internal static void Validate(byte[] supplied, ModernWindowsReleaseManifest release) {
             if (release == null) throw new SafetyException("Modern runtime configuration requires the authenticated release inventory.");
+            if (release.Files.Any(file => file.Name.Equals(DevelopmentName, StringComparison.OrdinalIgnoreCase)))
+                throw new SafetyException("The modern release includes an unreviewed development runtime configuration.");
             if (supplied == null || supplied.Length == 0 || supplied.Length > MaximumBytes) throw new SafetyException("The modern runtime configuration is missing or excessive.");
             // Parse only our bounded immutable byte snapshot; never ask the host to load it.
             var root = WindowsReleaseManifest.Fields(WindowsReleaseManifest.ReadJson((byte[])supplied.Clone()), new[] { "runtimeOptions" });

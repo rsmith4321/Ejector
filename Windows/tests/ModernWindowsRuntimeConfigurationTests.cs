@@ -6,6 +6,7 @@ using System.Threading;
 
 namespace EasyEject {
     public static partial class Tests {
+        const string ModernDevelopmentConfigurationName = "EasyEject.Modern.runtimeconfig.dev.json";
         static string ModernRuntimeJson(string version = "10.0.12") {
             return "{\"runtimeOptions\":{\"tfm\":\"net10.0\",\"includedFrameworks\":[{\"name\":\"Microsoft.NETCore.App\",\"version\":\"" + version + "\"},{\"name\":\"Microsoft.WindowsDesktop.App\",\"version\":\"" + version + "\"}],\"configProperties\":{\"System.Reflection.Metadata.MetadataUpdater.IsSupported\":false,\"System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization\":false,\"CSWINRT_USE_WINDOWS_UI_XAML_PROJECTIONS\":false}}}";
         }
@@ -18,6 +19,19 @@ namespace EasyEject {
             fixture.Metadata.Files.Add(new WindowsReleaseFile(name, bytes.Length, WindowsSignerEvidence.Hash(bytes))); fixture.Publish();
         }
         static void ModernWindowsRuntimeConfigurationTests() {
+            Test("modern runtime configuration refuses authenticated companion development configuration in every casing", delegate {
+                foreach (string name in new[] { ModernDevelopmentConfigurationName, ModernDevelopmentConfigurationName.ToLowerInvariant(), ModernDevelopmentConfigurationName.ToUpperInvariant() }) {
+                    var declaration = new ModernManifestFixture(); declaration.Files.Add(new WindowsReleaseFile(name, 1, new string('a', 64)));
+                    Throws<SafetyException>(() => ModernRuntimeValidate(ModernRuntimeJson(), declaration.Parse()));
+                }
+                using (var fixture = new ModernPackageFixture()) {
+                    ModernRuntimePublish(fixture, ModernRuntimeJson()); byte[] dev = Encoding.UTF8.GetBytes("{\"runtimeOptions\":{\"additionalProbingPaths\":[\"C:/foreign\"]}}");
+                    File.WriteAllBytes(fixture.PathFor(ModernDevelopmentConfigurationName), dev);
+                    fixture.Metadata.Files.Add(new WindowsReleaseFile(ModernDevelopmentConfigurationName, dev.Length, WindowsSignerEvidence.Hash(dev))); fixture.Publish();
+                    using (var review = fixture.Review()) Throws<SafetyException>(() => ModernWindowsRuntimeConfiguration.Require(review, CancellationToken.None));
+                    Check(File.ReadAllBytes(fixture.PathFor(ModernDevelopmentConfigurationName)).SequenceEqual(dev), "Development file changed"); fixture.RequireReleased();
+                }
+            });
             Test("modern runtime configuration accepts exact declared self-contained families and harmless ordering", delegate {
                 ModernRuntimeValidate(ModernRuntimeJson());
                 ModernRuntimeValidate(ModernRuntimeJson().Replace("Microsoft.NETCore.App", "swap").Replace("Microsoft.WindowsDesktop.App", "Microsoft.NETCore.App").Replace("swap", "Microsoft.WindowsDesktop.App"));
