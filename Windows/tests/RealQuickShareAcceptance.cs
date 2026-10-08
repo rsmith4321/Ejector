@@ -11,6 +11,7 @@ namespace EasyEject {
         // Explicit CLI only. Never called by the default suite; no downloads, settings
         // in the user's profile, user media, discovery, or physical device operations.
         static int RealQuickShareAcceptance(string[] args) {
+            if (args.Length > 1 && args[1] == "--owned-cold") return OwnedRealShareProbe(args);
             try {
                 if (args.Length != 3 && args.Length != 4) throw new SafetyException("Usage: --share-real-tools <ffmpeg.exe> <ffprobe.exe> [official Luna LUT.cube]. This executes the explicitly supplied tools on generated disposable clips only.");
                 var tools = new QuickShareTools(args[1], args[2], args.Length == 4 ? args[3] : null);
@@ -41,6 +42,7 @@ namespace EasyEject {
                     Test("real tools: corrupt receipt retains real encoded copy and fresh retry is reusable", () => RealShareCorruptReceipt(tools));
                     Test("real tools: rotated landscape applies both display-matrix directions once", () => RealShareRotation(tools));
                     Test("real tools: generated PQ and HLG tags refuse before encoding or publication", () => RealShareHdrRefusal(tools));
+                    Test("real tools: separate cold processes prepare create reuse and refuse changed originals", () => RealShareColdRestart(tools));
                     if (tools.Lut != null) {
                         Test("real tools: official LUT transform produces validated 1080p output", () => RealShareCase(tools, 1920, 1080, 30, true, QuickSharePreset.Hd, QuickShareColor.LunaILog, 1920, 1080, 30));
                         Test("real tools: official LUT transform produces validated 4K output", () => RealShareCase(tools, 3840, 2160, 30, true, QuickSharePreset.Uhd, QuickShareColor.LunaILog, 3840, 2160, 30));
