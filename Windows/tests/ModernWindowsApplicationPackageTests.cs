@@ -25,20 +25,27 @@ namespace EasyEject {
             Test("modern composed application review rejects authenticated classic executable and releases all held files", delegate {
                 using (var fixture = new ModernPackageFixture()) {
                     using (var content = fixture.Review()) Check(content.Release.Version == fixture.Metadata.Version, "Content control refused");
-                    Throws<SafetyException>(() => ApplicationPackage(fixture)); fixture.RequireReleased();
+                    Throws<SafetyException>(() => { using (var unexpected = ApplicationPackage(fixture)) { } }); fixture.RequireReleased();
                 }
             });
         }
-        static void ApplicationPackageFixture(ModernPackageFixture fixture, byte[] host, byte[] managed) {
+        static void BackendIdentityPublish(ModernPackageFixture fixture, byte[] bytes) {
+            string name = "EasyEject.Runtime.dll"; File.WriteAllBytes(fixture.PathFor(name), bytes);
+            fixture.Metadata.Files.RemoveAll(file => file.Name == name);
+            fixture.Metadata.Files.Add(new WindowsReleaseFile(name, bytes.Length, WindowsSignerEvidence.Hash(bytes))); fixture.Publish();
+        }
+        static void ApplicationPackageFixture(ModernPackageFixture fixture, byte[] host, byte[] managed, byte[] backendBytes) {
             NativeHostPublish(fixture, NativeHostStable(host)); ModernIdentityPublish(fixture, ModernIdentityStable(managed));
+            BackendIdentityPublish(fixture, ModernIdentityStable(backendBytes));
             ModernRuntimePublish(fixture, ModernRuntimeJson()); DependencyPublish(fixture, DependencyJson("0.1.0.0"));
         }
         static int ModernApplicationPackageSample(string folder) {
             byte[] host = File.ReadAllBytes(Path.Combine(folder, "EasyEject.Modern.exe"));
             byte[] managed = File.ReadAllBytes(Path.Combine(folder, "EasyEject.Modern.dll"));
+            byte[] backendBytes = File.ReadAllBytes(Path.Combine(folder, "EasyEject.Runtime.dll"));
             Test("modern composed application accepts owned stable application copies and retains complete ownership", delegate {
                 using (var fixture = new ModernPackageFixture()) {
-                    ApplicationPackageFixture(fixture, host, managed);
+                    ApplicationPackageFixture(fixture, host, managed, backendBytes);
                     var review = ApplicationPackage(fixture);
                     try {
                         Check(review.Folder == SafePaths.Normalize(fixture.Root) && review.Release.Version == "0.1.0.0", "Composed identity was lost");
@@ -53,33 +60,45 @@ namespace EasyEject {
             });
             Test("modern composed application refuses development managed identity after valid native host", delegate {
                 using (var fixture = new ModernPackageFixture()) {
-                    ApplicationPackageFixture(fixture, host, managed); ModernIdentityPublish(fixture, managed);
+                    ApplicationPackageFixture(fixture, host, managed, backendBytes); ModernIdentityPublish(fixture, managed);
                     using (var content = fixture.Review()) ModernWindowsAppHostIdentity.Require(content, CancellationToken.None);
-                    Throws<SafetyException>(() => ApplicationPackage(fixture)); fixture.RequireReleased();
+                    Throws<SafetyException>(() => { using (var unexpected = ApplicationPackage(fixture)) { } }); fixture.RequireReleased();
                 }
             });
             Test("modern composed application refuses conflicting runtime after native and managed identity", delegate {
                 using (var fixture = new ModernPackageFixture()) {
-                    ApplicationPackageFixture(fixture, host, managed); ModernRuntimePublish(fixture, ModernRuntimeJson("10.0.13"));
+                    ApplicationPackageFixture(fixture, host, managed, backendBytes); ModernRuntimePublish(fixture, ModernRuntimeJson("10.0.13"));
                     using (var content = fixture.Review()) { ModernWindowsAppHostIdentity.Require(content, CancellationToken.None); ModernWindowsManagedApplicationIdentity.Require(content, CancellationToken.None); }
-                    Throws<SafetyException>(() => ApplicationPackage(fixture)); fixture.RequireReleased();
+                    Throws<SafetyException>(() => { using (var unexpected = ApplicationPackage(fixture)) { } }); fixture.RequireReleased();
                 }
             });
             Test("modern composed application refuses conflicting dependency runtime after valid application configuration", delegate {
                 using (var fixture = new ModernPackageFixture()) {
-                    ApplicationPackageFixture(fixture, host, managed); DependencyPublish(fixture, DependencyJson("0.1.0.0").Replace("10.0.12", "10.0.13"));
+                    ApplicationPackageFixture(fixture, host, managed, backendBytes); DependencyPublish(fixture, DependencyJson("0.1.0.0").Replace("10.0.12", "10.0.13"));
                     using (var content = fixture.Review()) { ModernWindowsAppHostIdentity.Require(content, CancellationToken.None); ModernWindowsManagedApplicationIdentity.Require(content, CancellationToken.None); ModernWindowsRuntimeConfiguration.Require(content, CancellationToken.None); }
-                    Throws<SafetyException>(() => ApplicationPackage(fixture)); fixture.RequireReleased();
+                    Throws<SafetyException>(() => { using (var unexpected = ApplicationPackage(fixture)) { } }); fixture.RequireReleased();
                 }
             });
             Test("modern composed application revalidation refuses late extra files and preserves them", delegate {
                 using (var fixture = new ModernPackageFixture()) {
-                    ApplicationPackageFixture(fixture, host, managed);
+                    ApplicationPackageFixture(fixture, host, managed, backendBytes);
                     using (var review = ApplicationPackage(fixture)) {
                         string extra = fixture.PathFor("later.txt"); File.WriteAllText(extra, "retained");
                         Throws<SafetyException>(() => review.Revalidate(CancellationToken.None)); Check(File.ReadAllText(extra) == "retained", "Revalidation cleaned extra data");
                     }
                     fixture.RequireReleased();
+                }
+            });
+            Test("modern composed application refuses authenticated malformed backend bytes", delegate {
+                using (var fixture = new ModernPackageFixture()) {
+                    ApplicationPackageFixture(fixture, host, managed, backendBytes); BackendIdentityPublish(fixture, Encoding.UTF8.GetBytes("owned non-library payload"));
+                    Throws<SafetyException>(() => { using (var unexpected = ApplicationPackage(fixture)) { } }); fixture.RequireReleased();
+                }
+            });
+            Test("modern composed application refuses development backend despite stable main and declarations", delegate {
+                using (var fixture = new ModernPackageFixture()) {
+                    ApplicationPackageFixture(fixture, host, managed, backendBytes); BackendIdentityPublish(fixture, backendBytes);
+                    Throws<SafetyException>(() => { using (var unexpected = ApplicationPackage(fixture)) { } }); fixture.RequireReleased();
                 }
             });
             Console.WriteLine(passed + " passed, " + failed + " failed"); return failed == 0 ? 0 : 1;

@@ -138,9 +138,10 @@ namespace EasyEject {
         }
         static int ModernReleaseApplicationSample(string folder) {
             byte[] host = File.ReadAllBytes(Path.Combine(folder, "EasyEject.Modern.exe")), managed = File.ReadAllBytes(Path.Combine(folder, "EasyEject.Modern.dll"));
+            byte[] backendBytes = File.ReadAllBytes(Path.Combine(folder, "EasyEject.Runtime.dll"));
             Test("modern session composes ordered signed metadata ZIP and actual owned application review without writes", delegate {
                 using (var f = new ModernReviewFixture()) {
-                    ApplicationPackageFixture(f.Source.Archive.Package, host, managed); f.Source.Archive.Write(); Check(f.CheckRelease().Accepted, "Metadata failed");
+                    ApplicationPackageFixture(f.Source.Archive.Package, host, managed, backendBytes); f.Source.Archive.Write(); Check(f.CheckRelease().Accepted, "Metadata failed");
                     var before = Directory.GetFiles(f.Source.Archive.Package.Owned.Root, "*", SearchOption.AllDirectories).ToDictionary(path => path, path => WindowsSignerEvidence.Hash(File.ReadAllBytes(path)));
                     Check(f.Zip().Accepted, "ZIP failed"); var result = f.Folder();
                     Check(result.Accepted && result.Message.Contains("application/launch declarations") && result.Message.Contains("component/catalog") && !result.Message.Contains("all six") && result.Message.Contains("No installation or launch permission") && f.ArchiveCalls == 2 && f.PackageCalls == 1, "Modern result overstated or omitted policy scope");
@@ -149,7 +150,7 @@ namespace EasyEject {
             });
             Test("actual modern backend and presenter accept exact application sample while preserving later acceptance gates", delegate {
                 using (var f = new ModernReviewFixture()) {
-                    ApplicationPackageFixture(f.Source.Archive.Package, host, managed); f.Source.Archive.Write();
+                    ApplicationPackageFixture(f.Source.Archive.Package, host, managed, backendBytes); f.Source.Archive.Write();
                     using (var backend = WindowsReleaseViewBackend.ForModern(f.Checks, f.Source.Channel, ApplicationInformation.Version, f.Archive, f.Package))
                     using (var view = new ReleaseView(backend, new InstallationFolders(f.Source.Archive.Package.Root, f.Source.Archive.Package.Owned.Destination, path => { throw new Exception("Unexpected navigation"); }))) {
                         view.SetAvailable(true); var check = ChannelAwait(() => view.Check()); Check(check.Accepted && check.TryPresent(), "Metadata failed");

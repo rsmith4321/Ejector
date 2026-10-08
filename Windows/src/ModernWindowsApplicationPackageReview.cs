@@ -21,6 +21,7 @@ namespace EasyEject {
             cancel.ThrowIfCancellationRequested();
             ModernWindowsAppHostIdentity.Require(content, cancel);
             ModernWindowsManagedApplicationIdentity.Require(content, cancel);
+            ModernWindowsBackendIdentity.Require(content, cancel);
             ModernWindowsRuntimeConfiguration.Require(content, cancel);
             ModernWindowsDependencyConfiguration.Require(content, cancel);
             content.Revalidate(cancel);

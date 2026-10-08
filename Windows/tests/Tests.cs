@@ -127,6 +127,8 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--modern-windows-runtimeconfig") { ModernWindowsRuntimeConfigurationTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Bounded JSON and owned authenticated content with fake positive trust only; no runtime loading, installation or device action."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--modern-windows-managed") { ModernWindowsManagedIdentityTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Basic managed policy and owned malformed/classic fixtures only; positive actual modern metadata requires an explicit read-only sample."); return failed == 0 ? 0 : 1; }
             if (args.Length == 2 && args[0] == "--modern-windows-managed-sample") return ModernManagedIdentitySample(args[1]);
+            if (args.Length == 1 && args[0] == "--modern-windows-backend") { ModernWindowsBackendIdentityTests(); Console.WriteLine(passed + " passed, " + failed + " failed"); return failed == 0 ? 0 : 1; }
+            if (args.Length == 2 && args[0] == "--modern-windows-backend-sample") return ModernBackendIdentitySample(args[1]);
             if (args.Length == 1 && args[0] == "--modern-windows-apphost") { ModernWindowsAppHostIdentityTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Basic native host policy only; positive native layout requires an explicit read-only sample."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--modern-windows-deps") { ModernWindowsDependencyConfigurationTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Generated dependency graphs and owned content with fake positive trust only; no component loading, execution or device action."); return failed == 0 ? 0 : 1; }
             if (args.Length == 2 && args[0] == "--modern-windows-deps-sample") return ModernDependencySample(args[1]);
@@ -798,6 +800,7 @@ namespace EasyEject {
             ModernWindowsPackageContentTests();
             ModernWindowsRuntimeConfigurationTests();
             ModernWindowsManagedIdentityTests();
+            ModernWindowsBackendIdentityTests();
             ModernWindowsAppHostIdentityTests();
             ModernWindowsDependencyConfigurationTests();
             ModernWindowsReleaseReviewTests(); ModernWindowsChannelTests(); ModernWindowsArchiveTests(); ModernWindowsApplicationPackageTests();

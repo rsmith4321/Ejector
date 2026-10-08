@@ -168,16 +168,17 @@ namespace EasyEject {
         }
         static int ModernArchiveApplicationSample(string folder) {
             byte[] host = File.ReadAllBytes(System.IO.Path.Combine(folder, "EasyEject.Modern.exe")), managed = File.ReadAllBytes(System.IO.Path.Combine(folder, "EasyEject.Modern.dll"));
+            byte[] backendBytes = File.ReadAllBytes(System.IO.Path.Combine(folder, "EasyEject.Runtime.dll"));
             Test("modern ZIP binds separately held application review to exact inventory envelope and signer", delegate {
                 using (var f = new ModernArchiveFixture()) {
-                    ApplicationPackageFixture(f.Package, host, managed); f.Write();
+                    ApplicationPackageFixture(f.Package, host, managed, backendBytes); f.Write();
                     using (var archive = f.Review()) using (var application = ApplicationPackage(f.Package)) archive.VerifyExtractedPackage(application, CancellationToken.None);
                     f.Released();
                 }
             });
             Test("modern ZIP refuses another independently valid application snapshot", delegate {
                 using (var f = new ModernArchiveFixture()) {
-                    ApplicationPackageFixture(f.Package, host, managed); f.Write();
+                    ApplicationPackageFixture(f.Package, host, managed, backendBytes); f.Write();
                     using (var archive = f.Review()) {
                         string path = f.Package.PathFor("nested/fixture.json"); File.WriteAllText(path, "another valid snapshot"); byte[] bytes = File.ReadAllBytes(path);
                         f.Package.Metadata.Files.RemoveAll(file => file.Name == "nested/fixture.json"); f.Package.Metadata.Files.Add(new WindowsReleaseFile("nested/fixture.json", bytes.Length, WindowsSignerEvidence.Hash(bytes))); f.Package.Publish();

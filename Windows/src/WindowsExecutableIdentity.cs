@@ -17,19 +17,22 @@ namespace EasyEject {
         }
         internal static void ValidatePe(FileStream stream) { ReadMetadata(stream); }
         internal static byte[] ReadMetadata(FileStream stream) {
-            uint ignored; return ReadMetadata(stream, false, out ignored);
+            uint ignored; return ReadMetadata(stream, false, false, out ignored);
         }
         internal static byte[] ReadModernMetadata(FileStream stream, out uint entryPoint) {
-            return ReadMetadata(stream, true, out entryPoint);
+            return ReadMetadata(stream, true, false, out entryPoint);
         }
-        static byte[] ReadMetadata(FileStream stream, bool modern, out uint entryPoint) {
+        internal static byte[] ReadModernLibraryMetadata(FileStream stream) {
+            uint ignored; return ReadMetadata(stream, true, true, out ignored);
+        }
+        static byte[] ReadMetadata(FileStream stream, bool modern, bool library, out uint entryPoint) {
             entryPoint = 0;
             byte[] dos = Read(stream, 0, 64); if (BitConverter.ToUInt16(dos, 0) != 0x5a4d) Fail();
             uint offset = BitConverter.ToUInt32(dos, 60); if (offset < 64 || offset > 1048576) Fail(); byte[] header = Read(stream, offset, 24);
             ushort sections = BitConverter.ToUInt16(header, 6), optionalSize = BitConverter.ToUInt16(header, 20), flags = BitConverter.ToUInt16(header, 22);
-            if (BitConverter.ToUInt32(header, 0) != 0x4550 || BitConverter.ToUInt16(header, 4) != 0x8664 || sections == 0 || sections > 96 || optionalSize != 240 || (flags & 2) == 0 || (flags & 0x2000) != 0) Fail();
+            if (BitConverter.ToUInt32(header, 0) != 0x4550 || BitConverter.ToUInt16(header, 4) != 0x8664 || sections == 0 || sections > 96 || optionalSize != 240 || (flags & 2) == 0 || (flags & 0x2000) != (library ? 0x2000 : 0)) Fail();
             byte[] optional = Read(stream, offset + 24L, optionalSize);
-            if (BitConverter.ToUInt16(optional, 0) != 0x20b || BitConverter.ToUInt16(optional, 68) != 2 || BitConverter.ToUInt32(optional, 108) != 16) Fail();
+            if (BitConverter.ToUInt16(optional, 0) != 0x20b || BitConverter.ToUInt16(optional, 68) != (library ? 3 : 2) || BitConverter.ToUInt32(optional, 108) != 16) Fail();
             uint clrRva = BitConverter.ToUInt32(optional, 224), clrSize = BitConverter.ToUInt32(optional, 228); if (clrRva == 0 || clrSize != 72) Fail();
             byte[] table = Read(stream, offset + 24L + optionalSize, sections * 40); long clrOffset = -1;
             for (int i = 0; i < sections; i++) {
@@ -40,7 +43,7 @@ namespace EasyEject {
             if (clrOffset < 0) Fail(); byte[] clr = Read(stream, clrOffset, 72); uint clrFlags = BitConverter.ToUInt32(clr, 16);
             if (BitConverter.ToUInt32(clr, 0) != 72 || (clrFlags & 1) == 0 || (clrFlags & ~9U) != 0) Fail();
             entryPoint = BitConverter.ToUInt32(clr, 20);
-            if (modern && ((entryPoint & 0xff000000) != 0x06000000 || (entryPoint & 0x00ffffff) == 0)) Fail();
+            if (library ? entryPoint != 0 : modern && ((entryPoint & 0xff000000) != 0x06000000 || (entryPoint & 0x00ffffff) == 0)) Fail();
             uint metadataRva = BitConverter.ToUInt32(clr, 8), metadataSize = BitConverter.ToUInt32(clr, 12); long metadataOffset = -1;
             if (metadataRva == 0 || metadataSize < 16 || metadataSize > 16777216) Fail();
             for (int i = 0; i < sections; i++) {

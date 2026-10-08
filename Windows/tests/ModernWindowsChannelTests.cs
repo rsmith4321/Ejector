@@ -179,15 +179,16 @@ namespace EasyEject {
         }
         static int ModernChannelApplicationSample(string folder) {
             byte[] host = File.ReadAllBytes(Path.Combine(folder, "EasyEject.Modern.exe")), managed = File.ReadAllBytes(Path.Combine(folder, "EasyEject.Modern.dll"));
+            byte[] backendBytes = File.ReadAllBytes(Path.Combine(folder, "EasyEject.Runtime.dll"));
             Test("modern signed channel composes exact archive and separately held application checks", delegate {
                 using (var f = new ModernChannelFixture()) {
-                    ApplicationPackageFixture(f.Archive.Package, host, managed); f.Archive.Write(); var offer = f.Offer();
+                    ApplicationPackageFixture(f.Archive.Package, host, managed, backendBytes); f.Archive.Write(); var offer = f.Offer();
                     using (var archive = f.Archive.Review()) using (var application = ApplicationPackage(f.Archive.Package)) offer.VerifyExtracted(archive, application, CancellationToken.None); f.Archive.Released();
                 }
             });
             Test("modern signed channel refuses a separately valid changed extracted application snapshot", delegate {
                 using (var f = new ModernChannelFixture()) {
-                    ApplicationPackageFixture(f.Archive.Package, host, managed); f.Archive.Write(); var offer = f.Offer();
+                    ApplicationPackageFixture(f.Archive.Package, host, managed, backendBytes); f.Archive.Write(); var offer = f.Offer();
                     using (var archive = f.Archive.Review()) {
                         string name = "nested/fixture.json"; byte[] bytes = Encoding.UTF8.GetBytes("another valid snapshot"); File.WriteAllBytes(f.Archive.Package.PathFor(name), bytes);
                         f.Archive.Package.Metadata.Files.RemoveAll(file => file.Name == name); f.Archive.Package.Metadata.Files.Add(new WindowsReleaseFile(name, bytes.Length, WindowsSignerEvidence.Hash(bytes))); f.Archive.Package.Publish();

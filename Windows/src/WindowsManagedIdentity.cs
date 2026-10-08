@@ -24,6 +24,10 @@ namespace EasyEject {
             if (!WindowsReleaseManifest.StableVersion(version) || Name != "EasyEject.Modern" || Version != version || Product != "Easy Eject" || Title != "Easy Eject for Windows" || FileVersion != version || InformationalVersion != version)
                 throw new SafetyException("The actual managed modern Windows application/version identity does not match the authenticated release.");
         }
+        internal void RequireModernBackend(string version) {
+            if (!WindowsReleaseManifest.StableVersion(version) || Name != "EasyEject.Runtime" || Version != version || Product != "Easy Eject" || Title != "Easy Eject for Windows" || FileVersion != version || InformationalVersion != version)
+                throw new SafetyException("The actual modern backend library identity differs from the authenticated release.");
+        }
         internal static WindowsManagedIdentity Read(FileStream stream) {
             byte[] bytes = WindowsExecutableIdentity.ReadMetadata(stream);
             return NativeManagedMetadata.Read(bytes);
@@ -31,6 +35,9 @@ namespace EasyEject {
         internal static WindowsManagedIdentity ReadModern(FileStream stream) {
             uint entryPoint; byte[] bytes = WindowsExecutableIdentity.ReadModernMetadata(stream, out entryPoint);
             return NativeManagedMetadata.ReadModern(bytes, entryPoint);
+        }
+        internal static WindowsManagedIdentity ReadModernBackend(FileStream stream) {
+            return NativeManagedMetadata.ReadModernLibrary(WindowsExecutableIdentity.ReadModernLibraryMetadata(stream));
         }
     }
     internal static class NativeManagedMetadata {
@@ -61,6 +68,7 @@ namespace EasyEject {
             if ((entryPoint & 0xff000000) != 0x06000000 || (entryPoint & 0x00ffffff) == 0) throw new SafetyException("The modern managed application has no supported method entry point.");
             return Read(bytes, true, entryPoint);
         }
+        internal static WindowsManagedIdentity ReadModernLibrary(byte[] bytes) { return Read(bytes, true, 0); }
         static WindowsManagedIdentity Read(byte[] bytes, bool modern, uint entryPoint) {
             if (bytes == null || bytes.Length < 16 || bytes.Length > 16777216 || BitConverter.ToUInt32(bytes, 0) != 0x424a5342) throw new SafetyException("Missing or unsupported bounded CLR metadata snapshot.");
             var pin = GCHandle.Alloc(bytes, GCHandleType.Pinned); IntPtr dispenser = IntPtr.Zero, importer = IntPtr.Zero, assemblies = IntPtr.Zero, enumeration = IntPtr.Zero, locale = IntPtr.Zero;
@@ -100,7 +108,7 @@ namespace EasyEject {
                     }
                     if (result == 1 || fetched == 0) break;
                 }
-                if (modern) RequireModernEntryPoint(importer, entryPoint);
+                if (modern && entryPoint != 0) RequireModernEntryPoint(importer, entryPoint);
                 return new WindowsManagedIdentity(assemblyName, version, values);
             } finally {
                 try { if (enumeration != IntPtr.Zero && importer != IntPtr.Zero) Method<CloseEnumeration>(importer, 3)(importer, enumeration); }
