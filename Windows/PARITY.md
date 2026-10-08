@@ -1,5 +1,7 @@
 # Full Windows port · parity and acceptance
 
+Actual corrected-preview Settings Save/read-back and live shortcut registration/editor refusal/idle empty-card delivery/disable release now pass. [Native lifecycle evidence](modern/NATIVE_ACCEPTANCE_20261008.md) binds exact enabled/disabled records and guarded restoration of original settings absence/defaults, unchanged existing config/login/all601 files. No connected-card removal, hidden/cold/busy-transfer/notification/other-layout/new suite/trust proof; full-port goal remains active.
+
 Actual corrected-preview Settings keyboard checks now cover cleanup **Return→Cancel**, draft shortcut **Down E→F / Return**, and Cancel/reopen restoring off/E and cleanup off. [Foreground evidence](modern/NATIVE_ACCEPTANCE_20261008.md) binds unchanged601 files/configuration/login absence and helper limits. No settings Save/live global shortcut/device/new suite/distribution proof; other foreground and full-port gates remain, goal active.
 
 Native setup Stop is observed during one owned 1 GiB hashing test, but Save commits before the subsequent request. Actual cancellation remains open. Fresh manual selection/Save restores exact original tool setup bytes and supplied tool hashes; the fixture is guarded and moved to recoverable external evidence storage without execution/export. [Late-Stop evidence](modern/QUICK_SHARE_SETUP_SCROLL.md) retains exact committed/restored records and timing limits. No production change/new suite/device/trust proof; full goal active.

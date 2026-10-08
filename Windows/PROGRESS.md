@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Native settings Save and live shortcut lifecycle · October 8
+
+Corrected PID25172 now completes native Settings Save/read-back with successful Ctrl+Alt+Shift+E registration, keeps an open Settings review in place on the chord, and delivers the idle **“No camera or emulator cards are connected”** path. Fresh disable Save releases the shortcut; another chord leaves the idle summary unchanged. Guards recover only the test-created settings record after disable, restoring original store absence/defaults; existing config/login and all601 candidate files stay exact. [Native lifecycle evidence](modern/NATIVE_ACCEPTANCE_20261008.md) binds both saved records/recovery and **19:04:09.3121009Z**. No new code/build/suite/autostart/device/media/trust proof; connected-card, hidden/cold/busy-transfer/notification/other-layout and remaining full-port gates stay open, goal active.
+
 ## Native settings keyboard and cleanup cancellation · October 8
 
 Corrected PID25172 now passes actual cleanup-confirmation **Return→Cancel**, keeps cleanup off, and accepts shortcut-list **Down E→F / Return** in an unsaved draft. Cancel/reopen restores shortcut-off/disabled E and original cleanup; fixed footer remains reachable. [Keyboard evidence](modern/NATIVE_ACCEPTANCE_20261008.md) binds **18:58:43.1652089Z**, all601 exact files, unchanged two configuration records, absent app-settings/login and capture/focus limitations. Code/build unchanged; no new suite, live shortcut registration/delivery, settings Save, device/media or trust proof. Remaining acceptance gates/full goal stay open.
