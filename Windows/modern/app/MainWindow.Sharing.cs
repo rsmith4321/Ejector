@@ -113,6 +113,7 @@ namespace EasyEject.Modern {
         }
         async void OpenQuickShareTools() {
             if (!BeginSavedReview()) return;
+            Task pendingPicker = null, pendingSave = null; bool reviewing = false;
             try {
                 await EnsureVisible();
                 var snapshot = await Task.Run(() => QuickShareConfiguration.Load()); var value = snapshot.Value;
@@ -124,49 +125,74 @@ namespace EasyEject.Modern {
                 var status = Wrapped("Cancel keeps previous setup. No export starts here."); bool picking = false, failed = false; string saved = null;
                 var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Quick Share tools", PrimaryButtonText = "Save setup", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close };
                 var scroll = Scrolling(body);
+                Func<bool> owns = () => reviewing && !closed && Object.ReferenceEquals(confirmation, dialog);
+                Func<string, TextBox, string, Task> pickFile = async (label, field, extension) => {
+                    picking = true; scroll.IsEnabled = false; dialog.IsPrimaryButtonEnabled = false;
+                    try {
+                        var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(AppWindow.Id) { CommitButtonText = "Choose " + label };
+                        picker.FileTypeFilter.Add(extension); var result = await picker.PickSingleFileAsync();
+                        if (owns() && result != null) { field.Text = SafePaths.Normalize(result.Path); status.Text = "Selection changed. Save validates it; Cancel keeps the previous setup."; }
+                    } catch (Exception ex) { if (owns()) status.Text = "File selection unavailable. " + ex.Message; }
+                    finally { picking = false; if (owns()) { scroll.IsEnabled = !failed; dialog.IsPrimaryButtonEnabled = !failed; } }
+                };
                 Action<string, TextBox, string> addFile = (label, field, extension) => {
                     body.Children.Add(Wrapped(label)); body.Children.Add(field);
                     var choose = new Button { Content = "Choose…" }; body.Children.Add(choose);
+                    Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(field, label + " path");
+                    Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(choose, "Choose " + label);
                     choose.Click += async delegate {
-                        if (picking || quickShareSetupSaving) return; picking = true; scroll.IsEnabled = false; dialog.IsPrimaryButtonEnabled = false;
-                        try {
-                            var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(AppWindow.Id) { CommitButtonText = "Choose " + label };
-                            picker.FileTypeFilter.Add(extension); var result = await picker.PickSingleFileAsync();
-                            if (result != null) { field.Text = SafePaths.Normalize(result.Path); status.Text = "Selection changed. Save validates it; Cancel keeps the previous setup."; }
-                        } catch (Exception ex) { status.Text = "File selection unavailable. " + ex.Message; }
-                        finally { picking = false; scroll.IsEnabled = !failed; dialog.IsPrimaryButtonEnabled = !failed; }
+                        if (!owns() || picking || quickShareSetupSaving || failed) return;
+                        pendingPicker = pickFile(label, field, extension); await pendingPicker;
                     };
                 };
                 addFile("FFmpeg executable", ffmpeg, ".exe"); addFile("FFprobe executable", ffprobe, ".exe");
                 body.Children.Add(Wrapped("Official Luna I-Log LUT is optional for normal-color exports. Choose " + QuickShareMedia.OfficialLutName + " from your official Insta360 download. Save checks the exact official hash and retains a local copy. Your downloaded original stays intact; clearing the choice deletes neither copy."));
                 addFile("Official LUT", lut, ".cube");
-                var clearTools = new Button { Content = "Clear tool selections" }; clearTools.Click += delegate { ffmpeg.Text = ffprobe.Text = ""; };
-                var clearLut = new Button { Content = "Clear LUT selection" }; clearLut.Click += delegate { lut.Text = ""; };
+                var clearTools = new Button { Content = "Clear tool selections" }; clearTools.Click += delegate { if (owns() && !picking && !quickShareSetupSaving && !failed) ffmpeg.Text = ffprobe.Text = ""; };
+                var clearLut = new Button { Content = "Clear LUT selection" }; clearLut.Click += delegate { if (owns() && !picking && !quickShareSetupSaving && !failed) lut.Text = ""; };
                 body.Children.Add(clearTools); body.Children.Add(clearLut); body.Children.Add(status); dialog.Content = scroll;
                 dialog.CloseButtonClick += delegate(ContentDialog sender, ContentDialogButtonClickEventArgs args) {
+                    if (!owns()) { args.Cancel = true; return; }
                     if (picking) { args.Cancel = true; return; }
                     if (quickShareSetupSaving) { args.Cancel = true; RequestOperationStop(); status.Text = "Stopping validation. Waiting for the current file check/write…"; }
                 };
+                dialog.Closing += delegate(ContentDialog sender, ContentDialogClosingEventArgs args) {
+                    if (owns() && (picking || quickShareSetupSaving)) args.Cancel = true;
+                };
                 dialog.PrimaryButtonClick += async delegate(ContentDialog sender, ContentDialogButtonClickEventArgs args) {
-                    if (picking || quickShareSetupSaving || failed) { args.Cancel = true; return; }
+                    if (!owns() || picking || quickShareSetupSaving || failed) { args.Cancel = true; return; }
                     var deferral = args.GetDeferral(); args.Cancel = true;
                     string selectedFfmpeg = ffmpeg.Text, selectedFfprobe = ffprobe.Text, selectedLut = lut.Text;
                     quickShareSetupSaving = true; scroll.IsEnabled = false; dialog.IsPrimaryButtonEnabled = false; dialog.CloseButtonText = "Stop validation";
-                    operationCancel = new CancellationTokenSource(); status.Text = "Validating supplied files and saving setup. No tools are running…"; UpdateActions();
-                    try {
-                        await Task.Run(() => QuickShareConfiguration.Save(snapshot, selectedFfmpeg, selectedFfprobe, selectedLut, Profiles.Root, operationCancel.Token));
-                        saved = "Quick Share setup saved. No export started."; args.Cancel = false;
-                    } catch (OperationCanceledException) { failed = true; status.Text = "Setup validation cancelled. Close and reopen to review saved choices. An already copied local LUT is retained."; }
-                    catch (Exception ex) { failed = true; status.Text = "Setup was not confirmed. Close and reopen to review saved choices before retrying. " + ex.Message; }
-                    finally {
-                        operationCancel.Dispose(); operationCancel = null; quickShareSetupSaving = false; scroll.IsEnabled = !failed; dialog.CloseButtonText = "Close"; UpdateActions(); deferral.Complete();
-                    }
+                    var cancellation = new CancellationTokenSource(); operationCancel = cancellation;
+                    status.Text = "Validating supplied files and saving setup. No tools are running…"; UpdateActions();
+                    Func<Task> saveSetup = async () => {
+                        try {
+                            await Task.Run(() => QuickShareConfiguration.Save(snapshot, selectedFfmpeg, selectedFfprobe, selectedLut, Profiles.Root, cancellation.Token));
+                            saved = "Quick Share setup saved. No export started."; if (owns()) args.Cancel = false;
+                        } catch (OperationCanceledException) { failed = true; if (owns()) status.Text = "Setup validation cancelled. Close and reopen to review saved choices. An already copied local LUT is retained."; }
+                        catch (Exception ex) { failed = true; if (owns()) status.Text = "Setup was not confirmed. Close and reopen to review saved choices before retrying. " + ex.Message; }
+                        finally {
+                            if (Object.ReferenceEquals(operationCancel, cancellation)) operationCancel = null;
+                            cancellation.Dispose(); quickShareSetupSaving = false;
+                            if (owns()) { scroll.IsEnabled = !failed; dialog.CloseButtonText = "Close"; UpdateActions(); }
+                        }
+                    };
+                    try { pendingSave = saveSetup(); await pendingSave; }
+                    finally { deferral.Complete(); }
                 };
-                confirmation = dialog; UpdateActions(); await dialog.ShowAsync(); confirmation = null;
+                confirmation = dialog; reviewing = true; UpdateActions(); await dialog.ShowAsync(); reviewing = false; confirmation = null;
                 Summary.Text = saved ?? (failed ? status.Text : "Quick Share setup draft discarded. Previous selections kept.");
                 if (failed) RecordModernIssue(Summary.Text);
-            } catch (Exception ex) { Summary.Text = "Quick Share setup unavailable. " + ex.Message; RecordModernIssue(Summary.Text); }
-            finally { FinishSavedReview(); }
+            } catch (Exception ex) { Summary.Text = "Quick Share setup view unavailable. Reopen it to review saved choices before retrying. " + ex.Message; RecordModernIssue(Summary.Text); }
+            finally {
+                reviewing = false;
+                // A failed XAML view cannot dispose cancellation or release busy/tray
+                // ownership while its exact picker or file-validation worker remains.
+                if (pendingPicker != null) try { await pendingPicker; } catch { }
+                if (pendingSave != null) try { await pendingSave; } catch { }
+                FinishSavedReview();
+            }
         }
     }
 }
