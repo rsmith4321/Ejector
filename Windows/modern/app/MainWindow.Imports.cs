@@ -164,9 +164,16 @@ namespace EasyEject.Modern {
             try {
                 await EnsureVisible();
                 var list = new ListView { ItemsSource = values.Select(v => v.DeviceName + " · " + v.Message).ToArray(), SelectionMode = ListViewSelectionMode.Single, MaxHeight = 300 };
-                confirmation = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Completed imports", Content = list, PrimaryButtonText = "Review import", CloseButtonText = "Close", DefaultButton = ContentDialogButton.Close, IsPrimaryButtonEnabled = false };
-                list.SelectionChanged += delegate { confirmation.IsPrimaryButtonEnabled = list.SelectedIndex >= 0; };
-                UpdateActions(); if (await confirmation.ShowAsync() == ContentDialogResult.Primary && list.SelectedIndex >= 0) selected = values[list.SelectedIndex].Id;
+                var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Completed imports", Content = list, PrimaryButtonText = "Review import", CloseButtonText = "Close", DefaultButton = ContentDialogButton.Close, IsPrimaryButtonEnabled = false };
+                confirmation = dialog; bool selecting = true;
+                SelectionChangedEventHandler selection = delegate {
+                    if (selecting && !closed && Object.ReferenceEquals(confirmation, dialog)) dialog.IsPrimaryButtonEnabled = list.SelectedIndex >= 0 && list.SelectedIndex < values.Length;
+                };
+                list.SelectionChanged += selection;
+                try {
+                    UpdateActions(); var answer = await dialog.ShowAsync(); int index = list.SelectedIndex;
+                    if (answer == ContentDialogResult.Primary && index >= 0 && index < values.Length) selected = values[index].Id;
+                } finally { selecting = false; list.SelectionChanged -= selection; }
             } catch (Exception ex) { Summary.Text = "Completion list unavailable. " + ex.Message; }
             finally { confirmation = null; working = false; UpdateActions(); }
             if (selected != null) await ReviewImportCompletion(selected);
@@ -198,14 +205,18 @@ namespace EasyEject.Modern {
                         + (cleanup == null ? "" : "\n\n" + cleanup.Description) + sharingNote + shareMessage;
                     confirmation = MessageDialog(entry.HasMedia ? "Import complete. Eject now?" : "No matching media. Eject now?", message, cleanup == null ? "Eject Now" : "Clean & eject");
                     confirmation.CloseButtonText = "Keep Connected"; confirmation.SecondaryButtonText = "Open Import Folder"; confirmation.IsPrimaryButtonEnabled = canEject;
-                    bool sharingRequested = false;
+                    bool sharingRequested = false, choosing = true; var dialog = confirmation; Button share = null; RoutedEventHandler shareChoice = null;
                     if (canShare) {
                         var body = new StackPanel { Spacing = 16 }; body.Children.Add(Wrapped(message));
-                        var share = new Button { Content = "Quick Share…" }; body.Children.Add(share); var dialog = confirmation;
-                        share.Click += delegate { sharingRequested = true; dialog.Hide(); };
+                        share = new Button { Content = "Quick Share…" }; body.Children.Add(share);
+                        shareChoice = delegate { if (!choosing || closed || !Object.ReferenceEquals(confirmation, dialog)) return; sharingRequested = true; dialog.Hide(); };
+                        share.Click += shareChoice;
                         confirmation.Content = Scrolling(body);
                     }
-                    UpdateActions(); var answer = await confirmation.ShowAsync(); confirmation = null;
+                    ContentDialogResult answer;
+                    try { UpdateActions(); answer = await dialog.ShowAsync(); }
+                    finally { choosing = false; if (share != null) share.Click -= shareChoice; }
+                    confirmation = null;
                     if (sharingRequested) {
                         bool shared = await PerformQuickShare(entry.Batch);
                         if (!QuickSharePresentation.ReturnToCompletion(completions, entry, shared)) break;

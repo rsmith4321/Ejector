@@ -44,17 +44,22 @@ namespace EasyEject.Modern {
                 confirmation = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Verified import history", Content = Scrolling(body),
                     PrimaryButtonText = "Verify saved originals", SecondaryButtonText = "", CloseButtonText = "Close", DefaultButton = ContentDialogButton.Close, IsPrimaryButtonEnabled = false };
                 var dialog = confirmation;
-                list.SelectionChanged += delegate {
-                    var batch = list.SelectedIndex < 0 ? null : batches[list.SelectedIndex]; dialog.IsPrimaryButtonEnabled = batch != null;
+                bool selecting = true;
+                SelectionChangedEventHandler selection = delegate {
+                    if (!selecting || closed || !Object.ReferenceEquals(confirmation, dialog)) return;
+                    var batch = list.SelectedIndex < 0 || list.SelectedIndex >= batches.Count ? null : batches[list.SelectedIndex]; dialog.IsPrimaryButtonEnabled = batch != null;
                     bool share = profiles != null && ManualQuickShareService.EligibleProfile(batch, profiles) != null;
                     dialog.SecondaryButtonText = share ? "Quick Share…" : ""; dialog.IsSecondaryButtonEnabled = share;
                     if (batch != null) details.Text = batch.DeviceName + "\n" + batch.Folder + "\nReceipt: " + batch.ReceiptPath + "\n\n"
                         + String.Join("\n", batch.Originals.Take(100).Select(file => SafePaths.Relative(file.Path, batch.Folder) + " (" + file.Bytes + " bytes)"))
                         + (batch.Originals.Count > 100 ? "\n… " + (batch.Originals.Count - 100) + " more recorded files; verification checks all." : "");
                 };
-                var answer = await dialog.ShowAsync(); confirmation = null;
-                if (list.SelectedIndex < 0 || answer == ContentDialogResult.None) return;
-                var selected = ImportHistory.Clone(batches[list.SelectedIndex]);
+                list.SelectionChanged += selection; ContentDialogResult answer; int index;
+                try { answer = await dialog.ShowAsync(); index = list.SelectedIndex; }
+                finally { selecting = false; list.SelectionChanged -= selection; }
+                confirmation = null;
+                if (index < 0 || index >= batches.Count || answer == ContentDialogResult.None) return;
+                var selected = ImportHistory.Clone(batches[index]);
                 if (answer == ContentDialogResult.Secondary) { await PerformQuickShare(selected); return; }
                 operationCancel = new CancellationTokenSource(); ImportProgress.Visibility = Visibility.Visible; ImportProgress.IsIndeterminate = true;
                 token = activity.Begin(TrayOperationKind.Verify, selected.DeviceName, "Checking saved files"); UpdateActions();
