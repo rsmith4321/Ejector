@@ -8,6 +8,8 @@ Keep the complete app folder together. Finish any active work, then use **Quit p
 
 The Easy Eject artwork is included in the executable, window, header and tray. This power-authority review passes **1388/0 full checks in each runtime**, **242/0 selected** and **15/0 owned synthetic power checks**, with exact unchanged payload and native read-only monitor/disposal. Counts overlap. It has not had current-copy foreground or actual sleep/device acceptance. See [power review evidence](POWER_CONNECTION_ACCEPTANCE.md), [review build history](modern/REVIEW_BUILD.md) and [icon observations](modern/ICON_ACCEPTANCE.md).
 
+For generated sleep/wake interruption checks, the existing test runner accepts `--power-operations`. The [test-only operation milestone](POWER_OPERATION_ACCEPTANCE.md) records **27/0 each runtime**, covering manual sharing/publication, cleanup/fake eject and interrupted-removal confirmation/retry on retained fixtures. It does not request physical sleep or affect an attached device; the review app above is unchanged.
+
 ## First pass: detection and interface
 
 Identify the spare USB drive, reader/card or camera and whether its contents are disposable before testing. Device operations need an agreed scope. Begin with detection only.

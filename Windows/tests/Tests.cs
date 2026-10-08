@@ -113,6 +113,7 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--media-parity") { MediaParityTests(); MediaMatrixTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable files and native read-only path resolution only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--storage-connections") { StorageConnectionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake notifications, fake eject and disposable files only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--power-connections") { PowerConnectionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake power notifications/devices and generated files only; no real sleep, power setting or device action."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--power-operations") { PowerOperationTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Generated media/metadata/configuration and fake power/device/process/eject APIs only; no real power or device action."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--completion-connections") { CompletionConnectionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake removal and owned disposable files only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--completion-prompt-contract") { CompletionPromptContractTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Generated files and fake devices; no real eject or foreground notification proof."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--grouped-completion-prompt") { GroupedCompletionPromptTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Generated files, fake topology and hidden controls only; no eject or foreground proof."); return failed == 0 ? 0 : 1; }
@@ -830,6 +831,7 @@ namespace EasyEject {
             MediaMatrixTests();
             StorageConnectionTests();
             PowerConnectionTests();
+            PowerOperationTests();
             CompletionConnectionTests();
             CompletionPromptContractTests();
             GroupedCompletionPromptTests();
