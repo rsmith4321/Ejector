@@ -2,6 +2,8 @@
 
 ## Modern startup resource fix · October 8
 
+Verified source/evidence commit: **e4e6874**. Only the ten owned Windows files are committed; the other task's two dirty real-sharing files remain preserved and excluded.
+
 An actual unlocked-desktop launch reproduces the earlier review's XAML startup crash. An isolated copy retaining all 600 original files and adding only the generated `EasyEject.Modern.pri` opens successfully, with the Easy Eject title/header icon and internal-only inventory/actions observed. Publishing now includes that catalog automatically and refuses incomplete output; the modern inventory also requires it. Fresh unsigned `ReviewPriFixed-20261008/app` has **601 files /284307190 bytes** and unchanged artwork. The new folder has not been launched; the distinct earlier resource probe is the native evidence.
 
 Final isolated 9e4633d plus five owned files excludes/preserves dirty real-sharing work. Framework **14/0 manifest /20/0 content**; bundled .NET10.0.12 **14/20/11/17 focused /1289/0 full**, plus **236/0 modern** and actual read-only inventory/hidden notification smoke, all terminal/durable exit zero and zero compiler warnings/errors. Counts overlap. Exact app backend and 14 runtime file pairs match; all 601 payload hashes match. Actual no-build missing-catalog guard refuses specifically, creates no output files and restores the generated catalog exactly. Initial 13/1 and 18/2 fixture-size failures remain recorded and corrected without weakening held-file/cancellation checks. [Resource publishing evidence](modern/PUBLISH_RESOURCES.md) records source, commands, events, process/module/hash/log scopes.
