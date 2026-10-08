@@ -10,6 +10,7 @@ namespace EasyEject {
             return new ApprovedModernWindowsComponents(new string('f', 64), fixture.DotNet, fixture.Sdk, fixture.Minimum, files ?? fixture.Files.Where(file => !ApprovedModernWindowsComponents.IsApplicationFile(file.Name)));
         }
         static void ApprovedModernWindowsComponentsTests() {
+            ReviewedMicrosoftVendorLayoutTests();
             Test("independent component approval freezes exact vendor membership lengths hashes and runtime identifiers", delegate {
                 var f = new ModernManifestFixture(); var supplied = f.Files.Where(file => !ApprovedModernWindowsComponents.IsApplicationFile(file.Name)).ToList();
                 var approval = ComponentApproval(f, supplied); approval.Require(f.Parse()); string hash = approval.CatalogHash;

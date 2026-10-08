@@ -1,0 +1,2 @@
+# Preserve the exact byte hash referenced by the compiled local-review catalog.
+vendor-layout-source.json -text
