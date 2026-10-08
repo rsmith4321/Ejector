@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Exact import/notification harness assertion audit · October 8
+
+[IMPORT_NOTIFICATION_CONTRACT.md](IMPORT_NOTIFICATION_CONTRACT.md) accounts for all **17** baseline Mac assertion sites and **seven** outcomes, distinguishing actual generated-file/software fixtures, inspected modern routing and unexecuted live UI/physical conditions. Existing defaults **4/0** and completion-connections **17/0** replay on Framework/modern, four exit0 results/log hashes in `import-notification-audit-result-20261008.json`; unchanged Mac blob/source bindings and concurrent sharing edits preserved. Documentation only, no new/default/native/device proof. Remaining source mappings, delivery/UI/LUT/genuine-camera/identified hardware/filesystem/travel/trust gates remain; full goal active.
+
 ## Genuine-pin held application composition · October 8
 
 Source **a7d2af4** passes complete held application review with all **639** real independent vendor pins and unchanged supplied vendor bytes in owned **650-payload** fixtures. Both runtimes pass new integration **4/0**, existing approval **11/0** and basic composition **3/0**, warning-free compilation; sample terminals **15783/3558 exit0**, original601/notice649 exact and owned runners zero. [PINNED_VENDOR_COMPOSITION.md](modern/PINNED_VENDOR_COMPOSITION.md) binds source/backend/logs and scopes synthetic application metadata/docs and fake publisher trust. Production code and release approval configuration unchanged; no new default/native/media/device proof. Final publisher/notices/loader/distribution/UI/LUT/genuine-camera/identified hardware/filesystem/travel gates remain; full goal active.
