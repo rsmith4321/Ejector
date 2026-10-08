@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Readable native Quick Share setup failures · October 8
+
+Actual zero-byte tool refusal exposed a disabled ScrollViewer hiding the error below the initial fold. The owned UI correction disables choices inside a ContentControl while keeping the viewer active. Warning-free isolated **e1f307c** plus one app-file overlay passes **242/0 selected**, terminal **1755 exit0**; corrected native **PID25172/window7472742** scrolls the full refusal into view while Save/choices stay disabled and Close reachable. Reopen restores valid paths; explicit manual Save succeeds with no export, preserving exact setup bytes. Later issue attention/acknowledgement and guarded recovery of only the temporary zero-byte fixture pass. [Scroll correction evidence](modern/QUICK_SHARE_SETUP_SCROLL.md) binds hashes/commands/receipts, all601 unchanged files/76 matching loaded modules, retained failed first build/helper limits and exact idle-only stop of original PID6148. No new full/current-vendor/tray/busy-Stop/media/device/LUT/trust claim. Saved setup plus acknowledged test issue remain; other native/hardware/distribution acceptance stays open, full goal active.
+
 ## Exact update-safety harness assertion audit · October 8
 
 [UPDATE_SAFETY_CONTRACT.md](UPDATE_SAFETY_CONTRACT.md) accounts for all **six** Mac assertion sites/**eleven** loop-and-sheet executions, idle/manual and busy-background paths. Existing coordinator **28/0 each runtime** and modern selected **242/0** including **22** release-view groups replay, terminal **55066 exit0**, exact source/backend/log/unchanged-Mac bindings. Metadata wait/one-use delivery stays distinct from platform-specific Sparkle relaunch and unexecuted live activity/unsaved-editor/picker conditions. Documentation only; concurrent sharing edits preserved/excluded. Real publisher/endpoint/install/rollback/loader/UI and remaining full-port hardware/LUT/travel gates stay open; goal active.

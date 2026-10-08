@@ -17,7 +17,7 @@ namespace EasyEject.Modern {
             get { return manualSharing ?? (manualSharing = new ManualQuickShareService(Profiles.Root, operations, new WindowsQuickShareProcess(), batch => new WindowsDestinationGuard(discovery, batch.DestinationRoot, batch.Destination))); }
         }
         static TextBlock Wrapped(string value) { return new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true }; }
-        static ScrollViewer Scrolling(StackPanel body) { return new ScrollViewer { Content = body, MaxHeight = 420, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; }
+        static ScrollViewer Scrolling(UIElement body) { return new ScrollViewer { Content = body, MaxHeight = 420, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; }
         bool BeginSavedReview() {
             if (closed || UiBusy || inventory.Scanning || !DefaultsPanel.TryLeave() || !ProfilesPanel.TryLeave() || !SettingsPanel.TryLeave()) return false;
             ShowStorage(); working = true; UpdateActions(); return true;
@@ -124,16 +124,17 @@ namespace EasyEject.Modern {
                 var lut = new TextBox { Text = value.Lut == null ? "" : value.Lut.Path, IsReadOnly = true };
                 var status = Wrapped("Cancel keeps previous setup. No export starts here."); bool picking = false, failed = false; string saved = null;
                 var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Quick Share tools", PrimaryButtonText = "Save setup", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close };
-                var scroll = Scrolling(body);
+                var fields = new ContentControl { Content = body, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+                var scroll = Scrolling(fields);
                 Func<bool> owns = () => reviewing && !closed && Object.ReferenceEquals(confirmation, dialog);
                 Func<string, TextBox, string, Task> pickFile = async (label, field, extension) => {
-                    picking = true; scroll.IsEnabled = false; dialog.IsPrimaryButtonEnabled = false;
+                    picking = true; fields.IsEnabled = false; dialog.IsPrimaryButtonEnabled = false;
                     try {
                         var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(AppWindow.Id) { CommitButtonText = "Choose " + label };
                         picker.FileTypeFilter.Add(extension); var result = await picker.PickSingleFileAsync();
                         if (owns() && result != null) { field.Text = SafePaths.Normalize(result.Path); status.Text = "Selection changed. Save validates it; Cancel keeps the previous setup."; }
                     } catch (Exception ex) { if (owns()) status.Text = "File selection unavailable. " + ex.Message; }
-                    finally { picking = false; if (owns()) { scroll.IsEnabled = !failed; dialog.IsPrimaryButtonEnabled = !failed; } }
+                    finally { picking = false; if (owns()) { fields.IsEnabled = !failed; dialog.IsPrimaryButtonEnabled = !failed; } }
                 };
                 Action<string, TextBox, string> addFile = (label, field, extension) => {
                     body.Children.Add(Wrapped(label)); body.Children.Add(field);
@@ -163,7 +164,7 @@ namespace EasyEject.Modern {
                     if (!owns() || picking || quickShareSetupSaving || failed) { args.Cancel = true; return; }
                     var deferral = args.GetDeferral(); args.Cancel = true;
                     string selectedFfmpeg = ffmpeg.Text, selectedFfprobe = ffprobe.Text, selectedLut = lut.Text;
-                    quickShareSetupSaving = true; scroll.IsEnabled = false; dialog.IsPrimaryButtonEnabled = false; dialog.CloseButtonText = "Stop validation";
+                    quickShareSetupSaving = true; fields.IsEnabled = false; dialog.IsPrimaryButtonEnabled = false; dialog.CloseButtonText = "Stop validation";
                     var cancellation = new CancellationTokenSource(); operationCancel = cancellation;
                     status.Text = "Validating supplied files and saving setup. No tools are running…"; UpdateActions();
                     Func<Task> saveSetup = async () => {
@@ -175,7 +176,9 @@ namespace EasyEject.Modern {
                         finally {
                             if (Object.ReferenceEquals(operationCancel, cancellation)) operationCancel = null;
                             cancellation.Dispose(); quickShareSetupSaving = false;
-                            if (owns()) { scroll.IsEnabled = !failed; dialog.CloseButtonText = "Close"; UpdateActions(); }
+                            // Keep the viewer scrollable so a failed or stopped Save's
+                            // explanation remains readable while choices stay disabled.
+                            if (owns()) { fields.IsEnabled = !failed; dialog.CloseButtonText = "Close"; UpdateActions(); }
                         }
                     };
                     try { pendingSave = saveSetup(); await pendingSave; }
