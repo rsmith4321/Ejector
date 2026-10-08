@@ -15,6 +15,13 @@ namespace EasyEject {
         public long Epoch { get { return Interlocked.Read(ref epoch); } }
         string IScopedConnectionDiscovery.Stamp(string[] instances) { return Instances.Versions.Stamp(instances); }
         public void ConnectionChanged() { Interlocked.Increment(ref epoch); }
+        internal bool HandlePowerEvent(long powerEvent) {
+            if (powerEvent != 4 && powerEvent != 18 && powerEvent != 7) return false;
+            // Publish the epoch under the same gate as availability/stamps, so
+            // an unscoped scan cannot see a retired power state with the old epoch.
+            Instances.Versions.PowerEvent(powerEvent, ConnectionChanged);
+            return true;
+        }
         public Inventory Scan() {
             lock (scanGate) {
                 long start = Epoch; var inventory = new Inventory();
@@ -40,6 +47,7 @@ namespace EasyEject {
                 string fingerprint = String.Join("\n", inventory.Disks.Select(d => d.Fingerprint).Concat(inventory.Volumes.Select(v => v.Fingerprint)).OrderBy(x => x));
                 if (start != Epoch) { inventory.Complete = false; inventory.Errors.Add("Connection changed while scanning; refresh again."); }
                 if (!NotificationsAvailable) { inventory.Complete = false; inventory.Errors.Add("Connection notifications unavailable; operations are blocked."); }
+                if (Instances.Versions.Suspended) { inventory.Complete = false; inventory.Errors.Add("Storage connection review is suspended. Refresh after the system resumes; remaining originals and saved copies are kept."); }
                 if (previous != null && previous != fingerprint) ConnectionChanged();
                 previous = fingerprint;
                 inventory.Epoch = Epoch;

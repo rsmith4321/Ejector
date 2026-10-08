@@ -58,6 +58,9 @@ namespace EasyEject {
         readonly Dictionary<string, Attempt> attempts = new Dictionary<string, Attempt>(StringComparer.OrdinalIgnoreCase);
         bool suppressNext;
         internal void SettingsSaved() { suppressNext = true; }
+        // Resume invalidates old requests but must not automatically repeat a
+        // completed, cancelled or interrupted attempt on a still-mounted card.
+        internal void PowerBoundary() { suppressNext = true; }
         internal void Observe(Inventory state) {
             if (state == null || !state.Complete) return;
             var ids = new HashSet<string>(state.Volumes.Select(v => v.Id), StringComparer.OrdinalIgnoreCase);

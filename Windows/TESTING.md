@@ -2,11 +2,11 @@
 
 The latest local review is:
 
-`C:\Users\rsmit\.codex\EasyEjectBuildTools\ReviewCloseTrayVerified-20261008\app\EasyEject.Modern.exe`
+`C:\Users\rsmit\.codex\EasyEjectBuildTools\PowerConnectionAtomic-20261008\review\app\EasyEject.Modern.exe`
 
 Keep the complete app folder together. Finish any active work, then use **Quit preview** in the running preview's tray menu before opening this copy. Closing the window keeps that copy running; launching another version reveals it rather than switching versions. This unsigned review uses the normal Windows settings and history folders.
 
-The Easy Eject artwork is included in the executable, window, header and tray. The startup resource fix passed **1289 software tests**. The subsequent close-to-tray source change passed **236 focused tests**; that build has not yet had foreground acceptance. These counts overlap. See [review build evidence](modern/REVIEW_BUILD.md) and [icon observations](modern/ICON_ACCEPTANCE.md).
+The Easy Eject artwork is included in the executable, window, header and tray. This power-authority review passes **1388/0 full checks in each runtime**, **242/0 selected** and **15/0 owned synthetic power checks**, with exact unchanged payload and native read-only monitor/disposal. Counts overlap. It has not had current-copy foreground or actual sleep/device acceptance. See [power review evidence](POWER_CONNECTION_ACCEPTANCE.md), [review build history](modern/REVIEW_BUILD.md) and [icon observations](modern/ICON_ACCEPTANCE.md).
 
 ## First pass: detection and interface
 

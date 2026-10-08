@@ -46,7 +46,7 @@ namespace EasyEject.Modern {
             SettingsPanel.Saved += SettingsSaved;
             SettingsPanel.Completed += delegate(string message) { ShowStorage(); Summary.Text = settingsRuntimeMessage == null ? message : settingsRuntimeMessage + "\n" + message; settingsRuntimeMessage = null; UpdateActions(); };
             inventory = new StorageInventorySession(discovery);
-            notifications = new StorageNotificationWindow(discovery, () => StorageBusy);
+            notifications = new StorageNotificationWindow(discovery, () => StorageBusy, () => automatic.PowerBoundary());
             pulse = DispatcherQueue.CreateTimer(); pulse.Interval = TimeSpan.FromMilliseconds(500);
             pulse.Tick += async delegate {
                 if (closed) return;

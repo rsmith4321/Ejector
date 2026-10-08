@@ -8,11 +8,26 @@ using System.Text;
 namespace EasyEject {
     internal sealed class ConnectionVersions {
         readonly object gate = new object(); readonly Dictionary<string, long> versions = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-        long era; bool available, faulted;
-        internal bool Available { get { lock (gate) return available; } }
+        long era; bool available, faulted, suspended, automaticResumeSeen;
+        internal bool Available { get { lock (gate) return available && !suspended; } }
+        internal bool Suspended { get { lock (gate) return suspended; } }
         internal void Begin() { lock (gate) { versions.Clear(); era++; available = false; faulted = false; } }
         internal void Enable() { lock (gate) available = !faulted; }
         internal void Disable() { lock (gate) { available = false; faulted = true; era++; } }
+        internal bool PowerEvent(long powerEvent, Action changed = null) {
+            lock (gate) {
+                if (powerEvent == 4) { suspended = true; automaticResumeSeen = false; era++; if (changed != null) changed(); return true; }
+                if (powerEvent == 18) { suspended = false; automaticResumeSeen = true; era++; if (changed != null) changed(); return true; }
+                if (powerEvent == 7) {
+                    suspended = false;
+                    // User activity follows automatic resume in the same cycle.
+                    // Do not retire a fresh proof a second time for that pair.
+                    if (automaticResumeSeen) { automaticResumeSeen = false; return false; }
+                    era++; if (changed != null) changed(); return true;
+                }
+                return false;
+            }
+        }
         internal void Note(string instance) {
             lock (gate) {
                 if (String.IsNullOrWhiteSpace(instance) || instance.Length >= 200 || (!versions.ContainsKey(instance) && versions.Count >= 8192)) { available = false; faulted = true; era++; return; }
@@ -21,7 +36,7 @@ namespace EasyEject {
         }
         internal string Stamp(IEnumerable<string> instances) {
             lock (gate) {
-                if (!available) return "";
+                if (!available || suspended) return "";
                 var text = new StringBuilder(era.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 foreach (string id in instances.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.OrdinalIgnoreCase)) { long value; versions.TryGetValue(id, out value); text.Append('\n').Append(id.ToUpperInvariant()).Append('=').Append(value); }
                 using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(text.ToString()))).Replace("-", "").ToLowerInvariant();

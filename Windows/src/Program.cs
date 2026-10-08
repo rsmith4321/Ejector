@@ -50,6 +50,7 @@ namespace EasyEject {
         readonly Icon appIcon = AppIcons.Load();
         ToolStripMenuItem pendingMenu, issueMenu, settingsMenu, debugMenu, bulkMenu, savedProfilesMenu, helpMenu, aboutMenu, installationMenu;
         readonly GlobalHotkey hotkey = new GlobalHotkey(new WindowsHotkeyApi()); readonly bool readOnly;
+        readonly PowerNotifications powerNotifications = new PowerNotifications();
         int cardCount;
         readonly Button resume = new Button();
         readonly Button savedProfiles = new Button();
@@ -138,14 +139,24 @@ namespace EasyEject {
             base.OnHandleCreated(e);
             var filter = new BroadcastInterface { Size = Marshal.SizeOf(typeof(BroadcastInterface)), Type = 5, ClassGuid = new Guid("53f56307-b6bf-11d0-94f2-00a0c91efb8b") };
             notification = RegisterDeviceNotification(Handle, ref filter, 0);
-            discovery.NotificationsAvailable = notification != IntPtr.Zero;
+            discovery.NotificationsAvailable = notification != IntPtr.Zero && powerNotifications.Start(Handle);
             discovery.Instances.Start();
             if (createdBefore) automatic.SettingsSaved(); createdBefore = true;
             if (!readOnly && !hotkey.Configure(Handle, appSettings.ShortcutEnabled, appSettings.ShortcutKey)) appIssue.Record(hotkey.Status);
             if (notification == IntPtr.Zero) { status.Text = "Disk notifications unavailable. Refresh before every action."; discovery.ConnectionChanged(); }
         }
-        protected override void OnHandleDestroyed(EventArgs e) { hotkey.Stop(); hotkey.WindowDestroyed(); discovery.Instances.Stop(); discovery.NotificationsAvailable = false; discovery.ConnectionChanged(); ExpireCompletions(); if (notification != IntPtr.Zero) { UnregisterDeviceNotification(notification); notification = IntPtr.Zero; } base.OnHandleDestroyed(e); }
+        protected override void OnHandleDestroyed(EventArgs e) { hotkey.Stop(); hotkey.WindowDestroyed(); powerNotifications.Stop(); discovery.Instances.Stop(); discovery.NotificationsAvailable = false; discovery.ConnectionChanged(); ExpireCompletions(); if (notification != IntPtr.Zero) { UnregisterDeviceNotification(notification); notification = IntPtr.Zero; } base.OnHandleDestroyed(e); }
         protected override void WndProc(ref Message m) {
+            if (m.Msg == 0x218) {
+                long before = discovery.Epoch;
+                if (discovery.HandlePowerEvent(m.WParam.ToInt64())) {
+                    if (discovery.Epoch != before) {
+                        automatic.PowerBoundary(); eject.Enabled = false; import.Enabled = false;
+                        debounce.Stop(); debounce.Start(); ExpireNotifiedCompletions(); UpdateActions();
+                    }
+                    m.Result = new IntPtr(1); return;
+                }
+            }
             if (m.Msg == 0x312 && hotkey.Matches(m.WParam, m.LParam, Busy || scanning || readOnly)) {
                 IntPtr triggerId = m.WParam, triggerKeys = m.LParam;
                 BeginInvoke(new Action(async delegate { if (hotkey.Matches(triggerId, triggerKeys, Busy || scanning || readOnly)) await EjectCards(); })); m.Result = IntPtr.Zero; return;
@@ -792,6 +803,6 @@ namespace EasyEject {
             }
         }
         void ShowError(Exception ex) { RecordIssue(ex.Message); Notify("Easy Eject needs attention", ex.Message, ToolTipIcon.Warning); if (ForegroundWindow) ShowMessage(ex.Message, "Easy Eject", MessageBoxIcon.Warning); }
-        protected override void Dispose(bool disposing) { if (disposing) { releaseTimer.Dispose(); if (releaseReview != null) releaseReview.Dispose(); if (releaseChecks != null) releaseChecks.Dispose(); hotkey.Dispose(); discovery.Instances.Dispose(); tray.Dispose(); trayBusyIcons.Dispose(); debounce.Dispose(); } base.Dispose(disposing); if (disposing) appIcon.Dispose(); }
+        protected override void Dispose(bool disposing) { if (disposing) { releaseTimer.Dispose(); if (releaseReview != null) releaseReview.Dispose(); if (releaseChecks != null) releaseChecks.Dispose(); hotkey.Dispose(); powerNotifications.Dispose(); discovery.Instances.Dispose(); tray.Dispose(); trayBusyIcons.Dispose(); debounce.Dispose(); } base.Dispose(disposing); if (disposing) appIcon.Dispose(); }
     }
 }

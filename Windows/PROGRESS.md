@@ -1,5 +1,17 @@
 # Windows progress · October 8, 2026
 
+## Retire sleep/wake storage proofs in both interfaces · October 8
+
+The owned probe reproduces **9/6** on the prior exact backend. Both bridges now own suspend/resume subscriptions and retire epoch/stamps together, block suspended admission, require fresh resumed proof, preserve tracking faults/ordinary charger status, pair automatic/user resume and suppress automatic repeat on the initial resumed inventory. [Power acceptance](POWER_CONNECTION_ACCEPTANCE.md): **23/0 focused each runtime /15/0 owned native**, warning-free WinUI, final exact-app .NET **1388/0 full /242/0 selected /15/0 probe**, same-source Framework **1388/0**, native protected inventory/disposal, eighteen matching runtime pairs and all **649/286249164** payload bytes exact; parent23648 terminal **21:38:47.0411164Z exit0**. Originals/copies/receipts, configuration, old preview and peer pending edits retained. Actual OS/Modern Standby/foreground/device/media/LUT/filesystem/travel/trust and remaining operation-specific boundary coverage still gate the full goal. Testing-slot recovery and explicit brokered handback are retained outside the repo; no real sleep/settings/device action.
+
+## Independently check the completed peer review evidence · October 8
+
+Primary-thread read-only verification at **21:02:45.0850128Z** confirms all **649/286245956** combined payload lengths/hashes, four exact backend copies and eight retained logs. Actual logs confirm **242/0**, both **1365/0** runtimes, corrected **56/0**, pinned **4/0 /4/0** and generated actual-tool **16/0**; counts overlap. [Independent evidence check](modern/COMBINED_REVIEW_INDEPENDENT_AUDIT.md) preserves initial failures and the official-LUT NOT RUN/inventory-no-authority limits. No rerun/launch/configuration/device action; peer pending document remains unmodified/untracked. Sleep/wake, foreground, identified-device/media/LUT/filesystem/travel/trust gates and full goal remain open.
+
+## Prepare owned power-boundary reproduction · October 8
+
+At this earlier source-preparation checkpoint the standalone opt-in [power connection probe](modern/tools/POWER_CONNECTION_PROBE.md) had not been compiled or run while the laptop slot was yielded. It directly invokes only owned handlers, with read-only protected inventory/configuration hash checks and no eject API. Later reproduction/fix/terminal results are recorded above. Peer `modern/CURRENT_COMBINED_BUILD.md` remains untouched.
+
 ## Audit remaining sleep/wake connection proof · October 8
 
 Source **cf9e1a7** inspection finds no suspend/resume handling in either storage message bridge; scoped proof intentionally accepts global-epoch changes when protected fingerprints/stamps stay equal. [Power audit](POWER_CONNECTION_AUDIT.md) records the exact source contract/Microsoft event definitions and a focused generated-message reproduction plan. Missed-callback/stale-authority behavior remains an inference requiring proof, not a reproduced device failure. No production change/new test/settings/device action. Current1365/242 review evidence remains scoped; desktop/physical acceptance and full goal stay open. Desktop/heavy-build use is yielded only for the separately coordinated bounded read-only Gyroflow audit; no Easy Eject goal transfer or pause.
