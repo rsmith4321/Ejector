@@ -1,4 +1,12 @@
-# Windows progress · October 7, 2026
+# Windows progress · October 8, 2026
+
+## Modern dependency declarations · October 8
+
+Source **9c8ca3c** adds a separate bounded, read-only dependency graph policy. It binds project/runtime/SDK declarations, exact resolved edges and reachable libraries, package/reference metadata and unique asset destinations to the authenticated release inventory. The actual WebView package/projection relationship and legitimate zero component versions are covered without weakening stable application versions. Classic parser limits and normal production channel remain unchanged.
+
+Isolated **a2cbc76541f11e8d671ddfb2fa77641c987e044b** plus only three owned files, excluding/preserving dirty real-sharing work: warning-free Framework **17/0**, terminal 6384 exit zero; self-contained Release .NET 10 **14/0 manifest /20/0 content /11/0 runtime configuration /17/0 dependency/sample**, terminal 7859 and durable parent 12568 exit zero. Counts overlap; no full-suite rerun or new delivered-app byte claim. The owned actual dependency sample retains SHA **c9c6e6759038c15c86d1d931727a03f741c4ffa9bc71ae0832252efe9bda40b8**. Initial helper-name compilation error and two actual-schema refusals are corrected and retained in logs. [Dependency contract](modern/DEPENDENCY_CONFIGURATION_CONTRACT.md) records exact source, commands, logs, runner hash and synthetic/fake-trust limits.
+
+This source layer is not integrated modern installation approval. Component code/catalog identity, archive/channel/publisher/trusted startup and delivery remain open, along with foreground/lifecycle, supplied official Luna LUT/genuine-camera and explicitly identified disposable-device/filesystem/travel acceptance. Current review folder remains the earlier separately verified build below. No actual app/media/device/settings/security/power/display/tool-install/publication action. Full goal active; expired heartbeat paused.
 
 ## Current self-contained review and exact runtime · October 7/8
 

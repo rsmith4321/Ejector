@@ -1,5 +1,7 @@
 # Local Windows review build · October 7, 2026
 
+October 8 source follow-up **9c8ca3c** adds separately verified [dependency declarations](DEPENDENCY_CONFIGURATION_CONTRACT.md), Framework and self-contained .NET 10 **17/0** plus adjacent manifest/content/runtime **14/20/11**. This source is not in the earlier app folder documented below; no new delivered-app or full-suite claim is made. Authenticated component/catalog identity and integrated trusted package/delivery still require work.
+
 ## Current source refresh · October 7 (UTC October 8)
 
 Backend dependency metadata **a0e33ef** sets its SDK project Version to 0.1.0-dev, matching the handwritten assembly informational version and the modern app. It preserves GenerateAssemblyInfo=false and the existing 0.1.0.0 assembly/file identity. Previously the SDK dependency graph used default project version 1.0.0 despite those binary attributes. The new actual dependency record and app-to-backend edge both use EasyEject.Runtime/0.1.0-dev; no C# behavior changed.
