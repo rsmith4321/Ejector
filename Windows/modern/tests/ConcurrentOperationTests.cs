@@ -8,10 +8,10 @@ using System.Threading.Tasks;
 namespace EasyEject {
     public static partial class Tests {
         sealed class ModernPrimaryStorageGuard : IConcurrentStorageGuard {
-            internal bool Valid = true, ThrowAvailability; internal int Checks;
+            internal bool Valid = true, ThrowAvailability, ThrowValidation; internal int Checks;
             public int[] ProtectedDisks { get { return new[] { 7, 8 }; } }
             public bool AllowsUnrelatedOperations { get { if (ThrowAvailability) throw new SafetyException("Fixture proof unavailable"); return Valid; } }
-            public void Validate() { Checks++; if (!Valid) throw new SafetyException("Fixture primary connection changed"); }
+            public void Validate() { Checks++; if (ThrowValidation) throw new IOException("Fixture primary tracking read failed"); if (!Valid) throw new SafetyException("Fixture primary connection changed"); }
         }
         sealed class ModernSecondaryStorageApi : IEjectApi {
             internal Action Validate, Before; internal int Requests; internal bool Success = true;
@@ -84,6 +84,32 @@ namespace EasyEject {
                     f.Import.Discovery.Version = f.Import.Discovery.State.Epoch = 2;
                     Throws<SafetyException>(() => review.Execute(message => {})); Check(f.Factories == 0 && !review.Busy && review.TryClose(), "Expired review started worker");
                 } f.Finish();
+            });
+            Test("modern other-device review expires on lost or throwing proof until a fresh manual review", delegate {
+                foreach (bool throws in new[] { false, true }) {
+                    var f = new ModernConcurrentFixture(); File.WriteAllText(Path.Combine(f.Other, "ordinary.mp4"), "retained");
+                    using (var review = f.Review()) {
+                        f.Guard.Valid = false; f.Guard.ThrowAvailability = throws;
+                        Check(!review.Current && f.Work.Live && f.Work.State.Busy && !f.Primary.Task.IsCompleted, "Lost proof threw or released main/review ownership");
+                        f.Guard.Valid = true; f.Guard.ThrowAvailability = false;
+                        Check(!review.Current, "Earlier review regained confirmation after lost proof");
+                        Throws<SafetyException>(() => review.Execute(message => {}));
+                        Check(f.Factories == 0 && f.Api.Requests == 0 && File.ReadAllText(Path.Combine(f.Other, "ordinary.mp4")) == "retained", "Expired review reached a device request or changed media");
+                    }
+                    using (var fresh = f.Review()) Check(fresh.Current && fresh.Execute(message => {}).GetAwaiter().GetResult().Success, "Fresh independent manual review could not retry");
+                    Check(f.Work.Live && !f.Primary.Task.IsCompleted && f.Api.Requests == 1, "Fresh review restarted or ended the primary"); f.Finish();
+                }
+            });
+            Test("modern other-device tracking read failure is retained without a removal request or automatic retry", delegate {
+                var f = new ModernConcurrentFixture(); File.WriteAllText(Path.Combine(f.Other, "ordinary.mp4"), "retained");
+                using (var review = f.Review()) {
+                    f.Guard.ThrowValidation = true; var result = review.Execute(message => {}).GetAwaiter().GetResult();
+                    Check(!result.Success && !result.Cancelled && result.Message.Contains("tracking read failed") && review.Outcome == result && f.Api.Requests == 0 && f.Factories == 0,
+                        "Tracking failure lost terminal explanation or constructed removal API");
+                    f.Guard.ThrowValidation = false; Throws<SafetyException>(() => review.Execute(message => {}));
+                    Check(f.Work.Live && !f.Primary.Task.IsCompleted && File.ReadAllText(Path.Combine(f.Other, "ordinary.mp4")) == "retained", "Tracking failure ended primary or changed data");
+                }
+                using (var fresh = f.Review()) Check(fresh.Execute(message => {}).GetAwaiter().GetResult().Success && f.Api.Requests == 1, "Fresh manual retry failed after read recovery"); f.Finish();
             });
             Test("modern secondary success is retained once and leaves primary reservations untouched", delegate {
                 var f = new ModernConcurrentFixture(); using (f.Import.Operations.Reserve(new[] { 7, 8 })) using (var review = f.Review()) {

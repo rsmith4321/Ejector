@@ -37,7 +37,8 @@ namespace EasyEject.Modern {
                 var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Safe eject of another device", Content = Scrolling(body),
                     PrimaryButtonText = "Request safe removal", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close };
                 otherDialog = dialog;
-                refreshOtherReview = () => { if (!ending && otherReview == view) { dialog.IsPrimaryButtonEnabled = pending == null && view.Current; stopOtherMenu.Enabled = view.Busy;
+                refreshOtherReview = () => { if (!ending && otherReview == view) { bool current = view.Current; dialog.IsPrimaryButtonEnabled = pending == null && current; stopOtherMenu.Enabled = view.Busy;
+                    if (pending == null && !current) status.Text = "This device review expired because storage or connection tracking changed. Cancel and review the device again before requesting removal. The main transfer keeps its own result and Stop control.";
                     stopPrimary.IsEnabled = concurrentWork.Live && operationCancel != null && !operationCancel.IsCancellationRequested; } };
                 dialog.PrimaryButtonClick += async (sender, args) => {
                     args.Cancel = true; if (ending || pending != null || !view.Current) return;

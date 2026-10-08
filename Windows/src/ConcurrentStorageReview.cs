@@ -14,7 +14,7 @@ namespace EasyEject {
         readonly object gate = new object(); readonly ConcurrentStorageState state; readonly ManualStorageSession session;
         readonly IDiscovery discovery; readonly ConcurrentEjectService service; readonly MetadataCleanupPlan cleanup;
         readonly CleanupCounts counts = new CleanupCounts(); readonly CancellationTokenSource cancel = new CancellationTokenSource();
-        int phase; Task<ConcurrentStorageOutcome> worker; ConcurrentStorageOutcome outcome;
+        int phase; bool expired; Task<ConcurrentStorageOutcome> worker; ConcurrentStorageOutcome outcome;
         internal readonly string Description, Display;
         internal ConcurrentStorageReview(ConcurrentStorageState state, Inventory inventory, TrayStorageChoice choice, AppSettings settings, bool forceClean,
             IDiscovery discovery, Operations operations, Func<Action, IEjectApi> api, Func<string, string> volumeId) {
@@ -31,7 +31,18 @@ namespace EasyEject {
             } catch { if (session != null) state.Finish(session); cancel.Dispose(); throw; }
         }
         internal bool Busy { get { lock (gate) return phase == 1; } }
-        internal bool Current { get { lock (gate) return phase == 0 && discovery.Epoch == session.Plan.Epoch && session.PrimaryGuard.AllowsUnrelatedOperations; } }
+        internal bool Current {
+            get {
+                lock (gate) {
+                    if (phase != 0 || expired) return false;
+                    // Optional tracking is a permission, never a reason to tear
+                    // down the live primary worker or revive an old review.
+                    try { if (discovery.Epoch == session.Plan.Epoch && session.PrimaryGuard.AllowsUnrelatedOperations) return true; }
+                    catch { }
+                    expired = true; return false;
+                }
+            }
+        }
         internal ConcurrentStorageOutcome Outcome { get { lock (gate) return outcome; } }
         internal int[] Disks { get { return session.Plan.Disks; } }
         internal Task<ConcurrentStorageOutcome> Execute(Action<string> report) {
