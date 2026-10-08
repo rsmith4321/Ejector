@@ -9,7 +9,7 @@ namespace EasyEject {
         sealed class ModernManifestFixture {
             internal readonly List<WindowsReleaseFile> Files = ModernWindowsReleaseManifest.RequiredFiles.Select(name => new WindowsReleaseFile(name, 1, new string('a', 64))).ToList();
             internal string DotNet = "10.0.12", Sdk = "2.5.1", Minimum = "10.0.19041.0", Version = "1.2.3.4", Source = new string('b', 40);
-            internal string IndexText() { return "{\"format\":1,\"files\":[" + String.Join(",", Files.OrderBy(file => file.Name, StringComparer.Ordinal).Select(file => "{\"path\":\"" + Json(file.Name) + "\",\"length\":" + file.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + ",\"sha256\":\"" + file.Hash + "\"}")) + "]}"; }
+            internal string IndexText(bool reversed = false) { var ordered = Files.OrderBy(file => file.Name, StringComparer.Ordinal).ToArray(); if (reversed) Array.Reverse(ordered); return "{\"format\":1,\"files\":[" + String.Join(",", ordered.Select(file => "{\"path\":\"" + Json(file.Name) + "\",\"length\":" + file.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + ",\"sha256\":\"" + file.Hash + "\"}")) + "]}"; }
             internal byte[] Index() { return Encoding.UTF8.GetBytes(IndexText()); }
             internal string Body(byte[] index) { return "{\"format\":2,\"application\":\"EasyEject.Modern\",\"platform\":\"windows-x64\",\"version\":\"" + Version + "\",\"sourceRevision\":\"" + Source + "\",\"runtime\":{\"dotnet\":\"" + DotNet + "\",\"windowsAppSdk\":\"" + Sdk + "\",\"minimumWindows\":\"" + Minimum + "\"},\"fileIndex\":{\"name\":\"windows-modern-files.json\",\"length\":" + index.Length + ",\"sha256\":\"" + WindowsSignerEvidence.Hash(index) + "\",\"count\":" + Files.Count + ",\"totalLength\":" + Files.Sum(file => file.Length) + "}}"; }
             internal WindowsAuthenticatedManifest Snapshot(string body) { return new WindowsAuthenticatedManifest(Encoding.UTF8.GetBytes(body), new byte[] { 1 }, new WindowsSignerEvidence(new string('c', 64), new string('d', 64), new string('e', 64), FixtureSha256Oid)); }
@@ -65,7 +65,7 @@ namespace EasyEject {
             });
             Test("modern case aliases duplicate paths and noncanonical inventory order refuse", delegate {
                 foreach (string path in new[] { "EasyEject.Runtime.dll", "easyeject.runtime.dll" }) { var f = new ModernManifestFixture(); f.Files.Add(new WindowsReleaseFile(path, 1, new string('a', 64))); Throws<SafetyException>(() => f.Parse()); }
-                var order = new ModernManifestFixture(); byte[] bytes = Encoding.UTF8.GetBytes(order.IndexText().Replace("Assets/EasyEject.png", "zzzz.png")); Throws<SafetyException>(() => order.Parse(bytes));
+                var order = new ModernManifestFixture(); byte[] bytes = Encoding.UTF8.GetBytes(order.IndexText(true)); Throws<SafetyException>(() => order.Parse(bytes));
             });
             Test("modern file directory prefix collisions refuse", delegate {
                 var f = new ModernManifestFixture(); f.Files.Add(new WindowsReleaseFile("EasyEject.Runtime.dll/child.txt", 1, new string('a', 64))); Throws<SafetyException>(() => f.Parse());

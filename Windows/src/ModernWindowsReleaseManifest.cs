@@ -19,7 +19,7 @@ namespace EasyEject {
         internal static readonly ReadOnlyCollection<string> RequiredFiles = Array.AsReadOnly(new[] {
             "EasyEject.Modern.exe", "EasyEject.Modern.dll", "EasyEject.Modern.deps.json", "EasyEject.Modern.runtimeconfig.json", "EasyEject.Runtime.dll",
             "coreclr.dll", "hostfxr.dll", "hostpolicy.dll", "System.Private.CoreLib.dll", "System.Windows.Forms.dll",
-            "Microsoft.UI.Xaml.dll", "Microsoft.WindowsAppRuntime.dll", "Assets/EasyEject.png", "README.txt", "LICENSE.txt"
+            "Microsoft.ui.xaml.dll", "Microsoft.WindowsAppRuntime.dll", "Assets/EasyEject.png", "README.txt", "LICENSE.txt"
         });
         static readonly string[] Extensions = { ".dll", ".exe", ".html", ".json", ".mui", ".pdb", ".png", ".pri", ".txt", ".winmd" };
         internal readonly string Version, SourceRevision, DotNet, WindowsAppSdk, MinimumWindows, IndexHash;
