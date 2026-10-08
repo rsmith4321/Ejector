@@ -81,6 +81,15 @@ namespace EasyEject {
         // The saved ask choice requests a fresh dialog even when the app is hidden.
         // Optional notifications and current visibility cannot suppress that choice.
         internal static bool ShowChoice(bool askToEject, bool foreground, bool notifications) { return askToEject; }
+        internal static string OtherStorageWarning(ImportCompletion entry) {
+            var plan = entry.Origin.Plan;
+            if (plan == null || plan.Affected.Length <= 1) return "";
+            return "\n\n" + (entry.HasMedia ? "Import from " + entry.Origin.SourceDisplay + " is complete." : "No matching media on " + entry.Origin.SourceDisplay + ".")
+                + " Other storage may still have files to import.";
+        }
+        internal static string EjectLabel(ImportCompletion entry) {
+            var plan = entry.Origin.Plan; return plan != null && plan.Affected.Length > 1 ? "Eject Device" : "Eject Now";
+        }
         internal static string Notification(bool hasMedia, int removed = 0, int clearedTrash = 0) {
             return (hasMedia ? "Selected files imported and verified." : "No media matches your import options. Photos or skipped files may remain.") + (removed > 0 ? " Permanently removed " + removed + " verified originals." : "") + (clearedTrash > 0 ? " Cleared " + clearedTrash + " verified Trash files." : "") + " Device remains connected. Open Easy Eject to review the import and choose whether to eject.";
         }

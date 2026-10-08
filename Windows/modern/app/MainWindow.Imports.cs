@@ -199,10 +199,11 @@ namespace EasyEject.Modern {
                         } catch (Exception) { return false; }
                     });
                     string message = entry.Message + (entry.HasMedia ? "" : "\n\nPhotos, skipped previews or other files may remain on the device.")
+                        + CompletionPresentation.OtherStorageWarning(entry)
                         + "\n\nKeep Connected for Lightroom or other transfers. Eject requests removal of the physical device and all affected volumes."
                         + (entry.Origin.Plan == null ? "\n" + entry.Origin.BlockedReason : "\n\nAffected storage:\n" + String.Join("\n", entry.Origin.Plan.Affected))
                         + (cleanup == null ? "" : "\n\n" + cleanup.Description) + sharingNote + shareMessage;
-                    confirmation = MessageDialog(entry.HasMedia ? "Import complete. Eject now?" : "No matching media. Eject now?", message, cleanup == null ? "Eject Now" : "Clean & eject");
+                    confirmation = MessageDialog(entry.HasMedia ? "Import complete. Eject now?" : "No matching media. Eject now?", message, cleanup == null ? CompletionPresentation.EjectLabel(entry) : "Clean & eject");
                     confirmation.CloseButtonText = "Keep Connected"; confirmation.SecondaryButtonText = "Open Import Folder"; confirmation.IsPrimaryButtonEnabled = canEject;
                     bool sharingRequested = false, choosing = true; var dialog = confirmation; Button share = null; RoutedEventHandler shareChoice = null;
                     if (canShare) {

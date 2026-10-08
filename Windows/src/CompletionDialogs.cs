@@ -18,6 +18,7 @@ namespace EasyEject {
             Explanation.AutoSize = true; Explanation.MaximumSize = new Size(630, 0); Explanation.Location = new Point(24, 24);
             Explanation.Text = entry.DeviceName + Environment.NewLine + Environment.NewLine + entry.Message
                 + (entry.HasMedia ? "" : "\n\nPhotos, skipped previews or other files may still be on the device.")
+                + CompletionPresentation.OtherStorageWarning(entry)
                 + "\n\nChoose Keep Connected for Lightroom or other transfers. Eject Now requests Windows safe removal of this device and all affected partitions/storage sources."
                 + (plan == null ? "\n\n" + entry.Origin.BlockedReason : "\n\nAffected storage:\n" + String.Join("\n", plan.Affected))
                 + (cleanupText == "" ? "" : "\n\n" + cleanupText)
@@ -26,7 +27,7 @@ namespace EasyEject {
                 + "\n\nSaved folder:\n" + entry.Folder;
             body.Controls.Add(Explanation); body.SizeChanged += delegate { Explanation.MaximumSize = new Size(Math.Max(250, body.ClientSize.Width - 60), 0); };
             Keep.Text = "Keep Connected"; Keep.DialogResult = DialogResult.Cancel;
-            Eject.Text = cleanupText == "" ? plan != null && plan.Affected.Length > 1 ? "Eject Device" : "Eject Now" : "Clean && Eject"; Eject.DialogResult = DialogResult.Yes; Eject.Enabled = canEject;
+            Eject.Text = cleanupText == "" ? CompletionPresentation.EjectLabel(entry) : "Clean && Eject"; Eject.DialogResult = DialogResult.Yes; Eject.Enabled = canEject;
             OpenFolder.Text = "Open Import Folder"; OpenFolder.DialogResult = DialogResult.Ignore;
             Share.Text = "Quick Share…"; Share.DialogResult = DialogResult.Retry; Share.Visible = Share.Enabled = canShare && entry.Batch != null;
             var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(16), FlowDirection = FlowDirection.RightToLeft };

@@ -110,6 +110,7 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--storage-connections") { StorageConnectionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake notifications, fake eject and disposable files only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--completion-connections") { CompletionConnectionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake removal and owned disposable files only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--completion-prompt-contract") { CompletionPromptContractTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Generated files and fake devices; no real eject or foreground notification proof."); return failed == 0 ? 0 : 1; }
+            if (args.Length == 1 && args[0] == "--grouped-completion-prompt") { GroupedCompletionPromptTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Generated files, fake topology and hidden controls only; no eject or foreground proof."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--concurrent-storage") { ConcurrentStorageTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake eject, owned disposable files and hidden controls only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--automatic-admission") { AutomaticAdmissionTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Fake storage evidence and disposable files only."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--share-directories") { DirectoryLeaseTests(); QuickShareEngineTests(); QuickShareProcessTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Disposable directories, fake exports and contained synthetic child processes only."); return failed == 0 ? 0 : 1; }
@@ -825,6 +826,7 @@ namespace EasyEject {
             StorageConnectionTests();
             CompletionConnectionTests();
             CompletionPromptContractTests();
+            GroupedCompletionPromptTests();
             ConcurrentStorageTests();
             AutomaticAdmissionTests();
             Console.WriteLine(passed + " passed; " + failed + " failed. No real device eject API was used."); return failed == 0 ? 0 : 1;

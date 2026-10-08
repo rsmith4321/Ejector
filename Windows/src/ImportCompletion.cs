@@ -7,7 +7,7 @@ using System.Threading;
 namespace EasyEject {
     // Process-only authority, captured before copying. Never serialized or restored from history.
     internal sealed class ImportCompletionOrigin {
-        internal readonly string VolumeId, SourceRoot, VolumeFingerprint, DiskFingerprint, BlockedReason;
+        internal readonly string VolumeId, SourceRoot, SourceDisplay, VolumeFingerprint, DiskFingerprint, BlockedReason;
         internal readonly long Epoch;
         internal readonly bool SourceIsCard;
         readonly EjectPlan plan;
@@ -19,7 +19,7 @@ namespace EasyEject {
             if (!state.Complete || volume == null || volume.Error != "" || volume.System || volume.Disks.Count != 1 || String.IsNullOrWhiteSpace(volume.Serial)) throw new SafetyException("Import source identity is unavailable for completion actions.");
             var disk = state.Disks.SingleOrDefault(x => x.Number == volume.Disks[0]);
             if (disk == null || disk.Error != "" || disk.InstanceId == "") throw new SafetyException("Import source physical identity is unavailable.");
-            SourceRoot = SafePaths.Normalize(sourceRoot);
+            SourceRoot = SafePaths.Normalize(sourceRoot); SourceDisplay = volume.Display;
             if (!volume.Mounts.Any(x => SafePaths.Normalize(x).Equals(SourceRoot, StringComparison.OrdinalIgnoreCase))) throw new SafetyException("Completion source is not the selected volume root.");
             Epoch = state.Epoch; SourceIsCard = volume.IsCard; VolumeId = volumeId; VolumeFingerprint = volume.Fingerprint; DiskFingerprint = disk.Fingerprint;
             try { plan = CopyPlan(EjectService.Plan(state, volumeId)); BlockedReason = ""; }
