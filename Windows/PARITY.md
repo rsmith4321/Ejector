@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+The [current Framework full suite](POWER_OPERATION_ACCEPTANCE.md) now passes **1415/0**, with fresh warning-free x64 compilation of211 exact current raw inputs and actual Framework CLR4.8.9345.0 binding. It closes the earlier missing full Framework composition after the27 focused additions; modern1415/0 is a separate retained run, with overlapping counts. All649 review files/originalPID/config2 and source are preserved; own session40460 exits0 and terminal census finds no owned processes. No app launch, real eject or parity-row completion is inferred.
+
+The most recent supported activation at **20:52:18Z** again fails `GetCursorPos: Access is denied`, stops immediately and adds no successful input. Native lifecycle/history/sharing, expressly identified disposable hardware/filesystems/travel, official Luna LUT/genuine media and trusted distribution remain required.
+
 The [Windows review handoff](README.md) now identifies WinUI 3/.NET10 as primary, retains classic harness instructions and separates exact full/selected/opt-in evidence. The obsolete universal1214 count and no-actual-tool-run claim are corrected against retained current F810 evidence. Documentation only; native input, identified hardware, official Luna LUT and distribution gates remain open.
 
 The [fresh13:23UTC supported-input checkpoint](modern/VISIBLE_REVIEW_WORKFLOW.md) again reads the exact current F810 app but its first activation fails `GetCursorPos: Access is denied`; input stops immediately. All649/PID21224/window1967754/config2/source remain unchanged. Minimize/reveal/maximize/modal/draft acceptance remains unrun; readable accessibility, historical unlocked-session observations and chat activity do not prove current usable input. No new test count, application defect or lifecycle completion is claimed.

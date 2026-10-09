@@ -1,5 +1,17 @@
 # Windows progress · October 9, 2026
 
+## Complete the current Framework full suite · October 9
+
+The [Framework follow-up](POWER_OPERATION_ACCEPTANCE.md) passes **1415/0 defaults** from all **211 exact current raw compiler inputs** at clean source `3fe543c63fa40f88d0225ce250a4ee7b076db234`. Both fresh x64 builds use the installed compiler with warnings as errors and empty compile logs. The actual runner loads Framework `clr.dll` **4.8.9345.0**; this closes the full-composition gap after the earlier Framework1388/0 plus focused27/0 evidence. Modern1415/0 remains its separate retained run; these overlapping counts are not added.
+
+Executed once from the fresh isolated packet:
+
+    & 'C:\Users\rsmit\.codex\EasyEjectBuildTools\FrameworkFullCurrent-20261009T2058154028203Z\run-full-framework.ps1' -BrokerGrant
+
+Own session40460 exits0; parent18692 runs **21:11:46.6762965Z–21:17:19.5620587Z**. Both compilers and test13068 exit0; the fresh21:19:48Z census finds no owned process or descendant. Result SHA **285AA16B64B3381A9AEC6D774B130A5DC3361F315A52FAEEED771CBF9C804F61**, full log SHA **FEE45A42513B57B74BD342D7BB9F410F93F319F01EEEAD17B37FED72BF00BC82**. All649 current review files, original PID21224/window1967754, both live configuration records and current source remain unchanged. The compiled classic app is an unsigned PE fixture and is never launched. No real device eject API is used.
+
+The preceding fresh supported activation at **20:52:18.568Z** still fails `GetCursorPos: Access is denied (0x80070005)` and stops immediately with zero successful inputs. Its private packet is `ForegroundLifecycle-20261009T2051586398829Z`; afterguard confirms unchanged app/config/source. Minimize/tray/Quit/restart, app-native saved-history/manual sharing, identified disposable hardware, official Luna LUT/genuine media and distribution gates remain open. The full goal remains active; no application change or whole-port completion is claimed.
+
 ## Correct the Windows review handoff · October 9
 
 [README.md](README.md) now leads with the primary WinUI 3/.NET10 app and its existing pinned-SDK, isolated-output build command, while retaining the classic Framework harness instructions. Removed the stale universal1214 count and false claim that no actual tools have run. Current scoped1388/1415 evidence stays separate; current F810 actual-tool16/0 is linked to its exact retained proof, with positive official Luna LUT/native/hardware/trust acceptance still open. Script/project, full-suite result receipt and actual-tool log readback verified this documentation correction; no new build/test run, application/helper/configuration/runtime or acceptance-status change.
