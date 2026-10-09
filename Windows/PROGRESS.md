@@ -1,4 +1,8 @@
-# Windows progress · October 8, 2026
+# Windows progress · October 9, 2026
+
+## Prepare playable saved-history fixtures · October 9
+
+The separate opt-in [generated-video history mode](modern/tools/NATIVE_HISTORY_FIXTURE.md) now compiles warning-free and passes against unchanged F810 with seven matching backend/runtime pairs. Actual supplied, hash-pinned FFmpeg/FFprobe generate/probe/fully decode one-second clips; production import and source-absent saved-history verification retain two 169551-byte originals, refuse changed destination/original and pre-cancellation, and retry freshly. Five admission controls and the existing three-boundary text/power preparation pass. Parent 18024 is terminal exit 0 at 04:01:26.2391636Z; result SHA256 **F93DE54A226CD388BE539E79941ABFF99DEC7738D8D3671081627E780F1EE8D9**. All 649 app files, PID 21224 identity and live issue/tool configuration remain unchanged. Prepared profile/history stay private/unseeded; synthetic Luna metadata proves selection only. No new default count, app build or hardware/LUT/color/foreground/restart/trust claim. The full port and those gates remain open.
 
 ## Verify current-copy modal retention and Settings cancellation · October 8
 

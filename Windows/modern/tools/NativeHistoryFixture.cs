@@ -109,7 +109,8 @@ internal static class NativeHistoryFixture {
     }
     [STAThread] static int Main(string[] args) {
         try {
-            if (args.Length != 4 || args[0] != "--seed-owned-native-history" && args[0] != "--prepare-owned-native-history" && args[0] != "--prepare-owned-native-history-power") throw new ArgumentException("Usage: --prepare-owned-native-history (or explicit --prepare-owned-native-history-power / --seed-owned-native-history) NEW_FIXTURE_ROOT EXACT_CONFIG_ROOT EXPECTED_BACKEND_SHA256");
+            bool video = args.Length == 8 && args[0] == "--prepare-owned-native-video-history";
+            if (!video && (args.Length != 4 || args[0] != "--seed-owned-native-history" && args[0] != "--prepare-owned-native-history" && args[0] != "--prepare-owned-native-history-power")) throw new ArgumentException("Usage: --prepare-owned-native-history (or explicit --prepare-owned-native-history-power / --seed-owned-native-history) NEW_FIXTURE_ROOT EXACT_CONFIG_ROOT EXPECTED_BACKEND_SHA256. Video preparation: --prepare-owned-native-video-history plus FFMPEG_EXE FFMPEG_SHA256 FFPROBE_EXE FFPROBE_SHA256; no video seed mode.");
             bool seed = args[0] == "--seed-owned-native-history";
             bool powerCheck = args[0] == "--prepare-owned-native-history-power";
             string backend = typeof(VerifiedImporter).Assembly.Location;
@@ -118,6 +119,7 @@ internal static class NativeHistoryFixture {
             string allowed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectBuildTools") + Path.DirectorySeparatorChar;
             if (!root.StartsWith(allowed, StringComparison.OrdinalIgnoreCase) || Directory.Exists(root) || File.Exists(root)) throw new IOException("Fixture must be a new child of the owned EasyEjectBuildTools directory.");
             Ordinary(Path.GetDirectoryName(root));
+            using var videoTools = video ? new NativeHistoryVideo(args[4], args[5], args[6], args[7]) : null;
             string config = Path.GetFullPath(args[2]);
             string ordinaryConfig = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EasyEject", "Profiles");
             if (!String.Equals(config, Path.GetFullPath(ordinaryConfig), StringComparison.OrdinalIgnoreCase)) throw new IOException("Fixture supports only the explicit ordinary local Easy Eject configuration root.");
@@ -141,8 +143,11 @@ internal static class NativeHistoryFixture {
             string source = Path.Combine(root, "source"), destination = Path.Combine(root, "destination");
             Directory.CreateDirectory(source); Directory.CreateDirectory(destination);
             foreach (var path in beforePaths) Create(Path.Combine(root, "before-" + Path.GetFileName(path)), File.ReadAllBytes(path));
-            Create(Path.Combine(source, "first.mov"), Encoding.UTF8.GetBytes("Easy Eject owned native-history fixture one\n"));
-            Create(Path.Combine(source, "second.mov"), Encoding.UTF8.GetBytes("Easy Eject owned native-history fixture two\n"));
+            if (video) videoTools.Generate(root, source);
+            else {
+                Create(Path.Combine(source, "first.mov"), Encoding.UTF8.GetBytes("Easy Eject owned native-history fixture one\n"));
+                Create(Path.Combine(source, "second.mov"), Encoding.UTF8.GetBytes("Easy Eject owned native-history fixture two\n"));
+            }
             string volumeId = WindowsDiscovery.VolumeId(destination);
             var discovery = new WindowsDiscovery();
             using var monitor = new NativeMonitor(discovery);
@@ -154,7 +159,7 @@ internal static class NativeHistoryFixture {
             var identity = new DestinationIdentity { VolumeId = volume.Id, VolumeSerial = volume.Serial, DiskInstance = disk.InstanceId, DiskSerial = disk.Serial };
             var result = new VerifiedImporter(new Operations()).Run(source, source, destination, id, new OwnedGuard(source, destination), CancellationToken.None, Console.WriteLine, new MediaOptions(true, true, true, false, false, false));
             if (!result.HasSelectedMedia || result.Files != 2 || result.RemovedOriginals != 0 || result.Receipt.Files.Any(x => x.RemovedSource || x.FromTrash)) throw new IOException("Unexpected fixture import result.");
-            var batch = new CompletedBatch { Id = result.Receipt.Id, ProfileId = id, DeviceName = "Easy Eject disposable history fixture", CompletedUtc = DateTime.UtcNow.ToString("o"),
+            var batch = new CompletedBatch { Id = result.Receipt.Id, ProfileId = id, DeviceName = video ? "Easy Eject generated video fixture" : "Easy Eject disposable history fixture", CompletedUtc = DateTime.UtcNow.ToString("o"),
                 Folder = result.Folder, DestinationRoot = destination, ReceiptPath = result.ReceiptPath, ReceiptSha256 = Hash(result.ReceiptPath), Destination = identity,
                 Originals = result.Receipt.Files.Where(x => x.IsMedia).Select(x => new VerifiedCopy { Path = Path.Combine(result.Folder, x.RelativePath), Sha256 = x.Sha256, Bytes = x.Bytes }).ToList() };
             if (batch.Originals.Count != 2 || batch.Originals.Any(x => Hash(x.Path) != x.Sha256 || new FileInfo(x.Path).Length != x.Bytes)) throw new IOException("Fixture receipt/copy verification failed.");
@@ -213,7 +218,9 @@ internal static class NativeHistoryFixture {
                 Verification = verification, ChangedDestinationRefusal = destinationRefusal, ChangedOriginalRefusal = originalRefusal,
                 RejectedChangedOriginal = Identity(rejectedOriginal), CancellationRefusal = cancellationRefusal, FreshRetryVerifiedFiles = 2,
                 PowerVerification = powerVerification, PowerScope = powerCheck ? "Managed calls to this helper's owned discovery handler only; no OS broadcast, real sleep or existing-preview input" : null,
-                BeforeFiles = beforePaths.Select(x => Identity(x)).ToArray(), Scope = "Generated text fixtures; fake source guard/reservations; read-only current internal destination identity; no source eject authority or real camera/video claim" };
+                BeforeFiles = beforePaths.Select(x => Identity(x)).ToArray(), VideoFixture = video,
+                SuppliedTools = video ? new[] { Identity(Path.GetFullPath(args[4])), Identity(Path.GetFullPath(args[6])) } : null,
+                Scope = video ? "Generated one-second 640x360 silent30fps clips, supplied hash-pinned tools/probe/full decode and injected Luna identity; fake source guard/reservations; read-only current internal destination; no live publication, source eject authority, official LUT or real camera/color claim" : "Generated text fixtures; fake source guard/reservations; read-only current internal destination identity; no source eject authority or real camera/video claim" };
             byte[] evidenceBytes = JsonSerializer.SerializeToUtf8Bytes(evidence, new JsonSerializerOptions { WriteIndented = true, IncludeFields = true });
             Create(Path.Combine(root, "fixture-receipt.json"), evidenceBytes);
             Console.WriteLine(seed ? "Owned fixture seeded." : "Owned fixture prepared. Live profile/history configuration was not changed.");

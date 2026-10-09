@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="NativeHistoryFixture.cs" />
+    <Compile Include="NativeHistoryVideo.cs" />
     <Reference Include="EasyEject.Runtime">
       <HintPath>$(EasyEjectFixtureBackend)</HintPath>
       <Private>true</Private>

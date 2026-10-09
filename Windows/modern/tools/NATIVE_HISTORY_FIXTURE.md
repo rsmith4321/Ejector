@@ -1,6 +1,32 @@
 # Owned saved-history preparation · October 8, 2026
 
-`NativeHistoryFixture.csproj` is an opt-in fixture utility, excluded from the default application and contract builds. It requires an explicitly supplied existing review backend and a matching SHA-256 at execution. It prepares generated text files, a genuine production import receipt, and synthetic profile/history records outside OneDrive. These `.mov` files are deliberately plain text, not playable footage.
+`NativeHistoryFixture.csproj` is an opt-in fixture utility, excluded from the default application and contract builds. It requires an explicitly supplied existing review backend and a matching SHA-256 at execution. Its original modes prepare generated text files, a genuine production import receipt, and synthetic profile/history records outside OneDrive. Those `.mov` files are deliberately plain text. The separate video mode below prepares playable generated clips without publishing live configuration.
+
+## Generated-video preparation · October 9
+
+The explicit eight-argument mode is:
+
+```text
+--prepare-owned-native-video-history NEW_FIXTURE_ROOT EXACT_CONFIG_ROOT EXPECTED_BACKEND_SHA256 FFMPEG_EXE FFMPEG_SHA256 FFPROBE_EXE FFPROBE_SHA256
+```
+
+There is no video seed mode. The helper pins both supplied executables and their directory ancestry before creating generated media, then calls the exact backend's contained native process runner. It generates one second of silent 640×360, 30fps H.264 video, probes the expected stream properties and fully decodes it. An ignorable MP4 `free` box carries a synthetic Luna identity for selection only. The second clip is an exclusive copy. No genuine camera, official LUT or color accuracy is implied.
+
+Packet `C:/Users/rsmit/.codex/EasyEjectBuildTools/NativeHistoryVideo-20261008` freezes parent **f00bea1** plus the three helper inputs. The supplied FFmpeg/FFprobe hashes are **6C03ED874BF9C219D3BA865339B48A106EEF11FAC07E8E53BB599AC59214469D** / **FB41BE6F4386DF4625D13EEC932EC926BE4744853759C7C100947EDC7B917096**. The backend is unchanged **F810DFB734CF47AE09FA8A9558DA5F819056FE059692CE31857ABE2AF1F35FAD**; seven backend/runtime pairs match the current app. Private publication uses existing SDK/cache, cleared feeds and warnings as errors. No tools or application are installed or rebuilt.
+
+Executed `run-preparation.ps1 -BrokerGrant` after the coordinated terminal handback. Parent **18024**, **2026-10-09T04:01:19.4978206Z–04:01:26.2391636Z**, exits **0**. Generated-video preparation and the original text/power preparation both pass. Five admission controls pass: missing mode, wrong backend, wrong tool hash, unsupported video seed and occupied root. Wrong backend/tool/seed create no fixture root. The missing-mode and occupied-root controls establish refusal, not a new-root absence claim.
+
+The production importer writes a genuine receipt and two **169551-byte** originals. After logical source absence, native read-only destination monitoring and exact saved-history verification check only the two recorded files; changed destination/original and pre-cancellation refuse, and fresh verification succeeds. Both source copies are retained. The existing power route additionally preserves its three managed boundary/refusal/retry cases. Prepared profile/history remain private with `Seeded=false`, manual choices, originals kept and automatic actions off.
+
+| Retained evidence | SHA-256 |
+| --- | --- |
+| `result.json` | `F93DE54A226CD388BE539E79941ABFF99DEC7738D8D3671081627E780F1EE8D9` |
+| `fixture/fixture-receipt.json` | `43741D791FFCAAA3BFF55F6358D06EC1962BA427106953970B35AC226E7D6A29` |
+| `fixture/generated-video-probe.json` | `427A86A3BA7BE1A623D9116E87576AE89B1BC11FA4D76F62D1E5A6CF0873DAA4` |
+| `legacy-power-fixture/fixture-receipt.json` | `70E82F4B78C7A988FFD95C02E195B0717ED9C4DB4A7B8BDFF6684D7CF4D0FD1A` |
+| Helper executable / assembly | `FBB05462ABF54C78F1279D8B384E8B0D26B0E06AF01E09A6B85A469CF631DA77` / `F39B6E1B20C61B7D533F4D5188A00BAC91670072BF181B160FD35F0D59FB30A5` |
+
+Before/after checks preserve all **649** current payload files, PID21224/start/path and both live issue/tool records. This is generated-codec and backend preparation evidence, without live profile/history publication, foreground selection/export/restart, physical source eject, OS sleep delivery, official LUT, hardware/filesystem/travel or trusted-distribution acceptance. No default-suite count changes. Those acceptance gates and the full port remain open.
 
 ## Current power-aware preparation · October 8
 
