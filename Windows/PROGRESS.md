@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Verify actual tools on the current power-aware backend · October 8
+
+The existing F810 runner passes **16/0 generated Quick Share cases** with the supplied FFmpeg/FFprobe, including cold reuse/retry, abrupt owner loss/live encoder containment and corrupt-frame decode refusal. [Exact current-backend evidence](POWER_REAL_TOOLS_ACCEPTANCE.md) records terminal session82508 exit0, source/dependency bindings and fresh before/after checks of all649 manifest files, supplied tools, normal configuration and existing foreground PID21224. No production change or rebuild; the coordinated CPU slot was returned. Positive official LUT, genuine camera, current foreground/restart, physical sleep/wake/device/filesystem/travel and trusted distribution remain open. Full goal active; expired heartbeat paused.
+
 ## Add combined-source Framework, genuine vendor and supplied-tool proof · October 8
 
 Frozen pre-power-implementation **a7afd34** review passes exact modern **242/0 selected /1365/0 defaults**, corrected Framework **1365/0 defaults /56/0 process focus**, genuine vendor composition/manual release **4/0 each modern**, and actual supplied-tool generated sharing **16/0 modern** including cold retry, abrupt loss/live-encoder containment and damaged decode. [Combined evidence](modern/CURRENT_COMBINED_BUILD.md) retains the original **1046/319** Framework layout/cleanup failure and pre-execution tool-path refusal, exact corrective runs, terminals, all649 unchanged payload files/four backend hashes and zero owned runners. No production change; separate history-ready candidate/native evidence is preserved. Official LUT/genuine media, current foreground, sleep/wake authority, identified disposable hardware/filesystem/travel and actual trusted distribution remain open; goal active, heartbeat paused.
