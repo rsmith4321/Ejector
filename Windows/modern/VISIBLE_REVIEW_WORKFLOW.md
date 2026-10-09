@@ -1,5 +1,37 @@
 # Visible manual reviews · October 7, 2026
 
+## Current supported-input checkpoint · October 9, 13:23 UTC
+
+After today's goal resume and the broker's bounded supported lifecycle slot,
+fresh guards verify all649 review payload files and manifest, exact PID21224
+started `2026-10-09T02:46:46.1826671Z`, window1967754, clean b91e58e source and both
+unchanged live issue/tool config records. Supported `sky.list_windows`, exact
+unique selection, `get_window` and fresh screenshot/accessibility capture succeed.
+The tree shows idle Connected storage, enabled Refresh, no modal/editor and only
+the protected internal disk's five volumes. The captured image shows ribbons;
+this does not establish the desktop's lock state or the cause of denied input.
+
+The first `sky.activate_window` at **2026-10-09T13:23:46.853Z** fails:
+`GetCursorPos failed: Access is denied. (0x80070005)`.
+Input stops immediately with **zero successful inputs**, no retry/bypass and no
+sleeping-human prompt. The queued minimize/normal duplicate reveal, maximize
+preservation and modal/draft preservation cases are **unrun**. Historical WTS
+unlocked state and readable accessibility are not usable-input evidence. No
+production restore patch or application defect is inferred.
+
+Retained packet:
+`C:/Users/rsmit/.codex/EasyEjectBuildTools/ForegroundLifecycle-20261009T1323128482363Z`.
+`native-observation.json` SHA256
+**4BE266B6D07DAFC3BF540CCED0D72271E45E07B2CA56831B6337E3B7CCC61910**
+binds the returned window, fresh tree and exact activation failure.
+`after.json` SHA256
+**84F874F493228C41DB97734BCD0B48B4C74AA679FAE500680C1B52AFFFD385B0**
+at **13:24:28.0162623Z** verifies all649/PID/start/window/config2/source unchanged.
+No build/test count, live fixture publication, Save, import/export/eject, device,
+keeper/power/display/security change or alternate input occurred. The temporary
+keeper remains owned by the other task. The shared laptop slot was returned on
+failure; this documentation checkpoint is separately coordinated afterwards.
+
 ## Current F810 input checkpoint · October 9 UTC
 
 The already running F810 review app was selected through the supported `sky` inventory/window API: PID **21224**, window **1967754**, exact `PowerConnectionAtomic-20261008/review/app/EasyEject.Modern.exe` path. Fresh accessibility state showed idle connected storage, enabled Refresh, no editor/modal and only the protected internal disk's five volumes. Clicking the returned **Minimize** caption control failed with `GetCursorPos failed: Access is denied. (0x80070005)`. Fresh inventory, unique app selection and full window state preceded one retry; it failed identically. Input stopped. Readable accessibility state does not establish usable input or prove that Windows is locked.
