@@ -1,5 +1,9 @@
 # Windows progress · October 9, 2026
 
+## Retain current input failure and minimized-reveal acceptance · October 9 UTC
+
+The [current supported-input checkpoint](modern/VISIBLE_REVIEW_WORKFLOW.md) records two actual Minimize-control failures on the existing F810 window1967754, including fresh inventory/selection/accessibility recovery before the retry. Read-only state succeeds; `GetCursorPos` input is denied. The exact private receipt/hash is retained, input stopped and desktop availability is pending. Minimize/normal or tray reveal/maximized retention remain unrun; this does not establish an app defect or a locked desktop. No production patch, new test count, live configuration/media/device change or alternate input occurred. Safe source preparation continues; full Windows acceptance remains open.
+
 ## Prove exclusive disposable record publication and recovery · October 9
 
 The opt-in [publication helper](modern/tools/OWNED_RECORD_PUBLICATION.md) passes **17/0** disposable-only cases on actual F810, warning-free existing-SDK/cache compilation, terminal parent7120 exit0. Native identity/hash ledgers, exclusive publication, late collision/partial recovery, same-byte replacement refusal, all-record preflight, read-only/unrelated-file retention and crash/retry pass. All649 payload files, foreground PID21224 and both live config records are unchanged; the CLI has no live mode and no records were seeded. Initial ledgers refuse a UI-saved replacement profile, so a reviewed edit checkpoint remains required before manual opt-in/export acceptance. No default-suite count or app/hardware/LUT/trust completion claim; full goal remains open.
