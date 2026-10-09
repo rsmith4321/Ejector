@@ -1,5 +1,7 @@
 # Disposable record-publication proof · October 9, 2026
 
+The subsequent [exact generated-history gate](NATIVE_HISTORY_PUBLICATION.md) now reruns these 17 core cases and verifies explicit reviewed replacement checkpoints with actual disposable editor saves. The original evidence below remains historical; this project's self-test CLI still has no live mode. Live-capable engineering commands exist only in the separate optional `NativeHistoryPublication.csproj` and require their own admission/slot.
+
 `OwnedRecordPublication.csproj` is an opt-in fixture utility excluded from the normal application/default tests. Its CLI supports only **`--self-test NEW_OWNED_TEST_ROOT`**, requires exact current F810 and refuses an occupied root. There is **no live publication mode**. This prepares ownership guards before app-native generated history/Quick Share acceptance; the playable video packet remains unseeded.
 
 The core reuses the supplied backend's held directories, private configuration writer, exclusive file handles and nonreplace handle rename. All intended targets must initially be absent and existing configuration identity/hash/file set must match the snapshot. A separate exclusive ledger is flushed before each rename, binding native file identity, length/hash and exact temporary/final/quarantine paths. Partial publication is retained for explicit recovery.

@@ -45,9 +45,18 @@ internal static class OwnedRecordPublication {
         internal string Name;
         internal byte[] Bytes;
         internal Record(string name, string text) { Name = name; Bytes = Encoding.UTF8.GetBytes(text); }
+        internal Record(string name, byte[] bytes) { Name = name; Bytes = (byte[])bytes.Clone(); }
+    }
+    internal sealed class ReviewedEdit {
+        public ReviewedEdit() { }
+        public string Name { get; set; }
+        public Pin Before { get; set; }
+        public Pin After { get; set; }
     }
     static FileStream New(string path) { return (FileStream)Call(typeof(SafePaths), "NewFile", path); }
     static FileStream Existing(string path) { return (FileStream)Call(Backend.GetType("EasyEject.ConfigurationWriter", true), "OpenPrevious", path); }
+    internal static FileStream OpenRecord(string path) { return Existing(path) ?? throw new IOException("Expected record absent: " + path); }
+    internal static byte[] ReadRecord(FileStream stream) { stream.Position = 0; using var copy = new MemoryStream(); stream.CopyTo(copy); return copy.ToArray(); }
     static void Rename(FileStream stream, string path) { Call(Native, "Rename", stream.SafeFileHandle, path); }
     static string Field(object value, string name) { return value.GetType().GetField(name).GetValue(value).ToString(); }
     static string Identity(SafeFileHandle handle) {
@@ -66,9 +75,9 @@ internal static class OwnedRecordPublication {
         if (!SafePaths.Within(path, root)) throw new IOException("Owned record escaped root.");
         return path;
     }
-    static void Journal(string ledger, string name, object value) {
+    static string Journal(string ledger, string name, object value) {
         string path = Child(ledger, name);
-        using (var stream = New(path)) { byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(value, Json); stream.Write(bytes); stream.Flush(true); }
+        using (var stream = New(path)) { byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(value, Json); stream.Write(bytes); stream.Flush(true); return Convert.ToHexString(SHA256.HashData(bytes)); }
     }
     internal static Dictionary<string, Pin> Baseline(string root) {
         return Directory.GetFiles(root).ToDictionary(Path.GetFileName, Capture, StringComparer.OrdinalIgnoreCase);
@@ -104,24 +113,64 @@ internal static class OwnedRecordPublication {
             directories.Validate(); Journal(ledger, "publication-complete.json", new { Count = records.Length });
         }
     }
-    internal static int Recover(string root, string ledger) {
+    internal static string CheckpointReviewed(string root, string ledger, string name, string reviewedHash, Action<byte[]> validateEdit) {
+        root = SafePaths.Normalize(root); ledger = SafePaths.Normalize(ledger);
+        using var directories = new Directories(root, ledger);
+        using var writer = (IDisposable)Call(typeof(Profiles), "WriterGate", root);
+        using var scope = JsonDocument.Parse(File.ReadAllBytes(Child(ledger, "scope.json")));
+        if (scope.RootElement.GetProperty("Root").GetString() != root || scope.RootElement.GetProperty("Ledger").GetString() != ledger || !File.Exists(Child(ledger, "publication-complete.json"))) throw new IOException("Complete publication scope required.");
+        var names = scope.RootElement.GetProperty("Names").EnumerateArray().Select(v => v.GetString()).ToArray();
+        if (names.Count(n => n == name) != 1 || validateEdit == null) throw new IOException("Exact reviewed record required.");
+        var held = new List<FileStream>(); ReviewedEdit edit = null;
+        try {
+            for (int index = 0; index < names.Length; index++) {
+                var entry = ReadEntry(root, ledger, names[index], index);
+                var stream = OpenRecord(entry.Target); held.Add(stream); var pin = Capture(stream);
+                if (entry.Name != name) { if (!Same(entry.Expected, pin)) throw new IOException("Other owned record changed before checkpoint."); continue; }
+                if (pin.Sha256 != reviewedHash) throw new IOException("Explicitly reviewed edited bytes differ.");
+                validateEdit(ReadRecord(stream));
+                if (!Same(pin, Capture(stream))) throw new IOException("Reviewed handle changed.");
+                edit = new ReviewedEdit { Name = name, Before = entry.Expected, After = pin };
+            }
+            directories.Validate(); string hash = Journal(ledger, "reviewed-profile-edit.json", edit); directories.Validate();
+            return hash;
+        } finally { foreach (var stream in held) stream.Dispose(); }
+    }
+    static Entry ReadEntry(string root, string ledger, string name, int index) {
+        Entry entry = JsonSerializer.Deserialize<Entry>(File.ReadAllBytes(Child(ledger, "ready-" + index + ".json")), Json);
+        if (entry.Name != name || entry.Target != Child(root, name) || entry.Recovered != Child(ledger, "recovered-" + index + ".json") || !SafePaths.Within(entry.Temporary, root) || Path.GetDirectoryName(entry.Temporary) != root || !Path.GetFileName(entry.Temporary).StartsWith("owned-history-", StringComparison.Ordinal) || entry.Expected == null) throw new IOException("Invalid recovery ledger.");
+        return entry;
+    }
+    internal static int Recover(string root, string ledger) { return RecoverCore(root, ledger, null, null, null, null); }
+    internal static int RecoverReviewed(string root, string ledger, string name, string checkpointHash, Action<byte[]> validateEdit) {
+        if (String.IsNullOrWhiteSpace(checkpointHash) || validateEdit == null) throw new IOException("Explicit reviewed checkpoint hash and policy required.");
+        using var directories = new Directories(ledger);
+        using var proof = OpenRecord(Child(ledger, "reviewed-profile-edit.json"));
+        byte[] bytes = ReadRecord(proof);
+        if (Convert.ToHexString(SHA256.HashData(bytes)) != checkpointHash) throw new IOException("Reviewed checkpoint changed.");
+        var edit = JsonSerializer.Deserialize<ReviewedEdit>(bytes, Json);
+        if (edit == null || edit.Name != name || edit.Before == null || edit.After == null) throw new IOException("Reviewed checkpoint scope differs.");
+        return RecoverCore(root, ledger, name, edit.Before, edit.After, validateEdit);
+    }
+    static int RecoverCore(string root, string ledger, string reviewedName, Pin reviewedBefore, Pin reviewedAfter, Action<byte[]> validateEdit) {
         root = SafePaths.Normalize(root); ledger = SafePaths.Normalize(ledger);
         using (var directories = new Directories(root, ledger))
         using (var writer = (IDisposable)Call(typeof(Profiles), "WriterGate", root)) {
             using var scope = JsonDocument.Parse(File.ReadAllBytes(Child(ledger, "scope.json")));
             if (scope.RootElement.GetProperty("Root").GetString() != root || scope.RootElement.GetProperty("Ledger").GetString() != ledger) throw new IOException("Recovery scope differs.");
             string[] names = scope.RootElement.GetProperty("Names").EnumerateArray().Select(v => v.GetString()).ToArray();
+            if (reviewedName != null && names.Count(n => n == reviewedName) != 1) throw new IOException("Reviewed record is not in original publication scope.");
             var held = new List<(Entry Entry, FileStream Stream, bool Recovered)>();
             try {
                 for (int index = 0; index < names.Length; index++) {
                     string proof = Child(ledger, "ready-" + index + ".json");
                     if (!File.Exists(proof)) { if (File.Exists(Child(ledger, "created-" + index + ".json"))) throw new IOException("Incomplete private write retained; manual review required."); continue; }
-                    Entry entry = JsonSerializer.Deserialize<Entry>(File.ReadAllBytes(proof), Json);
-                    if (entry.Name != names[index] || entry.Target != Child(root, names[index]) || entry.Recovered != Child(ledger, "recovered-" + index + ".json") || !SafePaths.Within(entry.Temporary, root) || Path.GetDirectoryName(entry.Temporary) != root || !Path.GetFileName(entry.Temporary).StartsWith("owned-history-", StringComparison.Ordinal) || entry.Expected == null) throw new IOException("Invalid recovery ledger.");
+                    Entry entry = ReadEntry(root, ledger, names[index], index);
+                    if (entry.Name == reviewedName) { if (!Same(entry.Expected, reviewedBefore)) throw new IOException("Reviewed original publication proof differs."); entry.Expected = reviewedAfter; }
                     FileStream selected = null; bool recovered = false;
                     foreach (string candidate in new[] { entry.Recovered, entry.Temporary, entry.Target }) {
                         FileStream stream = Existing(candidate); if (stream == null) continue;
-                        try { if (Same(entry.Expected, Capture(stream))) { selected = stream; stream = null; recovered = candidate == entry.Recovered; break; } }
+                        try { if (Same(entry.Expected, Capture(stream))) { if (entry.Name == reviewedName) validateEdit(ReadRecord(stream)); selected = stream; stream = null; recovered = candidate == entry.Recovered; break; } }
                         finally { if (stream != null) stream.Dispose(); }
                     }
                     if (selected == null) throw new IOException("Owned record changed or lost; recovery refused.");
