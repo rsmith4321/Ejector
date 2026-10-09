@@ -1,5 +1,9 @@
 # Windows progress · October 9, 2026
 
+## Correct the Windows review handoff · October 9
+
+[README.md](README.md) now leads with the primary WinUI 3/.NET10 app and its existing pinned-SDK, isolated-output build command, while retaining the classic Framework harness instructions. Removed the stale universal1214 count and false claim that no actual tools have run. Current scoped1388/1415 evidence stays separate; current F810 actual-tool16/0 is linked to its exact retained proof, with positive official Luna LUT/native/hardware/trust acceptance still open. Script/project, full-suite result receipt and actual-tool log readback verified this documentation correction; no new build/test run, application/helper/configuration/runtime or acceptance-status change.
+
 ## Revalidate supported foreground input after goal resume · October 9 UTC
 
 The [fresh supported-input checkpoint](modern/VISIBLE_REVIEW_WORKFLOW.md) revalidates the same current F810 app/PID/window and all649 payload files, clean b91e58e source and both live config records. Supported inventory/window/accessibility succeeds; the **first activation** at **13:23:46.853Z** fails `GetCursorPos: Access is denied (0x80070005)`. Input stops immediately, without retry or alternate automation. Minimize/normal duplicate reveal, maximized retention and modal/draft preservation remain unrun; no app defect or locked-desktop cause is inferred. Exact private observation/after receipts and hashes are retained; afterguard at13:24:28.0162623Z confirms unchanged app/config/source. No build, config save, device/media/power/security action or test-count increase. Native input availability, explicit disposable-device identification and the other full-port acceptance gates remain open.
