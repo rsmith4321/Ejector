@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Observe the current app's loaded backend and runtime · October 8
+
+Direct OS module enumeration of the already open current app observes174 modules and verifies ten selected application/backend/native host/.NET/WinUI paths and hashes against the current manifest, including F810. [Current foreground evidence](modern/CURRENT_REVIEW_ACCEPTANCE_20261008.md) records PID21224/start identity, observed runtime file versions, exact packet hash and unchanged current issue/tool pins. No UI, process launch/termination, build or configuration action; normal Quit/restart, tray/modal/Settings and remaining physical/LUT/trusted-distribution acceptance stay open. The earlier “unlaunched” entry below describes the state before the later foreground launch checkpoint.
+
 ## Verify actual tools on the current power-aware backend · October 8
 
 The existing F810 runner passes **16/0 generated Quick Share cases** with the supplied FFmpeg/FFprobe, including cold reuse/retry, abrupt owner loss/live encoder containment and corrupt-frame decode refusal. [Exact current-backend evidence](POWER_REAL_TOOLS_ACCEPTANCE.md) records terminal session82508 exit0, source/dependency bindings and fresh before/after checks of all649 manifest files, supplied tools, normal configuration and existing foreground PID21224. No production change or rebuild; the coordinated CPU slot was returned. Positive official LUT, genuine camera, current foreground/restart, physical sleep/wake/device/filesystem/travel and trusted distribution remain open. Full goal active; expired heartbeat paused.
