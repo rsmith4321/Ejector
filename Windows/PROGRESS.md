@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Verify current-copy modal retention and Settings cancellation · October 8
+
+The current F810 app now has actual [foreground acceptance](modern/FOREGROUND_CURRENT_F810_20261008.md) for internal-storage action refusal, empty history Close/disabled verification, Alt+F4 hide with a retained dialog, normal duplicate launch revealing that same dialog/PID, Escape returning idle, reachable Settings scrolling/footer, shortcut draft Cancel/reopen and metadata-warning Escape/page Cancel. All649 payload files, both issue/tools records and the original process remain unchanged; no configuration record or real operation was created. The first all-tracked-files postcheck refused concurrent peer documentation changes; the corrected receipt identifies those exact three document deltas and verifies unchanged production inputs. Normal tray/Quit/busy-Quit/full restart, active operations and remaining hardware/LUT/trust gates stay open. No new suite count; full goal remains open.
+
 ## Bind every currently loaded local dependency · October 8
 
 The same current app's later complete OS module snapshot records **75 review-folder /103 Windows-folder /0 other modules**. Every loaded local module's length/hash matches the review manifest; all178 paths and75 payload pins are retained in [current review evidence](modern/CURRENT_REVIEW_ACCEPTANCE_20261008.md). The earlier174/ten-selected snapshot remains a separate observation time. This advances current-process dependency evidence without UI/process/configuration action; OS trust, lazy/future dependencies, clean-machine compatibility and remaining lifecycle/physical/LUT/trusted-distribution acceptance stay open.
