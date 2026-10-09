@@ -1,5 +1,9 @@
 # Windows progress · October 9, 2026
 
+## Prove exclusive disposable record publication and recovery · October 9
+
+The opt-in [publication helper](modern/tools/OWNED_RECORD_PUBLICATION.md) passes **17/0** disposable-only cases on actual F810, warning-free existing-SDK/cache compilation, terminal parent7120 exit0. Native identity/hash ledgers, exclusive publication, late collision/partial recovery, same-byte replacement refusal, all-record preflight, read-only/unrelated-file retention and crash/retry pass. All649 payload files, foreground PID21224 and both live config records are unchanged; the CLI has no live mode and no records were seeded. Initial ledgers refuse a UI-saved replacement profile, so a reviewed edit checkpoint remains required before manual opt-in/export acceptance. No default-suite count or app/hardware/LUT/trust completion claim; full goal remains open.
+
 ## Map native grouped-unmount acceptance precisely · October 9
 
 The [grouped-unmount contract](GROUPED_UNMOUNT_CONTRACT.md) now inventories all five baseline integration preconditions and their exact current Windows implementation/fixture assertions. It distinguishes sibling volumes removed by one physical-group request from separate sequential removal targets, identifies native identity/event/intermediate/final absence and success/veto evidence still required, and records the disposable-device acceptance prerequisites. This is source/requirement inspection only: no new test count, device action or completed hardware claim. The app/configuration and production code are unchanged; the full port remains open.
