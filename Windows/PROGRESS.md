@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Bind every currently loaded local dependency · October 8
+
+The same current app's later complete OS module snapshot records **75 review-folder /103 Windows-folder /0 other modules**. Every loaded local module's length/hash matches the review manifest; all178 paths and75 payload pins are retained in [current review evidence](modern/CURRENT_REVIEW_ACCEPTANCE_20261008.md). The earlier174/ten-selected snapshot remains a separate observation time. This advances current-process dependency evidence without UI/process/configuration action; OS trust, lazy/future dependencies, clean-machine compatibility and remaining lifecycle/physical/LUT/trusted-distribution acceptance stay open.
+
 ## Observe the current app's loaded backend and runtime · October 8
 
 Direct OS module enumeration of the already open current app observes174 modules and verifies ten selected application/backend/native host/.NET/WinUI paths and hashes against the current manifest, including F810. [Current foreground evidence](modern/CURRENT_REVIEW_ACCEPTANCE_20261008.md) records PID21224/start identity, observed runtime file versions, exact packet hash and unchanged current issue/tool pins. No UI, process launch/termination, build or configuration action; normal Quit/restart, tray/modal/Settings and remaining physical/LUT/trusted-distribution acceptance stay open. The earlier “unlaunched” entry below describes the state before the later foreground launch checkpoint.
