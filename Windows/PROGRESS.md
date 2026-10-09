@@ -1,5 +1,9 @@
 # Windows progress · October 8, 2026
 
+## Add combined-source Framework, genuine vendor and supplied-tool proof · October 8
+
+Companion clean-source **a7afd34** review passes exact modern **242/0 selected /1365/0 defaults**, corrected Framework **1365/0 defaults /56/0 process focus**, genuine vendor composition/manual release **4/0 each modern**, and actual supplied-tool generated sharing **16/0 modern** including cold retry, abrupt loss/live-encoder containment and damaged decode. [Combined evidence](modern/CURRENT_COMBINED_BUILD.md) retains the original **1046/319** Framework layout/cleanup failure and pre-execution tool-path refusal, exact corrective runs, terminals, all649 unchanged payload files/four backend hashes and zero owned runners. No production change; separate history-ready candidate/native evidence is preserved. Official LUT/genuine media, current foreground, sleep/wake authority, identified disposable hardware/filesystem/travel and actual trusted distribution remain open; goal active, heartbeat paused.
+
 ## Correct the foreground review entry point · October 8
 
 [Current review acceptance](modern/CURRENT_REVIEW_ACCEPTANCE_20261008.md) now leads with the newer `PowerConnectionAtomic-20261008/review/app` folder, exact application/backend/icon hashes and a concrete foreground/lifecycle/history/manual-sharing checklist. Fresh readback confirms the manifest and four application assets; current production source/build helper is unchanged from implementation3ccf740. The earlier a7afd34 folder remains an explicitly historical checkpoint. No build/test/app launch/live configuration or hardware action; the review application is still unlaunched and the full goal remains active.
