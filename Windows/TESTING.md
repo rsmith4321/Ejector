@@ -1,5 +1,7 @@
 # Windows device testing
 
+**Newest review copy (October 10, Mac parity through `dc2c3ba`/`07de127`):** `C:\Users\rsmit\.codex\EasyEjectBuildTools\ClaudeReview-3a704bd\review\app\EasyEject.Modern.exe` (601 files, unsigned, built from committed `3a704bd`; `review-build.json` SHA256 `29D7EFD0AB2DF1DFA19FBD58348895B16A192CDF07C9DDA615E67B9564FCE3D7`). It adds DJI O4 Pro Gyroflow-first Quick Share and the import-history Open Folder action. This laptop has no PowerShell 7, so it was built with a PowerShell 5.1 equivalent of `modern/build-review.ps1`. The same publish arguments and payload checks apply, but the vendor-notice and native-import reports were skipped. Quit the running preview from its tray menu before opening this copy. The older copy below stays as it is.
+
 The [October9 native generated-history pass](modern/VISIBLE_REVIEW_WORKFLOW.md) verified two exact saved clips with source absent, sharing hidden while off, explicit1080p/Standard opt-in, manual export of2 new copies and a separate manual reuse of both. Exact reviewed recovery retained temporary profile/history in quarantine; live history reopened empty. Original/output bytes and first-export write times are preserved. Normal successful-export issue clearing is recorded separately. Generated fixtures do not establish real camera/device, native4K, cold app restart, cancellation/changed-record refusal, positive official Luna LUT or trusted distribution acceptance. Existing1415/0 each-runtime counts are unchanged.
 
 The latest local review is:
