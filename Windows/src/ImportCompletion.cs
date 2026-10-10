@@ -135,5 +135,17 @@ namespace EasyEject {
                 }
             }
         }
+        // A saved history batch opens only its exact recorded folder on the verified destination.
+        // Opening grants no source, eject or sharing authority and starts no work.
+        internal static void Open(CompletedBatch batch, Func<CompletedBatch, IImportGuard> makeGuard, Operations operations, Action<string> open) {
+            batch = ImportHistory.Clone(batch); ImportHistory.Validate(batch);
+            if (!Directory.Exists(batch.Folder)) throw new SafetyException("The imported folder is unavailable. Connect the destination drive and try again.");
+            using (var directories = SafePaths.HoldDirectories(batch.DestinationRoot, batch.Folder)) {
+                directories.Validate(); var guard = makeGuard(ImportHistory.Clone(batch)); directories.Validate();
+                using (operations.Reserve(guard.ProtectedDisks)) {
+                    directories.Validate(); guard.Validate(); directories.Validate(); open(batch.Folder);
+                }
+            }
+        }
     }
 }

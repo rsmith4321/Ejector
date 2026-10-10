@@ -40,7 +40,8 @@ namespace EasyEject.Modern {
                 var details = Wrapped(batches.Count == 0 ? "No completed media batches yet. Index-only and failed imports create no sharing history." : "Select a batch. The source device is not needed to verify these saved originals.");
                 var body = new StackPanel { Spacing = 12 };
                 body.Children.Add(Wrapped("The last 20 exact verified batches survive source eject and restart. Verification checks the saved destination, receipt and every recorded file hash; earlier folders are never scanned."));
-                if (profileWarning.Length != 0) body.Children.Add(Wrapped(profileWarning)); body.Children.Add(list); body.Children.Add(details);
+                var openFolder = new Button { Content = "Open Folder", Visibility = Visibility.Collapsed }; bool openRequested = false;
+                if (profileWarning.Length != 0) body.Children.Add(Wrapped(profileWarning)); body.Children.Add(list); body.Children.Add(openFolder); body.Children.Add(details);
                 confirmation = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Verified import history", Content = Scrolling(body),
                     PrimaryButtonText = "Verify saved originals", SecondaryButtonText = "", CloseButtonText = "Close", DefaultButton = ContentDialogButton.Close, IsPrimaryButtonEnabled = false };
                 var dialog = confirmation;
@@ -50,14 +51,22 @@ namespace EasyEject.Modern {
                     var batch = list.SelectedIndex < 0 || list.SelectedIndex >= batches.Count ? null : batches[list.SelectedIndex]; dialog.IsPrimaryButtonEnabled = batch != null;
                     bool share = profiles != null && ManualQuickShareService.EligibleProfile(batch, profiles) != null;
                     dialog.SecondaryButtonText = share ? "Quick Share…" : ""; dialog.IsSecondaryButtonEnabled = share;
+                    openFolder.Visibility = share && QuickShareProfile.GyroflowFirst(ManualQuickShareService.EligibleProfile(batch, profiles)) ? Visibility.Visible : Visibility.Collapsed;
                     if (batch != null) details.Text = batch.DeviceName + "\n" + batch.Folder + "\nReceipt: " + batch.ReceiptPath + "\n\n"
                         + String.Join("\n", batch.Originals.Take(100).Select(file => SafePaths.Relative(file.Path, batch.Folder) + " (" + file.Bytes + " bytes)"))
                         + (batch.Originals.Count > 100 ? "\n… " + (batch.Originals.Count - 100) + " more recorded files; verification checks all." : "");
                 };
-                list.SelectionChanged += selection; ContentDialogResult answer; int index;
+                RoutedEventHandler openChoice = delegate { if (!selecting || closed || !Object.ReferenceEquals(confirmation, dialog) || openFolder.Visibility != Visibility.Visible) return; openRequested = true; dialog.Hide(); };
+                openFolder.Click += openChoice; list.SelectionChanged += selection; ContentDialogResult answer; int index;
                 try { answer = await dialog.ShowAsync(); index = list.SelectedIndex; }
-                finally { selecting = false; list.SelectionChanged -= selection; }
+                finally { selecting = false; list.SelectionChanged -= selection; openFolder.Click -= openChoice; }
                 confirmation = null;
+                if (openRequested && index >= 0 && index < batches.Count) {
+                    var folderBatch = ImportHistory.Clone(batches[index]);
+                    await Task.Run(() => CompletionFolder.Open(folderBatch, batch => new WindowsDestinationGuard(discovery, batch.DestinationRoot, batch.Destination), operations,
+                        folder => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "explorer.exe", Arguments = "\"" + folder + "\"", UseShellExecute = false })));
+                    Summary.Text = "Import folder opened. Stabilize O4 Pro clips in Gyroflow before using Quick Share. Apply the LUT in Gyroflow or Quick Share; recognized Gyroflow LUT exports keep their existing colors."; return;
+                }
                 if (index < 0 || index >= batches.Count || answer == ContentDialogResult.None) return;
                 var selected = ImportHistory.Clone(batches[index]);
                 if (answer == ContentDialogResult.Secondary) { await PerformQuickShare(selected); return; }

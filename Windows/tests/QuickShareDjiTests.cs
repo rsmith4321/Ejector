@@ -146,6 +146,21 @@ namespace EasyEject {
                     Check(QuickSharePresentation.Success(batch, QuickSharePreset.Hd, new QuickShareResult { Folder = "x" }, QuickShareCamera.DjiO4Pro).Contains("no supported DJI O4 Pro master videos"), "DJI empty result names Luna");
                 }
             });
+            Test("history Open Folder opens only the exact saved batch folder under a held reservation", delegate {
+                using (var f = new Fixture()) {
+                    var batch = DjiBatch(f, DjiMasterA); var operations = new Operations(); string opened = null; int reservedDuring = 0;
+                    CompletionFolder.Open(batch, b => new FakeGuard(), operations, folder => { opened = folder; try { using (operations.Reserve(new[] { 700 })) {} } catch (SafetyException) { reservedDuring++; } });
+                    Check(opened == batch.Folder && reservedDuring == 1, "Folder opened outside its reservation or elsewhere");
+                    using (operations.Reserve(new[] { 700, 701 })) {}
+                    int calls = 0; Throws<SafetyException>(() => CompletionFolder.Open(batch, b => new FakeGuard { FailAt = 1 }, operations, _ => calls++)); Check(calls == 0, "Disconnected destination opened");
+                    var changed = ImportHistory.Clone(batch); changed.Folder = Path.Combine(f.Destination, "missing-batch"); Throws<SafetyException>(() => CompletionFolder.Open(changed, b => new FakeGuard(), operations, _ => calls++));
+                    Check(calls == 0, "Missing folder opened");
+                    // A moved leaf folder is detected by the held identity check before opening.
+                    string moved = batch.Folder + "-moved";
+                    Throws<SafetyException>(() => CompletionFolder.Open(batch, b => { Directory.Move(batch.Folder, moved); Directory.CreateDirectory(batch.Folder); return new FakeGuard(); }, operations, _ => calls++));
+                    Check(calls == 0 && Directory.Exists(moved), "Replaced batch folder was opened");
+                }
+            });
             Test("DJI O4 Pro LUT setup is optional, validated and keeps earlier setup bytes", delegate {
                 using (var f = new Fixture()) {
                     var tools = FixtureShareTools(f); var saved = QuickShareConfiguration.Save(QuickShareConfiguration.Load(f.Destination), tools.Ffmpeg, tools.Ffprobe, null, f.Destination, CancellationToken.None);

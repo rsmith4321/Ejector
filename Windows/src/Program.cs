@@ -671,6 +671,10 @@ namespace EasyEject {
                 CompletedBatch batch; DialogResult choice;
                 using (var dialog = new ImportHistoryDialog(values, profiles)) { choice = dialog.ShowDialog(this); batch = dialog.SelectedBatch; }
                 if (choice == DialogResult.Retry) { await PerformQuickShare(batch); return; }
+                if (choice == DialogResult.Ignore && batch != null) {
+                    await Task.Run(() => CompletionFolder.Open(batch, selected => new WindowsDestinationGuard(discovery, selected.DestinationRoot, selected.Destination), operations, folder => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "explorer.exe", Arguments = "\"" + folder + "\"", UseShellExecute = false })));
+                    status.Text = "Import folder opened. Stabilize O4 Pro clips in Gyroflow before using Quick Share. Apply the LUT in Gyroflow or Quick Share; recognized Gyroflow LUT exports keep their existing colors."; return;
+                }
                 if (choice != DialogResult.OK || batch == null) return;
                 cancellation = new CancellationTokenSource(); cancel.Enabled = true;
                 var activity = BeginActivity(TrayOperationKind.Verify, batch.DeviceName, "Checking saved files");

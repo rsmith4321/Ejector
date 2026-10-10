@@ -1,5 +1,11 @@
 # Windows progress · October 10, 2026
 
+## Open Folder in import history for DJI O4 Pro batches · October 10 UTC
+
+Mirroring Mac `57f5e07`, both interfaces' import history now shows **Open Folder** beside Quick Share for opted-in DJI O4 Pro batches. `CompletionFolder.Open(CompletedBatch…)` validates the exact saved batch and refuses a missing folder. It holds the destination root and batch folder, reserves the destination disk, revalidates the destination guard, and only then opens Explorer. A moved or replaced folder or a disconnected destination opens nothing. Opening grants no source, eject or sharing authority.
+
+Tests ran on isolated copy `ClaudeHistoryFolder-20261010T045315Z`, from source identical to this commit. Modern app build clean, selected **242/0**, full modern **1427/0**, and focused `--share-dji` **12/0**. The first Framework full run is retained as `full-missing-app-config.log`: my harness omitted `EasyEject.Windows.exe.config`, so release fixtures failed. The rerun gave **1426/1**. The one failure was the fixture cleanup `UnauthorizedAccessException` deleting `helper.exe` right after "owned-job cancellation stops descendants" killed its process. The immediate focused `--share-directories` rerun passed **56/0**, including that case. Its fixture folder `EasyEjectFixtures/run-c2e924cfe8df49fa` is retained. This is recorded as a transient cleanup race, not a pass of that full run.
+
 ## Port DJI O4 Pro Gyroflow-first Quick Share from latest Mac · October 10 UTC
 
 The Mac commits after the `384cb767` Windows baseline (`af70f83`, `57f5e07`, `dc2c3ba`, fetched read-only from `origin/main`) were not yet on Windows; they are now ported in the shared runtime and both interfaces. Each device profile has an explicit camera choice: Insta360 Luna by default, with the field absent so existing profiles keep their bytes, or DJI O4 Pro. DJI O4 Pro devices are Gyroflow-first. Their completion choice explains opening the import folder and batch stabilizing in Gyroflow, and does not offer Quick Share there. Import history still offers it afterwards.

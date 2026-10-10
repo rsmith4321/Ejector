@@ -10,7 +10,7 @@ namespace EasyEject {
         internal readonly ListView Batches = new ListView();
         internal readonly TextBox Details = new TextBox();
         readonly Button verify = new Button();
-        internal readonly Button Share = new Button();
+        internal readonly Button Share = new Button(), OpenFolder = new Button();
         internal CompletedBatch SelectedBatch { get { return Batches.SelectedItems.Count == 0 ? null : ImportHistory.Clone((CompletedBatch)Batches.SelectedItems[0].Tag); } }
         internal ImportHistoryDialog(IEnumerable<CompletedBatch> values, SavedProfile[] profiles = null) {
             Text = "Verified import history"; Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi;
@@ -34,15 +34,18 @@ namespace EasyEject {
             verify.Click += delegate { if (SelectedBatch != null) { DialogResult = DialogResult.OK; Close(); } };
             Share.Text = "Quick Share…"; Share.AutoSize = true; Share.MinimumSize = new Size(150, 36); Share.Visible = false; Share.Enabled = false;
             Share.Click += delegate { if (SelectedBatch != null && profiles != null && ManualQuickShareService.EligibleProfile(SelectedBatch, profiles) != null) { DialogResult = DialogResult.Retry; Close(); } };
+            OpenFolder.Text = "Open Folder"; OpenFolder.AutoSize = true; OpenFolder.MinimumSize = new Size(130, 36); OpenFolder.Visible = false; OpenFolder.Enabled = false;
+            OpenFolder.Click += delegate { if (SelectedBatch != null && profiles != null && QuickShareProfile.GyroflowFirst(ManualQuickShareService.EligibleProfile(SelectedBatch, profiles))) { DialogResult = DialogResult.Ignore; Close(); } };
             Batches.SelectedIndexChanged += delegate {
                 var batch = SelectedBatch; verify.Enabled = batch != null;
                 Share.Visible = Share.Enabled = profiles != null && ManualQuickShareService.EligibleProfile(batch, profiles) != null;
+                OpenFolder.Visible = OpenFolder.Enabled = Share.Visible && QuickShareProfile.GyroflowFirst(ManualQuickShareService.EligibleProfile(batch, profiles));
                 if (batch == null) return;
                 Details.Text = batch.DeviceName + Environment.NewLine + batch.Folder + Environment.NewLine + "Receipt: " + batch.ReceiptPath + Environment.NewLine + Environment.NewLine
                     + String.Join(Environment.NewLine, batch.Originals.Take(100).Select(x => SafePaths.Relative(x.Path, batch.Folder) + " (" + x.Bytes + " bytes)"))
                     + (batch.Originals.Count > 100 ? Environment.NewLine + "… " + (batch.Originals.Count - 100) + " more recorded files; verification checks all." : "");
             };
-            footer.Controls.Add(close); footer.Controls.Add(verify); footer.Controls.Add(Share); CancelButton = close;
+            footer.Controls.Add(close); footer.Controls.Add(verify); footer.Controls.Add(Share); footer.Controls.Add(OpenFolder); CancelButton = close;
             layout.Controls.Add(intro); layout.Controls.Add(Batches); layout.Controls.Add(Details); layout.Controls.Add(footer); Controls.Add(layout);
         }
     }
