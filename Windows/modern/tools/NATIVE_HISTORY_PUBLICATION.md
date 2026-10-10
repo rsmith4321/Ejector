@@ -1,5 +1,29 @@
 # Exact generated-video history gate
 
+## Explicit reviewed empty issue baseline · October 10 UTC
+
+The helper now takes an optional trailing `--reviewed-empty-issue-baseline` on every live
+mode. It selects the reviewed empty issue state: exactly 49 bytes, SHA256
+`4E998657AF8E8B4DEBCF79494D65A5B9C9811D8D1884A9551EDA8191F8C32651`. Without the flag,
+the legacy 161B pin `2DA02745…85BC0` is still required, so the helper continues to
+refuse the current state by default. Any other spelling, position or repetition is refused.
+
+Publication records the selection as `IssueBaseline` in `admission.json`, and the fresh
+config baseline must match that state's hash and length. Checkpoint and recovery modes
+must pass the same selection the ledger recorded, or they refuse before writing.
+Ledgers written before the selector existed read as legacy. Nothing is adopted
+automatically, and the historical packets and the original `0C2ADA0F…` helper are kept.
+
+`run-admission-verification.ps1 -BrokerGrant [-ReviewedEmptyIssueBaseline]`: the switch
+also pins the live 49B issue state read-only before and after. Run from isolated copy
+`PublicationBaselineSource-20261010T0402460818713Z`, it passed **17/0 core, 48/0
+admission/integration, 60/0 issue-baseline and 12 CLI refusals**, each at its expected
+reason. Receipt `PublicationAdmissionRun-20261010T0402464683487Z/result.json`
+`E2C60935BEF18B47DED2FE6CA16553C144957F9288D3E76FE41B3C6A73669150`. See
+[Windows progress](../../PROGRESS.md) for retained earlier attempts and limits. This is
+still disposable/synthetic evidence; a live publication needs a new slot and fresh
+native idle proof.
+
 ## Positive native live slice · October 9 EDT
 
 Separately brokered live publication, explicitly reviewed native1080p/Standard

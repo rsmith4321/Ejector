@@ -20,6 +20,14 @@ internal static class NativeHistoryPublication {
     const string Receipt = "43741D791FFCAAA3BFF55F6358D06EC1962BA427106953970B35AC226E7D6A29";
     const string Original = "E8DCD8BB1916DB8933332A811C98931973A4D3293CA49BD563A0DD9D449AA03B";
     const string Issue = "2DA0274519483D90BBC19964F254B4A2A4E651A40F24726267A27FC6C3C85BC0";
+    const string EmptyIssue = "4E998657AF8E8B4DEBCF79494D65A5B9C9811D8D1884A9551EDA8191F8C32651";
+    // Issue-state baselines are chosen explicitly by the caller and recorded in
+    // the admission ledger. The legacy 161-byte state stays the default; the
+    // reviewed empty 49-byte state is never adopted automatically.
+    internal const string LegacyIssueBaseline = "legacy-161";
+    internal const string ReviewedEmptyIssueBaseline = "reviewed-empty-49";
+    internal const string ReviewedEmptyIssueFlag = "--reviewed-empty-issue-baseline";
+    static readonly Dictionary<string, (string Sha256, long Bytes)> IssueBaselines = new(StringComparer.Ordinal) { [LegacyIssueBaseline] = (Issue, 161), [ReviewedEmptyIssueBaseline] = (EmptyIssue, 49) };
     const string Tools = "C366C5017700613C17F734FFC01C8AEACC0F386B61EF19558FD8DE57EE94728D";
     const string ProfileName = "50FB7A97E4A3092B2441228AF78A80382AB367C4CD2C5CD6A24CEBB480ECCDF4.json";
     static readonly string Owned = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectBuildTools");
@@ -38,6 +46,8 @@ internal static class NativeHistoryPublication {
         public string FirstHash { get; set; } = Original;
         public string SecondHash { get; set; } = Original;
         public string IssueHash { get; set; } = Issue;
+        // Ledgers written before the selector existed only admitted the legacy state.
+        public string IssueBaseline { get; set; } = LegacyIssueBaseline;
         public string ToolsHash { get; set; } = Tools;
         public int ConfigCount { get; set; } = 2;
         public int Pid { get; set; } = 21224;
@@ -64,6 +74,7 @@ internal static class NativeHistoryPublication {
         readonly List<IDisposable> fileDirectories = new();
         bool disposed;
         internal Admission Value;
+        internal string IssueSelector = LegacyIssueBaseline;
         internal DateTimeOffset ProofCapturedUtc;
         internal byte[] ProfileBytes, HistoryBytes;
         internal Captured(params string[] roots) { directories = SafePaths.LockDirectories(roots); }
@@ -81,7 +92,7 @@ internal static class NativeHistoryPublication {
                 using var process = Process.GetProcessById(Value.ExpectedPid);
                 Require(process.StartTime.ToUniversalTime().ToString("o") == Value.ExpectedStartedUtc && process.MainWindowHandle.ToInt64() == Value.ExpectedWindow && process.MainModule.FileName.Equals(Path.Combine(App, "EasyEject.Modern.exe"), StringComparison.OrdinalIgnoreCase), "Current app changed before publication.");
                 Value.IdleAgeSeconds = (DateTimeOffset.UtcNow - ProofCapturedUtc).TotalSeconds;
-                Validate(Value, true);
+                Validate(Value, true, IssueSelector);
             }
             foreach (var item in held) { var pin = OwnedRecordPublication.Capture(item.Stream); Require(pin.Identity == item.Pin.Identity && pin.Bytes == item.Pin.Bytes && pin.Sha256 == item.Pin.Sha256, "Held source changed."); }
             Require(Hash(ProfileBytes) == Profile && Hash(HistoryBytes) == History, "Admitted publication payload changed.");
@@ -89,20 +100,53 @@ internal static class NativeHistoryPublication {
         }
         public void Dispose() { if (disposed) return; disposed = true; foreach (var item in held) item.Stream.Dispose(); foreach (var lease in fileDirectories) lease.Dispose(); directories.Dispose(); }
     }
-    static void Validate(Admission value, bool publishing) {
+    static (string Sha256, long Bytes) IssueBaselinePin(string selector) {
+        if (selector == null || !IssueBaselines.TryGetValue(selector, out var pin)) throw new IOException("Unknown issue baseline selection.");
+        return pin;
+    }
+    // Strips the optional trailing explicit baseline flag. Any other spelling,
+    // position or repetition is refused rather than interpreted.
+    internal static string[] IssueSelection(string[] args, out string selector) {
+        int flags = args.Count(a => a == ReviewedEmptyIssueFlag);
+        Require(!args.Any(a => a != ReviewedEmptyIssueFlag && a.Contains("issue-baseline", StringComparison.OrdinalIgnoreCase)), "Unknown issue baseline selection.");
+        Require(flags <= 1, "Repeated issue baseline selection.");
+        Require(flags == 0 || args[^1] == ReviewedEmptyIssueFlag, "Place " + ReviewedEmptyIssueFlag + " last.");
+        selector = flags == 1 ? ReviewedEmptyIssueBaseline : LegacyIssueBaseline;
+        return flags == 1 ? args[..^1] : args;
+    }
+    static void RequireIssueBaseline(Dictionary<string, OwnedRecordPublication.Pin> baseline, string selector) {
+        var expected = IssueBaselinePin(selector);
+        Require(baseline.Count == 2 && baseline.TryGetValue("issue-state.json", out var issue) && issue.Sha256 == expected.Sha256 && issue.Bytes == expected.Bytes && baseline.TryGetValue("quick-share-tools.json", out var tools) && tools.Sha256 == Tools, "Fresh baseline differs.");
+    }
+    // The caller's selection must match the one recorded at publication before
+    // any checkpoint or recovery write.
+    static Admission LedgerAdmission(string ledger, string selector) {
+        string path = Path.Combine(ledger, "admission.json");
+        Require(File.Exists(path), "Owned live admission ledger missing.");
+        var recorded = JsonSerializer.Deserialize<Admission>(File.ReadAllBytes(path));
+        Require(recorded != null && recorded.IssueBaseline == selector, "Caller issue baseline selection differs from the live ledger.");
+        Validate(recorded, true, selector);
+        return recorded;
+    }
+    static void Validate(Admission value, bool publishing, string selector) {
         Require(value != null, "Missing admission record.");
+        var issue = IssueBaselinePin(selector);
         Require(value.BackendHash == Backend && value.ExeHash == Exe && value.ManifestHash == Manifest, "Current backend/application binding differs.");
         Require(value.ProfileHash == Profile && value.HistoryHash == History && value.ReceiptHash == Receipt && value.FirstHash == Original && value.SecondHash == Original && value.OriginalsMatch, "Prepared fixture or originals changed.");
         Require(value.Pid > 0 && value.Pid == value.ExpectedPid && value.StartedUtc == value.ExpectedStartedUtc, "Current PID/start binding differs.");
         Require(value.Window > 0 && value.Window == value.ExpectedWindow && value.Idle && value.IdleAgeSeconds >= -5 && value.IdleAgeSeconds <= 60, "Fresh native idle proof required.");
         Require(value.ExactRoots && value.SourceAbsent, "Fixture/configuration scope differs or source returned.");
         Require(value.ToolsHash == Tools, "Existing tool setup changed.");
-        if (publishing) Require(value.ConfigCount == 2 && value.IssueHash == Issue && value.TargetsAbsent, "Initial live configuration or publication targets changed.");
+        if (publishing) {
+            Require(value.IssueBaseline == selector, "Admission issue baseline selection differs from caller.");
+            Require(value.ConfigCount == 2 && value.IssueHash == issue.Sha256 && value.TargetsAbsent, "Initial live configuration or publication targets changed.");
+        }
     }
-    static Captured Capture(int expectedPid, string expectedStart, string proofPath, string proofHash) {
+    static Captured Capture(int expectedPid, string expectedStart, string proofPath, string proofHash, string selector) {
+        IssueBaselinePin(selector);
         proofPath = SafePaths.Normalize(proofPath);
         Require(SafePaths.Within(proofPath, Owned), "Native proof path differs.");
-        var capturedFiles = new Captured(Config, Fixture, App, Path.GetDirectoryName(proofPath));
+        var capturedFiles = new Captured(Config, Fixture, App, Path.GetDirectoryName(proofPath)) { IssueSelector = selector };
         try {
         using var proof = JsonDocument.Parse(capturedFiles.Read(proofPath, proofHash.ToUpperInvariant()));
         var window = proof.RootElement.GetProperty("window"); string tree = proof.RootElement.GetProperty("tree").GetString();
@@ -122,7 +166,7 @@ internal static class NativeHistoryPublication {
             var originalBytes = originals.Select(o => { string path = SafePaths.Normalize(o.GetProperty("Path").GetString()); Require(SafePaths.Within(path, Path.Combine(Fixture, "destination")), "Original escaped exact fixture."); Require(o.GetProperty("Bytes").GetInt64() == 169551, "Original recorded length differs."); return capturedFiles.Read(path, Original); }).ToArray();
             bool idle = Regex.IsMatch(tree, @"button Refresh connected storage ID: Refresh") && !tree.Contains("Finish the current review or operation first.", StringComparison.Ordinal) && !Regex.IsMatch(tree, @"window Popup|ID: PrimaryButton|ID: CloseButton|ID: Save\b");
             Require(Hash(Path.Combine(App, "EasyEject.Runtime.dll")) == Backend, "Live application backend changed.");
-            capturedFiles.Value = new Admission { BackendHash = Hash(typeof(Profiles).Assembly.Location), ExeHash = Hash(processPath), ManifestHash = Hash(Path.Combine(Path.GetDirectoryName(App), "review-build.json")), ProfileHash = Hash(capturedFiles.ProfileBytes), HistoryHash = Hash(capturedFiles.HistoryBytes), ReceiptHash = Hash(receipt), FirstHash = Hash(originalBytes[0]), SecondHash = Hash(originalBytes[1]), OriginalsMatch = originalBytes.All(b => b.Length == 169551), IssueHash = Hash(Path.Combine(Config, "issue-state.json")), ToolsHash = Hash(Path.Combine(Config, "quick-share-tools.json")), ConfigCount = Directory.GetFileSystemEntries(Config, "*", SearchOption.AllDirectories).Length, ExpectedPid = expectedPid, Pid = process.Id, ExpectedStartedUtc = expectedStart, StartedUtc = process.StartTime.ToUniversalTime().ToString("o"), Window = process.MainWindowHandle.ToInt64(), ExpectedWindow = window.GetProperty("id").GetInt64(), Idle = idle, IdleAgeSeconds = (DateTimeOffset.UtcNow - captured).TotalSeconds, SourceAbsent = !Directory.Exists(Path.Combine(Fixture, "source")), TargetsAbsent = !File.Exists(Path.Combine(Config, ProfileName)) && !File.Exists(Path.Combine(Config, "completed-imports.json")) };
+            capturedFiles.Value = new Admission { BackendHash = Hash(typeof(Profiles).Assembly.Location), ExeHash = Hash(processPath), ManifestHash = Hash(Path.Combine(Path.GetDirectoryName(App), "review-build.json")), ProfileHash = Hash(capturedFiles.ProfileBytes), HistoryHash = Hash(capturedFiles.HistoryBytes), ReceiptHash = Hash(receipt), FirstHash = Hash(originalBytes[0]), SecondHash = Hash(originalBytes[1]), OriginalsMatch = originalBytes.All(b => b.Length == 169551), IssueHash = Hash(Path.Combine(Config, "issue-state.json")), IssueBaseline = selector, ToolsHash = Hash(Path.Combine(Config, "quick-share-tools.json")), ConfigCount = Directory.GetFileSystemEntries(Config, "*", SearchOption.AllDirectories).Length, ExpectedPid = expectedPid, Pid = process.Id, ExpectedStartedUtc = expectedStart, StartedUtc = process.StartTime.ToUniversalTime().ToString("o"), Window = process.MainWindowHandle.ToInt64(), ExpectedWindow = window.GetProperty("id").GetInt64(), Idle = idle, IdleAgeSeconds = (DateTimeOffset.UtcNow - captured).TotalSeconds, SourceAbsent = !Directory.Exists(Path.Combine(Fixture, "source")), TargetsAbsent = !File.Exists(Path.Combine(Config, ProfileName)) && !File.Exists(Path.Combine(Config, "completed-imports.json")) };
             return capturedFiles;
         } catch { capturedFiles.Dispose(); throw; }
     }
@@ -222,8 +266,8 @@ internal static class NativeHistoryPublication {
     static int AdmissionTests(string root) {
         root = SafePaths.Normalize(root); Require(SafePaths.Within(root, Owned) && Path.GetFileName(root).StartsWith("PublicationAdmissionTest-", StringComparison.Ordinal) && !Directory.Exists(root) && !File.Exists(root), "Tests require a new disposable root.");
         Directory.CreateDirectory(root); int count = 0;
-        void Refusal(string label, Action<Admission> change) { var value = new Admission(); change(value); bool refused = false; try { Validate(value, true); } catch (IOException) { refused = true; } Require(refused, "Admission failed to refuse " + label); Require(!Directory.Exists(Path.Combine(root, "live-ledger")), "Admission created a publication root."); count++; Console.WriteLine("PASS " + label); }
-        Validate(new Admission(), true); count++; Console.WriteLine("PASS valid-admission-logic-only");
+        void Refusal(string label, Action<Admission> change) { var value = new Admission(); change(value); bool refused = false; try { Validate(value, true, LegacyIssueBaseline); } catch (IOException) { refused = true; } Require(refused, "Admission failed to refuse " + label); Require(!Directory.Exists(Path.Combine(root, "live-ledger")), "Admission created a publication root."); count++; Console.WriteLine("PASS " + label); }
+        Validate(new Admission(), true, LegacyIssueBaseline); count++; Console.WriteLine("PASS valid-admission-logic-only");
         Refusal("wrong-backend", v => v.BackendHash = "wrong"); Refusal("wrong-exe", v => v.ExeHash = "wrong"); Refusal("changed-manifest", v => v.ManifestHash = "wrong");
         Refusal("changed-profile", v => v.ProfileHash = "wrong"); Refusal("changed-history", v => v.HistoryHash = "wrong"); Refusal("changed-receipt", v => v.ReceiptHash = "wrong");
         Refusal("changed-first-original", v => v.FirstHash = "wrong"); Refusal("changed-second-original", v => v.SecondHash = "wrong"); Refusal("changed-original-length", v => v.OriginalsMatch = false);
@@ -231,34 +275,122 @@ internal static class NativeHistoryPublication {
         Refusal("missing-window", v => v.Window = 0); Refusal("stale-idle", v => v.IdleAgeSeconds = 61); Refusal("future-idle", v => v.IdleAgeSeconds = -6); Refusal("busy-idle", v => v.Idle = false);
         Refusal("wrong-scope", v => v.ExactRoots = false); Refusal("source-returned", v => v.SourceAbsent = false); Refusal("changed-tool-config", v => v.ToolsHash = "wrong");
         Refusal("new-config-file", v => v.ConfigCount = 3); Refusal("changed-issue", v => v.IssueHash = "wrong"); Refusal("occupied-target", v => v.TargetsAbsent = false);
-        bool missing = false; try { Validate(null, true); } catch (IOException) { missing = true; } Require(missing, "Missing admission accepted"); count++; Console.WriteLine("PASS missing-admission");
+        bool missing = false; try { Validate(null, true, LegacyIssueBaseline); } catch (IOException) { missing = true; } Require(missing, "Missing admission accepted"); count++; Console.WriteLine("PASS missing-admission");
         using var profile = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(Fixture, "prepared-profile.json")));
         var edited = profile.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => JsonSerializer.Deserialize<object>(p.Value.GetRawText()));
         edited["SharingPreset"] = "1080p"; ValidateEdit(JsonSerializer.SerializeToUtf8Bytes(edited)); count++; Console.WriteLine("PASS exact-sharing-edit");
         edited["DeleteOriginals"] = true; bool unsafeEdit = false; try { ValidateEdit(JsonSerializer.SerializeToUtf8Bytes(edited)); } catch (IOException) { unsafeEdit = true; } Require(unsafeEdit, "Unreviewed removal change accepted"); count++; Console.WriteLine("PASS unreviewed-edit-refusal");
         count += IntegratedTests(root, File.ReadAllBytes(Path.Combine(Fixture, "prepared-profile.json")), File.ReadAllBytes(Path.Combine(Fixture, "prepared-history.json")));
-        ExclusiveJson(Path.Combine(root, "result.json"), new { Passed = count, Failed = 0, Scope = "Synthetic admission policy plus disposable native ownership/publication/recovery and actual ImportProfileEdit/SaveOffline serialization; no live UI proof or live configuration mutation" });
-        Console.WriteLine(count + " passed / 0 failed"); return 0;
+        int baselineCount = IssueBaselineTests(Path.Combine(root, "issue-baseline"));
+        ExclusiveJson(Path.Combine(root, "result.json"), new { Passed = count, IssueBaselinePassed = baselineCount, Failed = 0, Scope = "Synthetic admission policy plus disposable native ownership/publication/recovery and actual ImportProfileEdit/SaveOffline serialization; explicit issue baseline selection, JSON round trip and disposable ledger agreement; no live UI proof or live configuration mutation" });
+        Console.WriteLine(count + " + " + baselineCount + " issue-baseline passed / 0 failed"); return 0;
+    }
+    static int IssueBaselineTests(string root) {
+        Directory.CreateDirectory(root); int count = 0;
+        const string Legacy = LegacyIssueBaseline, Reviewed = ReviewedEmptyIssueBaseline;
+        string[] live = { "--publish-exact-video-history", "LEDGER", "IDLE_JSON", "IDLE_SHA", "21224", "START_UTC", "--broker-grant" };
+        void Pass(string label, Action check) { check(); count++; Console.WriteLine("PASS issue-baseline-" + label); }
+        void Refuse(string label, Action action) { bool refused = false; try { action(); } catch (IOException) { refused = true; } Require(refused, "Issue baseline failed to refuse " + label); count++; Console.WriteLine("PASS issue-baseline-" + label); }
+        Admission Selected(string selector, string issueHash) { return new Admission { IssueBaseline = selector, IssueHash = issueHash }; }
+        OwnedRecordPublication.Pin SyntheticPin(string sha, long bytes) { return new OwnedRecordPublication.Pin { Identity = "synthetic", Sha256 = sha, Bytes = bytes }; }
+        Dictionary<string, OwnedRecordPublication.Pin> ConfigPins(string issueSha, long issueBytes) { return new Dictionary<string, OwnedRecordPublication.Pin>(StringComparer.OrdinalIgnoreCase) { ["issue-state.json"] = SyntheticPin(issueSha, issueBytes), ["quick-share-tools.json"] = SyntheticPin(Tools, 486) }; }
+        string DisposableLedger(string name, byte[] admission) { string path = Path.Combine(root, name); Directory.CreateDirectory(path); if (admission != null) File.WriteAllBytes(Path.Combine(path, "admission.json"), admission); return path; }
+        byte[] WithoutSelector(Admission value) { var fields = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(JsonSerializer.SerializeToUtf8Bytes(value)); Require(fields.Remove("IssueBaseline"), "Selector field absent."); return JsonSerializer.SerializeToUtf8Bytes(fields); }
+        byte[] WithSelector(string selector) { var fields = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(JsonSerializer.SerializeToUtf8Bytes(Selected(Reviewed, EmptyIssue))); fields["IssueBaseline"] = JsonSerializer.SerializeToElement(selector); return JsonSerializer.SerializeToUtf8Bytes(fields); }
+
+        // Command-line selection: legacy is the default; only the exact trailing flag selects the reviewed state.
+        Pass("cli-default-legacy", () => { var rest = IssueSelection(live, out string s); Require(s == Legacy && rest.SequenceEqual(live), "Default selection changed."); });
+        Pass("cli-explicit-reviewed", () => { var rest = IssueSelection(live.Append(ReviewedEmptyIssueFlag).ToArray(), out string s); Require(s == Reviewed && rest.SequenceEqual(live), "Explicit selection not stripped exactly."); });
+        Pass("cli-explicit-reviewed-with-profile-hash", () => { var withHash = live.Append("PROFILE_SHA").ToArray(); var rest = IssueSelection(withHash.Append(ReviewedEmptyIssueFlag).ToArray(), out string s); Require(s == Reviewed && rest.SequenceEqual(withHash), "Reviewed hash argument lost."); });
+        Refuse("cli-flag-not-last", () => IssueSelection(new[] { live[0], ReviewedEmptyIssueFlag }.Concat(live.Skip(1)).ToArray(), out _));
+        Refuse("cli-repeated-flag", () => IssueSelection(live.Append(ReviewedEmptyIssueFlag).Append(ReviewedEmptyIssueFlag).ToArray(), out _));
+        foreach (string unknown in new[] { "--reviewed-any-issue-baseline", "--REVIEWED-EMPTY-ISSUE-BASELINE", "--issue-baseline=*", "--reviewed-empty-issue-baseline=4E998657AF8E8B4DEBCF79494D65A5B9C9811D8D1884A9551EDA8191F8C32651" })
+            Refuse("cli-unknown-" + count, () => IssueSelection(live.Append(unknown).ToArray(), out _));
+
+        // Allowed states.
+        Pass("allowed-legacy", () => Validate(Selected(Legacy, Issue), true, Legacy));
+        Pass("allowed-reviewed-empty", () => Validate(Selected(Reviewed, EmptyIssue), true, Reviewed));
+        Pass("allowed-recovery-ignores-current-issue", () => Validate(Selected(Reviewed, "changed-after-export"), false, Reviewed));
+        // Changed states and no automatic adoption.
+        Refuse("changed-reviewed-with-legacy-state", () => Validate(Selected(Reviewed, Issue), true, Reviewed));
+        Refuse("changed-legacy-with-empty-state", () => Validate(Selected(Legacy, EmptyIssue), true, Legacy));
+        Refuse("changed-reviewed-wrong-hash", () => Validate(Selected(Reviewed, "wrong"), true, Reviewed));
+        Refuse("changed-recorded-legacy-caller-reviewed", () => Validate(Selected(Legacy, EmptyIssue), true, Reviewed));
+        Refuse("changed-recorded-reviewed-caller-legacy", () => Validate(Selected(Reviewed, Issue), true, Legacy));
+        Refuse("changed-reviewed-new-config-file", () => { var v = Selected(Reviewed, EmptyIssue); v.ConfigCount = 3; Validate(v, true, Reviewed); });
+        Refuse("changed-reviewed-occupied-target", () => { var v = Selected(Reviewed, EmptyIssue); v.TargetsAbsent = false; Validate(v, true, Reviewed); });
+        Refuse("changed-reviewed-backend", () => { var v = Selected(Reviewed, EmptyIssue); v.BackendHash = "wrong"; Validate(v, true, Reviewed); });
+        // Unknown selections, including wildcard spellings.
+        foreach (string unknown in new[] { "*", "", "REVIEWED-EMPTY-49", "reviewed-empty", "legacy-161 " }) {
+            Refuse("unknown-caller-" + count, () => Validate(Selected(unknown, EmptyIssue), true, unknown));
+            Refuse("unknown-recorded-" + count, () => Validate(Selected(unknown, EmptyIssue), true, Reviewed));
+        }
+        Refuse("unknown-null-caller", () => Validate(Selected(Reviewed, EmptyIssue), true, null));
+        Refuse("unknown-null-recorded", () => Validate(Selected(null, EmptyIssue), true, Reviewed));
+        // Missing issue state.
+        Refuse("missing-legacy-issue-hash", () => Validate(Selected(Legacy, null), true, Legacy));
+        Refuse("missing-reviewed-issue-hash", () => Validate(Selected(Reviewed, null), true, Reviewed));
+        Refuse("missing-reviewed-config-file", () => { var v = Selected(Reviewed, EmptyIssue); v.ConfigCount = 1; Validate(v, true, Reviewed); });
+
+        // Fresh publication baseline: exact hash and length for the selected state only.
+        Pass("baseline-allowed-legacy", () => RequireIssueBaseline(ConfigPins(Issue, 161), Legacy));
+        Pass("baseline-allowed-reviewed", () => RequireIssueBaseline(ConfigPins(EmptyIssue, 49), Reviewed));
+        Refuse("baseline-reviewed-wrong-length", () => RequireIssueBaseline(ConfigPins(EmptyIssue, 50), Reviewed));
+        Refuse("baseline-legacy-wrong-length", () => RequireIssueBaseline(ConfigPins(Issue, 49), Legacy));
+        Refuse("baseline-reviewed-legacy-state", () => RequireIssueBaseline(ConfigPins(Issue, 161), Reviewed));
+        Refuse("baseline-legacy-empty-state", () => RequireIssueBaseline(ConfigPins(EmptyIssue, 49), Legacy));
+        Refuse("baseline-reviewed-missing-issue", () => { var c = ConfigPins(EmptyIssue, 49); c.Remove("issue-state.json"); c["other.json"] = SyntheticPin("x", 1); RequireIssueBaseline(c, Reviewed); });
+        Refuse("baseline-reviewed-extra-file", () => { var c = ConfigPins(EmptyIssue, 49); c["new-user-record.json"] = SyntheticPin("x", 1); RequireIssueBaseline(c, Reviewed); });
+        Refuse("baseline-reviewed-changed-tools", () => { var c = ConfigPins(EmptyIssue, 49); c["quick-share-tools.json"] = SyntheticPin("wrong", 486); RequireIssueBaseline(c, Reviewed); });
+        Refuse("baseline-unknown-selector", () => RequireIssueBaseline(ConfigPins(EmptyIssue, 49), "*"));
+
+        // JSON round trip of the recorded selector.
+        Pass("json-roundtrip-reviewed", () => { var back = JsonSerializer.Deserialize<Admission>(JsonSerializer.SerializeToUtf8Bytes(Selected(Reviewed, EmptyIssue), Json)); Require(back.IssueBaseline == Reviewed && back.IssueHash == EmptyIssue, "Selector lost in round trip."); Validate(back, true, Reviewed); });
+        Refuse("json-roundtrip-reviewed-caller-legacy", () => Validate(JsonSerializer.Deserialize<Admission>(JsonSerializer.SerializeToUtf8Bytes(Selected(Reviewed, EmptyIssue))), true, Legacy));
+        Pass("json-pre-selector-ledger-is-legacy", () => { var back = JsonSerializer.Deserialize<Admission>(WithoutSelector(new Admission())); Require(back.IssueBaseline == Legacy, "Pre-selector ledger not legacy."); Validate(back, true, Legacy); });
+        Refuse("json-pre-selector-ledger-caller-reviewed", () => Validate(JsonSerializer.Deserialize<Admission>(WithoutSelector(Selected(Legacy, EmptyIssue))), true, Reviewed));
+        Refuse("json-null-selector", () => Validate(JsonSerializer.Deserialize<Admission>(WithSelector(null)), true, Reviewed));
+        Refuse("json-wildcard-selector", () => Validate(JsonSerializer.Deserialize<Admission>(WithSelector("*")), true, Reviewed));
+        // The retained October 10 live ledger predates the selector; read it without changing it.
+        Pass("json-retained-live-ledger-legacy", () => {
+            string retained = Path.Combine(Owned, "NativeHistoryLive-20261010T0319476302460Z", "admission.json"); string before = Hash(retained);
+            var back = JsonSerializer.Deserialize<Admission>(File.ReadAllBytes(retained)); Require(back.IssueBaseline == Legacy && back.IssueHash == Issue, "Retained ledger not legacy.");
+            Validate(back, true, Legacy); bool refused = false; try { Validate(back, true, Reviewed); } catch (IOException) { refused = true; }
+            Require(refused && Hash(retained) == before, "Retained ledger accepted reviewed selection or changed.");
+        });
+
+        // Disposable ledger agreement used before checkpoint and recovery writes.
+        string reviewedLedger = DisposableLedger("ledger-reviewed", JsonSerializer.SerializeToUtf8Bytes(Selected(Reviewed, EmptyIssue), Json));
+        string legacyLedger = DisposableLedger("ledger-pre-selector", WithoutSelector(new Admission()));
+        Pass("ledger-reviewed-agrees", () => Require(LedgerAdmission(reviewedLedger, Reviewed).IssueBaseline == Reviewed, "Ledger selector differs."));
+        Refuse("ledger-reviewed-caller-legacy", () => LedgerAdmission(reviewedLedger, Legacy));
+        Pass("ledger-pre-selector-agrees-legacy", () => Require(LedgerAdmission(legacyLedger, Legacy).IssueBaseline == Legacy, "Ledger selector differs."));
+        Refuse("ledger-pre-selector-caller-reviewed", () => LedgerAdmission(legacyLedger, Reviewed));
+        Refuse("ledger-missing-admission", () => LedgerAdmission(DisposableLedger("ledger-missing", null), Reviewed));
+        Refuse("ledger-wildcard-selector", () => LedgerAdmission(DisposableLedger("ledger-wildcard", WithSelector("*")), "*"));
+        Refuse("ledger-null-selector", () => LedgerAdmission(DisposableLedger("ledger-null", WithSelector(null)), Reviewed));
+        Refuse("ledger-reviewed-recorded-legacy-state", () => LedgerAdmission(DisposableLedger("ledger-reviewed-legacy-state", JsonSerializer.SerializeToUtf8Bytes(Selected(Reviewed, Issue))), Reviewed));
+        return count;
     }
     [STAThread] static int Main(string[] args) {
         try {
             Require(Hash(typeof(Profiles).Assembly.Location) == Backend, "Wrong loaded backend.");
             if (args.Length == 2 && args[0] == "--core-self-test") return (int)typeof(PublicationGuardTests).GetMethod("Main", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { new[] { "--self-test", args[1] } });
             if (args.Length == 2 && args[0] == "--admission-self-test") return AdmissionTests(args[1]);
-            Require(args.Length == 7 || args.Length == 8, "Usage: --publish-exact-video-history (or --recover-exact-video-history / --checkpoint-exact-profile) LEDGER IDLE_JSON IDLE_SHA PID START_UTC --broker-grant [REVIEWED_PROFILE_SHA]. No general configuration mode.");
+            args = IssueSelection(args, out string selector);
+            Require(args.Length == 7 || args.Length == 8, "Usage: --publish-exact-video-history (or --recover-exact-video-history / --checkpoint-exact-profile) LEDGER IDLE_JSON IDLE_SHA PID START_UTC --broker-grant [REVIEWED_PROFILE_SHA] [" + ReviewedEmptyIssueFlag + "]. No general configuration mode.");
             Require(args[6] == "--broker-grant", "Explicit scoped broker grant argument required.");
             bool publish = args[0] == "--publish-exact-video-history", recover = args[0] == "--recover-exact-video-history", checkpoint = args[0] == "--checkpoint-exact-profile", reviewed = args[0] == "--recover-reviewed-exact-video-history";
             Require(publish || recover || checkpoint || reviewed, "Unsupported mode."); Require(checkpoint || reviewed ? args.Length == 8 : args.Length == 7, "Exact mode arguments required.");
-            string ledger = Ledger(args[1], publish); using var captured = Capture(Int32.Parse(args[4]), args[5], args[2], args[3]); var admission = captured.Value; Validate(admission, publish);
+            string ledger = Ledger(args[1], publish); using var captured = Capture(Int32.Parse(args[4]), args[5], args[2], args[3], selector); var admission = captured.Value; Validate(admission, publish, selector);
             if (publish) {
-                var baseline = OwnedRecordPublication.Baseline(Config); Require(baseline.Count == 2 && baseline["issue-state.json"].Sha256 == Issue && baseline["quick-share-tools.json"].Sha256 == Tools, "Fresh baseline differs.");
+                var baseline = OwnedRecordPublication.Baseline(Config); RequireIssueBaseline(baseline, selector);
                 var records = captured.Records();
                 using (SafePaths.LockDirectories(Owned)) Directory.CreateDirectory(ledger);
                 ExclusiveJson(Path.Combine(ledger, "admission.json"), admission);
                 OwnedRecordPublication.Publish(Config, ledger, records, baseline); Console.WriteLine("Published only the exact manual/off fixture profile and history. No import/export/eject started."); return 0;
             }
-            Require(File.Exists(Path.Combine(ledger, "admission.json")), "Owned live admission ledger missing.");
-            var originalAdmission = JsonSerializer.Deserialize<Admission>(File.ReadAllBytes(Path.Combine(ledger, "admission.json"))); Validate(originalAdmission, true);
+            LedgerAdmission(ledger, selector);
             if (checkpoint) {
                 string hash = OwnedRecordPublication.CheckpointReviewed(Config, ledger, ProfileName, args[7].ToUpperInvariant(), bytes => ValidateEdit(bytes, captured.ProfileBytes));
                 Console.WriteLine("Explicit reviewed checkpoint SHA256: " + hash); return 0;

@@ -1,3 +1,21 @@
+# Windows progress · October 10, 2026
+
+## HANDOFF Codex -> Claude accepted · October 10 UTC
+
+Claude accepts sole implementation ownership of native Easy Eject Windows, per Ryan's direct authorization in the Easy Eject Claude project. Route: a Claude desktop Remote Control session on LAPTOP-OQ24VVBH, folder `~\OneDrive\Documents`, allowed by Ryan. Actual read check at **2026-10-10T03:55Z**: `CodexHandoffs/EasyEject-20261009/Claude-Windows-Handoff-20261010.md` SHA256 **C61DA48AADC9DA080276F619A6E4411CB61702A70F2506E5A2F420A61BCF5D46** and its current-state JSON **CA5307A23B2B03D7139358562419BA0CB4090F6EF45612FF0C6C1180DFD1E8E2** both match. This repository read clean `windows/native-tray-milestone` HEAD **8f6d7bd7f34de0ed0b540e6fb40eda0fb56a1932**. The live app PID21224 with the same start time, the 49B/486B config pins and the original helper `0C2ADA0F…` all matched read-only.
+
+Access limits: this route works in Documents, plus read and write under `C:\Users\rsmit\.codex\EasyEjectBuildTools` for isolated builds. It has no native UI input lease and no device, signing or release authority. No PowerShell 7 is installed. Codex desktop processes are running, but Claude cannot observe Codex chat goals. Codex idleness rests on the owner packets and Ryan's statement; no Codex-owned helper or build process was observed. The Mac folder and its PROJECT-CONTINUITY.md belong to the separate Mac thread. Website stays with Marketing Sites.
+
+## Explicit reviewed empty issue baseline for the history helper · October 10 UTC
+
+The [exact generated-history helper](modern/tools/NATIVE_HISTORY_PUBLICATION.md) now accepts an optional trailing `--reviewed-empty-issue-baseline`, which admits only the current 49B issue state (`4E998657…2651`). The legacy 161B pin stays the default. There is no automatic adoption, wildcard or rewrite of historical packets. The selector is recorded as `IssueBaseline` in `admission.json`. Checkpoint and recovery modes require the caller's selection to match the ledger before any write. Pre-selector ledgers, including the retained October 10 live ledger (read unchanged), are treated as legacy. All manifest, app, backend, process, window, fresh-proof, exclusive-publication, identity and recovery guards are unchanged.
+
+`run-admission-verification.ps1 -BrokerGrant -ReviewedEmptyIssueBaseline` ran from isolated copy `PublicationBaselineSource-20261010T0402460818713Z`. It built warning-free (warnings as errors) outside OneDrive. Parent29480 finished **04:02:46.5085095Z–04:03:04.9403560Z**, exit0. Results: **17/0 core, 48/0 admission/integration, 60/0 new issue-baseline** (allowed/changed/unknown/missing/JSON round trip/ledger selector) and **12 CLI refusals**. The 12 refusals are the 8 existing plus 4 selector controls. Each refusal now has to reach its own expected reason. Receipt `PublicationAdmissionRun-20261010T0402464683487Z/result.json` SHA256 **E2C60935BEF18B47DED2FE6CA16553C144957F9288D3E76FE41B3C6A73669150**; helper DLL **C327FC2B…CAFC**. The apphost exe is the generic host, unchanged at 0C2ADA0F. The original helper packet, all649 payloads, PID21224/start and both live config files are unchanged; HEAD stayed 8f6d7bd.
+
+Three earlier attempts are retained, not rewritten. In `…0359518635321Z`, compile error CS0165 stopped the build before any test. In `…0400158053086Z`, 17/0 and 48+60/0 passed, but Windows PowerShell 5.1 turned the expected refusal stderr into a wrapper stop. In `…0401037364052Z`, all passed, but the synthetic proof was written with a UTF-8 BOM, so stale, PID and start controls refused at JSON parsing instead of their own checks. The October 9 Codex run used a host without that BOM. The wrapper now writes the proof without a BOM, launches CLI controls through Start-Process and asserts each reason.
+
+No live publication, UI input, export, config write, device action or default-count change. A future live slice still needs a fresh supported native idle proof and its own admission. Native4K/restart/refusal/cancel, tray/Quit, identified disposable hardware, official Luna LUT/genuine media and trusted distribution remain open.
+
 # Windows progress · October 9, 2026
 
 ## Native exact history and manual sharing pass · October 9 EDT

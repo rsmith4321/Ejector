@@ -1,4 +1,4 @@
-param([switch]$BrokerGrant)
+param([switch]$BrokerGrant,[switch]$ReviewedEmptyIssueBaseline)
 $ErrorActionPreference='Stop'
 if(!$BrokerGrant){throw 'Explicit bounded helper-test grant required.'}
 $publicationSource=$PSScriptRoot
@@ -7,7 +7,7 @@ $publicationTestRoot=Join-Path 'C:\Users\rsmit\.codex\EasyEjectBuildTools' ('Pub
 $publicationApp='C:\Users\rsmit\.codex\EasyEjectBuildTools\PowerConnectionAtomic-20261008\review\app'
 $publicationConfig='C:\Users\rsmit\AppData\Local\Packages\OpenAI.Codex_2p2nqsd0c76g0\LocalCache\Local\EasyEject\Profiles'
 $publicationManifest='C:\Users\rsmit\.codex\EasyEjectBuildTools\PowerConnectionAtomic-20261008\review\review-build.json'
-$publicationResult=[ordered]@{ParentPid=$PID;StartedUtc=[DateTime]::UtcNow.ToString('o');FinishedUtc=$null;ExitCode=1;Failure=$null;Packet=$publicationPacket;TestRoot=$publicationTestRoot;Count=$null;LivePublicationPerformed=$false;NegativeCliOnly=$true}
+$publicationResult=[ordered]@{ParentPid=$PID;StartedUtc=[DateTime]::UtcNow.ToString('o');FinishedUtc=$null;ExitCode=1;Failure=$null;Packet=$publicationPacket;TestRoot=$publicationTestRoot;Count=$null;LivePublicationPerformed=$false;NegativeCliOnly=$true;IssueBaseline=$(if($ReviewedEmptyIssueBaseline){'reviewed-empty-49'}else{'legacy-161'})}
 $publicationSavedEnv=@{}
 $publicationEnv=@{DOTNET_GENERATE_ASPNET_CERTIFICATE='false';DOTNET_CLI_TELEMETRY_OPTOUT='1';DOTNET_CLI_HOME='C:\Users\rsmit\.codex\EasyEjectBuildTools\cli';NUGET_PACKAGES='C:\Users\rsmit\.codex\EasyEjectBuildTools\nuget'}
 function PublicationAppPin {
@@ -27,9 +27,17 @@ function PublicationManifestPin {
  foreach($publicationFile in $publicationFiles){$publicationPath=Join-Path $publicationApp $publicationFile.path;if((Get-Item -LiteralPath $publicationPath).Length -ne $publicationFile.length -or (Get-FileHash -LiteralPath $publicationPath).Hash -ine $publicationFile.sha256){throw ('Current payload differs: '+$publicationFile.path)}}
  [ordered]@{ManifestSha256=(Get-FileHash -LiteralPath $publicationManifest).Hash;Files=649}|ConvertTo-Json -Compress
 }
+function PublicationIssueBaselinePin {
+ # Read-only: the explicitly selected live issue state must be exactly the reviewed empty49B record.
+ $publicationIssue=Get-Item -LiteralPath (Join-Path $publicationConfig 'issue-state.json')
+ $publicationIssueHash=(Get-FileHash -LiteralPath $publicationIssue.FullName).Hash
+ if($publicationIssue.Length -ne 49 -or $publicationIssueHash -ne '4E998657AF8E8B4DEBCF79494D65A5B9C9811D8D1884A9551EDA8191F8C32651'){throw 'Selected reviewed empty issue baseline differs; preserve and rebase.'}
+ [ordered]@{Selector='reviewed-empty-49';Length=$publicationIssue.Length;Sha256=$publicationIssueHash}|ConvertTo-Json -Compress
+}
 New-Item -ItemType Directory -Path $publicationPacket|Out-Null
 try {
  $publicationResult.BeforeApp=PublicationAppPin;$publicationResult.BeforeConfig=PublicationConfigPins;$publicationResult.BeforePayload=PublicationManifestPin
+ if($ReviewedEmptyIssueBaseline){$publicationResult.BeforeIssueBaseline=PublicationIssueBaselinePin}
  $publicationResult.HeadBefore=git rev-parse HEAD;$publicationResult.GitStatusBefore=@(git status --short)
  $publicationResult.SourcePins=@(foreach($publicationName in @('OwnedRecordPublication.cs','PublicationGuardTests.cs','OwnedRecordPublication.csproj','NativeHistoryPublication.cs','NativeHistoryPublication.csproj','nuget.config','run-admission-verification.ps1')){[ordered]@{Name=$publicationName;Sha256=(Get-FileHash -LiteralPath (Join-Path $publicationSource $publicationName)).Hash}})
  $publicationResult|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $publicationPacket 'before.json') -Encoding utf8
@@ -49,34 +57,44 @@ try {
  $publicationResult.AdmissionCount=Get-Content -LiteralPath (Join-Path $publicationAdmissionRoot 'result.json') -Raw|ConvertFrom-Json
  $publicationNegativeLedger=Join-Path 'C:\Users\rsmit\.codex\EasyEjectBuildTools' ('NativeHistoryLive-Negative-'+[DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ'))
  $publicationProof=Join-Path $publicationPacket 'synthetic-stale-proof.json'
- [ordered]@{capturedUtc=[DateTime]::UtcNow.AddMinutes(-10).ToString('o');window=[ordered]@{app=('process:'+(Join-Path $publicationApp 'EasyEject.Modern.exe'));id=1967754;title='Easy Eject'};tree='button Refresh connected storage ID: Refresh'}|ConvertTo-Json -Depth 4|Set-Content -LiteralPath $publicationProof -Encoding utf8
+ [ordered]@{capturedUtc=[DateTime]::UtcNow.AddMinutes(-10).ToString('o');window=[ordered]@{app=('process:'+(Join-Path $publicationApp 'EasyEject.Modern.exe'));id=1967754;title='Easy Eject'};tree='button Refresh connected storage ID: Refresh'}|ConvertTo-Json -Depth 4|ForEach-Object{[IO.File]::WriteAllText($publicationProof,$_,(New-Object Text.UTF8Encoding $false))}
  $publicationProofHash=(Get-FileHash -LiteralPath $publicationProof).Hash
  $publicationCliCases=@(
-  @{Name='missing-mode';Arguments=@()},
-  @{Name='wrong-mode';Arguments=@('--unsupported',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'21224','2026-10-09T02:46:46.1826671Z','--broker-grant')},
-  @{Name='missing-grant';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'21224','2026-10-09T02:46:46.1826671Z')},
-  @{Name='missing-proof';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,(Join-Path $publicationPacket 'absent-proof.json'),$publicationProofHash,'21224','2026-10-09T02:46:46.1826671Z','--broker-grant')},
-  @{Name='wrong-proof-hash';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,'wrong','21224','2026-10-09T02:46:46.1826671Z','--broker-grant')},
-  @{Name='wrong-pid';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'0','2026-10-09T02:46:46.1826671Z','--broker-grant')},
-  @{Name='wrong-start';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'21224','wrong-start','--broker-grant')},
-  @{Name='stale-native-proof';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'21224','2026-10-09T02:46:46.1826671Z','--broker-grant')}
+  @{Name='missing-mode';Expect='Usage:';Arguments=@()},
+  @{Name='wrong-mode';Expect='Unsupported mode.';Arguments=@('--unsupported',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'21224','2026-10-09T02:46:46.1826671Z','--broker-grant')},
+  @{Name='missing-grant';Expect='Usage:';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'21224','2026-10-09T02:46:46.1826671Z')},
+  @{Name='missing-proof';Expect='Expected record absent';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,(Join-Path $publicationPacket 'absent-proof.json'),$publicationProofHash,'21224','2026-10-09T02:46:46.1826671Z','--broker-grant')},
+  @{Name='wrong-proof-hash';Expect='Captured source differs';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,'wrong','21224','2026-10-09T02:46:46.1826671Z','--broker-grant')},
+  @{Name='wrong-pid';Expect='Unable to enumerate the process modules';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'0','2026-10-09T02:46:46.1826671Z','--broker-grant')},
+  @{Name='wrong-start';Expect='Current PID/start binding differs.';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'21224','wrong-start','--broker-grant')},
+  @{Name='stale-native-proof';Expect='Fresh native idle proof required.';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'21224','2026-10-09T02:46:46.1826671Z','--broker-grant')},
+  @{Name='reviewed-baseline-stale-native-proof';Expect='Fresh native idle proof required.';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'21224','2026-10-09T02:46:46.1826671Z','--broker-grant','--reviewed-empty-issue-baseline')},
+  @{Name='reviewed-baseline-not-last';Expect='Place --reviewed-empty-issue-baseline last.';Arguments=@('--publish-exact-video-history','--reviewed-empty-issue-baseline',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'21224','2026-10-09T02:46:46.1826671Z','--broker-grant')},
+  @{Name='reviewed-baseline-repeated';Expect='Repeated issue baseline selection.';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'21224','2026-10-09T02:46:46.1826671Z','--broker-grant','--reviewed-empty-issue-baseline','--reviewed-empty-issue-baseline')},
+  @{Name='unknown-issue-baseline';Expect='Unknown issue baseline selection.';Arguments=@('--publish-exact-video-history',$publicationNegativeLedger,$publicationProof,$publicationProofHash,'21224','2026-10-09T02:46:46.1826671Z','--broker-grant','--reviewed-any-issue-baseline')}
  )
  $publicationResult.NegativeCli=@(foreach($publicationCliCase in $publicationCliCases){
   $publicationCliArgs=$publicationCliCase.Arguments
-  & "$publicationPacket\runner\NativeHistoryPublication.exe" @publicationCliArgs 1> "$publicationPacket\cli-$($publicationCliCase.Name).stdout.log" 2> "$publicationPacket\cli-$($publicationCliCase.Name).stderr.log"
-  $publicationCliExit=$LASTEXITCODE
+  # Start-Process keeps expected refusal stderr out of Windows PowerShell 5.1's Stop-on-native-stderr handling.
+  $publicationCliStart=@{FilePath="$publicationPacket\runner\NativeHistoryPublication.exe";RedirectStandardOutput="$publicationPacket\cli-$($publicationCliCase.Name).stdout.log";RedirectStandardError="$publicationPacket\cli-$($publicationCliCase.Name).stderr.log";NoNewWindow=$true;Wait=$true;PassThru=$true}
+  if(@($publicationCliArgs).Count -gt 0){$publicationCliStart.ArgumentList=@($publicationCliArgs|ForEach-Object{'"'+$_+'"'})}
+  $publicationCliExit=(Start-Process @publicationCliStart).ExitCode
   if($publicationCliExit -ne 1 -or (Test-Path -LiteralPath $publicationNegativeLedger)){throw ('CLI negative refusal failed: '+$publicationCliCase.Name)}
   if((PublicationConfigPins) -ne $publicationResult.BeforeConfig){throw 'Negative CLI changed live configuration.'}
-  [ordered]@{Name=$publicationCliCase.Name;ExitCode=$publicationCliExit;LedgerAbsent=$true;ConfigUnchanged=$true}
+  # Each control must reach its own refusal, not an earlier unrelated one.
+  $publicationCliReason=[string]@(Get-Content -LiteralPath "$publicationPacket\cli-$($publicationCliCase.Name).stderr.log")[0]
+  if(-not $publicationCliReason -or -not $publicationCliReason.Contains($publicationCliCase.Expect)){throw ('CLI negative refusal reached a different check: '+$publicationCliCase.Name)}
+  [ordered]@{Name=$publicationCliCase.Name;ExitCode=$publicationCliExit;Reason=$publicationCliReason;LedgerAbsent=$true;ConfigUnchanged=$true}
  })
  $publicationResult.HelperHashes=@(foreach($publicationName in @('NativeHistoryPublication.exe','NativeHistoryPublication.dll')){[ordered]@{Name=$publicationName;Sha256=(Get-FileHash -LiteralPath "$publicationPacket\runner\$publicationName").Hash}})
- $publicationResult.Count=[ordered]@{Core=$publicationResult.CoreCount.Passed;AdmissionAndIntegration=$publicationResult.AdmissionCount.Passed;NegativeCli=$publicationResult.NegativeCli.Count;Failed=0}
+ $publicationResult.Count=[ordered]@{Core=$publicationResult.CoreCount.Passed;AdmissionAndIntegration=$publicationResult.AdmissionCount.Passed;IssueBaseline=$publicationResult.AdmissionCount.IssueBaselinePassed;NegativeCli=$publicationResult.NegativeCli.Count;Failed=0}
  $publicationResult.ExitCode=0
 }catch{$publicationResult.Failure=$_.Exception.ToString();$publicationResult.ExitCode=1}
 finally {
  try {
   $publicationResult.AfterApp=PublicationAppPin;$publicationResult.AfterConfig=PublicationConfigPins;$publicationResult.AfterPayload=PublicationManifestPin
   if($publicationResult.BeforeApp -ne $publicationResult.AfterApp -or $publicationResult.BeforeConfig -ne $publicationResult.AfterConfig -or $publicationResult.BeforePayload -ne $publicationResult.AfterPayload){throw 'Preservation guard failed.'}
+  if($ReviewedEmptyIssueBaseline){$publicationResult.AfterIssueBaseline=PublicationIssueBaselinePin;if($publicationResult.AfterIssueBaseline -ne $publicationResult.BeforeIssueBaseline){throw 'Selected issue baseline changed.'}}
   foreach($publicationPin in $publicationResult.SourcePins){if((Get-FileHash -LiteralPath (Join-Path $publicationSource $publicationPin.Name)).Hash -ne $publicationPin.Sha256){throw 'Helper source changed during execution.'}}
   $publicationResult.HeadAfter=git rev-parse HEAD;$publicationResult.GitStatusAfter=@(git status --short)
   $publicationResult.ActiveOwnedWorkers=@(Get-Process -Name NativeHistoryPublication -ErrorAction SilentlyContinue | Where-Object {$_.Path -like "$publicationPacket\runner\*"} | Select-Object Id,Path)
