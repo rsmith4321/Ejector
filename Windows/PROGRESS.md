@@ -1,5 +1,11 @@
 # Windows progress · October 10, 2026
 
+## Mac deletion-race parity check (07de127) · October 10 UTC
+
+Mac `07de127` closes path-based races between final verification and deleting an original, a recovered Trash file or cleanup metadata. Windows already uses the safe design for all of these. Each item is opened without following reparse points, with no sharing on removal, so it cannot be renamed, replaced or written while held. The final path, volume serial and file type are checked, the bytes are re-verified, and the item is deleted through its own handle (`FileDispositionInfo`), never by a path or recursively. Parents stay held, cleanup skips reparse points, and `__MACOSX` is removed only when empty and only atomically.
+
+`DeletionRaceParityTests.cs` (`--deletion-races`, **3/0**) mirrors Mac cases 1, 2 and 4/5 at the last audit step before removal. A swap to a directory or another file is refused by the OS. An ancestor swapped for a junction never reaches the outside folder. Mac cases 3 and 6–8 map to existing Windows Trash and cleanup tests named in the file. No production change was needed. Isolated copy `ClaudeRaceParity-20261010T093504Z`, identical to this commit: modern app build clean, selected **242/0**, full modern **1430/0**, and Framework full **1430/0**.
+
 ## Open Folder in import history for DJI O4 Pro batches · October 10 UTC
 
 Mirroring Mac `57f5e07`, both interfaces' import history now shows **Open Folder** beside Quick Share for opted-in DJI O4 Pro batches. `CompletionFolder.Open(CompletedBatch…)` validates the exact saved batch and refuses a missing folder. It holds the destination root and batch folder, reserves the destination disk, revalidates the destination guard, and only then opens Explorer. A moved or replaced folder or a disconnected destination opens nothing. Opening grants no source, eject or sharing authority.
