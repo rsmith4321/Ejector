@@ -72,8 +72,10 @@ namespace EasyEject {
                 path = SafePaths.Normalize(path); if (!SafePaths.Within(path, sourceRoot)) throw new SafetyException("Choose a media folder within the selected device.");
                 draft.RelativeSource = path.TrimEnd('\\').Equals(sourceRoot.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) ? "" : SafePaths.Relative(path, sourceRoot); revision++; }
         }
-        internal void SetSharing(bool enabled, bool uhd, bool lut) { lock (gate) { Editable(); draft.SharingPreset = enabled ? uhd ? QuickShareProfile.Uhd : QuickShareProfile.Hd : null;
-            draft.SharingColor = lut ? QuickShareProfile.LunaILog : QuickShareProfile.Standard; revision++; } }
+        internal void SetSharing(bool enabled, bool uhd, bool lut) { SetSharing(enabled, uhd, lut, QuickShareProfile.Camera(Snapshot())); }
+        internal void SetSharing(bool enabled, bool uhd, bool lut, QuickShareCamera camera) { lock (gate) { Editable(); if (!Enum.IsDefined(typeof(QuickShareCamera), camera)) throw new SafetyException("Choose a supported Quick Share camera.");
+            draft.SharingPreset = enabled ? uhd ? QuickShareProfile.Uhd : QuickShareProfile.Hd : null;
+            draft.SharingCamera = QuickShareProfile.CameraValue(camera); draft.SharingColor = QuickShareProfile.ColorValue(camera, lut); revision++; } }
         internal void ClearMacOwner() { lock (gate) { Editable(); draft.MacTrashUid = null; revision++; } }
         internal Review BeginReview(ProfileReviewKind kind, string ownerPath = null) {
             lock (gate) { Editable(); string owner = null;

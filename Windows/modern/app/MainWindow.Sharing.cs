@@ -78,21 +78,25 @@ namespace EasyEject.Modern {
             try {
                 await EnsureVisible();
                 token = activity.Begin(TrayOperationKind.Share, expected.DeviceName, "Reviewing saved batch and sharing choices");
-                var offer = await Task.Run(() => SharingService.Prepare(expected)); review = new ManualQuickShareReview(offer);
+                var offer = await Task.Run(() => SharingService.Prepare(expected)); var camera = offer.Camera;
+                string gyroflow = camera == QuickShareCamera.DjiO4Pro ? await Task.Run(() => QuickSharePresentation.GyroflowPending(offer.Batch)) : null;
+                if (gyroflow != null) { Summary.Text = gyroflow + " No export started; full-quality imported originals are kept."; if (AppWindow.IsVisible) { confirmation = MessageDialog("Quick Share", Summary.Text, null); await confirmation.ShowAsync(); confirmation = null; } return false; }
+                review = new ManualQuickShareReview(offer);
                 var size = new ComboBox { ItemsSource = new[] { "1080p · smaller files", "4K · more detail" }, SelectedIndex = review.Preset == QuickSharePreset.Uhd ? 1 : 0, HorizontalAlignment = HorizontalAlignment.Stretch };
-                var lut = new CheckBox { Content = "Apply official Luna I-Log LUT", IsChecked = review.Color == QuickShareColor.LunaILog };
+                var lut = new CheckBox { Content = "Apply official " + QuickShareMedia.LutLabel(camera) + " LUT", IsChecked = review.Color != QuickShareColor.Standard };
                 var body = new StackPanel { Spacing = 16 };
                 body.Children.Add(Wrapped(offer.Batch.DeviceName + "\n\nCreate sharing copies from this exact verified batch:\n" + offer.Batch.Folder));
                 body.Children.Add(Wrapped("Choose size for this export")); body.Children.Add(size); body.Children.Add(lut);
-                body.Children.Add(Wrapped("Use the LUT only for Luna I-Log recordings. Leave it off for normal-color footage; color tags do not identify the recording mode.\n\nFraming and audio are preserved without enlarging the video, at most 30 fps. Approximate sizes: 60 MB/min at 1080p; 180 MB/min at 4K.\n\nOutputs are probed and fully decoded before publication under Sharing Copies. Existing verified exports can be reused. Full-quality originals stay unchanged. This action never ejects. Tools and the official LUT must be supplied in Quick Share tools."));
+                body.Children.Add(Wrapped((camera == QuickShareCamera.DjiO4Pro ? "Shares the Gyroflow _stabilized.mp4 exports beside the DJI O4 Pro originals. Use the LUT only for D-Log M footage. Gyroflow exports marked as having a LUT applied keep their existing colors; Quick Share only makes them smaller. For other already-colored exports, turn the LUT off."
+                    : "Use the LUT only for Luna I-Log recordings. Leave it off for normal-color footage; color tags do not identify the recording mode.") + "\n\nFraming and audio are preserved without enlarging the video, at most 30 fps. Approximate sizes: 60 MB/min at 1080p; 180 MB/min at 4K.\n\nOutputs are probed and fully decoded before publication under Sharing Copies. Existing verified exports can be reused. Full-quality originals stay unchanged. This action never ejects. Tools and the official LUT must be supplied in Quick Share tools."));
                 confirmation = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Create sharing copies", Content = Scrolling(body), PrimaryButtonText = "Create sharing copies", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close };
                 UpdateActions(); var answer = await confirmation.ShowAsync(); confirmation = null;
                 if (answer != ContentDialogResult.Primary) { review.Cancel(); Summary.Text = "Quick Share cancelled. No export started; full-quality imported originals are kept."; return false; }
-                review.Set(size.SelectedIndex == 1 ? QuickSharePreset.Uhd : QuickSharePreset.Hd, lut.IsChecked == true ? QuickShareColor.LunaILog : QuickShareColor.Standard); request = review.Confirm();
+                review.Set(size.SelectedIndex == 1 ? QuickSharePreset.Uhd : QuickSharePreset.Hd, lut.IsChecked == true ? QuickShareMedia.LogColor(camera) : QuickShareColor.Standard); request = review.Confirm();
                 operationCancel = new CancellationTokenSource(); ImportProgress.Visibility = Visibility.Visible; ImportProgress.IsIndeterminate = true;
                 Summary.Text = "Creating sharing copies from exact verified saved originals…"; UpdateActions();
                 terminal = await StartStorageTask(token, () => Task.Run(() => SharingService.Run(request, operationCancel.Token, message => QueueImportProgress(token, message), guard => QueueStorageProof(token, guard))));
-                success = QuickSharePresentation.Success(request.Batch, request.Preset, terminal); Summary.Text = success; await DrainStorageTask(token); StopSavedCancellation();
+                success = QuickSharePresentation.Success(request.Batch, request.Preset, terminal, request.Camera); Summary.Text = success; await DrainStorageTask(token); StopSavedCancellation();
                 NotifyImport(terminal.CleanupWarnings.Count == 0 ? "Sharing copies ready" : "Sharing copies ready; needs attention", success, terminal.CleanupWarnings.Count != 0, terminal.CleanupWarnings.Count == 0);
                 if (AppWindow.IsVisible) { confirmation = MessageDialog("Quick Share", success, null); await confirmation.ShowAsync(); confirmation = null; }
                 return true;
@@ -100,10 +104,10 @@ namespace EasyEject.Modern {
                 StopSavedCancellation(); Summary.Text = ex.Message;
                 NotifyImport(ex.Cancelled ? "Quick Share cancelled" : "Quick Share needs attention", ex.Message, !ex.Cancelled || QuickSharePresentation.CancelNeedsAttention(ex));
             } catch (OperationCanceledException) {
-                StopSavedCancellation(); Summary.Text = terminal == null ? "Quick Share cancelled before export. Saved originals and earlier sharing copies are kept. Retry is manual." : success ?? QuickSharePresentation.Success(request.Batch, request.Preset, terminal);
+                StopSavedCancellation(); Summary.Text = terminal == null ? "Quick Share cancelled before export. Saved originals and earlier sharing copies are kept. Retry is manual." : success ?? QuickSharePresentation.Success(request.Batch, request.Preset, terminal, request.Camera);
             } catch (Exception ex) {
                 StopSavedCancellation(); Summary.Text = terminal == null ? "Quick Share stopped. Saved originals remain unchanged. Retry is manual. " + ex.Message
-                    : (success ?? QuickSharePresentation.Success(request.Batch, request.Preset, terminal)) + "\nCompletion display unavailable: " + ex.Message;
+                    : (success ?? QuickSharePresentation.Success(request.Batch, request.Preset, terminal, request.Camera)) + "\nCompletion display unavailable: " + ex.Message;
             } finally { await DrainStorageTask(token); if (review != null) review.Cancel(); StopSavedCancellation(); activity.End(Summary.Text); UpdateImportTray(); ImportStatus.Text = Summary.Text; ImportProgress.Visibility = Visibility.Collapsed; UpdateActions(); }
             return terminal != null;
         }
@@ -122,6 +126,7 @@ namespace EasyEject.Modern {
                 var ffmpeg = new TextBox { Text = value.Ffmpeg == null ? "" : value.Ffmpeg.Path, IsReadOnly = true };
                 var ffprobe = new TextBox { Text = value.Ffprobe == null ? "" : value.Ffprobe.Path, IsReadOnly = true };
                 var lut = new TextBox { Text = value.Lut == null ? "" : value.Lut.Path, IsReadOnly = true };
+                var djiLut = new TextBox { Text = value.DjiLut == null ? "" : value.DjiLut.Path, IsReadOnly = true };
                 var status = Wrapped("Cancel keeps previous setup. No export starts here."); bool picking = false, failed = false; string saved = null;
                 var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Quick Share tools", PrimaryButtonText = "Save setup", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close };
                 var fields = new ContentControl { Content = body, HorizontalContentAlignment = HorizontalAlignment.Stretch };
@@ -149,9 +154,12 @@ namespace EasyEject.Modern {
                 addFile("FFmpeg executable", ffmpeg, ".exe"); addFile("FFprobe executable", ffprobe, ".exe");
                 body.Children.Add(Wrapped("Official Luna I-Log LUT is optional for normal-color exports. Choose " + QuickShareMedia.OfficialLutName + " from your official Insta360 download. Save checks the exact official hash and retains a local copy. Your downloaded original stays intact; clearing the choice deletes neither copy."));
                 addFile("Official LUT", lut, ".cube");
+                body.Children.Add(Wrapped("Official DJI O4 Pro D-Log M LUT is optional. Choose the O4 Air Unit Series D-Log M to Rec.709 .cube from DJI's O4 download page. Save checks its exact official hash and retains a local copy, as above. Gyroflow exports that already carry Gyroflow's LUT marker do not need it."));
+                addFile("Official DJI O4 LUT", djiLut, ".cube");
                 var clearTools = new Button { Content = "Clear tool selections" }; clearTools.Click += delegate { if (owns() && !picking && !quickShareSetupSaving && !failed) ffmpeg.Text = ffprobe.Text = ""; };
                 var clearLut = new Button { Content = "Clear LUT selection" }; clearLut.Click += delegate { if (owns() && !picking && !quickShareSetupSaving && !failed) lut.Text = ""; };
-                body.Children.Add(clearTools); body.Children.Add(clearLut); body.Children.Add(status); dialog.Content = scroll;
+                var clearDjiLut = new Button { Content = "Clear DJI LUT selection" }; clearDjiLut.Click += delegate { if (owns() && !picking && !quickShareSetupSaving && !failed) djiLut.Text = ""; };
+                body.Children.Add(clearTools); body.Children.Add(clearLut); body.Children.Add(clearDjiLut); body.Children.Add(status); dialog.Content = scroll;
                 dialog.CloseButtonClick += delegate(ContentDialog sender, ContentDialogButtonClickEventArgs args) {
                     if (!owns()) { args.Cancel = true; return; }
                     if (picking) { args.Cancel = true; return; }
@@ -163,13 +171,13 @@ namespace EasyEject.Modern {
                 dialog.PrimaryButtonClick += async delegate(ContentDialog sender, ContentDialogButtonClickEventArgs args) {
                     if (!owns() || picking || quickShareSetupSaving || failed) { args.Cancel = true; return; }
                     var deferral = args.GetDeferral(); args.Cancel = true;
-                    string selectedFfmpeg = ffmpeg.Text, selectedFfprobe = ffprobe.Text, selectedLut = lut.Text;
+                    string selectedFfmpeg = ffmpeg.Text, selectedFfprobe = ffprobe.Text, selectedLut = lut.Text, selectedDjiLut = djiLut.Text;
                     quickShareSetupSaving = true; fields.IsEnabled = false; dialog.IsPrimaryButtonEnabled = false; dialog.CloseButtonText = "Stop validation";
                     var cancellation = new CancellationTokenSource(); operationCancel = cancellation;
                     status.Text = "Validating supplied files and saving setup. No tools are running…"; UpdateActions();
                     Func<Task> saveSetup = async () => {
                         try {
-                            await Task.Run(() => QuickShareConfiguration.Save(snapshot, selectedFfmpeg, selectedFfprobe, selectedLut, Profiles.Root, cancellation.Token));
+                            await Task.Run(() => QuickShareConfiguration.Save(snapshot, selectedFfmpeg, selectedFfprobe, selectedLut, Profiles.Root, cancellation.Token, null, selectedDjiLut));
                             saved = "Quick Share setup saved. No export started."; if (owns()) args.Cancel = false;
                         } catch (OperationCanceledException) { failed = true; if (owns()) status.Text = "Setup validation cancelled. Close and reopen to review saved choices. An already copied local LUT is retained."; }
                         catch (Exception ex) { failed = true; if (owns()) status.Text = "Setup was not confirmed. Close and reopen to review saved choices before retrying. " + ex.Message; }

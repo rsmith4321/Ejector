@@ -9,9 +9,9 @@ using System.Threading;
 
 namespace EasyEject {
     internal sealed class QuickShareTools {
-        internal readonly string Ffmpeg, Ffprobe, Lut;
-        internal QuickShareTools(string ffmpeg, string ffprobe, string lut = null) {
-            Ffmpeg = Executable(ffmpeg); Ffprobe = Executable(ffprobe); Lut = lut == null ? null : SafePaths.Normalize(lut);
+        internal readonly string Ffmpeg, Ffprobe, Lut, DjiLut;
+        internal QuickShareTools(string ffmpeg, string ffprobe, string lut = null, string djiLut = null) {
+            Ffmpeg = Executable(ffmpeg); Ffprobe = Executable(ffprobe); Lut = lut == null ? null : SafePaths.Normalize(lut); DjiLut = djiLut == null ? null : SafePaths.Normalize(djiLut);
         }
         static string Executable(string path) { path = SafePaths.Normalize(path); if (!Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Choose a local FFmpeg/FFprobe executable; scripts are unsupported."); return path; }
         internal IDisposable Hold() { return new HeldTools(this); }
@@ -34,7 +34,7 @@ namespace EasyEject {
         [DataMember] internal double FrameRate { get; set; }
         [DataMember] internal double Seconds { get; set; }
         internal bool Matches(QuickSharePlan plan, string source) {
-            return Recipe == QuickSharePlan.Recipe && SourceSha256 == source && LutSha256 == plan.LutSha && Preset == plan.PresetName && Color == plan.Color.ToString() && Bytes > 0
+            return Recipe == plan.RecipeName && SourceSha256 == source && LutSha256 == plan.LutSha && Preset == plan.PresetName && Color == plan.Color.ToString() && Bytes > 0
                 && Width == plan.Width && Height == plan.Height && Math.Abs(FrameRate - plan.FrameRate) < 0.000000001 && Math.Abs(Seconds - plan.Seconds) < 0.000000001 && ImportHistory.ValidHash(OutputSha256);
         }
     }
@@ -54,19 +54,34 @@ namespace EasyEject {
         readonly IQuickShareProcess process; readonly Operations operations; readonly Action<string> auditCheck;
         readonly Func<string, ulong> freeSpace; readonly Action<string, string> checkpoint;
         internal QuickShareEngine(IQuickShareProcess process, Operations operations, Action<string> auditCheck = null, Func<string, ulong> freeSpace = null, Action<string, string> checkpoint = null) { this.process = process; this.operations = operations; this.auditCheck = auditCheck ?? (_ => {}); this.freeSpace = freeSpace ?? Native.FreeSpace; this.checkpoint = checkpoint ?? ((stage, path) => {}); }
-        internal QuickShareResult Run(CompletedBatch batch, DestinationIdentity current, IImportGuard guard, QuickShareTools tools, QuickSharePreset preset, QuickShareColor color, CancellationToken cancel, Action<string> report) {
+        // The clip actually encoded: a Luna original itself, or a held Gyroflow export
+        // with the DJI O4 Pro original it was made from.
+        sealed class Clip { internal VerifiedCopy Record; internal QuickShareBatch.Original Master; internal QuickShareBatch.Export Export; }
+        static void VerifyClip(QuickShareBatch held, Clip clip) { if (clip.Export == null) held.VerifyOriginal(clip.Master); else held.VerifyExport(clip.Export); }
+        internal QuickShareResult Run(CompletedBatch batch, DestinationIdentity current, IImportGuard guard, QuickShareTools tools, QuickSharePreset preset, QuickShareColor color, CancellationToken cancel, Action<string> report, QuickShareCamera camera = QuickShareCamera.Luna) {
             var result = new QuickShareResult(); report = report ?? (_ => {});
             try {
-                if (!Enum.IsDefined(typeof(QuickSharePreset), preset) || !Enum.IsDefined(typeof(QuickShareColor), color)) throw new SafetyException("Choose a supported Quick Share size and color.");
+                if (!Enum.IsDefined(typeof(QuickSharePreset), preset) || !Enum.IsDefined(typeof(QuickShareColor), color) || !Enum.IsDefined(typeof(QuickShareCamera), camera)) throw new SafetyException("Choose a supported Quick Share size and color.");
+                if (color != QuickShareColor.Standard && color != QuickShareMedia.LogColor(camera)) throw new SafetyException("The selected LUT does not match this device's camera.");
+                bool dji = camera == QuickShareCamera.DjiO4Pro;
                 using (var held = new QuickShareBatch(batch, current, guard, operations, cancel, report)) {
                     result.Folder = SafePaths.Normalize(Path.Combine(held.Batch.Folder, "Sharing Copies"));
-                    var candidates = held.Originals.Where(x => QuickShareMedia.IsLunaMaster(x.Record.Path, x.Stream)).ToArray();
+                    var masters = dji ? held.Originals.Where(x => QuickShareMedia.IsDjiO4ProMasterName(x.Record.Path)).ToArray() : held.Originals.Where(x => QuickShareMedia.IsLunaMaster(x.Record.Path, x.Stream)).ToArray();
+                    foreach (var original in masters) if (SafePaths.Within(original.Record.Path, result.Folder)) throw new SafetyException("A Quick Share original is inside Sharing Copies. Choose the exact original import batch.");
+                    Clip[] candidates;
+                    if (dji) {
+                        // O4 Pro originals are stabilized in Gyroflow first; only their default-named
+                        // exports beside the verified originals are shared. Earlier folders are never scanned.
+                        if (masters.Length == 0) throw new SafetyException("Stabilize the O4 Pro originals in Gyroflow, then use Quick Share for their _stabilized.mp4 exports.");
+                        var missing = masters.Where(x => { held.Check(); return !File.Exists(QuickShareMedia.GyroflowExportPath(x.Record.Path)); }).Select(x => Path.GetFileName(x.Record.Path)).ToArray();
+                        if (missing.Length > 0) throw new SafetyException("Finish these O4 Pro videos in Gyroflow first: " + String.Join(", ", missing) + ". Export beside the originals with the default _stabilized.mp4 name, then choose Quick Share.");
+                        candidates = masters.Select(x => { var export = held.HoldExport(x); return new Clip { Record = export.Record, Master = x, Export = export }; }).ToArray();
+                    } else candidates = masters.Select(x => new Clip { Record = x.Record, Master = x }).ToArray();
                     result.Skipped = held.Originals.Count(x => Path.GetExtension(x.Record.Path).Equals(".mp4", StringComparison.OrdinalIgnoreCase)) - candidates.Length;
-                    foreach (var original in candidates) if (SafePaths.Within(original.Record.Path, result.Folder)) throw new SafetyException("A Quick Share original is inside Sharing Copies. Choose the exact original import batch.");
                     if (candidates.Length == 0) return result;
                     if (tools == null) throw new SafetyException("Choose FFmpeg and FFprobe before creating sharing copies. Nothing is installed automatically.");
                     if (color == QuickShareColor.LunaILog && tools.Lut == null) throw new SafetyException("Choose the official Luna Rec.709 s33 v2 LUT before applying I-Log conversion.");
-                    byte[] lut = color == QuickShareColor.LunaILog ? QuickShareMedia.ReadOfficialLut(tools.Lut, cancel) : null;
+                    byte[] lunaLut = color == QuickShareColor.LunaILog ? QuickShareMedia.ReadOfficialLut(tools.Lut, cancel) : null, djiLut = null;
                     using (tools.Hold()) {
                         held.Check();
                         using (var sharingDirectories = EnsureDirectory(result.Folder)) {
@@ -80,21 +95,36 @@ namespace EasyEject {
                                     check();
                                     result.AuditPath = Path.Combine(attempt, "export-audit.log");
                                     Action<string> log = line => { check(); audit.WriteLine(DateTime.UtcNow.ToString("o") + " " + line); audit.Flush(); auditFile.Flush(true); auditCheck(line); };
-                                    log("Manual Quick Share | batch " + held.Batch.Id + " | destination " + held.Batch.Destination.VolumeId + " | " + preset + " | " + color);
+                                    log("Manual Quick Share | batch " + held.Batch.Id + " | destination " + held.Batch.Destination.VolumeId + " | " + preset + " | " + color + (dji ? " | DJI O4 Pro Gyroflow exports" : ""));
                                     try {
                                         foreach (var original in candidates) {
-                                            check(); report("Reading Luna video " + Path.GetFileName(original.Record.Path));
-                                            var plan = new QuickSharePlan(Probe(tools, original.Record.Path, attempt, check, cancel), preset, color);
+                                            check(); report((dji ? "Reading Gyroflow export " : "Reading Luna video ") + Path.GetFileName(original.Record.Path));
+                                            QuickShareProbe input; QuickShareColor effective = color;
+                                            if (dji) {
+                                                var master = Probe(tools, original.Master.Record.Path, attempt, check, cancel);
+                                                if (master.Format == null || master.Format.Tags == null || master.Format.Tags.Encoder != "DJI O4P") throw new SafetyException("Choose a Gyroflow export matching a verified DJI O4 Pro original in this import.");
+                                                input = Probe(tools, original.Record.Path, attempt, check, cancel);
+                                                if (!(Math.Abs(master.Seconds - input.Seconds) < 0.5)) throw new SafetyException("The Gyroflow export or its O4 Pro original changed or does not match.");
+                                                VerifyClip(held, original);
+                                                if (QuickShareMedia.GyroflowAppliedLut(input)) { effective = QuickShareColor.Standard; log("Quick Share keeps the LUT already applied by Gyroflow | " + original.Record.Path); }
+                                            } else input = Probe(tools, original.Record.Path, attempt, check, cancel);
+                                            var plan = new QuickSharePlan(input, preset, effective, camera);
+                                            byte[] lut = plan.Color == QuickShareColor.LunaILog ? lunaLut : null;
+                                            if (plan.Color == QuickShareColor.DjiO4DLogM) {
+                                                if (tools.DjiLut == null) throw new SafetyException("Choose the official DJI O4 Air Unit Series D-Log M LUT in Quick Share tools, or leave the LUT off for this export.");
+                                                if (djiLut == null) djiLut = QuickShareMedia.ReadLut(tools.DjiLut, QuickShareColor.DjiO4DLogM, cancel);
+                                                lut = djiLut;
+                                            }
                                             using (var choice = Choose(result.Folder, original.Record, plan, held, cancel)) {
                                             check();
-                                            if (choice.Reused) { held.VerifyOriginal(original); log("Reused verified sharing copy | source SHA256 " + original.Record.Sha256 + " | " + choice.Path); result.Reused++; result.Outputs.Add(choice.Path); continue; }
+                                            if (choice.Reused) { VerifyClip(held, original); log("Reused verified sharing copy | source SHA256 " + original.Record.Sha256 + " | " + choice.Path); result.Reused++; result.Outputs.Add(choice.Path); continue; }
                                             double required = Math.Ceiling(plan.Seconds * (plan.Bitrate + (plan.HasAudio ? 160000.0 : 0)) / 8) + 1073741824;
                                             if (!QuickShareProbe.Finite(required) || required >= UInt64.MaxValue || freeSpace(result.Folder) <= required) throw new SafetyException("Quick Share needs estimated export space plus 1 GiB free. Saved originals remain intact.");
                                             var work = new PrivateShareWork(result.Folder); FileStream heldLut = null;
                                             try {
                                                 Action checkWork = () => { check(); work.Validate(); };
                                                 checkWork();
-                                                if (lut != null) { using (var target = SafePaths.NewFile(Path.Combine(work.Path, "luna.cube"))) { target.Write(lut, 0, lut.Length); target.Flush(true); } heldLut = SafePaths.ReadFile(Path.Combine(work.Path, "luna.cube")); }
+                                                if (lut != null) { using (var target = SafePaths.NewFile(Path.Combine(work.Path, plan.LutFile))) { target.Write(lut, 0, lut.Length); target.Flush(true); } heldLut = SafePaths.ReadFile(Path.Combine(work.Path, plan.LutFile)); }
                                                 string temporary = Path.Combine(work.Path, "output.mp4");
                                                 log("Before encode | source SHA256 " + original.Record.Sha256 + " | " + original.Record.Path + " -> " + choice.Path);
                                                 report("Creating " + plan.PresetName + " sharing copy " + Path.GetFileName(original.Record.Path)); checkWork();
@@ -109,11 +139,11 @@ namespace EasyEject {
                                                     process.Run(tools.Ffmpeg, QuickSharePlan.DecodeArguments(temporary), work.Path, plan.DecodeTimeout, cancel, checkWork);
                                                     output.Position = 0; if (!VerifiedImporter.SameStamp(stamp, Native.Info(output.SafeFileHandle)) || ImportHistory.Hash(output, cancel) != outputHash) throw new SafetyException("The sharing output changed during validation.");
                                                 }
-                                                held.VerifyOriginal(original); checkpoint("Before publication handle", temporary); checkWork();
+                                                VerifyClip(held, original); checkpoint("Before publication handle", temporary); checkWork();
                                                 using (var output = OpenPublication(temporary)) {
                                                     output.Position = 0; if (!VerifiedImporter.SameStamp(stamp, Native.Info(output.SafeFileHandle)) || output.Length != outputBytes || ImportHistory.Hash(output, cancel) != outputHash) throw new SafetyException("The sharing output was replaced after validation.");
                                                     output.Flush(true);
-                                                    var receipt = new QuickShareReceipt { Recipe = QuickSharePlan.Recipe, SourceSha256 = original.Record.Sha256, LutSha256 = plan.LutSha, OutputSha256 = outputHash, Preset = plan.PresetName, Color = plan.Color.ToString(), Bytes = outputBytes, Width = plan.Width, Height = plan.Height, FrameRate = plan.FrameRate, Seconds = plan.Seconds };
+                                                    var receipt = new QuickShareReceipt { Recipe = plan.RecipeName, SourceSha256 = original.Record.Sha256, LutSha256 = plan.LutSha, OutputSha256 = outputHash, Preset = plan.PresetName, Color = plan.Color.ToString(), Bytes = outputBytes, Width = plan.Width, Height = plan.Height, FrameRate = plan.FrameRate, Seconds = plan.Seconds };
                                                     using (var record = SafePaths.NewFile(Path.Combine(work.Path, "receipt.partial"))) {
                                                         bool receiptPublished = false;
                                                         try {
@@ -124,7 +154,7 @@ namespace EasyEject {
                                                             Native.Rename(output.SafeFileHandle, choice.Path); result.PublishedCopies++; output.Flush(true);
                                                             checkpoint("Before receipt publication", ReceiptPath(choice.Path)); checkWork();
                                                             Native.Rename(record.SafeFileHandle, ReceiptPath(choice.Path)); receiptPublished = true; result.PublishedReceipts++; record.Flush(true); result.Created++; result.Outputs.Add(choice.Path);
-                                                            log("Verified sharing copy | " + QuickSharePlan.Recipe + " | source SHA256 " + original.Record.Sha256 + " | LUT " + (plan.LutSha ?? "none") + " | output SHA256 " + outputHash + " | " + choice.Path);
+                                                            log("Verified sharing copy | " + plan.RecipeName + " | source SHA256 " + original.Record.Sha256 + " | LUT " + (plan.LutSha ?? "none") + " | output SHA256 " + outputHash + " | " + choice.Path);
                                                         } finally { if (!receiptPublished) Native.DeleteOnClose(record.SafeFileHandle); }
                                                     }
                                                 }
@@ -200,7 +230,7 @@ namespace EasyEject {
             internal string Clean() {
                 string error = null;
                 try { Validate(); } catch (Exception ex) { if (directories != null) { directories.Dispose(); directories = null; } return "Private sharing work retained at " + Path + ": " + ex.Message; }
-                foreach (string name in new[] { "output.mp4", "luna.cube", "receipt.partial" }) {
+                foreach (string name in new[] { "output.mp4", "luna.cube", "camera.cube", "receipt.partial" }) {
                     string file = System.IO.Path.Combine(Path, name);
                     try { Validate(); if (!Occupied(file)) continue; using (var held = SafePaths.ProtectOriginal(file, true)) { Validate(); Native.DeleteOnClose(held.SafeFileHandle); } } catch (Exception ex) { error = ex.Message; break; }
                 }

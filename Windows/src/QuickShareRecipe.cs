@@ -10,13 +10,38 @@ using System.Threading;
 
 namespace EasyEject {
     internal enum QuickSharePreset { Hd, Uhd }
-    internal enum QuickShareColor { Standard, LunaILog }
+    // New values are appended so existing numeric/string forms keep their meaning.
+    internal enum QuickShareColor { Standard, LunaILog, DjiO4DLogM }
+    internal enum QuickShareCamera { Luna, DjiO4Pro }
 
     // This policy does not discover clips, execute tools, publish files or grant eject authority.
     // Its caller must hold the exact receipt/originals and a fresh destination reservation.
     internal static class QuickShareMedia {
         internal const string OfficialLutName = "Luna_I-Log_to_Rec709_BT1886_s33_v2.cube";
         internal const string OfficialLutSha = "e3e5c3ab4ca7c166f3ebb740b45ed8cbce649b0c18dca9d5661754c53b9ee17d";
+        internal const string DjiLutName = "DJI O4 Air Unit Series D-Log M to Rec.709 V1.cube";
+        internal const string DjiLutSha = "b18162854ab47702068410c33afa98a8cb6eef159fc5a04ce0e65fad0fd8947e";
+        internal const string GyroflowSuffix = "_stabilized";
+        const string GyroflowLutMarker = "Gyroflow export LUT applied: ";
+        static readonly System.Text.RegularExpressions.Regex DjiMasterName = new System.Text.RegularExpressions.Regex(@"^DJI_\d{14}_\d{4}_D$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        internal static QuickShareColor LogColor(QuickShareCamera camera) { return camera == QuickShareCamera.DjiO4Pro ? QuickShareColor.DjiO4DLogM : QuickShareColor.LunaILog; }
+        internal static string LutSha(QuickShareColor color) { return color == QuickShareColor.LunaILog ? OfficialLutSha : color == QuickShareColor.DjiO4DLogM ? DjiLutSha : null; }
+        internal static string CameraName(QuickShareCamera camera) { return camera == QuickShareCamera.DjiO4Pro ? "DJI O4 Pro" : "Insta360 Luna"; }
+        internal static string LutLabel(QuickShareCamera camera) { return camera == QuickShareCamera.DjiO4Pro ? "DJI O4 Pro D-Log M" : "Insta360 Luna I-Log"; }
+        // Name only. The engine also requires the DJI O4P encoder tag from a probe.
+        internal static bool IsDjiO4ProMasterName(string path) {
+            return Path.GetExtension(path).Equals(".mp4", StringComparison.OrdinalIgnoreCase) && DjiMasterName.IsMatch(Path.GetFileNameWithoutExtension(path));
+        }
+        // Gyroflow's default export name beside the imported original.
+        internal static string GyroflowExportPath(string master) {
+            return SafePaths.Normalize(Path.Combine(Path.GetDirectoryName(master), Path.GetFileNameWithoutExtension(master) + GyroflowSuffix + ".mp4"));
+        }
+        // An explicit marker written by Gyroflow's export LUT option. Never infer log color from video tags.
+        internal static bool GyroflowAppliedLut(QuickShareProbe input) {
+            string comment = input == null || input.Format == null || input.Format.Tags == null ? null : input.Format.Tags.Comment;
+            if (comment == null) return false;
+            return comment.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None).Any(line => line.StartsWith(GyroflowLutMarker, StringComparison.Ordinal) && line.Substring(GyroflowLutMarker.Length).Trim().Length > 0);
+        }
         internal static bool IsLunaMaster(string path, Stream held) {
             if (!Path.GetExtension(path).Equals(".mp4", StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(path).StartsWith("VID_", StringComparison.OrdinalIgnoreCase)) return false;
             long position = held.Position;
@@ -28,15 +53,18 @@ namespace EasyEject {
                 return identity.Contains("Insta360 Luna Ultra") || identity.Contains("Insta360 Luna Pro");
             } finally { held.Position = position; }
         }
-        internal static byte[] ReadOfficialLut(string path, CancellationToken cancel) {
+        internal static byte[] ReadOfficialLut(string path, CancellationToken cancel) { return ReadLut(path, QuickShareColor.LunaILog, cancel); }
+        internal static byte[] ReadLut(string path, QuickShareColor color, CancellationToken cancel) {
+            string expected = LutSha(color); if (expected == null) throw new SafetyException("Standard color does not need a LUT.");
+            bool dji = color == QuickShareColor.DjiO4DLogM;
             path = SafePaths.Normalize(path);
             using (SafePaths.LockDirectories(Path.GetDirectoryName(path))) using (var held = SafePaths.ReadFile(path)) {
                 cancel.ThrowIfCancellationRequested();
-                if (held.Length <= 0 || held.Length >= 2000000) throw new SafetyException("Choose the official Luna Rec.709 s33 v2 LUT.");
-                if (ImportHistory.Hash(held, cancel) != OfficialLutSha) throw new SafetyException("Choose " + OfficialLutName + " from Insta360's official Luna LUT download.");
+                if (held.Length <= 0 || held.Length >= 2000000) throw new SafetyException(dji ? "Choose the official DJI O4 Air Unit Series Rec.709 LUT." : "Choose the official Luna Rec.709 s33 v2 LUT.");
+                if (ImportHistory.Hash(held, cancel) != expected) throw new SafetyException(dji ? "Choose the official DJI O4 Air Unit Series D-Log M to Rec.709 LUT from DJI's O4 download page." : "Choose " + OfficialLutName + " from Insta360's official Luna LUT download.");
                 held.Position = 0; var bytes = new byte[held.Length]; int offset = 0, count;
                 while (offset < bytes.Length && (count = held.Read(bytes, offset, bytes.Length - offset)) > 0) { cancel.ThrowIfCancellationRequested(); offset += count; }
-                if (offset != bytes.Length) throw new SafetyException("The Luna LUT could not be read completely.");
+                if (offset != bytes.Length) throw new SafetyException(dji ? "The DJI O4 LUT could not be read completely." : "The Luna LUT could not be read completely.");
                 cancel.ThrowIfCancellationRequested(); return bytes;
             }
         }
@@ -60,7 +88,9 @@ namespace EasyEject {
         [DataMember(Name = "channels")] internal int? Channels { get; set; }
         [DataMember(Name = "side_data_list")] internal List<QuickShareSideData> SideData { get; set; }
     }
-    [DataContract] internal sealed class QuickShareFormat { [DataMember(Name = "duration")] internal string Duration { get; set; } [DataMember(Name = "format_name")] internal string Name { get; set; } }
+    // Only the container tags used for camera identity and Gyroflow's explicit LUT marker.
+    [DataContract] internal sealed class QuickShareTags { [DataMember(Name = "encoder")] internal string Encoder { get; set; } [DataMember(Name = "comment")] internal string Comment { get; set; } }
+    [DataContract] internal sealed class QuickShareFormat { [DataMember(Name = "duration")] internal string Duration { get; set; } [DataMember(Name = "format_name")] internal string Name { get; set; } [DataMember(Name = "tags", EmitDefaultValue = false)] internal QuickShareTags Tags { get; set; } }
     [DataContract] internal sealed class QuickShareProbe {
         [DataMember(Name = "streams")] internal List<QuickShareStream> Streams { get; set; }
         [DataMember(Name = "format")] internal QuickShareFormat Format { get; set; }
@@ -84,23 +114,27 @@ namespace EasyEject {
         // Windows uses an explicit software encoder, with no silent hardware/recipe fallback.
         // A distinct recipe prevents reuse of exports whose encoder contract differs.
         internal const string Recipe = "windows-luna-share-v1-libx264-h264-30fps-aac160";
-        internal readonly QuickSharePreset Preset; internal readonly QuickShareColor Color;
+        internal const string DjiRecipe = "windows-dji-o4-share-v2-libx264-h264-30fps-aac160";
+        internal readonly QuickSharePreset Preset; internal readonly QuickShareColor Color; internal readonly QuickShareCamera Camera;
         internal readonly int Width, Height, Bitrate; internal readonly string Fps;
         internal readonly double Seconds, FrameRate, EncodeTimeout, DecodeTimeout;
         internal readonly bool HasAudio; internal readonly double? AudioSeconds;
         internal string PresetName { get { return Preset == QuickSharePreset.Hd ? "1080p" : "4K"; } }
-        internal string LutSha { get { return Color == QuickShareColor.LunaILog ? QuickShareMedia.OfficialLutSha : null; } }
-        internal QuickSharePlan(QuickShareProbe input, QuickSharePreset preset, QuickShareColor color) {
-            if (!Enum.IsDefined(typeof(QuickSharePreset), preset) || !Enum.IsDefined(typeof(QuickShareColor), color)) throw new SafetyException("Choose a supported Quick Share size and color.");
-            if (input == null || input.Video == null || input.Video.Width.GetValueOrDefault() <= 0 || input.Video.Height.GetValueOrDefault() <= 0 || input.Seconds <= 0 || !QuickShareProbe.Finite(input.Seconds)) throw new SafetyException("Quick Share could not read the Luna video's duration or dimensions.");
+        internal string RecipeName { get { return Camera == QuickShareCamera.DjiO4Pro ? DjiRecipe : Recipe; } }
+        internal string LutSha { get { return QuickShareMedia.LutSha(Color); } }
+        internal string LutFile { get { return Color == QuickShareColor.LunaILog ? "luna.cube" : "camera.cube"; } }
+        internal QuickSharePlan(QuickShareProbe input, QuickSharePreset preset, QuickShareColor color, QuickShareCamera camera = QuickShareCamera.Luna) {
+            if (!Enum.IsDefined(typeof(QuickSharePreset), preset) || !Enum.IsDefined(typeof(QuickShareColor), color) || !Enum.IsDefined(typeof(QuickShareCamera), camera)) throw new SafetyException("Choose a supported Quick Share size and color.");
+            if (color != QuickShareColor.Standard && color != QuickShareMedia.LogColor(camera)) throw new SafetyException("The selected LUT does not match this device's camera.");
+            if (input == null || input.Video == null || input.Video.Width.GetValueOrDefault() <= 0 || input.Video.Height.GetValueOrDefault() <= 0 || input.Seconds <= 0 || !QuickShareProbe.Finite(input.Seconds)) throw new SafetyException(camera == QuickShareCamera.Luna ? "Quick Share could not read the Luna video's duration or dimensions." : "Quick Share could not read the camera video's duration or dimensions.");
             var video = input.Video;
-            if (video.Transfer == "smpte2084" || video.Transfer == "arib-std-b67" || video.SideData != null && video.SideData.Any(x => x != null && x.Type != null && x.Type.IndexOf("DOVI", StringComparison.OrdinalIgnoreCase) >= 0)) throw new SafetyException("Quick Share supports Luna I-Log and standard SDR clips. This clip is HDR or Dolby Vision.");
+            if (video.Transfer == "smpte2084" || video.Transfer == "arib-std-b67" || video.SideData != null && video.SideData.Any(x => x != null && x.Type != null && x.Type.IndexOf("DOVI", StringComparison.OrdinalIgnoreCase) >= 0)) throw new SafetyException(camera == QuickShareCamera.Luna ? "Quick Share supports Luna I-Log and standard SDR clips. This clip is HDR or Dolby Vision." : "Quick Share supports D-Log M, I-Log and standard SDR clips. This clip is HDR or Dolby Vision.");
             long rotation = video.SideData == null ? 0 : video.SideData.Where(x => x != null && x.Rotation.HasValue).Select(x => (long)x.Rotation.Value).FirstOrDefault();
             bool turned = Math.Abs(rotation) % 180 == 90;
             int width = turned ? video.Height.Value : video.Width.Value, height = turned ? video.Width.Value : video.Height.Value;
             double scale = Math.Min(1, Math.Min((preset == QuickSharePreset.Hd ? 1920.0 : 3840.0) / Math.Max(width, height), (preset == QuickSharePreset.Hd ? 1080.0 : 2160.0) / Math.Min(width, height)));
             Width = Math.Max(2, (int)(width * scale) / 2 * 2); Height = Math.Max(2, (int)(height * scale) / 2 * 2);
-            Preset = preset; Color = color; Seconds = input.Seconds; Bitrate = preset == QuickSharePreset.Hd ? 8000000 : 24000000;
+            Preset = preset; Color = color; Camera = camera; Seconds = input.Seconds; Bitrate = preset == QuickSharePreset.Hd ? 8000000 : 24000000;
             double rate; string fps; ParseRate(video.FrameRate, out rate, out fps); FrameRate = rate > 0 && rate <= 30 ? rate : 30; Fps = rate > 0 && rate <= 30 ? fps : "30";
             HasAudio = input.Audio != null; AudioSeconds = HasAudio ? QuickShareProbe.Number(input.Audio.Duration) : null;
             EncodeTimeout = Math.Max(180, Seconds * 20 + 60); DecodeTimeout = Math.Max(180, Seconds * 10 + 60);
@@ -118,7 +152,7 @@ namespace EasyEject {
             original = SafePaths.Normalize(original); temporary = SafePaths.Normalize(temporary);
             if (original.Equals(temporary, StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Quick Share cannot replace its original.");
             var filters = new List<string> { "fps=" + Fps, "scale=" + Width.ToString(CultureInfo.InvariantCulture) + ":" + Height.ToString(CultureInfo.InvariantCulture) + ":flags=lanczos" };
-            if (Color == QuickShareColor.LunaILog) filters.AddRange(new[] { "format=gbrpf32le", "lut3d=file=luna.cube:interp=tetrahedral" });
+            if (LutSha != null) filters.AddRange(new[] { "format=gbrpf32le", "lut3d=file=" + LutFile + ":interp=tetrahedral" });
             filters.AddRange(new[] { "scale=in_range=auto:out_range=tv:out_color_matrix=bt709", "format=yuv420p", "setsar=1", "setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709" });
             return new[] { "-nostdin", "-hide_banner", "-v", "error", "-xerror", "-nostats", "-stats_period", "0.5", "-progress", "pipe:1",
                 "-i", original, "-map", "0:v:0", "-map", "0:a:0?", "-map_metadata", "-1", "-map_chapters", "-1", "-vf", String.Join(",", filters),

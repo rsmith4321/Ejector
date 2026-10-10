@@ -11,21 +11,23 @@ namespace EasyEject {
         [DataMember] internal string Path, Sha256;
         [DataMember] internal long Bytes;
         internal QuickShareToolFile Copy() { return (QuickShareToolFile)MemberwiseClone(); }
-        internal void Validate(bool lut, string root) {
+        internal void Validate(bool lut, string root, QuickShareColor color = QuickShareColor.LunaILog) {
             if (Path == null || SafePaths.Normalize(Path) != Path || !ImportHistory.ValidHash(Sha256) || Bytes <= 0 || Bytes > QuickShareConfiguration.MaximumToolBytes)
                 throw new SafetyException("Saved Quick Share file selection is invalid. Choose the files again.");
             if (lut) {
-                if (Path != QuickShareConfiguration.LutPath(root) || Sha256 != QuickShareMedia.OfficialLutSha || Bytes >= 2000000) throw new SafetyException("Saved Quick Share LUT is not the official local copy.");
+                if (Path != QuickShareConfiguration.LutPath(root, color) || Sha256 != QuickShareMedia.LutSha(color) || Bytes >= 2000000) throw new SafetyException("Saved Quick Share LUT is not the official local copy.");
             } else if (!System.IO.Path.GetExtension(Path).Equals(".exe", StringComparison.OrdinalIgnoreCase)) throw new SafetyException("Select a local FFmpeg/FFprobe executable, not a script.");
         }
     }
     [DataContract] internal sealed class QuickShareToolSettings {
         [DataMember] internal int Version = 1;
         [DataMember] internal QuickShareToolFile Ffmpeg, Ffprobe, Lut;
-        internal QuickShareToolSettings Copy() { return new QuickShareToolSettings { Version = Version, Ffmpeg = Ffmpeg == null ? null : Ffmpeg.Copy(), Ffprobe = Ffprobe == null ? null : Ffprobe.Copy(), Lut = Lut == null ? null : Lut.Copy() }; }
+        // Absent in setups saved before the DJI O4 Pro option; omitted until chosen.
+        [DataMember(EmitDefaultValue = false)] internal QuickShareToolFile DjiLut;
+        internal QuickShareToolSettings Copy() { return new QuickShareToolSettings { Version = Version, Ffmpeg = Ffmpeg == null ? null : Ffmpeg.Copy(), Ffprobe = Ffprobe == null ? null : Ffprobe.Copy(), Lut = Lut == null ? null : Lut.Copy(), DjiLut = DjiLut == null ? null : DjiLut.Copy() }; }
         internal void Validate(string root) {
             if (Version != 1) throw new SafetyException("Saved Quick Share setup version is unsupported. Review the configuration.");
-            if (Ffmpeg != null) Ffmpeg.Validate(false, root); if (Ffprobe != null) Ffprobe.Validate(false, root); if (Lut != null) Lut.Validate(true, root);
+            if (Ffmpeg != null) Ffmpeg.Validate(false, root); if (Ffprobe != null) Ffprobe.Validate(false, root); if (Lut != null) Lut.Validate(true, root); if (DjiLut != null) DjiLut.Validate(true, root, QuickShareColor.DjiO4DLogM);
         }
     }
     internal sealed class QuickShareConfigurationSnapshot {
@@ -40,7 +42,8 @@ namespace EasyEject {
     internal static class QuickShareConfiguration {
         internal const string FileName = "quick-share-tools.json";
         internal const long MaximumToolBytes = 1073741824;
-        internal static string LutPath(string root) { return System.IO.Path.Combine(SafePaths.Normalize(root), "luna-lut-" + QuickShareMedia.OfficialLutSha + ".cube"); }
+        internal static string LutPath(string root) { return LutPath(root, QuickShareColor.LunaILog); }
+        internal static string LutPath(string root, QuickShareColor color) { return System.IO.Path.Combine(SafePaths.Normalize(root), (color == QuickShareColor.DjiO4DLogM ? "dji-o4-lut-" : "luna-lut-") + QuickShareMedia.LutSha(color) + ".cube"); }
         internal static QuickShareConfigurationSnapshot Load() { return Load(Profiles.Root); }
         internal static QuickShareConfigurationSnapshot Load(string root, Action<string> checkpoint = null) {
             root = SafePaths.Normalize(root);
@@ -77,27 +80,30 @@ namespace EasyEject {
                 return new QuickShareToolFile { Path = path, Bytes = stream.Length, Sha256 = ImportHistory.Hash(stream, cancel) };
             }
         }
-        internal static QuickShareConfigurationSnapshot Save(QuickShareConfigurationSnapshot expected, string ffmpeg, string ffprobe, string lutSource, string root, CancellationToken cancel, Action<string> checkpoint = null) {
+        static QuickShareToolFile InstallLut(string root, string source, QuickShareColor color, CancellationToken cancel) {
+            if (String.IsNullOrWhiteSpace(source)) return null;
+            byte[] bytes = QuickShareMedia.ReadLut(SafePaths.Normalize(source), color, cancel); string target = LutPath(root, color);
+            // Selecting and saving explicitly authorizes this one official local copy.
+            // Clearing preferences leaves the copy intact; it never deletes the supplied asset.
+            if (File.Exists(target)) QuickShareMedia.ReadLut(target, color, cancel);
+            else {
+                using (var output = SafePaths.NewFile(System.IO.Path.Combine(root, ".lut-" + Guid.NewGuid().ToString("N") + ".partial"))) {
+                    bool published = false;
+                    try { output.Write(bytes, 0, bytes.Length); output.Flush(true); cancel.ThrowIfCancellationRequested(); Native.Rename(output.SafeFileHandle, target); published = true; output.Flush(true); }
+                    finally { if (!published) Native.DeleteOnClose(output.SafeFileHandle); }
+                }
+            }
+            return new QuickShareToolFile { Path = target, Bytes = bytes.Length, Sha256 = QuickShareMedia.LutSha(color) };
+        }
+        internal static QuickShareConfigurationSnapshot Save(QuickShareConfigurationSnapshot expected, string ffmpeg, string ffprobe, string lutSource, string root, CancellationToken cancel, Action<string> checkpoint = null, string djiLutSource = null) {
             root = SafePaths.Normalize(root);
             using (var directories = SafePaths.HoldDirectories(root)) using (var writer = Profiles.WriterGate(root)) {
                 cancel.ThrowIfCancellationRequested(); CheckSnapshot(expected, Load(root));
                 if (checkpoint != null) checkpoint("After setup review");
                 directories.Validate(); cancel.ThrowIfCancellationRequested();
                 var value = new QuickShareToolSettings { Ffmpeg = Capture(ffmpeg, cancel), Ffprobe = Capture(ffprobe, cancel) };
-                if (!String.IsNullOrWhiteSpace(lutSource)) {
-                    byte[] bytes = QuickShareMedia.ReadOfficialLut(SafePaths.Normalize(lutSource), cancel); string target = LutPath(root);
-                    // Selecting and saving explicitly authorizes this one official local copy.
-                    // Clearing preferences leaves the copy intact; it never deletes the supplied asset.
-                    if (File.Exists(target)) QuickShareMedia.ReadOfficialLut(target, cancel);
-                    else {
-                        using (var output = SafePaths.NewFile(System.IO.Path.Combine(root, ".lut-" + Guid.NewGuid().ToString("N") + ".partial"))) {
-                            bool published = false;
-                            try { output.Write(bytes, 0, bytes.Length); output.Flush(true); cancel.ThrowIfCancellationRequested(); Native.Rename(output.SafeFileHandle, target); published = true; output.Flush(true); }
-                            finally { if (!published) Native.DeleteOnClose(output.SafeFileHandle); }
-                        }
-                    }
-                    value.Lut = new QuickShareToolFile { Path = target, Bytes = bytes.Length, Sha256 = QuickShareMedia.OfficialLutSha };
-                }
+                value.Lut = InstallLut(root, lutSource, QuickShareColor.LunaILog, cancel);
+                value.DjiLut = InstallLut(root, djiLutSource, QuickShareColor.DjiO4DLogM, cancel);
                 value.Validate(root);
                 using (var held = new VerifiedQuickShareTools(value, cancel, false, QuickShareColor.Standard)) {
                     cancel.ThrowIfCancellationRequested();
@@ -139,14 +145,16 @@ namespace EasyEject {
             if (!Enum.IsDefined(typeof(QuickShareColor), color)) throw new SafetyException("Choose a supported Quick Share color.");
             if (requireTools && (settings.Ffmpeg == null || settings.Ffprobe == null)) throw new SafetyException("Choose both FFmpeg and FFprobe in Quick Share tools before exporting.");
             if (requireTools && color == QuickShareColor.LunaILog && settings.Lut == null) throw new SafetyException("Choose the official Luna I-Log LUT in Quick Share tools or leave the LUT off for this export.");
-            var records = new[] { settings.Ffmpeg, settings.Ffprobe, color == QuickShareColor.LunaILog || !requireTools ? settings.Lut : null }.Where(x => x != null).ToArray();
+            // The DJI LUT is optional at admission: Gyroflow exports that already carry its
+            // explicit LUT marker need none. The engine refuses only when a LUT is actually needed.
+            var records = new[] { settings.Ffmpeg, settings.Ffprobe, color == QuickShareColor.LunaILog || !requireTools ? settings.Lut : null, color == QuickShareColor.DjiO4DLogM || !requireTools ? settings.DjiLut : null }.Where(x => x != null).ToArray();
             if (records.Length > 0) AddDirectories(records.Select(x => System.IO.Path.GetDirectoryName(x.Path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
             foreach (var record in records) {
                 cancel.ThrowIfCancellationRequested(); var stream = AddFile(record.Path);
                 if (stream.Length != record.Bytes || stream.Length > QuickShareConfiguration.MaximumToolBytes || (Native.Info(stream.SafeFileHandle).Attributes & 0x1000) != 0 || ImportHistory.Hash(stream, cancel) != record.Sha256)
                     throw new SafetyException("A selected Quick Share executable or LUT changed or is unavailable. Choose it again in Quick Share tools before retrying.");
             }
-            if (settings.Ffmpeg != null && settings.Ffprobe != null) Tools = new QuickShareTools(settings.Ffmpeg.Path, settings.Ffprobe.Path, settings.Lut == null ? null : settings.Lut.Path);
+            if (settings.Ffmpeg != null && settings.Ffprobe != null) Tools = new QuickShareTools(settings.Ffmpeg.Path, settings.Ffprobe.Path, settings.Lut == null ? null : settings.Lut.Path, settings.DjiLut == null ? null : settings.DjiLut.Path);
         }
         public void Dispose() { foreach (var file in files) file.Dispose(); files.Clear(); foreach (var directory in directories.AsEnumerable().Reverse()) directory.Dispose(); directories.Clear(); }
     }

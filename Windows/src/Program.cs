@@ -625,13 +625,13 @@ namespace EasyEject {
                             catch (Exception ex) { if (!ConfigurationError(ex)) throw; return false; }
                         });
                     }
-                    bool canShare = false;
+                    bool canShare = false, gyroflowFirst = false;
                     if (!readOnly && entry.Batch != null) {
-                        try { canShare = await Task.Run(() => SharingService.CanOffer(entry.Batch)); }
+                        try { canShare = await Task.Run(() => SharingService.CanOffer(entry.Batch)); gyroflowFirst = canShare && await Task.Run(() => SharingService.GyroflowFirst(entry.Batch)); }
                         catch (Exception ex) { if (!ConfigurationError(ex)) throw; Log("Completion sharing unavailable | " + ex.Message); }
                     }
                     DialogResult choice;
-                    using (var dialog = new ImportCompletionDialog(entry, canEject, cleanup == null ? "" : cleanup.Description, canShare, shareMessage)) { activeCompletion = dialog; choice = dialog.ShowDialog(this); activeCompletion = null; }
+                    using (var dialog = new ImportCompletionDialog(entry, canEject, cleanup == null ? "" : cleanup.Description, canShare, shareMessage, gyroflowFirst)) { activeCompletion = dialog; choice = dialog.ShowDialog(this); activeCompletion = null; }
                     if (choice == DialogResult.Retry) {
                         bool shared = await PerformQuickShare(entry.Batch);
                         if (!QuickSharePresentation.ReturnToCompletion(completions, entry, shared)) break;
@@ -699,6 +699,8 @@ namespace EasyEject {
             try {
                 BeginActivity(TrayOperationKind.Share, expected.DeviceName, "Reviewing saved batch and sharing choices");
                 var offer = await Task.Run(() => SharingService.Prepare(expected)); ManualQuickShareRequest request;
+                string gyroflow = offer.Camera == QuickShareCamera.DjiO4Pro ? QuickSharePresentation.GyroflowPending(offer.Batch) : null;
+                if (gyroflow != null) { status.Text = gyroflow + " No export started; full-quality imported originals are kept."; FinishActivity(status.Text); if (ForegroundWindow) ShowMessage(status.Text, "Quick Share", MessageBoxIcon.Information); return false; }
                 using (var dialog = new QuickSharePromptDialog(offer.Batch.DeviceName, offer.Batch.Folder, offer.Profile)) {
                     if (dialog.ShowDialog(this) != DialogResult.OK) { status.Text = "Quick Share cancelled. No export started; full-quality imported originals are kept."; return false; }
                     request = offer.Choose(dialog.Preset, dialog.ColorChoice);
@@ -709,10 +711,10 @@ namespace EasyEject {
                 var result = await Task.Run(() => SharingService.Run(request, active.Token, ActivityReporter(activity)));
                 await concurrentStorage.WaitForManual;
                 StopSharingCancellation(active);
-                string messageText = QuickSharePresentation.Success(request.Batch, request.Preset, result);
+                string messageText = QuickSharePresentation.Success(request.Batch, request.Preset, result, request.Camera);
                 if (result.CleanupWarnings.Count != 0) RecordIssue(messageText); else { ClearIssue(); status.Text = messageText; Log(messageText); }
                 FinishActivity(status.Text);
-                Notify(result.CleanupWarnings.Count != 0 ? "Sharing copies ready; needs attention" : result.Created + result.Reused == 0 ? "No supported Luna master videos" : "Sharing copies ready", messageText, result.CleanupWarnings.Count == 0 ? ToolTipIcon.Info : ToolTipIcon.Warning);
+                Notify(result.CleanupWarnings.Count != 0 ? "Sharing copies ready; needs attention" : result.Created + result.Reused == 0 ? (request.Camera == QuickShareCamera.Luna ? "No supported Luna master videos" : "No supported DJI O4 Pro videos") : "Sharing copies ready", messageText, result.CleanupWarnings.Count == 0 ? ToolTipIcon.Info : ToolTipIcon.Warning);
                 if (ForegroundWindow) ShowMessage(messageText, "Quick Share", result.CleanupWarnings.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
                 return true;
             } catch (QuickShareFailure ex) {

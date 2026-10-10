@@ -10,6 +10,7 @@ namespace EasyEject {
     public static partial class Tests {
         sealed class FakeShareProcess : IQuickShareProcess {
             internal QuickShareProbe Input = ShareInput(); internal Action<string, string> OnStage = (stage, path) => {};
+            internal Func<string, QuickShareProbe> InputFor; internal string[] LastEncode;
             internal Action<QuickShareProbe> ChangeOutput = _ => {}; internal int Encodes, Decodes, Probes;
             internal readonly List<string> Inputs = new List<string>(); readonly Dictionary<string, QuickSharePlan> outputs = new Dictionary<string, QuickSharePlan>();
             internal string Temporary;
@@ -18,13 +19,13 @@ namespace EasyEject {
                 bool probe = args.Contains("-show_streams"), decode = args.Contains("null"); string path = probe ? args.Last() : ShareOption(args, "-i");
                 if (probe) {
                     Probes++; bool output = outputs.ContainsKey(path); OnStage(output ? "Probe output" : "Probe original", path);
-                    var value = output ? ShareOutput(outputs[path]) : Input; if (output) ChangeOutput(value);
+                    var value = output ? ShareOutput(outputs[path]) : InputFor == null ? Input : InputFor(path); if (output) ChangeOutput(value);
                     using (var json = new MemoryStream()) { new DataContractJsonSerializer(typeof(QuickShareProbe)).WriteObject(json, value); return json.ToArray(); }
                 }
                 if (decode) { Decodes++; Check(args.Contains("-xerror") && args.Contains("0:v:0") && args.Contains("0:a:0?") && !args.Contains("-t"), "Engine did not request full video/audio decode"); OnStage("Decode", path); }
                 else {
-                    Encodes++; Inputs.Add(path); Temporary = args.Last(); OnStage("Before encode", path); validate();
-                    var plan = SharePlan(Input, ShareOption(args, "-b:v") == "24000000" ? QuickSharePreset.Uhd : QuickSharePreset.Hd, ShareOption(args, "-vf").Contains("lut3d") ? QuickShareColor.LunaILog : QuickShareColor.Standard);
+                    Encodes++; Inputs.Add(path); LastEncode = args; Temporary = args.Last(); OnStage("Before encode", path); validate();
+                    var plan = SharePlan(InputFor == null ? Input : InputFor(path), ShareOption(args, "-b:v") == "24000000" ? QuickSharePreset.Uhd : QuickSharePreset.Hd, ShareOption(args, "-vf").Contains("lut3d") ? QuickShareColor.LunaILog : QuickShareColor.Standard);
                     Check(args.Contains("-n") && !File.Exists(Temporary), "Encoder was allowed to overwrite private work");
                     File.WriteAllText(Temporary, "synthetic encoded output " + plan.PresetName + " " + plan.Color + " " + File.ReadAllText(path)); outputs[Temporary] = plan;
                     OnStage("After encode", Temporary); if (progress != null) progress("out_time_us=1000000");

@@ -286,6 +286,8 @@ namespace EasyEject {
         [DataMember] public bool? RecoverTrash; [DataMember] public string MacTrashUid;
         // Per-device manual offer. Missing fields preserve legacy off/default-Luna behavior.
         [DataMember] public string SharingPreset; [DataMember] public string SharingColor;
+        // Absent means Insta360 Luna, so existing profiles keep their exact saved bytes.
+        [DataMember(EmitDefaultValue = false)] public string SharingCamera;
         public bool FollowsDefaults { get { return UsesImportDefaults == true; } }
         public bool AutomaticEnabled(ImportDefaults defaults) { if (defaults == null) throw new ArgumentNullException("defaults"); return FollowsDefaults ? defaults.AutomaticEnabled : AutomaticImport ?? false; }
         public MediaOptions Resolve(ImportDefaults defaults) {

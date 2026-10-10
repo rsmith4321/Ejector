@@ -186,9 +186,9 @@ namespace EasyEject.Modern {
                 string shareMessage = "";
                 while (true) {
                     var freshSettings = await Task.Run(() => AppSettings.Load()); MetadataCleanupPlan cleanup = null;
-                    bool canShare = false; string sharingNote = "";
+                    bool canShare = false, gyroflowFirst = false; string sharingNote = "";
                     if (entry.Batch != null) {
-                        try { canShare = await Task.Run(() => SharingService.CanOffer(entry.Batch)); }
+                        try { canShare = await Task.Run(() => SharingService.CanOffer(entry.Batch)); gyroflowFirst = canShare && await Task.Run(() => SharingService.GyroflowFirst(entry.Batch)); }
                         catch (Exception ex) { sharingNote = "\n\nSaved sharing choices need review. " + ex.Message; }
                     }
                     bool canEject = await Task.Run(() => {
@@ -202,11 +202,12 @@ namespace EasyEject.Modern {
                         + CompletionPresentation.OtherStorageWarning(entry)
                         + "\n\nKeep Connected for Lightroom or other transfers. Eject requests removal of the physical device and all affected volumes."
                         + (entry.Origin.Plan == null ? "\n" + entry.Origin.BlockedReason : "\n\nAffected storage:\n" + String.Join("\n", entry.Origin.Plan.Affected))
-                        + (cleanup == null ? "" : "\n\n" + cleanup.Description) + sharingNote + shareMessage;
+                        + (cleanup == null ? "" : "\n\n" + cleanup.Description) + sharingNote
+                        + (gyroflowFirst ? "\n\n" + QuickShareProfile.GyroflowGuidance + " Quick Share is available afterwards in Import history." : "") + shareMessage;
                     confirmation = MessageDialog(entry.HasMedia ? "Import complete. Eject now?" : "No matching media. Eject now?", message, cleanup == null ? CompletionPresentation.EjectLabel(entry) : "Clean & eject");
                     confirmation.CloseButtonText = "Keep Connected"; confirmation.SecondaryButtonText = "Open Import Folder"; confirmation.IsPrimaryButtonEnabled = canEject;
                     bool sharingRequested = false, choosing = true; var dialog = confirmation; Button share = null; RoutedEventHandler shareChoice = null;
-                    if (canShare) {
+                    if (canShare && !gyroflowFirst) {
                         var body = new StackPanel { Spacing = 16 }; body.Children.Add(Wrapped(message));
                         share = new Button { Content = "Quick Share…" }; body.Children.Add(share);
                         shareChoice = delegate { if (!choosing || closed || !Object.ReferenceEquals(confirmation, dialog)) return; sharingRequested = true; dialog.Hide(); };
