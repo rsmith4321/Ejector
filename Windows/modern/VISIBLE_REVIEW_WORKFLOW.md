@@ -1,5 +1,83 @@
 # Visible manual reviews · October 7, 2026
 
+## Exact generated history and manual1080p sharing · October 9 EDT
+
+One broker-approved UI/CPU/live-publication slice used clean source
+`b1b108e7fc19e6c92d7d54e9426523f1b21a780d`, unchanged F810, original
+PID21224/start `2026-10-09T02:46:46.1826671Z`/HWND1967754. Entry was
+**2026-10-10T03:19:47Z**; final native idle **03:28:15.070Z**, then positive
+handback to broker/Windows worker. Twenty-four returned supported actions and40
+text observations are retained; screenshots were inspected inline. Settled
+observations followed immediate animation trees before outcomes were claimed.
+
+- Native history listed only two169551B generated saved clips, excluding
+  `unrelated.mov`. Sharing was hidden while off. **Verify saved originals**
+  returned **Verified all2 exact saved files. Originals unchanged**, source absent.
+- Explicitly enabling the profile offer retained1080p and unchecked official LUT.
+  Save returned1080p/Standard. Exact JSON review found only `SharingPreset: null
+  → 1080p` changed; every other field, including manual import, originals kept,
+  eject/Trash/defaults, destination and device identities, stayed identical.
+- Each export opened its own Cancel-default prompt, visibly1080p/LUT off.
+  First manual action produced **2 new /0 reused**; second **0 new /2 reused**.
+  The first showed export/checking progress and Stop export. Production audits
+  record exclusive publication/verified copies and later exact reuse. Both output
+  files are360697B, SHA256
+  `9A83E01240C44B2B36819291F2727DB891E5505C9F78736F68FD642E3B93D6E1`.
+  Originals retain169551B/SHA `E8DCD8BB…449AA03B`. Both outputs, both receipts
+  and first audit retain identical lengths/hashes/write times on reuse.
+- Exact reviewed recovery retained both owned records in quarantine. Reopened
+  history was empty, verification disabled and sharing absent. Close plus settled
+  capture returned idle/Refresh enabled. No original app restart occurred.
+
+Each helper command used a different actual supported idle proof less than60s
+old, exact PID/start and broker grant; no synthetic proof or unexpected adoption.
+
+| Mode | PID | UTC start–end | Result |
+| --- | --- | --- | --- |
+| `--publish-exact-video-history` |6524|03:20:38.9997713–03:20:39.3640417|exit0, manual/off records|
+| `--checkpoint-exact-profile` |9892|03:25:44.3900745–03:25:44.6129009|exit0, reviewed edit|
+| `--recover-reviewed-exact-video-history` |23520|03:27:27.0534270–03:27:27.2745557|exit0,2 records quarantined|
+
+Edited profile SHA `F3D0867871748B1257403803FB1317BE620BDC8B6F57257CB0A33D1C36177FC5`;
+explicit checkpoint SHA `DE5A00CA1F3BFC93680B64488D18DF3201C6B6F979175B5BCC120D7ABACC1B9A`.
+No helper timeout. Packet:
+`C:/Users/rsmit/.codex/EasyEjectBuildTools/NativeHistoryForeground-20261010T0319476302460Z`.
+Ledger/quarantine:
+`C:/Users/rsmit/.codex/EasyEjectBuildTools/NativeHistoryLive-20261010T0319476302460Z`.
+
+| Evidence | SHA256 |
+| --- | --- |
+| `before.json` |`03971C551486907D2B27C721E0EEABB17765A1703805B7264D069C18E36CF5FC`|
+| `native-observations.json` |`B932DF288A58E4420D61217368407CCB55D9734DFA78D7817B7E8354BFCC120C`|
+| Original `after.json` |`369F5347E1AB395A14EBA7AB92FAD48F420317141697124EACFC15098A6308B4`|
+| `guard-resolution.json` |`30EA68EF48F319906351D1588E4C0E7810ACC2477226F43F30F487678225AC5A`|
+| `outcome.json` |`46278F58193F44DBD39AE89776CE3FFB38D37F82CC51A26FB86318215D99A947`|
+
+Original afterguard failure is retained. Its five sharing mismatches came from
+automatic ISO timestamp parsing before string comparison. Separate correction
+uses preserved strings/explicit UTC equality and recomputed hashes/lengths; all
+match. Broker independently confirmed unique paths and UTC ticks. Reuse audit
+`0950e7db51bb41d1bcb712a965ed9a2a/export-audit.log` SHA
+`37CBAE34266B507A67FE6887D50BB8E388BBAA624DA5AA735ED51B0AB554CC9C`
+records two verified reuses and new0/reused2.
+
+The real config delta is separate: successful `MainWindow.Sharing.cs` calls
+`NotifyImport(resolved:true) → ClearModernIssue`. Earlier scan warning161B remains
+in fixture `before-issue-state.json`; current empty49B issue state SHA
+`4E998657AF8E8B4DEBCF79494D65A5B9C9811D8D1884A9551EDA8191F8C32651`
+stays in place. Recovery preserved it and unchanged tools config; no old issue
+was restored. All649 payloads/manifest, original process/window and15 pre-existing
+fixture files match. No helper/FFmpeg/FFprobe remained at afterguard; clean source.
+Outputs/audits/quarantine retained; keeper untouched. Old helper pins prior issue
+state and must refuse another publication until separately reviewed/tested.
+
+No production/build/default-count change: existing1415/0 each-runtime evidence
+is separate. Synthetic Luna metadata establishes fixture selection, not genuine
+camera/color correctness. Native4K, full app cold restart/source-absent continuity,
+native changed-record refusal/cancellation/retry, tray/Quit/drafts/notifications/
+hotkey, identified disposable hardware, genuine camera/official Luna LUT,
+filesystems/travel and trusted distribution remain open. Full goal active.
+
 ## Supported input recovered; current F810 lifecycle · October 9 EDT
 
 Ryan restarted Codex and directly replied **ready**. The Windows worker/broker

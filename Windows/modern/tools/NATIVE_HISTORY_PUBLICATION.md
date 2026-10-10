@@ -1,5 +1,27 @@
 # Exact generated-video history gate
 
+## Positive native live slice · October 9 EDT
+
+Separately brokered live publication, explicitly reviewed native1080p/Standard
+edit checkpoint and reviewed recovery each passed with a different actual
+supported idle proof less than60s old. All helper processes exited0. Native history
+verified two exact generated saved clips with source absent, hid sharing while
+off, then offered separate manual export after opt-in:2 new, then2 reused.
+All first-export bytes/hashes/write times remain. Both owned records are retained
+in quarantine; history reopened empty and the original app returned idle.
+[Full observations/commands/pins](../VISIBLE_REVIEW_WORKFLOW.md) preserve original
+afterguard failure and separate UTC comparison correction. All649 payloads,
+original process/window,15 pre-existing fixture files and tools config match.
+Successful app export legitimately cleared its earlier scan issue; current49B
+state and prior161B snapshot remain. Recovery restored no old config.
+
+This slot is finished/handed back. The old helper still pins prior161B issue state
+and must refuse a new publication against current49B state. A separately reviewed,
+tested helper baseline is required; do not restore old issue or adopt unexpected
+config. Future live/restart work also needs a new slot and fresh native idle proof.
+No code/build/default-count change or complete-port claim. Native4K/full restart/
+refusal/cancel, real camera/device/official Luna LUT/filesystem/travel/trust remain.
+
 This optional engineering helper binds only the existing F810 review app and the
 retained `NativeHistoryVideo-20261008` generated fixture. It is not an application
 feature or a general configuration writer. Real camera media, devices and tools
@@ -93,5 +115,6 @@ running. Tested source/project/wrapper/feed inputs were copied byte-identically
 into this repository after the execution boundary; milestone documentation is
 separate. Default tests/app build, native UI/manual export/cold restart, official
 Luna LUT, real camera/disposable-device/filesystem/travel and trust gates remain
-open. Current supported native input is denied; do not bypass it or publish live
-fixture records until that gate and separate live-slot admission are satisfied.
+open. At that historical checkpoint supported input was denied. The positive
+slice above followed Ryan's Codex restart and separate live admission. Future
+execution still requires current supported input and fresh admission.
