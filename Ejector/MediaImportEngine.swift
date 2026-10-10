@@ -58,9 +58,48 @@ nonisolated struct MediaImportEngine {
         guard lstat(url.path, &s) == 0, (s.st_mode & S_IFMT) == S_IFREG else {
             throw ImportFailure("Cannot read a regular file: \(url.lastPathComponent)")
         }
-        return Stamp(device: s.st_dev, inode: s.st_ino, size: s.st_size,
-                     seconds: s.st_mtimespec.tv_sec, nanos: s.st_mtimespec.tv_nsec,
-                     changeSeconds: s.st_ctimespec.tv_sec, changeNanos: s.st_ctimespec.tv_nsec)
+        return stamp(s)
+    }
+
+    static func stamp(_ s: stat) -> Stamp {
+        Stamp(device: s.st_dev, inode: s.st_ino, size: s.st_size,
+              seconds: s.st_mtimespec.tv_sec, nanos: s.st_mtimespec.tv_nsec,
+              changeSeconds: s.st_ctimespec.tv_sec, changeNanos: s.st_ctimespec.tv_nsec)
+    }
+
+    // Opens a checked folder and confirms the kernel resolved exactly that path.
+    // Later work through the descriptor stays in this folder even if an ancestor
+    // is swapped for a link; O_NOFOLLOW alone only covers the final component.
+    static func openPinnedDirectory(_ url: URL) throws -> Int32 {
+        let path = url.standardizedFileURL.path
+        let fd = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard fd >= 0 else { throw ImportFailure("Cannot open \(path): \(String(cString: strerror(errno)))") }
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        guard fcntl(fd, F_GETPATH, &buffer) == 0, String(cString: buffer) == path else {
+            close(fd); throw ImportFailure("A folder changed while it was in use: \(path)")
+        }
+        return fd
+    }
+
+    // Removes only the regular file that was verified: never recursively, and only
+    // when the entry in the pinned parent still has the verified type and identity.
+    static func removeVerifiedFile(_ url: URL, expected: Stamp) throws {
+        let name = url.lastPathComponent
+        let parent: Int32
+        do { parent = try openPinnedDirectory(url.deletingLastPathComponent()) } catch {
+            throw ImportFailure("A folder changed before deletion. Original kept: \(name)")
+        }
+        defer { close(parent) }
+        #if EASY_EJECT_TEST_SEAMS
+        DeletionRaceHooks.afterParentPinned?()
+        #endif
+        var folder = stat(), entry = stat()
+        guard fstat(parent, &folder) == 0, folder.st_dev == expected.device,
+              fstatat(parent, name, &entry, AT_SYMLINK_NOFOLLOW) == 0, (entry.st_mode & S_IFMT) == S_IFREG,
+              stamp(entry) == expected else { throw ImportFailure("A file changed before deletion. Original kept: \(name)") }
+        guard unlinkat(parent, name, 0) == 0 else {
+            throw ImportFailure("Could not remove \(name): \(String(cString: strerror(errno))). Original kept.")
+        }
     }
 
     static func checkPath(_ url: URL) throws {
@@ -451,7 +490,10 @@ nonisolated struct MediaImportEngine {
             guard try Self.stamp(entry.source) == entry.before, try Self.stamp(entry.saved) == entry.savedBefore else {
                 throw ImportFailure("A file changed before deletion. Remaining originals kept.")
             }
-            try FileManager.default.removeItem(at: entry.source)
+            #if EASY_EJECT_TEST_SEAMS
+            DeletionRaceHooks.afterFinalStamp?()
+            #endif
+            try Self.removeVerifiedFile(entry.source, expected: entry.before)
             try audit("Removed verified source | \(entry.source.path)")
         }
         let removed = Set(removals.map(\.source))
@@ -520,3 +562,13 @@ nonisolated struct MediaImportEngine {
         return SavedCopy(url: target, reused: false)
     }
 }
+
+#if EASY_EJECT_TEST_SEAMS
+// Scheduling points for the concurrent-replacement regression tests only.
+// Release builds never define EASY_EJECT_TEST_SEAMS.
+nonisolated enum DeletionRaceHooks {
+    nonisolated(unsafe) static var afterFinalStamp: (() -> Void)?
+    nonisolated(unsafe) static var afterParentPinned: (() -> Void)?
+    nonisolated(unsafe) static var beforeMetadataUnlink: (() -> Void)?
+}
+#endif
