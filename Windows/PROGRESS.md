@@ -1,5 +1,13 @@
 # Windows progress · October 9, 2026
 
+## Supported input recovered; current-app lifecycle checks pass · October 9 EDT
+
+After Ryan restarted Codex and replied **ready**, supported Windows input works on the unchanged F810 review. At **2026-10-10T03:04:44Z** the original PID21224 was responding with no visible main window. Normal `sky.launch_app` revealed the original HWND1967754. Clicking Minimize succeeded; the next state capture explicitly reported that the window was minimized. A normal duplicate launch restored the same window. Maximizing, duplicate launch with the maximized window retained, and restoring normal size passed. An empty import-history dialog survived another normal duplicate launch; Escape and a settled screenshot returned the app to idle storage with no modal.
+
+Private evidence: `C:/Users/rsmit/.codex/EasyEjectBuildTools/ForegroundRestartReady-20261010T0304442218727Z`. `native-observation.json` SHA256 **045E28FE068EBBA8CED019DFE0A78C191881385FE8DE692C234C40B4B8F1FF30** retains supported selection, initial reveal, eight returned actions and text observations; screenshots were inspected inline. `after.json` SHA256 **A8B3707A7C24BE37A6FBEFC775BB438A7A19252D76C9546F4D3C8722219778E4** at **03:07:31.5984467Z** verifies all649 payloads, original PID/start/HWND, both live configuration records and clean source7736b9fa unchanged. The screen was positively returned to the Gyroflow Windows worker. The broker's keep-awake holder was untouched.
+
+No code change or additional software-test count. Normal minimized reveal is now observed working; the earlier source-only restore hypothesis is not a reproduced defect. Tray-menu reveal/Quit, full app restart, unsaved-draft retention, nonempty history/manual sharing, active workflows/notifications/hotkey, identified disposable hardware, official Luna LUT/genuine media and trusted distribution remain open. The goal is active.
+
 ## Complete the current Framework full suite · October 9
 
 The [Framework follow-up](POWER_OPERATION_ACCEPTANCE.md) passes **1415/0 defaults** from all **211 exact current raw compiler inputs** at clean source `3fe543c63fa40f88d0225ce250a4ee7b076db234`. Both fresh x64 builds use the installed compiler with warnings as errors and empty compile logs. The actual runner loads Framework `clr.dll` **4.8.9345.0**; this closes the full-composition gap after the earlier Framework1388/0 plus focused27/0 evidence. Modern1415/0 remains its separate retained run; these overlapping counts are not added.

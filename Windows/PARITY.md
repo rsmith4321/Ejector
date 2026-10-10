@@ -1,8 +1,10 @@
 # Full Windows port · parity and acceptance
 
+Supported input recovered after Ryan's Codex restart/ready confirmation. The unchanged F810 review now has actual normal-launch reveal from hidden/minimized state, maximized duplicate-launch retention, empty-history modal retention across duplicate launch and Escape-to-idle evidence. [Exact lifecycle observations](modern/VISIBLE_REVIEW_WORKFLOW.md) retain all649 payloads, original PID/start/HWND and config2 unchanged. No software-test count or whole parity-row promotion follows. Tray/Quit/full restart, drafts/nonempty sharing/active workflows, hardware/LUT/trust acceptance remain open.
+
 The [current Framework full suite](POWER_OPERATION_ACCEPTANCE.md) now passes **1415/0**, with fresh warning-free x64 compilation of211 exact current raw inputs and actual Framework CLR4.8.9345.0 binding. It closes the earlier missing full Framework composition after the27 focused additions; modern1415/0 is a separate retained run, with overlapping counts. All649 review files/originalPID/config2 and source are preserved; own session40460 exits0 and terminal census finds no owned processes. No app launch, real eject or parity-row completion is inferred.
 
-The most recent supported activation at **20:52:18Z** again fails `GetCursorPos: Access is denied`, stops immediately and adds no successful input. Native lifecycle/history/sharing, expressly identified disposable hardware/filesystems/travel, official Luna LUT/genuine media and trusted distribution remain required.
+The earlier supported activation at **20:52:18Z** failed `GetCursorPos: Access is denied`, stopped immediately and added no successful input. Its historical failure is retained separately from the later successful recovery. Remaining native lifecycle/history/sharing, expressly identified disposable hardware/filesystems/travel, official Luna LUT/genuine media and trusted distribution remain required.
 
 The [Windows review handoff](README.md) now identifies WinUI 3/.NET10 as primary, retains classic harness instructions and separates exact full/selected/opt-in evidence. The obsolete universal1214 count and no-actual-tool-run claim are corrected against retained current F810 evidence. Documentation only; native input, identified hardware, official Luna LUT and distribution gates remain open.
 

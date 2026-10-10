@@ -1,6 +1,53 @@
 # Visible manual reviews · October 7, 2026
 
-## Current supported-input checkpoint · October 9, 13:23 UTC
+## Supported input recovered; current F810 lifecycle · October 9 EDT
+
+Ryan restarted Codex and directly replied **ready**. The Windows worker/broker
+cleared the bounded screen slice. Fresh guards at **2026-10-10T03:04:44Z** matched
+all649 review files/manifest, source7736b9fa clean, original PID21224/start
+`2026-10-09T02:46:46.1826671Z` and both live issue/tool configuration records.
+The process was responding with MainWindowHandle0; supported inventory returned
+no Easy Eject window. Normal `sky.launch_app` of the existing review returned
+success and revealed the original HWND1967754, with idle internal-only storage.
+
+Actual observations, **03:04:56.036Z–03:06:55.135Z** (October9, 23:04–23:06 EDT):
+
+- Minimize clicked successfully. The next supported state capture explicitly
+  reported `window is minimized`; normal duplicate launch restored that window.
+- Maximize produced the maximized layout. Another normal duplicate launch
+  retained it, with the caption's Restore control in the fresh tree. Restore
+  returned the normal-size layout. This is observed working behavior, not a
+  reproduced restore defect or a production patch.
+- The empty Verified import history dialog remained visible across a normal
+  duplicate launch. Its saved-original verification action was disabled and the
+  owner stayed gated. Escape dismissed it; a separate settled capture showed
+  idle storage, enabled Refresh and no modal. No history record was created.
+
+Packet: `C:/Users/rsmit/.codex/EasyEjectBuildTools/ForegroundRestartReady-20261010T0304442218727Z`.
+Text evidence includes the initial reveal plus eight returned actions. Inline
+screenshots were inspected without saving image payloads. Immediate captures
+sometimes retained the pre-animation tree; settled captures establish outcomes.
+
+| Evidence | SHA256 |
+| --- | --- |
+| `before.json` | `216D1BB3062D73880172EF4DF607301DD2A334CC970652B7C6D99761B1BB70E1` |
+| `native-observation.json` | `045E28FE068EBBA8CED019DFE0A78C191881385FE8DE692C234C40B4B8F1FF30` |
+| `after.json` | `A8B3707A7C24BE37A6FBEFC775BB438A7A19252D76C9546F4D3C8722219778E4` |
+
+The **03:07:31.5984467Z** afterguard matches all649 payload files, original
+PID/start/HWND, config2 and clean source. Exactly one original app process remains.
+The UI slot was positively returned to the Windows Gyroflow worker, with the
+preview visible/normal-size/idle and no modal or draft. Keeper ownership remains
+with the broker. No code/build/test-count change, Save, media/tool/device action,
+eject or power/display/security change occurred.
+
+Tray-menu reveal/Quit, full app restart, draft retention, nonempty native history
+and manual sharing, active/busy workflows/notifications/hotkey, identified
+disposable hardware/filesystems, official Luna LUT/genuine media and trusted
+distribution remain unproved. Historical input failures below remain evidence
+of their earlier checkpoints; they do not describe this recovered input slice.
+
+## Earlier supported-input checkpoint · October 9, 13:23 UTC
 
 After today's goal resume and the broker's bounded supported lifecycle slot,
 fresh guards verify all649 review payload files and manifest, exact PID21224
@@ -32,7 +79,7 @@ keeper/power/display/security change or alternate input occurred. The temporary
 keeper remains owned by the other task. The shared laptop slot was returned on
 failure; this documentation checkpoint is separately coordinated afterwards.
 
-## Current F810 input checkpoint · October 9 UTC
+## Earlier F810 input checkpoint · October 9 UTC
 
 The already running F810 review app was selected through the supported `sky` inventory/window API: PID **21224**, window **1967754**, exact `PowerConnectionAtomic-20261008/review/app/EasyEject.Modern.exe` path. Fresh accessibility state showed idle connected storage, enabled Refresh, no editor/modal and only the protected internal disk's five volumes. Clicking the returned **Minimize** caption control failed with `GetCursorPos failed: Access is denied. (0x80070005)`. Fresh inventory, unique app selection and full window state preceded one retry; it failed identically. Input stopped. Readable accessibility state does not establish usable input or prove that Windows is locked.
 
