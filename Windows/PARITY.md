@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native generated 4K preset/restart checkpoint
+
+[Isolated native UI evidence](modern/SHARE_RESTART_20261011.md) now covers two exact saved files with source absent, sharing hidden while off, explicit offline 4K/Standard opt-in, manual **2-new** creation using existing supplied tools, actual idle tray Quit/restart and separate manual **2-reused** action. All ten existing originals/outputs/receipts/audits retain hashes, sizes and write times; both outputs pass independent probe/full decode. The 4K preset preserves the small generated clips' 640×360 dimensions without upscaling. Actual isolated hotkey registration/unregistration and settings-draft flyout Quit refusal also pass. These are scoped native generated-fixture results, not genuine 4K camera/LUT, physical eject/sleep/travel, all themes/DPI or trusted-distribution acceptance. No whole row or full port is complete; default counts and the prepared publication-held 0.2 ZIP are unchanged.
+
 ## October 11 · Codex tray flyout checkpoint
 
 The new [WinUI tray flyout](modern/TRAY_FLYOUT.md) has shared grouping, protection/opt-in, dismiss/default and fixed-scale placement coverage: **1454/0** full tests in each runtime, **246/0** selected modern. An explicit isolated WinUI host also passes the actual tray Quit callback with unsaved/hidden drafts and busy refusal, and allows a hidden profile catalog's import handoff. The originally reported Quit exit was not reproduced on the baseline callback; active-draft protection is hardened without claiming its cause is known.
@@ -14,8 +18,8 @@ Every gate below is **implemented + unit-tested, awaiting Ryan's real test**. No
 | --- | --- | --- | --- |
 | Mac features (shared defaults, Use defaults/custom, dialog footers, grouped eject, notifications never eject, manual Quick Share, DJI O4 Pro) | Existing | Existing suites | implemented + unit-tested, awaiting Ryan's real test |
 | Explicit eject choice with Keep Connected default, including no media | Shared `CompletionPresentation.ChoiceTitle` in both interfaces | `no-media completion still offers an explicit Keep Connected default eject choice` | implemented + unit-tested, awaiting Ryan's real test |
-| Native 4K Quick Share | Existing engine/service | `manual 4K Quick Share through the native helper process…` (4K create, separate 1080p, exact 4K reuse) | implemented + unit-tested, awaiting Ryan's real test |
-| True Quit and restart with source absent | Existing persistence | `app session Quit then restart with source absent…`: separate session, restart-create and restart-reuse processes on the production default root | implemented + unit-tested, awaiting Ryan's real test |
+| Native 4K Quick Share | Existing engine/service | `manual 4K Quick Share through the native helper process…` (4K create, separate 1080p, exact 4K reuse); isolated native UI 4K-preset creation/reuse with supplied tools | generated native UI pass; genuine 4K camera footage and official LUT still pending |
+| True Quit and restart with source absent | Existing persistence | `app session Quit then restart with source absent…`; actual native idle tray callback Quit/restart and separate manual exact reuse with generated source absent | generated native UI pass; physical source eject/reconnect and genuine media still pending |
 | Changed original/destination refusal, cancel and retry | Existing | Existing manual/cold sharing suites | implemented + unit-tested, awaiting Ryan's real test |
 | Tray, menu, reveal; Quit idle vs busy | New shared `AppQuitPolicy` in both interfaces; a refused Quit no longer stays armed in the classic app | Four `tray …`/`Quit …`/`system close …` cases; existing tray/reveal suites | implemented + unit-tested, awaiting Ryan's real test |
 | Drafts | Quit refused while an editor is open | `refused Quit keeps an unsaved defaults draft…`; existing draft suites | implemented + unit-tested, awaiting Ryan's real test |

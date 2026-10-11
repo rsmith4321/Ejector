@@ -1,5 +1,11 @@
 # Windows progress · October 10, 2026
 
+## Native manual 4K preset and source-absent restart · October 11
+
+The isolated engineering app now verifies exact generated history with its source absent, keeps sharing hidden while opted out, saves a manual 4K/Standard profile and existing supplied-tool setup without exporting, then creates **2 new** validated sharing copies through an explicit native action. Actual idle tray Quit/restart preserves the batch and choices; a fresh manual action reports **0 new / 2 reused**. Independent checks preserve all ten existing files' hashes, sizes and write times, and separately probe/full-decode both outputs. The 4K preset correctly avoids upscaling these 640×360 fixtures. See [native evidence, scope, commands and hashes](modern/SHARE_RESTART_20261011.md).
+
+The opt-in helper adds guarded isolated preparation with an exact review marker/owner lock, warning-free compilation and eight admission refusal controls. It never seeds live configuration. Native isolated Settings also verifies actual Ctrl+Alt+Shift+E registration/unregistration, Return keeping E:/F: connected and flyout Quit refusal with an unsaved settings draft. These opt-in checks add no default-suite count or production payload change. Both owned review processes quit normally. Generated source absence is now covered natively; physical source eject, genuine media/LUT, whole-camera eject/veto, power/travel, physical DPI/themes and clean-machine/trusted distribution remain open. The unchanged 0.2 ZIP still awaits publication approval.
+
 ## 0.2.0 candidate validation · October 11
 
 The exact-commit normal review folder and validated 650-entry public ZIP are now [ready for review](modern/REVIEW_020_20261011.md), built from pushed payload commit `6de85d2`. ZIP SHA-256: `da45e2022e3b7447bc31d85f4100451243b16c083e4a1b45019de312d848fc06`. Publication remains held for Ryan's explicit OK. Mac `v1.7.6` remains Latest. Subsequent documentation checkpoints do not change this payload.

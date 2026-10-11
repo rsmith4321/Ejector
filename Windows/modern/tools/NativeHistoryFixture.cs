@@ -109,8 +109,9 @@ internal static class NativeHistoryFixture {
     }
     [STAThread] static int Main(string[] args) {
         try {
-            bool video = args.Length == 8 && args[0] == "--prepare-owned-native-video-history";
-            if (!video && (args.Length != 4 || args[0] != "--seed-owned-native-history" && args[0] != "--prepare-owned-native-history" && args[0] != "--prepare-owned-native-history-power")) throw new ArgumentException("Usage: --prepare-owned-native-history (or explicit --prepare-owned-native-history-power / --seed-owned-native-history) NEW_FIXTURE_ROOT EXACT_CONFIG_ROOT EXPECTED_BACKEND_SHA256. Video preparation: --prepare-owned-native-video-history plus FFMPEG_EXE FFMPEG_SHA256 FFPROBE_EXE FFPROBE_SHA256; no video seed mode.");
+            bool isolatedVideo = args.Length == 8 && args[0] == "--prepare-owned-isolated-native-video-history";
+            bool video = isolatedVideo || args.Length == 8 && args[0] == "--prepare-owned-native-video-history";
+            if (!video && (args.Length != 4 || args[0] != "--seed-owned-native-history" && args[0] != "--prepare-owned-native-history" && args[0] != "--prepare-owned-native-history-power")) throw new ArgumentException("Usage: --prepare-owned-native-history (or explicit --prepare-owned-native-history-power / --seed-owned-native-history) NEW_FIXTURE_ROOT EXACT_CONFIG_ROOT EXPECTED_BACKEND_SHA256. Video preparation: --prepare-owned-native-video-history plus FFMPEG_EXE FFMPEG_SHA256 FFPROBE_EXE FFPROBE_SHA256; no video seed mode. Isolated video preparation: --prepare-owned-isolated-native-video-history with the same arguments, replacing EXACT_CONFIG_ROOT with an initialized, stopped ui- review root.");
             bool seed = args[0] == "--seed-owned-native-history";
             bool powerCheck = args[0] == "--prepare-owned-native-history-power";
             string backend = typeof(VerifiedImporter).Assembly.Location;
@@ -122,7 +123,14 @@ internal static class NativeHistoryFixture {
             using var videoTools = video ? new NativeHistoryVideo(args[4], args[5], args[6], args[7]) : null;
             string config = Path.GetFullPath(args[2]);
             string ordinaryConfig = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EasyEject", "Profiles");
-            if (!String.Equals(config, Path.GetFullPath(ordinaryConfig), StringComparison.OrdinalIgnoreCase)) throw new IOException("Fixture supports only the explicit ordinary local Easy Eject configuration root.");
+            // Isolated preparation accepts only an already initialized, stopped
+            // UI-review fixture. It can never select the live seed mode.
+            using var isolatedOwner = isolatedVideo ? HoldIsolatedReview(config) : null;
+            if (isolatedVideo) {
+                var isolated = typeof(Profiles).GetProperty("IsolatedAppDataForTests", BindingFlags.Static | BindingFlags.NonPublic);
+                if (isolated == null) throw new IOException("Reviewed backend has no explicit isolated app-data override.");
+                isolated.SetValue(null, config);
+            } else if (!String.Equals(config, Path.GetFullPath(ordinaryConfig), StringComparison.OrdinalIgnoreCase)) throw new IOException("Fixture supports only the explicit ordinary local Easy Eject configuration root.");
             // Use this exact backend's existing own-folder resolver for packaged
             // app-data redirection. Media paths retain the normal strict guards.
             var resolver = typeof(Profiles).GetProperty("Root", BindingFlags.Static | BindingFlags.NonPublic);
@@ -211,7 +219,7 @@ internal static class NativeHistoryFixture {
             Create(preparedProfile, profileBytes); Create(preparedHistory, historyBytes);
             if (seed) { Create(profilePath, profileBytes); Create(historyPath, historyBytes); }
             var evidence = new { ObservedUtc = DateTime.UtcNow.ToString("o"), Backend = backend, BackendSha256 = Hash(backend), FixtureRoot = root, RequestedConfigRoot = args[2], ConfigRoot = config,
-                Seeded = seed, PreparedProfile = Identity(preparedProfile), PreparedHistory = Identity(preparedHistory),
+                Seeded = seed, IsolatedReview = isolatedVideo, PreparedProfile = Identity(preparedProfile), PreparedHistory = Identity(preparedHistory),
                 Profile = seed ? Identity(profilePath) : null, History = seed ? Identity(historyPath) : null, Receipt = Identity(batch.ReceiptPath), OriginalCopies = batch.Originals.Select(x => Identity(x.Path)).ToArray(),
                 RetainedSource = retainedSource, UnrecordedFile = Identity(Path.Combine(result.Folder, "unrelated.mov")), Destination = identity,
                 NotificationsAvailable = discovery.NotificationsAvailable, InventoryComplete = state.Complete,
@@ -226,5 +234,17 @@ internal static class NativeHistoryFixture {
             Console.WriteLine(seed ? "Owned fixture seeded." : "Owned fixture prepared. Live profile/history configuration was not changed.");
             return 0;
         } catch (Exception ex) { Console.Error.WriteLine(ex.Message); return 1; }
+    }
+    static FileStream HoldIsolatedReview(string root) {
+        string parent = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectFixtures");
+        if (!String.Equals(Path.GetDirectoryName(root), parent, StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(root).StartsWith("ui-", StringComparison.Ordinal)) throw new IOException("Isolated preparation requires an owned ui- review fixture child.");
+        Ordinary(root);
+        string marker = Path.Combine(root, "review-scope.txt"), owner = Path.Combine(root, "review-owner.lock");
+        Ordinary(marker); Ordinary(owner);
+        var held = new FileStream(owner, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        try {
+            if (File.ReadAllText(marker) != "Isolated preferences; normal device discovery and manual actions. No scripted hardware action.\r\n") throw new IOException("Isolated preparation requires the exact review scope marker.");
+            return held;
+        } catch { held.Dispose(); throw; }
     }
 }

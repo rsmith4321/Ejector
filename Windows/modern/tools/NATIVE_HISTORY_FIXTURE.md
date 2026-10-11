@@ -1,5 +1,9 @@
 # Owned saved-history preparation · October 8, 2026
 
+## Isolated review preparation · October 11
+
+The separate `--prepare-owned-isolated-native-video-history` mode uses the same eight arguments as video preparation below, with an initialized, stopped `ui-` review root replacing `EXACT_CONFIG_ROOT`. It requires a direct child of `%USERPROFILE%\.codex\EasyEjectFixtures`, ordinary ancestry, the exact `review-scope.txt` marker and exclusive `review-owner.lock`, then selects only the explicit isolated backend app-data override. It prepares private records, never seeds them or writes live preferences/history. Original ordinary-root modes retain their prior rules. Eight refusal controls and warning-free compilation pass; see [current commands, pins, native 4K-preset export and true Quit/restart reuse](../SHARE_RESTART_20261011.md). No new default-suite count or complete hardware/LUT acceptance follows.
+
 `NativeHistoryFixture.csproj` is an opt-in fixture utility, excluded from the default application and contract builds. It requires an explicitly supplied existing review backend and a matching SHA-256 at execution. Its original modes prepare generated text files, a genuine production import receipt, and synthetic profile/history records outside OneDrive. Those `.mov` files are deliberately plain text. The separate video mode below prepares playable generated clips without publishing live configuration.
 
 ## Generated-video preparation · October 9

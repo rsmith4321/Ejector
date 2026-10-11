@@ -1,5 +1,7 @@
 # Windows device testing
 
+**New isolated native sharing/restart evidence:** [generated 4K-preset creation and exact reuse](modern/SHARE_RESTART_20261011.md) now passes through the normal UI, existing supplied tools and actual idle tray Quit/restart with source absent. Originals, outputs and receipts remain exact. This is generated-codec evidence; genuine camera/LUT, physical removal/power/travel and distribution gates remain open. The engineering host is stopped; retained preferences/history are isolated.
+
 **New 0.2.0 review candidate (unpublished):** [exact build, ZIP, hashes and limits](modern/REVIEW_020_20261011.md). Review executable: `C:\Users\rsmit\.codex\EasyEjectBuildTools\ClaudeReview-6de85d2\review\app\EasyEject.Modern.exe`. The normal review uses live preferences and is intentionally not running. All new native card checks used the isolated engineering host. Publication still requires Ryan's OK.
 
 **Current distributable review (0.1 preview):** `C:\Users\rsmit\.codex\EasyEjectBuildTools\ClaudeReview-a168bf8\review\app\EasyEject.Modern.exe`, unsigned, code at `a168bf8`; full suites **1446/0** each runtime. The published [0.1 pre-release](https://github.com/rsmith4321/Ejector/releases/tag/windows-v0.1.0-preview) adds the Windows license at `252633e`. Its public ZIP SHA-256 is `cb1460b2dce73a45551ecbe090770f1115374cb60c9ce841817a2f3040f1f5ee`.
