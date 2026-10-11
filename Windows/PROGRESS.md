@@ -1,5 +1,11 @@
 # Windows progress · October 10, 2026
 
+## Native keyboard navigation and draft cancellation · October 11
+
+[Fresh native keyboard review](modern/KEYBOARD_NAVIGATION_NATIVE_20261011.md) verifies tray Tab/Shift+Tab/Return, defaults Tab/Space draft change/reverse traversal/Return Cancel/restored checkbox after keyboard reopening, and Settings footer/lower-option scrolling/Cancel. Native PID29520 exits0/PASS/no exception; zero isolated saved preferences. Fresh engineering build has0 warnings/errors and automatic native regressions PASS. Production UI source remains unchanged from40b0a26. Focus-provider output is qualified against direct screenshot outlines; native sizing attempts do not confirm smaller geometry, so no new compact/scaling/full-accessibility claim. Engineering .NET10.0.0 is not normal Release UI.
+
+Aggregate SHA **81980938b901c4c380709283421ba47f8d215810f09deb570d9da6a670ecad5e** pins source/build/modules/process/input observations and exact649 review/live2/protected5+21+1+1/source archive/ZIP/Mac/login preservation. Initial launcher parser and finalizer JSON-date issues are retained/corrected; no app failure. Current40b0a26/e6471495 ZIP unchanged/unpublished, normal app unlaunched; no new backend/tool counts or device/OS/install/push/publication. Full hardware/media/LUT/travel/accessibility/trust/publishing gates remain open; goal active.
+
 ## Current package replay and DJI effective-color reuse · October 11
 
 [Exact40b0a26 packaged backend](modern/PACKAGED_REGRESSION_20261011.md) passes **1454/0 full**, **246/0 selected**, and **16/0 actual supplied-tool generated cases**, all exit0/empty stderr. Each parent loads matching packaged Runtime9032385a/.NET10.0.12 bytes; warning-free archived runner/Framework-fixture builds and403 source/649 review/live2/protected5+21+1+1/Mac/login/ZIP preservation pass. Aggregate SHA **19849027eb4a1f10918dcb72a42e69ccd26032cf750db7e932206c8aad27f387**. Positive official LUT explicitly NOT RUN; read-only inventory internal-only.

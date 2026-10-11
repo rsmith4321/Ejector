@@ -1,5 +1,11 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native keyboard draft/navigation evidence
+
+[Actual isolated keyboard session](modern/KEYBOARD_NAVIGATION_NATIVE_20261011.md) verifies tray Open navigation, defaults preview draft/keyboard Cancel/restored saved checkbox, Settings footer order/lower-option automatic scroll/Cancel and settled storage return. PID29520 exit0/PASS/no exception; zero isolated saved preferences. Warning-free fresh engineering build/automatic native regressions pass, with unchanged production UI source40b0a26. Generic/stale focus-provider output and unconfirmed native resizing are qualified; no complete keyboard/screen-reader/compact/scale acceptance. Engineering .NET10.0.0 is separate from normal Release.
+
+Aggregate SHA81980938b901c4c380709283421ba47f8d215810f09deb570d9da6a670ecad5e binds source/build/process/modules/text/visual notes and exact649 review/live2/prior protected5+21+1+1/ZIP/source/Mac/login preservation. Retained launcher parser/JSON date verifier errors corrected, not app failures. Production package stays40b0a26/e6471495, normal app unlaunched/unpublished; no backend count change, real device/media/OS/install/push action. Full physical/media/LUT/travel/accessibility/trust/publishing gates remain open; goal active.
+
 ## October 11 · exact current package and DJI cross-color reuse assertion
 
 [40b0a26 packaged replay](modern/PACKAGED_REGRESSION_20261011.md) passes **1454/0 full**, **246/0 selected**, **16/0 actual supplied-tool generated cases**, exit0/empty stderr; live Runtime/.NET modules match package bytes. Warning-free archived builds and exact403 source/649 review/live2/protected5+21+1+1/ZIP/Mac/login preservation pass; aggregate SHA19849027eb4a1f10918dcb72a42e69ccd26032cf750db7e932206c8aad27f387. Official positive LUT explicitly NOT RUN; read-only inventory internal-only. Current ZIP/source stays40b0a26/e64714952dc971df3b93badd45ba631877fd2ce0439dd49adb72fb9df1f5d4ca.

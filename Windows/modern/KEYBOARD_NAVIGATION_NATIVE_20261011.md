@@ -1,0 +1,29 @@
+# Native keyboard navigation · October 11, 2026
+
+A fresh isolated engineering session exercises actual supported keyboard input through the modern tray, Import defaults and Settings. No production source change was needed. This adds direct native navigation/cancellation observations; it does not establish complete accessibility or compact-window acceptance.
+
+## Observed inputs and results
+
+| Surface | Actual input and direct observation |
+| --- | --- |
+| Tray flyout | Initial Open focus → Tab visibly outlines Settings → Shift+Tab visibly outlines Open → Return reveals the main window. The old tray capture then reports an unusable app window; fresh selection of the unique returned main window succeeds without repeating Return. |
+| Import defaults | After entering the page, Tab reaches Videos; the next Tab reaches Include camera previews. Space visibly unchecks only the isolated previews draft. Reverse Tab traverses Videos → navigation → Cancel. Return on Cancel shows **Import defaults draft discarded. Saved choices were not changed.** |
+| Reopen defaults | Navigation Down → Down → Return reopens Import defaults. A settled screenshot confirms Include camera previews is checked again. No Save defaults action occurred and no saved isolated configuration exists. |
+| Settings | Navigation Down → Return opens Settings. Reverse Tab reaches Cancel → Save → the lower Enable debug logging option. The scroll viewport brings that previously hidden option into view; it is not activated. Tab → Tab → Return reaches Cancel and shows **Settings draft discarded. Saved settings were not changed.** Settled navigation returns to Connected storage. |
+| Window sizing attempt | A border drag and native system-menu Size/Right attempt do not confirm changed geometry; reported screenshot bounds remain1108×754. Escape leaves the attempt and the app stays visible/idle. **No new compact-layout or scaling proof is claimed.** Earlier automated compact geometry checks remain scoped to their own runs. |
+
+Screenshots were inspected directly and were not saved, decoded or re-emitted from their payloads. `accessibility-observations.json` retains text/tree snapshots, including transition captures and later settled observations. `visual-observations.json` records the direct visual findings. The tool's `focused_element` often reports a generic pane or the Settings status text despite a visible outline on another control. Consequently these are visual/input-response observations, **not exact accessibility-provider focus, human screen-reader or blanket keyboard acceptance**. Some immediate page-change trees still describe the previous page; settled observations determine the result. Temporary navigation-selection animation is not treated as a defect.
+
+## Source, process and preservation evidence
+
+Source checkpoint **9cf92cf013afc4ac05eaeee6300e2052a8821aa1**; production UI/app and modern test sources remain identical to package source **40b0a2694bcc0382756411d6db112cc4c7ea9168**. The fresh existing-SDK10.0.401 engineering build has **0 warnings /0 errors**, and its automatic native theme/completion/pending-focus/compact-presenter/tray-Quit regressions finish PASS in fixture `ui-d02969be28714e98901fb24edc41f447`. This is the same regression harness, not a new backend-suite count.
+
+Manual inspection process **PID29520**, fixture `C:\Users\rsmit\.codex\EasyEjectFixtures\ui-keyboard-native-20261011`, mode `inspect`, exits **0**, with PASS and no `unhandled.txt`. The settled session finishes via the existing engineering finish gate and actual production tray-Quit callback. This mode has generated devices and no connected device API/discovery/automatic-import worker; no actual eject/import/removal is offered as evidence. Settings/login/debug/notification/cleanup choices are not changed or saved.
+
+Fresh build root: `C:\Users\rsmit\.codex\EasyEjectBuildTools\Codex020-keyboard-ui-20261011`. Evidence root: `C:\Users\rsmit\.codex\EasyEjectBuildTools\Codex020-keyboard-native-20261011`. Source/test/build/apphost pins, loaded-module paths/hashes, start/exit records, automatic result, native fixture files and observation records are retained. The engineering host loads the installed framework-dependent **.NET10.0.0**, core file version10.0.25.52411; it is not the normal self-contained .NET10.0.12 Release UI. [Current exact packaged backend results](PACKAGED_REGRESSION_20261011.md) remain separate. Normal review app remains unchanged/unlaunched.
+
+`final.json` SHA-256 **81980938b901c4c380709283421ba47f8d215810f09deb570d9da6a670ecad5e** verifies source/build/module pins, exact **649 review files**, **2 live files**, prior protected groups of **5 /21 /1 /1** files, zero saved isolated preference files, source archive/current ZIP, preserved Mac baseline and absent login registration. ZIP remains107460521bytes, SHA **e64714952dc971df3b93badd45ba631877fd2ce0439dd49adb72fb9df1f5d4ca**.
+
+The first retained `launch.ps1` has a parser error before app launch; `launch-final.ps1` corrects the missing parentheses and launches the only manual inspection process. The first retained `finalize.ps1` falsely flags a loaded-module timestamp because default JSON parsing converts it to DateTime; direct before/loaded/current hashes, lengths and timestamp strings match. `finalize-final.ps1` uses `ConvertFrom-Json -DateKind String` for those pins and passes. Neither verifier/launcher issue is an app failure, and both originals remain retained.
+
+No normal app launch, real media/device action, OS setting change, signing, installation, autostart registration, push or publication occurred. Genuine media/official LUT, acknowledged physical/filesystem/travel workflows, full screen-reader/display/human acceptance and trusted direct-distribution/publication gates remain open; full goal remains active.
