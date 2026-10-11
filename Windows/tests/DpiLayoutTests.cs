@@ -9,6 +9,13 @@ namespace EasyEject {
     public static partial class Tests {
         [DllImport("user32.dll")] static extern bool IsProcessDPIAware();
         [DllImport("user32.dll")] static extern uint GetDpiForSystem();
+        // Layout checks at fixed scales, independent of the live monitor's current scale.
+        static readonly float[] FixedTestScales = { 1f, 1.5f, 2.25f };
+        static string ScaleName(float scale) { return ((int)Math.Round(scale * 100)) + "%"; }
+        static void AtFixedScale(float scale, Action body) {
+            DpiForm.FixedScaleForTests = scale;
+            try { body(); } finally { DpiForm.FixedScaleForTests = null; }
+        }
         static void LoadDpiForm(Form form) {
             form.ShowInTaskbar = false; form.Opacity = 0; form.Show(); Application.DoEvents(); form.Hide();
         }
@@ -21,15 +28,17 @@ namespace EasyEject {
                 using (var form = new AppSettingsDialog(new AppSettings())) Check(form.CurrentAutoScaleDimensions.Width == GetDpiForSystem(), "Native UI dimensions disagree with system DPI");
                 Console.WriteLine("Native system DPI=" + GetDpiForSystem() + "; app/test DPI contexts match.");
             });
-            Test("settings scales its design viewport minimum and footer once at native DPI", () => {
+            foreach (float scale in FixedTestScales) Test("settings scales its design viewport minimum and footer once at fixed " + ScaleName(scale) + " scale", () => AtFixedScale(scale, () => {
                 using (var form = new AppSettingsDialog(new AppSettings())) {
-                    Size original = form.ClientSize, minimum = form.MinimumSize; float font = form.Font.Size; double factor = GetDpiForSystem() / 96.0;
+                    Size original = form.ClientSize, minimum = form.MinimumSize; float font = form.Font.Size;
                     var accept = form.AcceptButton; var cancelButton = form.CancelButton;
-                    LoadDpiForm(form); CheckDpiSize(original, form.ClientSize, factor, "Settings viewport did not scale from its design basis"); CheckDpiSize(minimum, form.MinimumSize, factor, "Settings minimum did not scale");
-                    Size scaled = form.Size; LoadDpiForm(form); Check(form.Size == scaled && form.Font.Size == font && form.AcceptButton == accept && form.CancelButton == cancelButton, "Repeated load changed scale, point size or defaults");
+                    LoadDpiForm(form); CheckDpiSize(original, form.ClientSize, scale, "Settings viewport did not scale from its design basis"); CheckDpiSize(minimum, form.MinimumSize, scale, "Settings minimum did not scale");
+                    double real = form.CurrentAutoScaleDimensions.Height / 96.0; // text already renders at the real DPI
+                    Check(Math.Abs(form.Font.Size - font * scale / real) < 0.05, "Settings text was not scaled exactly once | font=" + form.Font.Size + ", real=" + real);
+                    Size scaled = form.Size; float scaledFont = form.Font.Size; LoadDpiForm(form); Check(form.Size == scaled && form.Font.Size == scaledFont && form.AcceptButton == accept && form.CancelButton == cancelButton, "Repeated load changed scale, point size or defaults");
                     CheckFooterInside(form);
                 }
-            });
+            }));
             Test("profile scales native layout while retaining draft source defaults and manual sharing", () => {
                 var profile = OfflineProfile(); profile.SharingPreset = QuickShareProfile.Uhd; profile.SharingColor = QuickShareProfile.Standard;
                 using (var form = new ImportProfileDialog(profile, null, profile.Name, new ImportDefaults(), true)) {

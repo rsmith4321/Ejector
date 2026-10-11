@@ -2,7 +2,34 @@
 
 ## Claim · remaining software gates · October 11 UTC
 
-Worker: Claude (Windows, Opus). Started **2026-10-11T03:37Z** from clean HEAD `2f0ff42`. Scope: implement and unit-test the remaining Windows software gates on generated fixtures only. No device, eject, live configuration, review app, signing, install, push or release.
+Worker: Claude (Windows, Opus). Started **2026-10-11T03:37Z** from clean HEAD `2f0ff42`. Scope: implement and unit-test the remaining Windows software gates on generated fixtures only. No device, eject, live configuration, review app, signing or install.
+
+## Remaining software gates implemented and unit-tested · October 11 UTC
+
+Every gate in the new [PARITY table](PARITY.md) is **implemented + unit-tested, awaiting Ryan's real test**. None is device-verified.
+
+1. **Test isolation (`6cae83f`).** The default suite's package-redirection test used to write and delete a fixture profile in the live `%LOCALAPPDATA%\EasyEject\Profiles`. Each test process now uses its own `%USERPROFILE%\.codex\EasyEjectFixtures\appdata-<id>`, inherited by child processes and removed on exit. A new test fails if `Profiles.Root` resolves inside the real LocalAppData. Production leaves the override null.
+2. **Gates (`448574e`).**
+   - A shared `AppQuitPolicy` drives tray close and Quit in both interfaces. Close hides to the tray, and Quit exits only when idle with no open editor.
+   - A refused Quit is now forgotten. Before this, the classic app stayed armed, so a later window close exited.
+   - New default-suite cases:
+     - native-helper 4K Quick Share with exact reuse
+     - a separate-process app session, Quit, then restart-create and restart-reuse on the production default root with the source absent
+     - an unsaved draft survives a refused Quit
+     - the no-media eject choice keeps Keep Connected as the default
+     - a simulated travel run: sleep mid-copy, wake, reconnect, fresh retry, reuse, and history after the source is removed
+   - Modern static theme/DPI contract: theme-resource brushes only, no forced theme, PerMonitorV2.
+3. **DPI.**
+   - The three Forms layout tests read the live monitor scale, so they failed when the display was temporarily at 225%. They now run at fixed 100/150/225% through `DpiForm.FixedScaleForTests`, whatever the monitor is at: the real-DPI layout runs first, then bounds and text are scaled by the remaining ratio.
+   - The 225% run reproduced a real defect. When the device window cannot reach its preferred size, the wrapped action buttons took the whole height and left the storage list at 1 px. The action row is now capped to the remaining room (at least one button row) and scrolls.
+   - An earlier attempt using a fixed 96-DPI thread context hung the .NET 10 runner on an exception during form load. That process was stopped and its run (`Claude-20261011-0417`) is discarded.
+
+Final full run `C:\Users\rsmit\.codex\EasyEjectBuildTools\Claude-20261011-0439`, warnings as errors, BelowNormal priority:
+- modern selected **246/0**
+- modern full **1446/0**
+- Framework full **1446/0**
+
+The baseline was 242/0 and 1430/0. The live Profiles folder's file list, sizes and write times were snapshotted before and after each full run, and it is unchanged: empty, last write 2026-10-10T09:40:47.85Z.
 
 ## Mac deletion-race parity check (07de127) · October 10 UTC
 

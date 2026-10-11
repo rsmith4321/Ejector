@@ -99,7 +99,7 @@ namespace EasyEject {
             cancel.Click += delegate { RequestCancellation(); };
             status.AutoSize = false; status.Multiline = true; status.ReadOnly = true; status.ScrollBars = ScrollBars.Vertical; status.WordWrap = true; status.Dock = DockStyle.Fill; status.MaximumSize = new Size(940, 0); status.Text = "Reading connected devices…";
             layout.Controls.Add(intro); layout.Controls.Add(list); layout.Controls.Add(actions); layout.Controls.Add(status); Controls.Add(layout);
-            layout.SizeChanged += delegate { int width = Math.Max(350, layout.ClientSize.Width - layout.Padding.Horizontal - 8); intro.MaximumSize = status.MaximumSize = new Size(width, 0); };
+            layout.SizeChanged += delegate { int width = Math.Max(350, layout.ClientSize.Width - layout.Padding.Horizontal - 8); intro.MaximumSize = status.MaximumSize = new Size(width, 0); FitActionRow(layout, intro, list, actions); };
             var menu = new ContextMenuStrip(); menu.Items.Add(activityMenu); menu.Items.Add(new ToolStripSeparator()); menu.Items.Add("Show devices", null, delegate { Show(); WindowState = FormWindowState.Normal; Activate(); });
             menu.Items.Add("Refresh", null, async delegate { await RefreshDevices(); });
             menu.Items.Add(storageMenu);
@@ -468,6 +468,25 @@ namespace EasyEject {
                 Notify(historyFailed ? "Import verified; history needs attention" : result.HasSelectedMedia ? "Import complete" : "No matching media", historyFailed ? historyNote.Trim() : sourceUnchanged ? CompletionPresentation.Notification(result.HasSelectedMedia, result.RemovedOriginals, result.ClearedTrashFiles) : "The import finished, then the source connection changed. Open Easy Eject to review connected devices. " + removalMessage, historyFailed ? ToolTipIcon.Warning : ToolTipIcon.Info);
                 if (ForegroundWindow) ShowMessage(message, result.HasSelectedMedia ? "Import complete" : "No matching media", historyFailed ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
             }
+        }
+        // At high display scale on a small screen the window cannot reach its preferred size and the
+        // wrapped action buttons could take every pixel from the storage list. Keep the list usable:
+        // cap the action row to the remaining room (at least one button row) and let it scroll.
+        static void FitActionRow(TableLayoutPanel layout, Control intro, Control list, FlowLayoutPanel actions) {
+            if (layout.RowStyles.Count != 4 || actions.Controls.Count == 0) return;
+            float scale = Math.Max(1f, layout.RowStyles[3].Height / 96f);
+            int width = Math.Max(1, layout.ClientSize.Width - layout.Padding.Horizontal - actions.Margin.Horizontal);
+            int preferred = actions.GetPreferredSize(new Size(width, 0)).Height;
+            int available = layout.ClientSize.Height - layout.Padding.Vertical - intro.Height - intro.Margin.Vertical - (int)layout.RowStyles[3].Height - actions.Margin.Vertical;
+            int listMinimum = Math.Max((int)Math.Ceiling(100 * scale), list.Font.Height * 4) + list.Margin.Vertical;
+            Control first = actions.Controls[0]; int oneRow = first.Height + first.Margin.Vertical + SystemInformation.HorizontalScrollBarHeight;
+            if (preferred <= available - listMinimum) {
+                if (layout.RowStyles[2].SizeType != SizeType.AutoSize) { actions.AutoScroll = false; layout.RowStyles[2] = new RowStyle(SizeType.AutoSize); }
+                return;
+            }
+            float height = Math.Max(oneRow, available - listMinimum);
+            if (!actions.AutoScroll) actions.AutoScroll = true;
+            if (layout.RowStyles[2].SizeType != SizeType.Absolute || Math.Abs(layout.RowStyles[2].Height - height) >= 1) layout.RowStyles[2] = new RowStyle(SizeType.Absolute, height);
         }
         static bool ConfigurationError(Exception ex) {
             return ex is SafetyException || ex is System.Runtime.Serialization.SerializationException || ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception;

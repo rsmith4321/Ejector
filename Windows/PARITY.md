@@ -1,5 +1,24 @@
 # Full Windows port · parity and acceptance
 
+## Remaining software gates · October 11 (Claude)
+
+Every gate below is **implemented + unit-tested, awaiting Ryan's real test**. None is device-verified. Tests use generated fixtures, fake devices/media/power events and owned child processes. Every test process now uses its own isolated app-data folder, so the default suites never touch live settings ([progress](PROGRESS.md)).
+
+| Gate | Code | Tests (default suite unless noted) | Status |
+| --- | --- | --- | --- |
+| Mac features (shared defaults, Use defaults/custom, dialog footers, grouped eject, notifications never eject, manual Quick Share, DJI O4 Pro) | Existing | Existing suites | implemented + unit-tested, awaiting Ryan's real test |
+| Explicit eject choice with Keep Connected default, including no media | Shared `CompletionPresentation.ChoiceTitle` in both interfaces | `no-media completion still offers an explicit Keep Connected default eject choice` | implemented + unit-tested, awaiting Ryan's real test |
+| Native 4K Quick Share | Existing engine/service | `manual 4K Quick Share through the native helper process…` (4K create, separate 1080p, exact 4K reuse) | implemented + unit-tested, awaiting Ryan's real test |
+| True Quit and restart with source absent | Existing persistence | `app session Quit then restart with source absent…`: separate session, restart-create and restart-reuse processes on the production default root | implemented + unit-tested, awaiting Ryan's real test |
+| Changed original/destination refusal, cancel and retry | Existing | Existing manual/cold sharing suites | implemented + unit-tested, awaiting Ryan's real test |
+| Tray, menu, reveal; Quit idle vs busy | New shared `AppQuitPolicy` in both interfaces; a refused Quit no longer stays armed in the classic app | Four `tray …`/`Quit …`/`system close …` cases; existing tray/reveal suites | implemented + unit-tested, awaiting Ryan's real test |
+| Drafts | Quit refused while an editor is open | `refused Quit keeps an unsaved defaults draft…`; existing draft suites | implemented + unit-tested, awaiting Ryan's real test |
+| Notifications and hotkey | Existing | Existing notification/shortcut registration and conflict suites | implemented + unit-tested, awaiting Ryan's real test |
+| DPI and theme | Forms layout at fixed 100/150/225% scales independent of the live monitor; device window caps and scrolls its action row on small or high-scale screens; WinUI theme-resource contract | Six fixed-scale layout cases; modern `ThemeContractTests` (3) | implemented + unit-tested, awaiting Ryan's real test |
+| Long transfer, reconnect, sleep/wake, travel | Existing | `travel rehearsal: sleep mid-copy, wake, card reconnect…`; existing power/connection suites | implemented + unit-tested, awaiting Ryan's real test |
+
+Still needs Ryan: live UI on this laptop, an identified disposable device and destination, real eject/veto, the official Luna LUT with genuine footage, clean-machine checks, signing and release.
+
 Latest Mac DJI O4 Pro Gyroflow-first Quick Share (`af70f83`/`57f5e07`/`dc2c3ba`) is ported in source: camera choice, held `_stabilized.mp4` exports, optional official O4 LUT, Gyroflow LUT marker and completion guidance ([progress](PROGRESS.md), contract below). Both full runtimes pass **1426/0**, modern selected **242/0**. Real O4 Pro/Gyroflow media, positive official LUT, foreground and device acceptance remain open.
 
 Claude accepted Windows ownership from Codex on October 10 after verifying the handoff packet hashes and clean HEAD 8f6d7bd ([progress](PROGRESS.md)). The [generated-history helper](modern/tools/NATIVE_HISTORY_PUBLICATION.md) now has an explicit, ledger-recorded `--reviewed-empty-issue-baseline` for the current 49B issue state; legacy 161B remains the default. It passes **17/0 core, 48/0 admission, 60/0 issue-baseline and 12 exact-reason CLI refusals** in an isolated warning-free build. This is helper evidence only: no live publication, UI, device or parity-row promotion.
