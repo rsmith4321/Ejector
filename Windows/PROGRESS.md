@@ -2,6 +2,8 @@
 
 ## Native notification, pending-choice and no-media checks · October 11
 
+Tested source/evidence committed locally as **b877dec4dfb26d5eeca062433df786a851dcb84e**; shared Mac handoff packet updated for pickup. No push or direct-delivery claim.
+
 [Scoped native evidence](modern/NOTIFICATION_PENDING_NATIVE_20261011.md) passes notifications-off/pending retention, actual no-media Return/Escape and explicit pending-list review with no history/config/destination change. Enabled shell delivery reports Shown then Closed after about 13.3ms, without a targetable notification surface; **visual delivery/click-to-reveal remain unverified**. Pending-list Return selects a row without taking action, rather than closing the picker. Both owned sessions exit0/no unhandled exception; engineering/native regressions and final normal build are warning-free, normal metadata excludes the test controls. Test-only source leaves the current 34125fc unsigned ZIP exact. No new default-suite count, physical action, push or publication; full acceptance and publishing OK remain open.
 
 ## Rebuilt completion-focus review package · October 11
