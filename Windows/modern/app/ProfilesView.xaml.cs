@@ -8,6 +8,7 @@ namespace EasyEject.Modern {
     public sealed class ProfileCard {
         public string DisplayName { get; set; } public string ChoiceSummary { get; set; } public string TargetPath { get; set; }
         internal SavedProfile Entry;
+        public override string ToString() { return DisplayName + " · " + ChoiceSummary + " · " + TargetPath; }
     }
     public sealed partial class ProfilesView : UserControl {
         ImportProfileEdit editor; ImportDefaults defaults; bool busy, updating, active; int lifetime;

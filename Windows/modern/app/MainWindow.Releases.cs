@@ -54,6 +54,7 @@ namespace EasyEject.Modern {
                 releaseView = owner;
                 var body = new StackPanel { Spacing = 12 };
                 var page = new ComboBox { ItemsSource = new[] { "Release review", "Update history", "Installation guide" }, SelectedIndex = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(page, "Updates and installation section");
                 var releases = new StackPanel { Spacing = 10 }; var history = new StackPanel { Spacing = 10, Visibility = Visibility.Collapsed }; var guide = new StackPanel { Spacing = 10, Visibility = Visibility.Collapsed };
                 var status = Wrapped(releaseStatus ?? releaseChecks.Status);
                 var details = Wrapped(owner.Guide(ApplicationInformation.Version, releaseChecks.Status)); details.IsTextSelectionEnabled = true;

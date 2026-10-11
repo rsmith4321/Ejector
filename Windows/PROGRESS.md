@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Production accessible names verified in native UI · October 11
+
+[Native accessibility correction](modern/ACCESSIBILITY_NAMES_NATIVE_20261011.md) replaces storage/profile class-name rows with displayed details and labels key lists/selectors/diagnostic text. Actual profile selection, history/manual4K prompt Cancel and ordinary dialog recovery pass; PID30912 exits0/no exception. Final warning-free native regressions/normal **246/0**/host exclusion and live2/isolated5/destination21/Mac/login preservation pass. Pending list is source/factory-tested, not separately provider-observed; human accessibility remains open. **0040e58 ZIP superseded pending rebuild**, preserved exact. No export/device/OS/push/publication action. Aggregate SHAb38710eae522a99e2c08f9193b1893566da20b9dcf58564026832ced96855122; full goal active.
+
 ## Native release ShowAsync cancellation awaits worker and picker · October 11
 
 [Actual WinUI cancellation in two sessions](modern/RELEASE_PRESENTATION_NATIVE_20261011.md) removes modal/raises TaskCanceledException while existing cleanup retains exact worker or native picker/global ownership. Busy Quit refuses until worker terminal; late result never presents. Native picker stays open until actual Cancel, zero backend work; ordinary unconfigured entry recovers. PID27216/28816 quit0/no exception. Warning-free native regressions, normal **246/0**/probe exclusion, exact live/isolated/currentZIP/Mac/login preservation pass. Test-only wrapper/telemetry, no production behavior/payload/device/OS/push/publication change. General rendering/configured trust/full gates remain open; goal active. Aggregate SHA24fbbbe17837f017a48585d953c5365c071fd9d8a27929efcd2e964aae9d8ea5.

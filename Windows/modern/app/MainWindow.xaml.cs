@@ -13,6 +13,7 @@ namespace EasyEject.Modern {
         public string Title { get; set; }
         public string Detail { get; set; }
         public string State { get; set; }
+        public override string ToString() { return Title + " · " + Detail + " · " + State; }
         internal TrayStorageChoice Choice;
         internal AutomaticConnection Connection;
     }

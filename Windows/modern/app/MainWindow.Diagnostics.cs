@@ -84,6 +84,7 @@ namespace EasyEject.Modern {
                 owner = await Task.Run(() => new DiagnosticsReview(root));
 #endif
                 var logText = new TextBox { Text = owner.Text, IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap, FontFamily = new FontFamily("Cascadia Mono"), MinHeight = 180, MaxHeight = 320 };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(logText, "Displayed debug log");
                 ScrollViewer.SetVerticalScrollBarVisibility(logText, ScrollBarVisibility.Auto); ScrollViewer.SetHorizontalScrollBarVisibility(logText, ScrollBarVisibility.Auto);
                 var status = Wrapped("Only the displayed log is copied or cleared. Logs may contain device names and file paths; nothing is sent automatically.");
                 var refresh = new Button { Content = "Refresh" }; var copy = new Button { Content = "Copy to Clipboard" }; var clear = new Button { Content = "Clear displayed log" };

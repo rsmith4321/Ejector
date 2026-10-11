@@ -39,6 +39,7 @@ namespace EasyEject.Modern {
                 catch (Exception ex) { profileWarning = "Sharing choices could not be read. Saved-file verification remains available. " + ex.Message; RecordModernIssue(profileWarning); }
                 var list = new ListView { MaxHeight = 180, SelectionMode = ListViewSelectionMode.Single,
                     ItemsSource = batches.Select(b => DateTime.Parse(b.CompletedUtc, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToLocalTime().ToString("g") + " · " + b.DeviceName + " · " + b.Originals.Count + " files").ToArray() };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(list, "Verified import batches");
                 var details = Wrapped(batches.Count == 0 ? "No completed media batches yet. Index-only and failed imports create no sharing history." : "Select a batch. The source device is not needed to verify these saved originals.");
                 var body = new StackPanel { Spacing = 12 };
                 body.Children.Add(Wrapped("The last 20 exact verified batches survive source eject and restart. Verification checks the saved destination, receipt and every recorded file hash; earlier folders are never scanned."));
@@ -94,6 +95,7 @@ namespace EasyEject.Modern {
                 if (gyroflow != null) { Summary.Text = gyroflow + " No export started; full-quality imported originals are kept."; if (AppWindow.IsVisible) { confirmation = MessageDialog("Quick Share", Summary.Text, null); await confirmation.ShowAsync(); confirmation = null; } return false; }
                 review = new ManualQuickShareReview(offer);
                 var size = new ComboBox { ItemsSource = new[] { "1080p · smaller files", "4K · more detail" }, SelectedIndex = review.Preset == QuickSharePreset.Uhd ? 1 : 0, HorizontalAlignment = HorizontalAlignment.Stretch };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(size, "Sharing copy size for this export");
                 var lut = new CheckBox { Content = "Apply official " + QuickShareMedia.LutLabel(camera) + " LUT", IsChecked = review.Color != QuickShareColor.Standard };
                 var body = new StackPanel { Spacing = 16 };
                 body.Children.Add(Wrapped(offer.Batch.DeviceName + "\n\nCreate sharing copies from this exact verified batch:\n" + offer.Batch.Folder));

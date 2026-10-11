@@ -182,6 +182,7 @@ namespace EasyEject.Modern {
             if (selected != null) await ReviewImportCompletion(selected);
         }
         KeepConnectedDialog PendingImportsDialog(ListView list) {
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(list, "Completed imports awaiting review");
             return new KeepConnectedDialog { XamlRoot = Root.XamlRoot, Title = "Completed imports", Content = list,
                 PrimaryButtonText = "Review import", CloseButtonText = "Close", IsPrimaryButtonEnabled = false };
         }
