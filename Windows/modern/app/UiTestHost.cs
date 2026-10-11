@@ -193,6 +193,7 @@ namespace EasyEject.Modern {
             Require(ProfilesPanel.TryLeave(), "Could not cancel profile test draft."); ShowStorage();
             var prompt = MessageDialog(ManualEjectPrompt.Title, "Generated fixture only", ManualEjectPrompt.Confirm); prompt.CloseButtonText = ManualEjectPrompt.Keep;
             Require(prompt.DefaultButton == Microsoft.UI.Xaml.Controls.ContentDialogButton.Close && prompt.CloseButtonText == "Keep Connected", "Native eject prompt has an unsafe default.");
+            await TestNativeFlyoutTextLayout();
             if (UiTestHost.Inspect) {
                 if (UiTestHost.InspectCompletion) InitializeCompletionInspection();
                 if (UiTestHost.InspectNotifications) InitializeNotificationInspection();
@@ -364,6 +365,7 @@ namespace EasyEject.Modern {
         }
         internal void WriteInspectionLayout() {
             Surface.UpdateLayout();
+            WriteInspectionTextLayout();
             var work = System.Windows.Forms.Screen.FromPoint(anchor).WorkingArea;
             var location = AppWindow.Position; var size = AppWindow.Size;
             File.WriteAllText(Path.Combine(UiTestHost.Root, "flyout-layout.json"), System.Text.Json.JsonSerializer.Serialize(new {

@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native status bounds qualify suspected clipping · October 11
+
+[Native content/header measurements](modern/FLYOUT_TEXT_NATIVE_20261011.md) do **not** confirm the earlier screenshot-based flyout clipping conclusion. Original short status fits its16-pixel desired line/header with no reported trimming/viewport overlap. New engineering regressions pass short/three-line statuses in Light/Dark with one/18 generated devices, fixed footer/work-area checks and normal selected **246/0**, all warning-free. Three explicit sessions exit0/PASS/no exception; engineering methods absent normally, live records/currentZIP/Mac baseline exact. Production typography/layout unchanged. Human pixel readability and broader display/full acceptance gates stay open; no held action or publishing, goal active.
+
 ## Native Light/Dark/Windows app-scoped rendering · October 11
 
 [Engineering theme inspection](modern/THEME_NATIVE_20261011.md) verifies actual visual-tree Light/Dark brush changes and Default restoration in main window/18-device tray flyout at existing150% scale, with a Light defaults-editor Cancel. Final native root/focus/presenter/compact/tray regression and normal selected **246/0** pass warning-free; native exit0/no exception, normal metadata excludes theme probes. Two live records/zero isolated saves/current0040e58 ZIP/Mac baseline stay exact. **Flyout status-line glyph clipping is observed and remains a follow-up**; viewport/footer bounds alone do not establish full layout acceptance. No OS setting/media/device/production-payload/push/publication change; broader OS/display/physical/LUT/trust and publishing gates remain open, goal active.

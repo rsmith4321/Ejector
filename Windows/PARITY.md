@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native multiline status bounds / clipping qualification
+
+[Original native text layout](modern/FLYOUT_TEXT_NATIVE_20261011.md) contradicts status/header overlap or reported trimming; earlier screenshot-based clipping is **unconfirmed**, not a proved production bug. New short/wrapped Light/Dark native cases with one/18 generated devices pass, plus normal selected **246/0**, warning-free; native sessions exit0/PASS/no exception and preservation/normal-host exclusion pass. Production layout/currentZIP unchanged. Pixel readability/accessibility/broader displays and full genuine-media/physical/LUT/travel/trust/publishing acceptance remain open; full goal active.
+
 ## October 11 · scoped native Light/Dark/Default rendering
 
 [Actual app-scoped theme input](modern/THEME_NATIVE_20261011.md) confirms main/flyout Light/Dark brushes and Windows Default restoration at existing150% scale. Engineering regressions and normal **246/0** pass warning-free; normal metadata excludes the probes, native exit0/no exception, live records/currentZIP/Mac baseline exact. **Flyout status glyph clipping requires investigation**; actual OS/high-contrast transitions, broader scaling/monitors/accessibility and all genuine-media/physical/LUT/travel/trust/publishing gates remain open. No production preference, OS setting, device action or payload change; full goal active.

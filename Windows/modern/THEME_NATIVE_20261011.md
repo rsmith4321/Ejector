@@ -2,6 +2,8 @@
 
 An engineering-only inspection now applies Light, Dark and Default to the main window and tray flyout visual trees. Production continues following Windows; there is no saved theme preference, OS setting change or media/device operation. The helper is outside the app source tree, conditionally compiled only for `EasyEjectUiTests=true`, and enclosed in `UI_TESTS`. The production static theme-resource contract remains unchanged.
 
+**Subsequent qualification:** [native text/header/content measurements](FLYOUT_TEXT_NATIVE_20261011.md) do not confirm the screenshot-based status clipping suspected below. Original status is untrimmed and fits the header/viewport; short/wrapped Light/Dark native assertions pass. Production layout remains unchanged; pixel readability/broader display acceptance stays open. The earlier evidence record is retained as observed.
+
 ## Evidence
 
 All build/evidence roots are under `%USERPROFILE%/.codex/EasyEjectBuildTools`; fixtures are under sibling `EasyEjectFixtures`.
