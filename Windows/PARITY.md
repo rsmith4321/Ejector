@@ -1,5 +1,11 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · blocked on acceptance prerequisites
+
+The full goal is being marked **blocked**, with scope preserved, after three consecutive unchanged prerequisite checks following **b11c569**. Fresh read-only discovery still has only one internal disk/five volumes, no external camera/card; configured official LUT is absent and current review apphost is NotSigned. Exact camera/test-destination identity, genuine required footage/official LUT, held normal-Release/physical/filesystem/travel/accessibility/trust steps and explicit publishing authorization cannot be replaced by more fixture counts. A model/media/LUT-path question is pending. No further meaningful safe independent completion work was identified in this audit; this is not a complete-port claim.
+
+Current40b0a26 candidate/ZIPe6471495 remains unchanged/unpublished and normal app unlaunched. Latest1454/246/16 packaged,13 targeted DJI and native keyboard evidence retain their stated scopes, without new counts. Mac baseline/worktree preservation remains verified; no real device/media/OS/signing/install/autostart/push/publication action. [Completion gate audit](COMPLETION_GATES_20261011.md) retains every outstanding requirement. Earlier active-status entries are historical checkpoints; expired heartbeat remains paused.
+
 ## October 11 · native keyboard draft/navigation evidence
 
 [Actual isolated keyboard session](modern/KEYBOARD_NAVIGATION_NATIVE_20261011.md) verifies tray Open navigation, defaults preview draft/keyboard Cancel/restored saved checkbox, Settings footer order/lower-option automatic scroll/Cancel and settled storage return. PID29520 exit0/PASS/no exception; zero isolated saved preferences. Warning-free fresh engineering build/automatic native regressions pass, with unchanged production UI source40b0a26. Generic/stale focus-provider output and unconfirmed native resizing are qualified; no complete keyboard/screen-reader/compact/scale acceptance. Engineering .NET10.0.0 is separate from normal Release.
