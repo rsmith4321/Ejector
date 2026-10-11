@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Completed-import picker honors initial Close · October 11
+
+[Production keyboard correction](modern/PENDING_PICKER_FOCUS_20261011.md) makes first Return close the pending picker without selecting/consuming a choice. Before native factory regression fails; after passes late programmatic redirection and deliberate selection. Actual Return-close, Shift+Tab/Return row selection, explicit Review and completion Escape pass. Engineering/native regressions and normal selected **246/0** are warning-free; native Quit exits0/no exception, 21 destination files/1 copied history/2 live records stay exact. **34125fc review ZIP is superseded pending exact-commit rebuild.** Full physical/media/LUT/OS/trust and publishing gates stay open; goal active.
+
 ## Native notification, pending-choice and no-media checks · October 11
 
 Tested source/evidence committed locally as **b877dec4dfb26d5eeca062433df786a851dcb84e**; shared Mac handoff packet updated for pickup. No push or direct-delivery claim.

@@ -166,7 +166,7 @@ namespace EasyEject.Modern {
             try {
                 await EnsureVisible();
                 var list = new ListView { ItemsSource = values.Select(v => v.DeviceName + " · " + v.Message).ToArray(), SelectionMode = ListViewSelectionMode.Single, MaxHeight = 300 };
-                var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Completed imports", Content = list, PrimaryButtonText = "Review import", CloseButtonText = "Close", DefaultButton = ContentDialogButton.Close, IsPrimaryButtonEnabled = false };
+                var dialog = PendingImportsDialog(list);
                 confirmation = dialog; bool selecting = true;
                 SelectionChangedEventHandler selection = delegate {
                     if (selecting && !closed && Object.ReferenceEquals(confirmation, dialog)) dialog.IsPrimaryButtonEnabled = list.SelectedIndex >= 0 && list.SelectedIndex < values.Length;
@@ -174,11 +174,16 @@ namespace EasyEject.Modern {
                 list.SelectionChanged += selection;
                 try {
                     UpdateActions(); var answer = await dialog.ShowAsync(); int index = list.SelectedIndex;
+                    if (!dialog.SafeInitialFocus) throw new SafetyException("Completed imports review could not focus Close. Open a fresh review.");
                     if (answer == ContentDialogResult.Primary && index >= 0 && index < values.Length) selected = values[index].Id;
                 } finally { selecting = false; list.SelectionChanged -= selection; }
             } catch (Exception ex) { Summary.Text = "Completion list unavailable. " + ex.Message; }
             finally { confirmation = null; working = false; UpdateActions(); }
             if (selected != null) await ReviewImportCompletion(selected);
+        }
+        KeepConnectedDialog PendingImportsDialog(ListView list) {
+            return new KeepConnectedDialog { XamlRoot = Root.XamlRoot, Title = "Completed imports", Content = list,
+                PrimaryButtonText = "Review import", CloseButtonText = "Close", IsPrimaryButtonEnabled = false };
         }
         async Task ReviewImportCompletion(string id) {
             if (StorageBusy || inventory.Scanning) return; var entry = completions.Get(id);

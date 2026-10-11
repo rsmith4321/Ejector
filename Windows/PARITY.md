@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · pending-picker keyboard default corrected
+
+[Completed imports Close focus](modern/PENDING_PICKER_FOCUS_20261011.md) corrects the prior Return→row-selection mismatch while preserving deliberate keyboard selection and explicit fresh review. Native before regression fails; fixed factory/input/regressions and warning-free selected **246/0** pass. Native exit0/no exception; destination/live/copied records exact. **34125fc ZIP superseded pending rebuild**. Full import timing/physical/media/LUT/OS/travel/trust and publishing OK remain open; no hardware/live-setting/push/publication action.
+
 ## October 11 · native notification/pending/no-media scope
 
 [Native generated inspection](modern/NOTIFICATION_PENDING_NATIVE_20261011.md) verifies notification-off/pending retention, actual no-media Return/Escape, empty/nonempty pending picker and fresh explicit review. Pending-list Return selects its row without executing review/eject; it does not close. Enabled shell Shown→Closed callbacks preserve the pending choice, but no supported notification surface is exposed: visible delivery and actual click/reveal remain open. Both native sessions exit0/no exception; warning-free engineering regressions/normal build and engineering-metadata exclusion pass. All 21 destination files, 2 live records and copied histories stay exact; no new production payload/default-count/device/publication claim. Current 34125fc ZIP and full acceptance/publishing holds remain unchanged; goal active.

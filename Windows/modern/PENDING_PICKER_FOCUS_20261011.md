@@ -1,0 +1,23 @@
+# Completed-import picker keyboard default · October 11, 2026
+
+The production Completed imports picker now establishes **Close** as its initial keyboard choice. Previously Close was highlighted, but focus started in the list: first Return selected its first row and enabled Review import. It did not perform review/eject. The correction makes first Return close the picker without selecting or consuming a choice; deliberate keyboard/mouse selection and explicit Review import remain available.
+
+`PendingImportsDialog` uses the existing `KeepConnectedDialog` focus redirection with the Close label. No queued callback/timer is added. A missing template or unsuccessful safe initial focus refuses subsequent review; selection handlers still detach in finally, working/confirmation state is released and pending entries remain process-only. Fresh completion retains all source/destination/physical-device checks and the safe Keep Connected default. No engine, import, sharing or eject adapter changes.
+
+## Before and after evidence
+
+All build/evidence roots are under `%USERPROFILE%/.codex/EasyEjectBuildTools`; native fixtures are under sibling `EasyEjectFixtures`.
+
+| Check | Result |
+| --- | --- |
+| `Codex020-pending-focus-before-20261011.log` | Warning-free engineering compile with unchanged old dialog behavior. New settled native factory regression **fails**: initial focus is not Close. This matches the prior actual Return→row-selection observation in [notification/pending evidence](NOTIFICATION_PENDING_NATIVE_20261011.md). No before-pass claim. |
+| `Codex020-pending-focus-fixed-20261011.log` | Warning-free engineering compile; same factory regression passes unselected/disabled-primary initial Close focus, late programmatic redirection, deliberate keyboard focus/selection. Existing completion focus/presenter/compact/Stop/tray draft/editor/busy/idle checks PASS. Automated fixture `ui-ca7ac57c8584448b98299736503108f3`. |
+| `Codex020-pending-focus-normal-20261011.log` | Normal build warning-free; existing selected modern contracts **246 passed / 0 failed**. Normal metadata retains production picker/flyout/safe-close types and excludes engineering host, pending/focus tests and inspection/probes. Normal executable never launched. |
+| `ui-pending-focus-native-20261011`, PID26752 | Supported actual input: generated no-media completion Return→Keep Connected; pending picker starts unselected/Review disabled; **first Return closes**. Reopen shows the retained entry still unselected. Deliberate **Shift+Tab** reaches the row; Return selects it and enables Review. Explicit mouse Review opens a fresh no-media completion; Escape→Keep Connected. Final pending=1, working=false, no confirmation. |
+| Native shutdown/preservation | Settled idle precedes the finish gate; actual tray Quit callback exits **0**, result PASS, no `unhandled.txt`. All **21** prior generated destination files, **1** copied history and **2** live records retain exact hash/length/write time/count; zero destination additions. |
+
+Inspection has read-only storage notifications, absent synthetic source, no removal plan/runtime pump and no batch on the no-media entry. No real import, format, original deletion or device action occurred. One hidden-flyout capture and one unavailable input-geometry observation recover through fresh supported main-window selection/activation and a single retry; no repeated blind action or app-failure claim.
+
+Aggregate `Codex020-pending-focus-native-20261011/native-final.json` SHA-256 **`913b97715bc1c5aa967d63cdfbff190ee5de89bfbf8b00fba0cf1435709ba9e2`** pins loaded modules, exact sources, exits, logs, normal exclusion and file baselines. `finalize-evidence.ps1` retains the assertions. Commands: `Windows/modern/build-ui-tests.ps1 -BuildRoot <fresh-root>`; `Windows/modern/build.ps1 -Test -BuildRoot <fresh-root>`; owned engineering executable `<fresh-ui-root> inspect-notifications`.
+
+**The 34125fc review ZIP is superseded by this production correction and requires an exact-commit rebuild.** No push/publication; Ryan's publishing OK remains pending. Earlier full shared-engine **1454/0 each runtime** remains separate evidence, not a rerun for this UI correction. Actual visible OS notification/click, full import sequencing, physical eject/veto/cleanup/plan expiry, genuine footage/official LUT, broad display/travel and trusted distribution acceptance remain open. Full goal stays active.

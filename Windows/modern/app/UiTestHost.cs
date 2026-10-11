@@ -134,6 +134,7 @@ namespace EasyEject.Modern {
         internal async Task TestTrayQuit() {
             await EnsureVisible();
             await TestCompletionSafeFocus();
+            await TestPendingPickerFocus();
             var presenter = (Microsoft.UI.Windowing.OverlappedPresenter)AppWindow.Presenter;
             presenter.Minimize();
             Require(presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Minimized, "Native presenter did not minimize.");
@@ -244,6 +245,30 @@ namespace EasyEject.Modern {
                 Require(safe, "Completion initial focus did not choose Keep Connected; sharing=" + sharing + "; focusReady=" + dialog.SafeInitialFocus + "; focus=" + (focus?.Content?.ToString() ?? "not a button") + "; " + dialog.FocusDiagnostics);
                 Require(!sharing || share.IsEnabled && share.IsTabStop, "Safe initial focus removed keyboard access to Quick Share.");
             }
+        }
+        async Task TestPendingPickerFocus() {
+            var list = new Microsoft.UI.Xaml.Controls.ListView {
+                ItemsSource = new[] { "Generated pending choice. No device action." },
+                SelectionMode = Microsoft.UI.Xaml.Controls.ListViewSelectionMode.Single, MaxHeight = 300 };
+            var dialog = PendingImportsDialog(list);
+            var opened = new TaskCompletionSource<bool>(); dialog.Opened += (_, args) => opened.TrySetResult(true);
+            var shown = dialog.ShowAsync();
+            await Task.WhenAny(opened.Task, Task.Delay(5000));
+            if (!opened.Task.IsCompleted) { dialog.Hide(); await shown; throw new InvalidOperationException("Native pending picker did not open."); }
+            await Task.Delay(500);
+            var focus = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(Root.XamlRoot) as Microsoft.UI.Xaml.Controls.Button;
+            bool safe = focus != null && focus.Name == "CloseButton" && list.SelectedIndex == -1 && !dialog.IsPrimaryButtonEnabled;
+            bool reachable = false;
+            if (safe) {
+                list.Focus(FocusState.Programmatic);
+                safe = (Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(Root.XamlRoot) as Microsoft.UI.Xaml.Controls.Button)?.Name == "CloseButton" && list.SelectedIndex == -1;
+                reachable = list.Focus(FocusState.Keyboard);
+                list.SelectedIndex = 0;
+                reachable &= list.SelectedIndex == 0;
+            }
+            dialog.Hide(); await shown;
+            Require(safe, "Pending picker initial focus did not choose Close without selecting an import; focus=" + (focus?.Content?.ToString() ?? "not a button"));
+            Require(reachable, "Pending picker prevented deliberate keyboard list selection.");
         }
         internal TrayFlyoutView FixtureFlyout() {
             var state = new Inventory { Epoch = 1 };
