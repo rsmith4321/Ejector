@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Rebuilt 0.2 compact-layout review package · October 11
+
+The [current unsigned review/package](modern/REVIEW_020_20261011.md) now comes from exact committed Windows source **960bd75b0734b816ca72dec1ab4ae4d4657496f7**. Release build and packaging exit 0; all **650** ZIP entries decompress/hash exactly against staging. ZIP **107,458,551 bytes**, SHA-256 **7d07e88a56d5bd73ff68b2e07970d37e314b8f0eb77e1ecc71decd8230c2c997**. Production metadata excludes the engineering host; runtime/PRI/resources and pinned notices/license remain included. Current UI correction evidence is native compact/tray/editor/Stop regression plus **246/0** selected contracts; earlier full **1454/0 each** is separate shared-engine baseline evidence. Normal review remains unlaunched, live preferences untouched. Source commit is local only; no push/publication or 0.2 URL. Explicit publishing OK and full physical/media/LUT/trust acceptance remain open.
+
 ## Compact storage layout correction · October 11
 
 [Native compact layout](modern/COMPACT_STORAGE_20261011.md) reproduces five reported volumes with a zero-height device list at 680×600 logical/150% scaling. The footer now scrolls within a height cap and Stop stays fixed outside it. Regression changes **height=0 failure → PASS** for usable device space, reachable last utility and fixed Stop. Native device/footer scrolling, About and Settings/defaults/generated-profile editor footers pass; normal selected contracts **246/0**, both builds warning-free. Live files remain exact; all owned reviews quit normally. The previous 6de85d2 review/ZIP is superseded and must be rebuilt before publication. Physical/media/LUT/trust and explicit publishing gates stay open.

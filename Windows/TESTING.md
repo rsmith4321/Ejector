@@ -1,6 +1,8 @@
 # Windows device testing
 
-**Compact layout:** [680×600 logical at existing 150% scaling](modern/COMPACT_STORAGE_20261011.md) reproduces/fixes a zero-height device list. Native device/footer scrolling and editor footers pass; a native regression verifies usable device space, reachable last utility and fixed Stop, and normal selected contracts pass **246/0**. The previous 6de85d2 ZIP is superseded; rebuild required before publication.
+**Current package:** [960bd75 committed-source review](modern/REVIEW_020_20261011.md) replaces the superseded 6de85d2 ZIP. Release build/package exit 0, all 650 ZIP entries independently decompress/hash against staging and the engineering host is absent. Normal app remains unlaunched; no push/publication. Explicit publication OK and physical/media/LUT/trust acceptance remain open.
+
+**Compact layout:** [680×600 logical at existing 150% scaling](modern/COMPACT_STORAGE_20261011.md) reproduces/fixes a zero-height device list. Native device/footer scrolling and editor footers pass; a native regression verifies usable device space, reachable last utility and fixed Stop, and normal selected contracts pass **246/0**. These are scoped native/selected checks, not a full-suite run against the packaged Release bytes.
 
 **Native issue persistence/recovery:** [generated isolated issue review](modern/ISSUE_NATIVE_20261011.md) covers empty-state reread, default Cancel, acknowledgement/true restart, stale-save refusal with exact changed-record retention, distinct explanations, explicit recovery and separate acknowledgement/restart. All three processes quit normally; live settings stay exact. No source/build/default-count change, genuine failure or operation retry is claimed.
 

@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · rebuilt current 0.2 package
+
+[Committed-source review 960bd75](modern/REVIEW_020_20261011.md) includes the compact storage correction. Release build/package exit 0; all 650 ZIP entries independently decompress/hash against staging, engineering host absent, full runtime/resources/notices retained. This replaces the superseded 6de85d2 candidate. Current selected **246/0** and native regression/input evidence remain scoped separately from prior shared-engine full **1454/0 each**. No normal-app launch, push, publication, hardware or live-setting changes. Publishing OK and full physical/media/LUT/trust acceptance remain open.
+
 ## October 11 · compact storage layout correction
 
 [Native 680×600/150% layout](modern/COMPACT_STORAGE_20261011.md) exposes and fixes a zero-height device list: bounded scrolling actions/results retain device space, with Stop fixed outside the scroller. Native compact scrolling/actions/editor footers and **246/0** normal selected contracts pass; native regression reproduces before failure and passes after. No engine/classic change or new full-default count. The prepared 6de85d2 package is superseded pending rebuild. Physical/media/LUT/trust, broader DPI/monitor/busy-operation acceptance and publishing OK remain open.
