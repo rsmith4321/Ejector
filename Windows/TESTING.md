@@ -1,5 +1,7 @@
 # Windows device testing
 
+**Native Settings/update review:** [unconfigured controls, guide/folders and Save/restart](modern/SETTINGS_UPDATES_NATIVE_20261011.md) have scoped native evidence with unchanged live settings/login registration. Escape after Explorer focus return remains unresolved; configured signed update/restore and physical/trust gates stay open.
+
 **Native sharing choices:** [manual 1080p override, exact reuse and unavailable-LUT refusal](modern/SHARE_CHOICES_20261011.md) pass on the generated UHD/audio batch. Outputs independently probe/full-decode, existing originals/4K files/preferences remain exact, and missing-LUT refusal writes no destination files. Positive official LUT/genuine footage remain open; no default-suite count or production payload change.
 
 **Native defaults Save/restart and inheritance:** [October 11 isolated native defaults evidence](modern/DEFAULTS_NATIVE_20261011.md) covers actual Save/restart, cancelled drafts, safe warning defaults and card-profile inheritance. This is opt-in engineering-host evidence with exact module/file/process pins; no default-suite count or OS tray-icon/notification acceptance is implied.

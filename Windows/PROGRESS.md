@@ -1,5 +1,11 @@
 # Windows progress · October 10, 2026
 
+## Native Settings and unconfigured update review · October 11
+
+[Scoped native Settings/update evidence](modern/SETTINGS_UPDATES_NATIVE_20261011.md) confirms missing-channel release/history controls disabled, correct guide version/paths and both exact-folder Explorer buttons. Only automatic release checks are saved off in isolated preferences; true Quit/restart restores that choice, and an opposite draft Cancel preserves the saved file exactly. Both owned processes quit normally, the login Run value stays absent and both live configuration files remain exact.
+
+Escape after Explorer focus return does not dismiss the guide, while explicit Close and a separate direct text-focus Escape reproduction succeed. This remains an unresolved focus/input case, not a blanket selectable-text defect or keyboard pass. An initial raw-JSON defaults assertion is corrected against nullable field preservation. No production source/payload/default-count change or configured signed update acceptance; physical/LUT/trust and publication gates remain open.
+
 ## Native manual 1080p override and missing-LUT refusal · October 11
 
 [Native sharing-choice evidence](modern/SHARE_CHOICES_20261011.md) now proves a fresh manual 1080p override of the saved 4K preference on the generated UHD/audio batch. Both new outputs independently probe/full-decode at 1920×1080/30fps with stereo AAC and matching exclusive receipts. A separate explicit repeat reports **0 new / 2 reused** and retains all 16 prior destination files; only its audit is added. The saved profile/tools/history files remain exact and every new review still defaults to saved 4K/LUT off. Requesting an unavailable official LUT refuses without changing or adding any destination file. Normal tray callback Quit exits the owned app; no owned worker/private work remains.

@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native Settings/update scope
+
+[Native isolated Settings/update review](modern/SETTINGS_UPDATES_NATIVE_20261011.md) now verifies disabled unconfigured release/history controls, guide paths/exact-folder navigation, automatic-check Save/true Quit/restart and exact Cancel preservation. Login remains absent and both live configuration files remain exact. Post-Explorer Escape focus/input remains unresolved despite passing direct Escape reproduction; configured signed update/restore/worker acceptance and physical/media/LUT/trust gates are still open. No production/default-count change or full completion claim follows.
+
 ## October 11 · native manual sharing choices
 
 [Generated native choice/reuse checks](modern/SHARE_CHOICES_20261011.md) now cover explicit 1080p from a preferred-4K profile, independent 1920×1080/audio probe/full decode, recipe-specific **2-reused** manual repeat and unavailable official LUT refusal with zero destination writes. Saved preferences/history/tools, full-quality originals and existing 4K outputs remain exact. This is native generated-media evidence only; positive official LUT/genuine footage and all physical/trust gates remain open. No production/default-count change or full completion claim follows.
