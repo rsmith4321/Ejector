@@ -88,6 +88,7 @@ namespace EasyEject {
             // Set the test process only, before any Forms/native handle is created.
             System.Windows.Forms.Application.SetHighDpiMode(System.Windows.Forms.HighDpiMode.SystemAware);
 #endif
+            IsolateConfiguration();
             if (args.Length > 0 && args[0] == "--reopen-signal-fixture") return ReopenSignalFixture(args);
             if (args.Length == 1 && args[0] == "--window-reopen") { System.Windows.Forms.Application.EnableVisualStyles(); System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false); WindowReopenTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned session events/child processes and nonactivating disposable forms only; no real app signal or device/media operation."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--manual-import-review") { ManualImportReviewTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated selections/configuration and fake devices only; no foreground confirmation or real device action."); return failed == 0 ? 0 : 1; }
@@ -398,6 +399,9 @@ namespace EasyEject {
             } });
             Test("production configuration storage supports package redirection", delegate {
                 var state = State(); state.Volumes[0].Id = "fixture-only-" + Guid.NewGuid().ToString("N"); string root = Profiles.Root;
+                // Same production resolution code, rooted at this process's owned isolated app-data.
+                Check(Profiles.IsolatedAppDataForTests != null && SafePaths.Within(root, Profiles.IsolatedAppDataForTests), "Configuration test is not using isolated app-data");
+                Check(!SafePaths.Within(root, Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData))), "Configuration test resolved live local app-data");
                 string name; using (var hash = System.Security.Cryptography.SHA256.Create()) name = BitConverter.ToString(hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(state.Volumes[0].Id))).Replace("-", "") + ".json";
                 string path = Path.Combine(root, name); Check(!File.Exists(path), "Disposable profile already exists");
                 using (SafePaths.LockDirectories(root)) {
@@ -825,6 +829,7 @@ namespace EasyEject {
             QuickShareDialogTests();
             QuickShareConfigurationTests();
             SavedActionOwnershipTests(); ConnectedProfileSelectionTests(); OfflineProfileSelectionTests(); ImportSelectionTests(); DestinationConstructionTests(); ShareBatchOwnershipTests(); ManualQuickShareTests(); ColdQuickShareTests();
+            ConfigurationIsolationTests();
             TrayStorageMenuTests();
             StatusLayoutTests();
             InformationDiagnosticsTests();

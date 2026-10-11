@@ -16,9 +16,11 @@ namespace EasyEject {
         }
         [STAThread]
         static int Main(string[] args) {
+            IsolateConfiguration();
             if (args.Length > 0 && args[0] == "--reopen-signal-fixture") return ReopenSignalFixture(args);
             if (args.Length == 1 && args[0] == "--monitor-native") return NativeStorageMonitorSmoke();
             if (args.Length != 0) return 2;
+            ConfigurationIsolationTests();
             WindowReopenTests();
             DefaultsEditTests();
             StorageControllerTests();

@@ -10,6 +10,7 @@
   <ItemGroup>
     <Compile Include="..\RuntimePlatform.cs" />
     <Compile Include="..\..\tests\WindowReopenTests.cs" />
+    <Compile Include="..\..\tests\ConfigurationIsolation.cs" />
     <Compile Include="DefaultsEditTests.cs" />
     <Compile Include="StorageControllerTests.cs" />
     <Compile Include="ProfileEditTests.cs" />

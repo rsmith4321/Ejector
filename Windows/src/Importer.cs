@@ -306,9 +306,13 @@ namespace EasyEject {
         public ImportProfile Copy() { var value = (ImportProfile)MemberwiseClone(); if (SavedDestination != null) value.SavedDestination = SavedDestination.Copy(); return value; }
     }
     public static partial class Profiles {
+        // Test harnesses only: an owned disposable folder standing in for local app-data, so
+        // default suites never read or write the user's live configuration. Production leaves it null.
+        internal static string IsolatedAppDataForTests { get; set; }
         internal static string Root {
             get {
-                string appData = SafePaths.Normalize(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+                string isolated = IsolatedAppDataForTests;
+                string appData = SafePaths.Normalize(isolated ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
                 // Codex's packaged process redirects newly created app-data folders. Resolve only
                 // our own configuration folder inside app-data; media import paths stay strict.
                 using (SafePaths.LockDirectories(appData)) {

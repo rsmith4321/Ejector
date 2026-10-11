@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Claim · remaining software gates · October 11 UTC
+
+Worker: Claude (Windows, Opus). Started **2026-10-11T03:37Z** from clean HEAD `2f0ff42`. Scope: implement and unit-test the remaining Windows software gates on generated fixtures only. No device, eject, live configuration, review app, signing, install, push or release.
+
 ## Mac deletion-race parity check (07de127) · October 10 UTC
 
 Mac `07de127` closes path-based races between final verification and deleting an original, a recovered Trash file or cleanup metadata. Windows already uses the safe design for all of these. Each item is opened without following reparse points, with no sharing on removal, so it cannot be renamed, replaced or written while held. The final path, volume serial and file type are checked, the bytes are re-verified, and the item is deleted through its own handle (`FileDispositionInfo`), never by a path or recursively. Parents stay held, cleanup skips reparse points, and `__MACOSX` is removed only when empty and only atomically.
