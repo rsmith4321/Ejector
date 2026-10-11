@@ -1,5 +1,11 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · Codex tray flyout checkpoint
+
+The new [WinUI tray flyout](modern/TRAY_FLYOUT.md) has shared grouping, protection/opt-in, dismiss/default and fixed-scale placement coverage: **1454/0** full tests in each runtime, **246/0** selected modern. An explicit isolated WinUI host also passes the actual tray Quit callback with unsaved/hidden drafts and busy refusal, and allows a hidden profile catalog's import handoff. The originally reported Quit exit was not reproduced on the baseline callback; active-draft protection is hardened without claiming its cause is known.
+
+Computer control verified the generated flyout confirmation's Return/Escape safe default and idle Escape dismissal. Real Insta360 removal review correctly lists E: internal storage and F: SD card together; it was cancelled without removal. The connected-device flyout shows both capacities, hides sharing while off, and its actual removal confirmation keeps both mounted on Return. Empty-DCIM import backed up only the zero-byte index to a disposable C: destination; repeat reused it and displayed **No matching media. Eject now?**, with actual Return keeping connected. These limited observations do not complete hardware copying/eject/veto, genuine footage/LUT, all physical DPI/themes, OS tray-icon interaction or trusted-distribution rows. Version bump, review ZIP and 0.2 publishing approval are still pending.
+
 ## Remaining software gates · October 11 (Claude)
 
 Every gate below is **implemented + unit-tested, awaiting Ryan's real test**. None is device-verified. Tests use generated fixtures, fake devices/media/power events and owned child processes. Every test process now uses its own isolated app-data folder, so the default suites never touch live settings ([progress](PROGRESS.md)).

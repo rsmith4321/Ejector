@@ -13,6 +13,8 @@ namespace EasyEject.Modern {
         ImportProfileEdit editor; ImportDefaults defaults; bool busy, updating, active; int lifetime;
         Func<string, Task<string>> choose; IDiscovery discovery;
         internal bool Busy { get { return busy; } }
+        internal bool Editing { get { return active && editor != null; } }
+        internal void QuitRefused(string message) { Status.Text = message; }
         internal event Action<string> Changed;
         internal event Action<string> Completed;
         internal event Action RequestDefaults;

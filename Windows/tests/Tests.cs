@@ -833,6 +833,7 @@ namespace EasyEject {
             SavedActionOwnershipTests(); ConnectedProfileSelectionTests(); OfflineProfileSelectionTests(); ImportSelectionTests(); DestinationConstructionTests(); ShareBatchOwnershipTests(); ManualQuickShareTests(); ColdQuickShareTests();
             ConfigurationIsolationTests();
             AppLifecycleTests();
+            TrayFlyoutTests();
             TrayStorageMenuTests();
             StatusLayoutTests();
             InformationDiagnosticsTests();

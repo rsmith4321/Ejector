@@ -21,21 +21,21 @@ namespace EasyEject.Modern {
             DispatcherQueue.TryEnqueue(() => { if (!closed && concurrentWork.Attach(token, guard)) UpdateActions(); });
         }
         async Task DrainStorageTask(TrayOperation token) { var wait = concurrentWork.Drain(token); if (!closed) UpdateActions(); await wait; }
-        async Task ReviewOtherStorage(bool forceClean, TrayStorageChoice choice) {
+        async Task ReviewOtherStorage(bool forceClean, TrayStorageChoice choice, TrayFlyoutWindow surface = null) {
             if (!CanUseOtherStorage || inventory.Scanning || choice == null) return;
             ConcurrentStorageReview view = null; Task<ConcurrentStorageOutcome> pending = null; bool ending = false;
             try {
                 view = new ConcurrentStorageReview(concurrentWork.State, inventory.Current, choice, settings, forceClean, discovery, operations,
                     validate => new WindowsEjectApi(validate), WindowsDiscovery.VolumeId);
-                otherReview = view; UpdateActions(); await EnsureVisible();
+                otherReview = view; UpdateActions(); if (surface == null) await EnsureVisible();
                 var status = Wrapped("Review every affected volume. Cancel keeps this device connected.");
                 var stop = new Button { Content = "Stop this device action", IsEnabled = false };
                 var stopPrimary = new Button { Content = "Stop the main transfer", IsEnabled = operationCancel != null };
                 stop.Click += delegate { view.RequestStop(); status.Text = "Stopping this device action before its next request. Wait for the result before unplugging."; };
                 stopPrimary.Click += delegate { RequestOperationStop(); stopPrimary.IsEnabled = false; };
                 var body = new StackPanel { Spacing = 16 }; body.Children.Add(Wrapped(view.Description)); body.Children.Add(status); body.Children.Add(stop); body.Children.Add(stopPrimary);
-                var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "Safe eject of another device", Content = Scrolling(body),
-                    PrimaryButtonText = "Request safe removal", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close };
+                var dialog = new ContentDialog { XamlRoot = surface == null ? Root.XamlRoot : surface.DialogRoot, Title = "Safe eject of another device", Content = Scrolling(body),
+                    PrimaryButtonText = ManualEjectPrompt.Confirm, CloseButtonText = ManualEjectPrompt.Keep, DefaultButton = ContentDialogButton.Close };
                 otherDialog = dialog;
                 refreshOtherReview = () => { if (!ending && otherReview == view) { bool current = view.Current; dialog.IsPrimaryButtonEnabled = pending == null && current; stopOtherMenu.Enabled = view.Busy;
                     if (pending == null && !current) status.Text = "This device review expired because storage or connection tracking changed. Cancel and review the device again before requesting removal. The main transfer keeps its own result and Stop control.";

@@ -1,5 +1,25 @@
 # Windows progress · October 10, 2026
 
+## Codex takeover and tray flyout · October 11
+
+Started from `252633e` on `windows/native-tray-milestone`, after reading both October 11 Claude handoffs. The previously untracked shared flyout draft is now integrated into a WinUI window and exercised by eight new shared cases. Left-click opens the compact themed/DPI-aware device list, right-click retains the existing menu, and double-click reveals the main window. Import and device-filtered Quick Share use existing manual workflows. Removal uses the existing review, reservations and native implementation, with Keep Connected as the default. See [implementation and native UI evidence](modern/TRAY_FLYOUT.md).
+
+Warning-free builds and default suites:
+
+- `Windows/modern/build.ps1 -Test -FullTest -BuildRoot C:\Users\rsmit\.codex\EasyEjectBuildTools\CodexFlyout-full-v2-20261011`: selected **246/0**, full **1454/0**; retained sibling `.log`.
+- Installed Framework compiler `/warn:4 /warnaserror+ /platform:x64`, current `src/*.cs` and `tests/*.cs`, then `CodexFlyout-framework-20261011/EasyEject.Tests.exe`: full **1454/0**, retained `tests.log`/`errors.log`.
+- `Windows/modern/build-ui-tests.ps1 -BuildRoot C:\Users\rsmit\.codex\EasyEjectBuildTools\CodexUiQuit-final-20261011`: warning-free explicit UI-test build and **PASS actual tray Quit**, including hidden active defaults/profile drafts, busy/editor refusal, hidden catalog handoff and idle close. This test host is excluded from normal builds and uses isolated app-data.
+
+The original reported unsaved-defaults exit was **not reproduced** through the actual baseline tray callback. The hardening protects active drafts even when their panel is hidden and restores the editor with an explanation. A foreground empty-card import caught a regression in the first hardening draft: hidden profile catalogs blocked completion. The corrected definition requires an actual profile draft; its native regression passes. Neither default suite invokes a real eject API. The final UI-only corrections were separately compiled and exercised; the full counts above apply to their shared backend/model inputs, before the later version bump.
+
+Computer control observed the rounded dark flyout, opened its generated confirmation, and verified Return/Escape both keep connected. Escape also hid the idle flyout without exiting. This does not establish every theme/physical DPI or OS tray-icon input path. A test-only isolated review now permits normal discovery/manual workflows and actual tray-command invocation without writing live settings; its automatic-import pump is disabled.
+
+Ryan identified the attached Insta360 card and authorized formatting; **no format was performed**. Read-only identity: SD card F:, exFAT, 512,663,486,464 bytes, volume `{e8b09d42-c528-11f1-8188-40c73cd727f5}`, serial `EEEFBFD0`, disk 2 `USBSTOR\DISK&VEN_SD_CARD&PROD_SD_CARD&REV_0100\33840FA1&1`. Camera internal E: is separate storage on the same USB removal target. The actual removal review lists both; Escape kept both connected. Camera model is still unconfirmed. F:\DCIM has no media files. Its explicit no-media import copied only a zero-byte device index to the owned C: fixture, with automatic import/removal/recovery/sharing off; no original was removed. The corrected native rerun reused that index and showed the no-media eject question; Return kept connected. The actual connected-device flyout displays E:/F: and their capacities, hides non-opted-in sharing, and opens its correctly rooted E:/F: confirmation; Return kept both volumes mounted. Generated copy/cancel/reuse checks remain in progress. Whole-camera eject/veto is pending explicit scope because it affects E: too.
+
+Final normal (non-UI-test) app build and selected suite at `CodexFlyout-normal-final-20261011`: warning-free, **246/0**, after the UI corrections. No public release was performed by these local build commands.
+
+Normal startup of the old 0.1 review wrote issue-state; no live defaults/profile/settings were saved or restored. All automated and new engineering-review preferences/history are isolated. The old PowerConnectionAtomic review, Mac sources, website and system settings remain untouched. Version/review ZIP preparation and publication approval remain pending; no 0.2 release or complete-port claim is made.
+
 ## Claim · remaining software gates · October 11 UTC
 
 Worker: Claude (Windows, Opus). Started **2026-10-11T03:37Z** from clean HEAD `2f0ff42`. Scope: implement and unit-test the remaining Windows software gates on generated fixtures only. No device, eject, live configuration, review app, signing or install.

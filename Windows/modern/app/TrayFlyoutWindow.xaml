@@ -1,0 +1,12 @@
+<Window x:Class="EasyEject.Modern.TrayFlyoutWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Easy Eject tray">
+ <Border x:Name="Surface" CornerRadius="12" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" Background="{ThemeResource LayerFillColorDefaultBrush}" Padding="16" KeyDown="Surface_KeyDown">
+  <Grid RowSpacing="12">
+   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+   <StackPanel Spacing="4"><TextBlock Text="Easy Eject" FontSize="18" FontWeight="SemiBold"/><TextBlock x:Name="Status" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+   <ScrollViewer x:Name="DeviceScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="Devices" Spacing="12"/></ScrollViewer>
+   <StackPanel Grid.Row="2" Spacing="8"><TextBlock x:Name="Result" TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/><StackPanel Orientation="Horizontal" Spacing="8"><Button x:Name="Open" Content="Open window" Click="Open_Click"/><Button x:Name="Settings" Content="Settings" Click="Settings_Click"/><Button x:Name="Quit" Content="Quit" Click="Quit_Click"/></StackPanel></StackPanel>
+  </Grid>
+ </Border>
+</Window>

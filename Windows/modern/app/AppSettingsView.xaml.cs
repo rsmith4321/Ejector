@@ -11,6 +11,8 @@ namespace EasyEject.Modern {
         internal Func<string> ShortcutDescription;
         internal Func<string> ReleaseDescription;
         internal bool Busy { get { return loading || saving || confirming; } }
+        internal bool Editing { get { return active; } }
+        internal void QuitRefused(string message) { Status.Text = message; }
         public AppSettingsView() { InitializeComponent(); Letter.ItemsSource = GlobalHotkey.Letters; }
         internal async Task StartEdit() {
             if (Busy) return; loading = true; active = true; Render();

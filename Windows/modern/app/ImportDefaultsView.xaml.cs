@@ -9,6 +9,8 @@ namespace EasyEject.Modern {
         bool updating, loading, saving, confirming, active;
         int loadRevision;
         internal bool Busy { get { return loading || saving || confirming; } }
+        internal bool Editing { get { return active; } }
+        internal void QuitRefused(string message) { Status.Text = message; }
         internal event Action<string> Completed;
         internal event Action Saved;
         public ImportDefaultsView() { InitializeComponent(); }

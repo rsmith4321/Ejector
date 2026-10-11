@@ -35,7 +35,8 @@ namespace EasyEject.Modern {
         readonly System.Threading.Tasks.TaskCompletionSource<bool> visibleRoot = new System.Threading.Tasks.TaskCompletionSource<bool>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
         Task runtimeStart; readonly WindowReopenRequests reopen;
         bool UiBusy { get { return working || concurrentWork != null && concurrentWork.State.Busy || automaticReading || DefaultsPanel.Busy || ProfilesPanel.Busy || SettingsPanel.Busy; } }
-        bool StorageBusy { get { return UiBusy || DefaultsPanel.Visibility == Visibility.Visible || ProfilesPanel.Visibility == Visibility.Visible || SettingsPanel.Visibility == Visibility.Visible; } }
+        bool EditorOpen { get { return DefaultsPanel.Editing || ProfilesPanel.Editing || SettingsPanel.Editing || DefaultsPanel.Visibility == Visibility.Visible || ProfilesPanel.Visibility == Visibility.Visible || SettingsPanel.Visibility == Visibility.Visible; } }
+        bool StorageBusy { get { return UiBusy || EditorOpen; } }
         public MainWindow() {
             InitializeComponent(); concurrentWork = new ConcurrentStorageWork(operations); SystemBackdrop = new MicaBackdrop();
             SettingsPanel.ReleaseDescription = () => releaseChecks.Status;
@@ -81,26 +82,22 @@ namespace EasyEject.Modern {
             menu.Items.Add(issueMenu); menu.Items.Add(debugMenu); menu.Items.Add(helpMenu); menu.Items.Add(aboutMenu);
             menu.Items.Add("Stop current operation", null, delegate { RequestOperationStop(); });
             stopOtherMenu.Enabled = false; stopOtherMenu.Click += delegate { if (otherReview != null) otherReview.RequestStop(); }; menu.Items.Add(stopOtherMenu);
-            menu.Items.Add("Quit preview", null, delegate {
-                // Open editors keep their drafts: Quit reveals them instead of discarding.
-                if (AppQuitPolicy.QuitRequested(UiBusy, StorageBusy) != AppCloseAction.Exit) { Reveal(); return; }
-                quitting = true; Close();
-            });
+            menu.Items.Add("Quit preview", null, delegate { RequestQuit(); });
             menu.Opening += delegate { RebuildStorageMenu(); };
             tray = new Forms.NotifyIcon { Icon = appIcon, Text = "Easy Eject interface preview", Visible = true, ContextMenuStrip = menu };
-            tray.DoubleClick += delegate { Reveal(); };
-            tray.MouseClick += delegate(object sender, Forms.MouseEventArgs args) { if (args.Button == Forms.MouseButtons.Left) Reveal(); };
+            tray.DoubleClick += delegate { HideTrayFlyout(); Reveal(); };
+            tray.MouseClick += delegate(object sender, Forms.MouseEventArgs args) { if (args.Button == Forms.MouseButtons.Left) ToggleTrayFlyout(Forms.Control.MousePosition); };
             tray.BalloonTipClicked += delegate { Reveal(); };
             AppWindow.Closing += delegate(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args) {
                 // Hiding the window keeps its dialogs, workers and tray alive.
                 // Busy protection belongs to actual Quit, not close-to-tray.
-                var closing = AppQuitPolicy.Closing(quitting, true, UiBusy);
+                var closing = AppQuitPolicy.Closing(quitting, true, UiBusy || EditorOpen);
                 if (closing == AppCloseAction.HideToTray) { args.Cancel = true; AppWindow.Hide(); return; }
                 if (closing == AppCloseAction.StayOpen) { args.Cancel = true; quitting = false; Reveal(); }
             };
             Closed += delegate {
                 closed = true; releaseChecks.Dispose(); pulse.Stop(); inventory.Dispose(); notifications.Dispose();
-                reopen.Dispose(); visibleRoot.TrySetCanceled();
+                reopen.Dispose(); visibleRoot.TrySetCanceled(); trayFlyout?.Close();
                 DefaultsPanel.TryLeave(); ProfilesPanel.TryLeave(); SettingsPanel.TryLeave(); shortcut.Dispose(); tray.Dispose(); trayIcons.Dispose(); appIcon.Dispose(); menu.Dispose();
             };
             DefaultsPanel.Saved += delegate { automatic.SettingsSaved(); };
@@ -128,7 +125,13 @@ namespace EasyEject.Modern {
             };
         }
         internal void Reveal() { reopen.Request(); }
-        internal Task StartRuntime() { return runtimeStart ?? (runtimeStart = StartRuntimeCore()); }
+        internal Task StartRuntime() {
+#if UI_TESTS
+            return runtimeStart ?? (runtimeStart = UiTestHost.Review ? StartRuntimeCore() : Task.CompletedTask);
+#else
+            return runtimeStart ?? (runtimeStart = StartRuntimeCore());
+#endif
+        }
         async Task StartRuntimeCore() {
             if (closed || started) return; started = true;
             try { notifications.Start(); } catch (Exception ex) { Summary.Text = "Connection monitoring unavailable. Device actions are blocked. " + ex.Message; }
@@ -188,6 +191,7 @@ namespace EasyEject.Modern {
                 : StorageBusy ? "Finish the current review or operation first." : !fresh ? "Refresh the storage list before reviewing a device." : card == null ? "Select a device to review safe removal." : card.Choice.Error ?? "Safe removal affects this physical device and all its volumes. Review before unplugging.";
             stopOtherMenu.Enabled = otherReview != null && otherReview.Busy;
             if (tray != null) UpdateImportTray();
+            RefreshTrayFlyout();
         }
         void RebuildStorageMenu() {
             foreach (var item in storageMenu.DropDownItems.Cast<Forms.ToolStripItem>().ToArray()) item.Dispose();
@@ -251,20 +255,21 @@ namespace EasyEject.Modern {
         }
         async void CleanEject_Click(object sender, RoutedEventArgs args) { await EjectDevice(true); }
         void CancelOperation_Click(object sender, RoutedEventArgs args) { RequestOperationStop(); }
-        async Task EjectDevice(bool forceClean, TrayStorageChoice chosen = null) {
-            if (working) { var selected = StorageCards.SelectedItem as StorageCard; await ReviewOtherStorage(forceClean, chosen ?? selected?.Choice); return; }
+        async Task EjectDevice(bool forceClean, TrayStorageChoice chosen = null, TrayFlyoutWindow surface = null) {
+            if (working) { var selected = StorageCards.SelectedItem as StorageCard; await ReviewOtherStorage(forceClean, chosen ?? selected?.Choice, surface); return; }
             if (closed || StorageBusy || inventory.Scanning || !notifications.Available || settings == null) return;
             var card = StorageCards.SelectedItem as StorageCard;
             var choice = chosen ?? (card == null ? null : card.Choice); if (choice == null) return;
             working = true; UpdateActions();
             EjectResult terminal = null;
             try {
-                await EnsureVisible();
+                if (surface == null) await EnsureVisible();
                 var reviewedSettings = await Task.Run(() => AppSettings.Load());
                 activeReview = new ManualEjectReview(inventory.Current, choice, reviewedSettings, forceClean, discovery, operations,
                     validate => new WindowsEjectApi(validate), WindowsDiscovery.VolumeId);
                 var owner = activeReview;
-                confirmation = MessageDialog("Safe eject", owner.Description, "Request safe removal");
+                confirmation = MessageDialog(ManualEjectPrompt.Title, owner.Description, ManualEjectPrompt.Confirm, surface?.DialogRoot);
+                confirmation.CloseButtonText = ManualEjectPrompt.Keep;
                 UpdateActions(); var answer = await confirmation.ShowAsync(); confirmation = null;
                 if (answer != ContentDialogResult.Primary) { owner.Cancel(); return; }
                 owner.Confirm(); operationCancel = new CancellationTokenSource(); Summary.Text = owner.HasCleanup ? "Cleaning before safe removal…" : "Requesting safe removal…"; UpdateActions();
@@ -275,15 +280,20 @@ namespace EasyEject.Modern {
                 string logWarning = LogModernOperation("Manual safe removal | " + result.Message); if (logWarning != null) Summary.Text += " " + logWarning;
                 string deliveryWarning = TryModernNotification(result.Success ? "Safe removal accepted" : "Device still connected", result.Message, !result.Success, reviewedSettings.NotificationsEnabled);
                 if (deliveryWarning != null) Summary.Text += " " + deliveryWarning;
-                confirmation = MessageDialog(result.Success ? "Safe removal accepted" : "Device still connected", result.Message, null);
-                await confirmation.ShowAsync(); confirmation = null;
+                if (surface == null) {
+                    confirmation = MessageDialog(result.Success ? ManualEjectPrompt.Accepted : ManualEjectPrompt.Refused, result.Message, null);
+                    await confirmation.ShowAsync(); confirmation = null;
+                } else surface.Report(result.Message + (deliveryWarning == null ? "" : "\n" + deliveryWarning));
             } catch (OperationCanceledException ex) { Summary.Text = terminal == null ? ex.Message : terminal.Message; }
             catch (Exception ex) {
                 if (terminal != null) { Summary.Text = terminal.Message + " Completion message unavailable: " + ex.Message; RecordModernIssue(Summary.Text); }
                 else {
                     Summary.Text = "Removal stopped. Refresh and review the device again.";
                     RecordModernIssue(Summary.Text + " " + ex.Message);
-                    try { confirmation = MessageDialog("Device still connected", ex.Message, null); await confirmation.ShowAsync(); }
+                    try {
+                        if (surface == null) { confirmation = MessageDialog(ManualEjectPrompt.Refused, ex.Message, null); await confirmation.ShowAsync(); }
+                        else { surface.Report("Device still connected. " + ex.Message); TryModernNotification(ManualEjectPrompt.Refused, ex.Message, true, settings.NotificationsEnabled); }
+                    }
                     catch (Exception displayError) { Summary.Text = "Removal stopped. Message unavailable: " + displayError.Message; }
                     finally { confirmation = null; }
                 }
@@ -294,8 +304,8 @@ namespace EasyEject.Modern {
             }
             await ReadInventory();
         }
-        ContentDialog MessageDialog(string title, string message, string action) {
-            return new ContentDialog { XamlRoot = Root.XamlRoot, Title = title, CloseButtonText = action == null ? "Close" : "Cancel",
+        ContentDialog MessageDialog(string title, string message, string action, XamlRoot root = null) {
+            return new ContentDialog { XamlRoot = root ?? Root.XamlRoot, Title = title, CloseButtonText = action == null ? "Close" : "Cancel",
                 PrimaryButtonText = action ?? "", DefaultButton = ContentDialogButton.Close,
                 Content = new ScrollViewer { MaxHeight = 360, Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true } } };
         }

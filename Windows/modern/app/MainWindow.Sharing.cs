@@ -27,12 +27,14 @@ namespace EasyEject.Modern {
             quickShareSetupSaving = false; confirmation = null; working = false;
             ImportStatus.Text = Summary.Text; ImportProgress.Visibility = Visibility.Collapsed; activity.End(Summary.Text); UpdateImportTray(); UpdateActions();
         }
-        async void ReviewHistory() {
+        async void ReviewHistory(string profileId = null) {
             if (!BeginSavedReview()) return;
             string verified = null; TrayOperation token = null;
             try {
                 await EnsureVisible();
-                var batches = await Task.Run(() => ImportHistory.Load()); SavedProfile[] profiles = null; string profileWarning = "";
+                var batches = await Task.Run(() => ImportHistory.Load());
+                if (profileId != null) batches = batches.Where(b => b.ProfileId == profileId).ToList();
+                SavedProfile[] profiles = null; string profileWarning = "";
                 try { profiles = await Task.Run(() => Profiles.Catalog()); }
                 catch (Exception ex) { profileWarning = "Sharing choices could not be read. Saved-file verification remains available. " + ex.Message; RecordModernIssue(profileWarning); }
                 var list = new ListView { MaxHeight = 180, SelectionMode = ListViewSelectionMode.Single,

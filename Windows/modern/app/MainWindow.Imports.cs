@@ -22,6 +22,9 @@ namespace EasyEject.Modern {
             await RunImport(card.Connection, null); await ReadInventory();
         }
         async Task PumpAutomaticImports() {
+#if UI_TESTS
+            if (UiTestHost.Review) return;
+#endif
             if (automaticPumping || StorageBusy || inventory.Scanning || closed || !notifications.Available || settings == null) return;
             automaticPumping = true;
             try {

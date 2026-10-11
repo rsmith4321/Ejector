@@ -1,10 +1,12 @@
 # Windows device testing
 
-**Newest review copy (October 10, Mac parity through `dc2c3ba`/`07de127`):** `C:\Users\rsmit\.codex\EasyEjectBuildTools\ClaudeReview-3a704bd\review\app\EasyEject.Modern.exe` (601 files, unsigned, built from committed `3a704bd`; `review-build.json` SHA256 `29D7EFD0AB2DF1DFA19FBD58348895B16A192CDF07C9DDA615E67B9564FCE3D7`). It adds DJI O4 Pro Gyroflow-first Quick Share and the import-history Open Folder action. This laptop has no PowerShell 7, so it was built with a PowerShell 5.1 equivalent of `modern/build-review.ps1`. The same publish arguments and payload checks apply, but the vendor-notice and native-import reports were skipped. Quit the running preview from its tray menu before opening this copy. The older copy below stays as it is.
+**Current distributable review (0.1 preview):** `C:\Users\rsmit\.codex\EasyEjectBuildTools\ClaudeReview-a168bf8\review\app\EasyEject.Modern.exe`, unsigned, code at `a168bf8`; full suites **1446/0** each runtime. The published [0.1 pre-release](https://github.com/rsmith4321/Ejector/releases/tag/windows-v0.1.0-preview) adds the Windows license at `252633e`. Its public ZIP SHA-256 is `cb1460b2dce73a45551ecbe090770f1115374cb60c9ce841817a2f3040f1f5ee`.
+
+The 0.2 [tray flyout engineering checkpoint](modern/TRAY_FLYOUT.md) passes **1454/0** each full runtime and **246/0** selected modern, with separate native tray-command/draft tests. The new normal review copy and public ZIP are in preparation; publishing still requires Ryan's OK. PowerShell 7.6.5 is available in this Codex environment, so the repository's normal review/notices/import-report scripts can run. Keep all builds outside OneDrive. Do not start the stopped historical PowerConnectionAtomic review below.
 
 The [October9 native generated-history pass](modern/VISIBLE_REVIEW_WORKFLOW.md) verified two exact saved clips with source absent, sharing hidden while off, explicit1080p/Standard opt-in, manual export of2 new copies and a separate manual reuse of both. Exact reviewed recovery retained temporary profile/history in quarantine; live history reopened empty. Original/output bytes and first-export write times are preserved. Normal successful-export issue clearing is recorded separately. Generated fixtures do not establish real camera/device, native4K, cold app restart, cancellation/changed-record refusal, positive official Luna LUT or trusted distribution acceptance. Existing1415/0 each-runtime counts are unchanged.
 
-The latest local review is:
+Historical October 8 review (preserved; do not restart):
 
 `C:\Users\rsmit\.codex\EasyEjectBuildTools\PowerConnectionAtomic-20261008\review\app\EasyEject.Modern.exe`
 
