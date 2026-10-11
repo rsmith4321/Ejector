@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native diagnostic Close/Escape retains active worker · October 11
+
+[Controlled native overlap](modern/DIAGNOSTICS_WORKER_NATIVE_20261011.md) pauses the real review owner's first Refresh callback before a real generated-log read. Actual Close/Escape retain the modal/snapshot and disabled actions while busy; release reads current501-character log in the same dialog, then Escape closes normally. Native PID25544 exits0/no exception. Warning-free engineering regressions/normal **246/0**, normal probe exclusion and scoped17-method diagnostic IL comparison pass; broader raw binary comparison is explicitly not equal/qualified. Live/settings/prior fixture/login absence/currentZIP/Mac baseline preserved. No production behavior/payload/clear/device/OS/push/publication action. Native clear/clear-failure and XAML-presentation-failure worker retention remain open; full goal active. Aggregate SHA59a687cb1f3be317de34ee5979d9e67ee8348a669f554726a1ecd4cf77be48a7.
+
 ## Native diagnostic read/Refresh failures recover · October 11
 
 [Owned file-lock checks](modern/DIAGNOSTICS_FAILURE_NATIVE_20261011.md) exercise the production diagnostic UI: initial read failure retains the file/saves an issue/restores controls; failed Refresh keeps the displayed 416-character snapshot, and Copy remains exact despite the current 497-character log. After lock release, fresh-view reopen/explicit Refresh pass; issue Cancel preserves attention. Native PID30408 exits0/no exception. Both read-only locks released; live files, prior fixture/evidence, settings/login absence, normal assembly/currentZIP and Mac baseline exact. No production edit/new build/suite count, clear/device/OS/push/publication action. Native clear and overlapping-worker closure remain open; full goal active. Aggregate SHA9227ccc2f9566972dfdb753dd53f6c8f2d65a7346f8bdae0ff514c07409a7c6b.

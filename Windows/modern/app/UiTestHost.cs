@@ -123,7 +123,43 @@ namespace EasyEject.Modern {
                 } catch (Exception ex) { Summary.Text = "Generated diagnostic clipboard comparison unavailable. " + ex.Message; }
                 finally { FinishSavedReview(); }
             };
-            footer.Children.Add(flyout); footer.Children.Add(quit); footer.Children.Add(debug); footer.Children.Add(clipboard);
+            var pauseDebug = new Microsoft.UI.Xaml.Controls.Button { Content = "Pause next debug Refresh" };
+            pauseDebug.Click += (_, args) => {
+                if (StorageBusy || settings == null || !settings.DebugEnabled) return;
+                if (File.Exists(Path.Combine(UiTestHost.Root, "debug-worker-started.json")) ||
+                    File.Exists(Path.Combine(UiTestHost.Root, "debug-worker-release.txt"))) {
+                    Summary.Text = "Choose a fresh owned fixture for another paused debug review."; return;
+                }
+                Interlocked.Exchange(ref pauseNextDebugRefresh, 1);
+                Summary.Text = "Engineering-only pause armed for the next debug view's first Refresh; no file action started.";
+            };
+            footer.Children.Add(flyout); footer.Children.Add(quit); footer.Children.Add(debug); footer.Children.Add(clipboard); footer.Children.Add(pauseDebug);
+        }
+        int pauseNextDebugRefresh;
+        DiagnosticsReview CreateReviewDiagnostics(string root) {
+            if (!UiTestHost.Review || Interlocked.Exchange(ref pauseNextDebugRefresh, 0) == 0)
+                return new DiagnosticsReview(root);
+            // Hold a real review's load callback before its real read. This makes
+            // native Closing/disabled controls observable without slow hardware,
+            // deleting a log, or replacing the production dialog/controller.
+            DiagnosticsReview review = null; int paused = 0;
+            review = new DiagnosticsReview(DebugLog.Load(root), () => {
+                if (Interlocked.Exchange(ref paused, 1) == 0) {
+                    string release = Path.Combine(UiTestHost.Root, "debug-worker-release.txt");
+                    File.WriteAllText(Path.Combine(UiTestHost.Root, "debug-worker-started.json"),
+                        System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow, busy = review.Busy, root }));
+                    var timer = System.Diagnostics.Stopwatch.StartNew();
+                    while (!File.Exists(release)) {
+                        if (timer.Elapsed > TimeSpan.FromMinutes(3)) throw new TimeoutException("Owned diagnostic worker pause timed out; displayed log retained.");
+                        Thread.Sleep(50);
+                    }
+                }
+                var snapshot = DebugLog.Load(root);
+                File.WriteAllText(Path.Combine(UiTestHost.Root, "debug-worker-read.json"),
+                    System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow, busy = review.Busy, characters = snapshot.Text.Length }));
+                return snapshot;
+            }, expected => DebugLog.Clear(expected, root));
+            return review;
         }
         // Diagnostic evidence only: UI_TESTS review builds record activation and
         // Escape routing. Never record text or other keys, and never handle a key.

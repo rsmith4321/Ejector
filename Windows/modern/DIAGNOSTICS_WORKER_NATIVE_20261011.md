@@ -1,0 +1,35 @@
+# Native diagnostic worker owns Close/Escape · October 11, 2026
+
+Actual Windows input now verifies diagnostic **Close and Escape containment while the real review owner is busy**, followed by successful read/render and normal closure. The preceding [read/Refresh failure checks](DIAGNOSTICS_FAILURE_NATIVE_20261011.md) failed immediately and did not prove this overlap. This check uses an explicitly engineered pause before the real read; it does not claim physical slow-I/O, Clear, or XAML-presentation-failure acceptance.
+
+## Engineering-only control
+
+`MainWindow.Diagnostics.cs` selects `CreateReviewDiagnostics(root)` only under `#if UI_TESTS`; the normal branch retains `new DiagnosticsReview(root)`. `UiTestHost.cs`, itself entirely conditional, adds **Pause next debug Refresh** to the isolated review footer. Arming it while idle does not start work. The next view receives a real `DiagnosticsReview`, initial `DebugLog.Load`, real clear delegate and a first-Refresh load callback that waits for an owned fixture release marker before calling real `DebugLog.Load` again. A three-minute timeout throws and retains the displayed log; the marker prevents reusing the same fixture as a fresh run. No input injection or alternate dialog/controller is implemented by the probe.
+
+During the pause, `DiagnosticsReview.Refresh` has already entered its normal busy phase. The existing production controller sets its worker flag, disables actions and handles ContentDialog Closing. The hook records busy=true at callback entry and immediately after the real read, before the owner's normal finally releases ownership. Automated modes and unarmed reviews use the original constructor directly. Normal metadata excludes the factory, pause field, host and all other review probes.
+
+## Native observations
+
+Executable: `C:\Users\rsmit\.codex\EasyEjectBuildTools\Codex020-debug-worker-ui-20261011\bin\EasyEject.Modern\Debug\net10.0-windows10.0.26100.0\win-x64\EasyEject.Modern.exe`. Fresh owned fixture: `C:\Users\rsmit\.codex\EasyEjectFixtures\ui-debug-worker-20261011`; only the exact marker, debug-only settings and generated 416-byte log are seeded from the earlier owned fixture. This is an engineering `review-restart`, not the normal self-contained Release UI. PID **25544** loads recorded Modern/Runtime DLLs and installed framework-dependent .NET **10.0.0** coreclr.
+
+| Input / state | Result |
+| --- | --- |
+| Arm pause → production main **Debug log…** | Original four-event snapshot opens. No file operation starts merely from arming. |
+| Append one owned generated event → actual **Refresh** | Worker entry **19:01:30.5933987Z**, busy=true. The view says “Working on the reviewed log…”; Refresh, Copy and Clear are disabled. The later event is absent from displayed text. |
+| Actual **Close** during work | Same dialog remains open, with “Wait for the current log operation before closing.” The three actions remain disabled and snapshot unchanged. `close-refused.json` retains the actual accessibility observation. |
+| Actual **Escape** during work | Same modal/snapshot remains, actions disabled. Keyboard probe records PreviewEscape and handled Escape from the Close button inside the worker interval; `escape-retained.json` records the retained view. No second file operation is admitted or clear action invoked. |
+| Release the owned pause | The real read completes at **19:02:04.2889978Z**, callback still observes busy=true before returning. The controller then reports “Current debug log displayed.” and re-enables actions. The five-event, **501-character** current file appears in this same dialog. |
+| Actual **Escape** after work | The dialog closes and ordinary main debug/Refresh controls recover. The probe records handled Escape after the read; `settled-after-escape.json` proves the settled state. This is a scoped foreground Escape check, not a reversal of the separate Explorer-return keyboard qualification. |
+| Settled idle → **Test tray Quit** | Production tray callback exits **0**, no `unhandled.txt`. Immediate post-Quit capture reports unusable app window after exit; no repeat input is sent. |
+
+No Clipboard Copy or Clear is clicked in this milestone. Generated Clipboard text from the preceding milestone is not read/restored. No media, real removal, settings Save, install, autostart, OS setting, push or publication action occurs. Read-only inventory again shows only internal/protected storage.
+
+## Build and preservation
+
+- `Codex020-debug-worker-ui-20261011.log`: warning-free engineering build and retained native theme/text/completion/pending/presenter/Stop/tray/editor/busy/idle regressions PASS, automatic fixture `ui-91e0088536214daf8460f58db2ec4bb9`, no exception.
+- `Codex020-debug-worker-normal-20261011.log`: warning-free normal build, selected **246 passed / 0 failed**; counts remain separate from earlier full/supplied-tool evidence.
+- Normal metadata excludes `UiTestHost`, `CreateReviewDiagnostics`, `pauseNextDebugRefresh` and existing review/theme/text helpers while retaining the production debug controller. A supplemental comparison confirms **17 diagnostic controller/generated non-constructor IL hashes** match the prior normal assembly. An initial broader raw comparison does **not** pass: both assemblies have1119 method definitions, but176 raw entries differ, predominantly constructors and generated WinRT methods/signature-index keys. `normal-method-comparison.json` preserves that result; the final scoped comparison explicitly does not claim whole-assembly or whole-key-set identity. The initial comparison-script extension-method invocation error was corrected before that measurement. Tests/exclusion/source branch, not blanket binary equivalence, support this milestone.
+- Both live profile files retain exact bytes/hash/write time/count; isolated settings and original diagnostic fixture remain exact. The new isolated Profiles contains only unchanged settings and the generated501-byte log, exactly matching the pre-read expected file. Owned pause is released, app stopped, login registration absent, Mac baseline unchanged.
+- Current production/package source remains **0040e58**; existing unsigned ZIP **107459831 bytes**, SHA **e941e2c49a9bb88d65d6d24234e6cd2fbcd711350ef2c7cf43105a7e56198bb4**, unchanged. The test-only conditional does not update the package or establish normal Release/clean-machine startup acceptance.
+
+Evidence root: `C:\Users\rsmit\.codex\EasyEjectBuildTools\Codex020-debug-worker-native-20261011`. `finalize.ps1` verifies active-interval observations, busy/read chronology, routed Escape before/after completion, normal shutdown/modules, settings/log/live/ZIP preservation, normal probe exclusion, scoped IL comparison and build results. Aggregate `final.json` SHA-256 **59a687cb1f3be317de34ee5979d9e67ee8348a669f554726a1ecd4cf77be48a7** pins source/scripts/observations and records limitations. Native Clear/clear-failure, actual XAML-presentation failure with a surviving worker and the full physical/genuine-media/LUT/travel/display/trusted-distribution/publishing gates remain open; full goal active.

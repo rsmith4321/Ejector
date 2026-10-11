@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native diagnostic worker Close/Escape ownership
+
+[Actual Close/Escape during controlled real-review work](modern/DIAGNOSTICS_WORKER_NATIVE_20261011.md) retains the same dialog/snapshot and disabled actions until the owned pause releases and real read completes; post-work Escape closes, native exit0/no exception. Warning-free native regressions and normal **246/0**/probe exclusion/scoped diagnostic IL comparison pass. Blanket binary comparison is qualified, not asserted equal. Live/currentZIP/Mac preserved; test-only hook, no production behavior/clear/device/OS/push/publication change. Native clear/clear-failure and presentation-failure worker retention, full physical/genuine-media/LUT/travel/display/trust/publishing acceptance remain open; goal active.
+
 ## October 11 · native diagnostic read/Refresh failures
 
 [Real locked-file failure/recovery](modern/DIAGNOSTICS_FAILURE_NATIVE_20261011.md) verifies initial read refusal with retained diagnostics/issue, failed Refresh preserving exact displayed-snapshot Copy, fresh-view recovery and retained issue Cancel. Native exit0/no exception and preservation pass; no production/build/suite-count/payload/device/OS/push/publication change. Native clear and overlapping-worker closure remain unproved; configured update/trust, physical/genuine-media/LUT/travel/display/signing/publishing gates stay open, full goal active.

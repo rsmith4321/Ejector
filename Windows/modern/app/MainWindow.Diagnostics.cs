@@ -77,7 +77,12 @@ namespace EasyEject.Modern {
             if (settings == null || !settings.DebugEnabled || !BeginSavedReview()) return;
             DiagnosticsReview owner = null; Task pendingWork = null;
             try {
-                await EnsureVisible(); string root = Profiles.Root; owner = await Task.Run(() => new DiagnosticsReview(root));
+                await EnsureVisible(); string root = Profiles.Root;
+#if UI_TESTS
+                owner = await Task.Run(() => CreateReviewDiagnostics(root));
+#else
+                owner = await Task.Run(() => new DiagnosticsReview(root));
+#endif
                 var logText = new TextBox { Text = owner.Text, IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap, FontFamily = new FontFamily("Cascadia Mono"), MinHeight = 180, MaxHeight = 320 };
                 ScrollViewer.SetVerticalScrollBarVisibility(logText, ScrollBarVisibility.Auto); ScrollViewer.SetHorizontalScrollBarVisibility(logText, ScrollBarVisibility.Auto);
                 var status = Wrapped("Only the displayed log is copied or cleared. Logs may contain device names and file paths; nothing is sent automatically.");
