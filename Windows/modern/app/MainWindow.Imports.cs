@@ -183,6 +183,10 @@ namespace EasyEject.Modern {
         }
         KeepConnectedDialog PendingImportsDialog(ListView list) {
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(list, "Completed imports awaiting review");
+            list.ItemTemplate = (DataTemplate)Root.Resources["PendingImportRowTemplate"];
+            list.ItemContainerStyle = (Style)Root.Resources["PendingImportRowStyle"];
+            ScrollViewer.SetHorizontalScrollMode(list, ScrollMode.Disabled);
+            ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
             return new KeepConnectedDialog { XamlRoot = Root.XamlRoot, Title = "Completed imports", Content = list,
                 PrimaryButtonText = "Review import", CloseButtonText = "Close", IsPrimaryButtonEnabled = false };
         }

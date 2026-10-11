@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · readable and accessible pending-import rows
+
+[Native pending chooser before/after](modern/PENDING_ROWS_NATIVE_20261011.md) proves exact provider name/full row text and fixes observed single-line clipping with wrapping. Actual Return/selection/separate action/Close/fresh reset/Escape retain pending entry/recover idle; both exits0/no exception. Warning-free native regressions/normal **246/0**/probe exclusion/preservation pass. No backend/removal authority change or new full/tool count; ba5661f ZIP superseded pending rebuild. Broader visual/screen-reader/hardware/media/LUT/travel/trust/publishing gates remain open; full goal active.
+
 ## October 11 · exact current-package backend replay
 
 [Current ba5661f replay](modern/PACKAGED_REGRESSION_20261011.md) passes **1454/0 full**, **246/0 selected**, **16/0 supplied-tool cases**, exact Release Runtime/bundled .NET10.0.12 module pins, exit0/empty stderr. Counts overlap; positive official LUT explicitly NOT RUN.402 source files/649 review files/live2/isolated5/prior destination21/ZIP/Mac/login preservation independently pass. Aggregate SHAc32611d45bdbba6b0519fa757404ce0faae167f2780f1a52284b61e73d4afcee. This refreshes current software evidence without promoting fixtures to native/hardware/genuine-media/travel/trust acceptance. No normal launch/device/OS/install/push/publication; full goal active and publishing OK pending.

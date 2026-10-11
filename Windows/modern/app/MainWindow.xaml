@@ -3,6 +3,10 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:local="using:EasyEject.Modern" Title="Easy Eject">
  <Grid x:Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+  <Grid.Resources>
+   <DataTemplate x:Key="PendingImportRowTemplate"><TextBlock Text="{Binding}" TextWrapping="Wrap"/></DataTemplate>
+   <Style x:Key="PendingImportRowStyle" TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
+  </Grid.Resources>
   <NavigationView x:Name="Navigation" ItemInvoked="Navigation_ItemInvoked" IsBackButtonVisible="Collapsed" PaneDisplayMode="Left" IsSettingsVisible="False" IsPaneToggleButtonVisible="False" OpenPaneLength="218" AlwaysShowHeader="False">
    <NavigationView.PaneHeader><StackPanel Margin="20,24,0,24" Spacing="6"><Image Source="Assets/EasyEject.png" Width="40" Height="40" HorizontalAlignment="Left" AutomationProperties.Name="Easy Eject icon"/><TextBlock Text="Easy Eject" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="Storage, safely handled" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel></NavigationView.PaneHeader>
    <NavigationView.MenuItems><NavigationViewItem x:Name="StorageNavigation" Content="Connected storage" Tag="storage" IsSelected="True"><NavigationViewItem.Icon><FontIcon Glyph="&#xE7F1;"/></NavigationViewItem.Icon></NavigationViewItem><NavigationViewItem x:Name="ProfilesNavigation" Content="Saved profiles" Tag="profiles"><NavigationViewItem.Icon><FontIcon Glyph="&#xE8D4;"/></NavigationViewItem.Icon></NavigationViewItem><NavigationViewItem x:Name="DefaultsNavigation" Content="Import defaults" Tag="defaults"><NavigationViewItem.Icon><FontIcon Glyph="&#xE713;"/></NavigationViewItem.Icon></NavigationViewItem><NavigationViewItem x:Name="SettingsNavigation" Content="Settings" Tag="settings"><NavigationViewItem.Icon><FontIcon Glyph="&#xE713;"/></NavigationViewItem.Icon></NavigationViewItem></NavigationView.MenuItems>
