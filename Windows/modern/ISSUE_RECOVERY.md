@@ -1,5 +1,7 @@
 # Persisted issue review and save recovery
 
+Later [October 11 native acceptance](ISSUE_NATIVE_20261011.md) exercises empty-state rereading, acknowledgement/restart, a changed record during a live review, refusal without overwrite, distinct explanations, explicit recovery and separate acknowledgement/restart using generated isolated records. The software evidence below remains historical and separately scoped; these native checks do not establish every uncertain-write or physical boundary.
+
 Source **`886f0fa`** closes the persisted-snapshot/reopening source gap recorded in DIAGNOSTICS_WORKFLOW.md. It preserves Mac baseline `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c` dismissal semantics: acknowledge the reviewed warning, retain its explanation, never retry an import/export/eject, and restore attention for later failures. Windows issue JSON fields and classic Load validation/Save behavior remain unchanged; live revisions are never serialized.
 
 ## Contracts

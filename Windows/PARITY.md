@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native persisted issue recovery
+
+[Scoped native issue checks](modern/ISSUE_NATIVE_20261011.md) pass initially empty-state reread, default Cancel, acknowledgement/restart, changed-record stale-save refusal, distinct live/saved explanations, explicit recovery without acknowledgement and separate Dismiss/restart. Generated isolated warnings use real production review/publication paths; no genuine operation failed or retried. Live configuration stays exact and all processes quit normally. No source/payload/default-count change. Physical/media/LUT/trust and explicit publication gates remain open.
+
 ## October 11 · native window lifecycle and shortcut
 
 [Supported native lifecycle checks](modern/LIFECYCLE_NATIVE_20261011.md) pass Minimize/actual global-chord restore, maximized retention, same-process close-to-tray/shortcut reveal and saved-off nonactivation. The native presenter regression and actual tray Quit/Stop checks pass in two warning-free builds. Live configuration stays exact; login stays absent. No production behavior change. OS tray-icon input, notifications and physical/media/LUT/trust/publication acceptance remain open.

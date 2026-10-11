@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native persisted issue recovery · October 11
+
+[Generated isolated issue evidence](modern/ISSUE_NATIVE_20261011.md) passes empty-state reread, Cancel-default preservation, explicit acknowledgement and exact true Quit/restart. A record changed during an open dialog makes stale Dismiss refuse without overwriting; fresh review shows both explanations, default Cancel preserves the changed record, explicit recovery preserves acknowledgement status and a separate Dismiss survives another restart. All three processes quit normally; live files stay exact, login stays absent and only the isolated issue record is written. No source/build/payload/default-count change or real operation failure is claimed; physical/media/LUT/trust/publication gates remain open.
+
 ## Native minimize/maximize and global shortcut · October 11
 
 [Native lifecycle evidence](modern/LIFECYCLE_NATIVE_20261011.md) now proves title-bar Minimize plus actual registered shortcut restore from Explorer, maximized retention through minimize/reveal, close-to-tray with the same live process/hidden window and maximized shortcut reveal. Saving the shortcut off prevents activation; normal tray callback Quit exits. Both live configuration files stay exact and login stays unregistered. New native presenter regression and existing tray Quit/Stop checks pass in two warning-free builds. No production fix/payload/default-count change was needed; OS tray-icon/notification and physical/media/LUT/trust/publication gates remain open.
