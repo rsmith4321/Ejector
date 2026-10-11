@@ -1,0 +1,38 @@
+# Native release Stop, picker and Keep-current behavior · October 11, 2026
+
+The real WinUI release dialog/presenter now has native evidence for **Stop retaining an uncooperative worker, Close refusal until terminal, rejection of its late result, native history-picker Cancel/selection and Return keeping current history**. An explicitly generated backend supplies the foreground states. This does **not** authenticate an update, configure production, restore history, install anything or prove trusted-distribution acceptance.
+
+## Engineering boundary
+
+`UiReleaseInspection.cs` is entirely `#if UI_TESTS`. Its one-session **Test release workflows** button opens the existing `ViewModernReleases` with a generated `IReleaseViewBackend`; the production presenter, dialog, native file picker, selection tokens, Stop, Closing and inline confirmation handlers remain in use. Conditional factory selection and a clear engineering label are excluded from normal builds, whose original `WindowsReleaseViewBackend.ForModern(...)` branch is retained. Both real production channels remain unconfigured.
+
+The backend has no network/replay/store/restore/install/executable capability. ZIP/folder review actions are disabled. The first metadata worker deliberately ignores Cancel while waiting up to three minutes for an owned release marker. It only returns generated result text. The only permitted file read is the exact owned `generated-history.json` containing `{"generated":true,"authenticUpdateHistory":false}`. Its presented fake backup ID9001 exists only in memory; any Restore invocation would throw before acting. This read-only fixture cannot establish signed/history/package trust or actual restore behavior.
+
+## Actual native session
+
+Executable: `C:\Users\rsmit\.codex\EasyEjectBuildTools\Codex020-release-final-ui-20261011\bin\EasyEject.Modern\Debug\net10.0-windows10.0.26100.0\win-x64\EasyEject.Modern.exe`. Fresh owned fixture: `C:\Users\rsmit\.codex\EasyEjectFixtures\ui-release-native-20261011`, seeded only with the exact review marker and prior owned debug-only settings/generated log. Native PID **4776** loads the recorded engineering Modern/Runtime DLLs and installed .NET **10.0.0** coreclr. It is not the normal self-contained Release UI. Read-only inventory has five internal/protected volumes on one disk, no external card.
+
+| Input / state | Result |
+| --- | --- |
+| Test entry → **Check release metadata** | Dialog explicitly identifies the engineering fixture. The generated worker starts; page selector/check are disabled, Stop enabled. |
+| **Stop review** while worker stays live | Status says “Stopping review. Waiting for its exact worker…”; backend cancellation is recorded with held=true. Page/check remain disabled. No new worker is admitted. |
+| **Close** before worker terminal | Same dialog remains, with “Wait for the current picker or release worker before closing.” A second held=true cancellation is recorded. |
+| Release owned marker | Worker produces a generated result and terminates. The presenter reports activity/ownership change; **no Check result is presented**. Page/check recover and Stop disables. |
+| Update history → **Review history backup…** → native **Cancel** | Windows Open dialog appears with the parent disabled. Cancel returns “Choice cancelled. No new action started.” Backend still has only its original Check run; no file read or restore starts. |
+| Reopen picker → exact owned fixture path → **Review history backup** | Native filename field contains the verified complete fixture path before submission. Backend performs only its guarded generated-file read, then one Backup result is presented. Generated reviewed history9001 appears and enables inline confirmation. |
+| **Restore reviewed history…** → **Return** without choosing Restore | Inline body offers Keep current history and Restore. Return removes the confirmation, retains the release dialog, reports choice cancelled and disables stale Restore. Backend records cancellation and **zero Restore runs**. This verifies the safe key outcome; it does not assert reliable provider-reported focus. |
+| **Close**, settled main controls → actual tray Quit callback | Backend disposes only after its worker/picker are terminal. App exits **0**, no `unhandled.txt`. Immediate capture reports unusable app window after Quit; no repeat input is sent. |
+
+Native picker children are exposed inside the parent capture, although no separate picker window appears in the supported window inventory. One indexed Cancel input reports unavailable cached element; fresh selection/activation/screenshot and one visible-coordinate retry succeed. Later filename focus is established through the observed caret/click/native Alt+N access key; provider `focused_element` continues to report Search Box, so that field alone is not treated as proof. Typed generated path is verified in the native File name value and screenshot before selection. No shell command is entered through any UI, no search is submitted and no user file is selected. Screenshot payloads are not saved or reprocessed.
+
+## Verification and preservation
+
+- Initial `Codex020-release-ui-20261011.log` is a failed engineering compile: assigned-but-unused helper field CS0414, with consequent XAML compiler diagnostics. The unused field was removed; no warning was suppressed. This initial run is not counted as a pass.
+- Final `Codex020-release-final-ui-20261011.log`: **0 warnings/0 errors**, existing native root/theme/text/completion/pending/presenter/Stop/tray/editor/busy/idle regressions PASS; retained automatic fixture `ui-94c0e4fd085e4207841d03ace2812712`, no exception.
+- `Codex020-release-normal-20261011.log`: **0 warnings/0 errors**, selected **246 passed / 0 failed**. Normal metadata retains `ViewModernReleases`, excludes `ReviewReleaseBackend`, `UiTestHost`, factory/initializer/flag fields and earlier diagnostic review hooks. No broad binary-identity claim or new full/supplied-tool count.
+- Native trace has exactly two runs: Check and Backup. Exactly one presentation, Backup; no Check delivery, Restore or other action. Terminal/disposal and active-interval Stop/Close observations are verified. The generated JSON stays exact; isolated settings/log remain unchanged with exactly two profile files. Both live files retain exact hash/length/write time/count; login registration stays absent, Mac baseline exact.
+- Current production/package source remains **0040e58**, unsigned ZIP **107459831 bytes**, SHA **e941e2c49a9bb88d65d6d24234e6cd2fbcd711350ef2c7cf43105a7e56198bb4**, unchanged. No live preference, device/media, autostart, OS setting, install, push or publication change.
+
+Evidence root: `C:\Users\rsmit\.codex\EasyEjectBuildTools\Codex020-release-native-20261011`. `launch.ps1`, actual accessibility observations, loaded modules/exit and `finalize.ps1` remain there; backend trace is retained in the owned fixture and pinned by the aggregate. `final.json` SHA-256 **be5d01ee84de2d0559190b426611c27d02e065060e33eff7cd6f5ac0a6697188** verifies the scoped assertions and preservation.
+
+Native ZIP/folder selection, activity change during an outstanding picker, accepted restore/publication/uncertain recovery, queued delivery after worker completion but before UI consumption and presentation-failure lifetime remain open. Existing software fixtures cover their own contracts. Genuine configured metadata/CMS/HTTP/revocation/component/package/publisher/installation/rollback proof and all physical/genuine-media/LUT/travel/display/signing/publishing gates remain necessary. Full goal active; no production channel or publishing authorization is inferred.

@@ -37,7 +37,13 @@ namespace EasyEject.Modern {
             bool selecting = false; Action render = () => {};
             try {
                 await EnsureVisible(); var folders = new InstallationFolders(Path.GetDirectoryName(Environment.ProcessPath), Profiles.Root);
-                try { owner = new ReleaseView(WindowsReleaseViewBackend.ForModern(releaseChecks, WindowsReleaseChecks.ModernProductionChannel, ApplicationInformation.Version, components: WindowsReleaseChecks.ModernProductionComponents), folders); }
+                try {
+#if UI_TESTS
+                    owner = new ReleaseView(CreateReviewReleaseBackend(), folders);
+#else
+                    owner = new ReleaseView(WindowsReleaseViewBackend.ForModern(releaseChecks, WindowsReleaseChecks.ModernProductionChannel, ApplicationInformation.Version, components: WindowsReleaseChecks.ModernProductionComponents), folders);
+#endif
+                }
                 catch { folders.Dispose(); throw; }
                 releaseView = owner;
                 var body = new StackPanel { Spacing = 12 };
@@ -46,6 +52,9 @@ namespace EasyEject.Modern {
                 var status = Wrapped(releaseStatus ?? releaseChecks.Status);
                 var details = Wrapped(owner.Guide(ApplicationInformation.Version, releaseChecks.Status)); details.IsTextSelectionEnabled = true;
                 var releaseText = Wrapped(releaseChecks.Configured ? "Choose Check release metadata. Download and extraction remain manual." : WindowsUpdateSafety.ChannelStatus);
+#if UI_TESTS
+                if (reviewReleaseBackend != null) releaseText.Text = "Engineering fixture only. No authenticated update, network, restore or installation capability.";
+#endif
                 var backupText = Wrapped("Review only update history from your settings backup. Restore is a separate confirmed action; other settings and media are retained.");
                 var confirmText = Wrapped(""); var confirmBody = new StackPanel { Spacing = 10, Visibility = Visibility.Collapsed };
                 var check = new Button { Content = "Check release metadata" }; var archive = new Button { Content = "Verify selected ZIP…" }; var extracted = new Button { Content = "Verify extracted folder…" };

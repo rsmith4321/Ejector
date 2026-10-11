@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native release Stop / picker / Keep-current checks · October 11
+
+[Actual release foreground flow](modern/RELEASE_FOREGROUND_NATIVE_20261011.md), using a labeled read-only generated backend behind the real presenter, verifies Stop/Close retaining an uncooperative worker, late-result refusal, native picker Cancel/no work and exact generated-file selection, plus Return cancelling inline restore with zero Restore runs. PID4776 exits0/no exception. Initial helper CS0414 compile is retained/corrected; final warning-free native regressions and normal **246/0**/probe exclusion pass. Live/isolated files, login absence, currentZIP/Mac baseline preserved. Test-only hooks; no real update authentication/channel/history restore/install/device/OS/push/publication action. Remaining configured trust/pickers/restore/queued-delivery/full acceptance gates stay open; goal active. Aggregate SHAbe5d01ee84de2d0559190b426611c27d02e065060e33eff7cd6f5ac0a6697188.
+
 ## Native diagnostic Close/Escape retains active worker · October 11
 
 [Controlled native overlap](modern/DIAGNOSTICS_WORKER_NATIVE_20261011.md) pauses the real review owner's first Refresh callback before a real generated-log read. Actual Close/Escape retain the modal/snapshot and disabled actions while busy; release reads current501-character log in the same dialog, then Escape closes normally. Native PID25544 exits0/no exception. Warning-free engineering regressions/normal **246/0**, normal probe exclusion and scoped17-method diagnostic IL comparison pass; broader raw binary comparison is explicitly not equal/qualified. Live/settings/prior fixture/login absence/currentZIP/Mac baseline preserved. No production behavior/payload/clear/device/OS/push/publication action. Native clear/clear-failure and XAML-presentation-failure worker retention remain open; full goal active. Aggregate SHA59a687cb1f3be317de34ee5979d9e67ee8348a669f554726a1ecd4cf77be48a7.

@@ -90,6 +90,7 @@ namespace EasyEject.Modern {
         internal void InitializeReviewControls() {
             InitializeReviewKeyboardProbe();
             var footer = (Microsoft.UI.Xaml.Controls.StackPanel)Navigation.PaneFooter;
+            InitializeReleaseReviewProbe(footer);
             var flyout = new Microsoft.UI.Xaml.Controls.Button { Content = "Test tray flyout" };
             flyout.Click += (_, args) => { var area = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Control.MousePosition).Bounds; ToggleTrayFlyout(new System.Drawing.Point(area.Right - 140, area.Bottom - 20)); };
             var quit = new Microsoft.UI.Xaml.Controls.Button { Content = "Test tray Quit" };

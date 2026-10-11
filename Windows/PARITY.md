@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native update foreground ownership and safe cancellation
+
+[Real presenter/native history picker](modern/RELEASE_FOREGROUND_NATIVE_20261011.md) passes controlled Stop/Close worker retention, revoked result refusal, picker cancellation/exact generated-file selection and Return keeping current history. Backend is explicitly generated/read-only, not production update trust; zero Restore runs. Native exit0/no exception, warning-free final native regressions and normal **246/0**/probe exclusion/preservation pass. No production behavior/channel/payload/history restore/install/device/OS/push/publication change. Configured trust, remaining picker/restore/queued-delivery and full physical/genuine-media/LUT/travel/display/signing/publishing gates remain open; full goal active.
+
 ## October 11 · native diagnostic worker Close/Escape ownership
 
 [Actual Close/Escape during controlled real-review work](modern/DIAGNOSTICS_WORKER_NATIVE_20261011.md) retains the same dialog/snapshot and disabled actions until the owned pause releases and real read completes; post-work Escape closes, native exit0/no exception. Warning-free native regressions and normal **246/0**/probe exclusion/scoped diagnostic IL comparison pass. Blanket binary comparison is qualified, not asserted equal. Live/currentZIP/Mac preserved; test-only hook, no production behavior/clear/device/OS/push/publication change. Native clear/clear-failure and presentation-failure worker retention, full physical/genuine-media/LUT/travel/display/trust/publishing acceptance remain open; goal active.
