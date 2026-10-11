@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native diagnostic read/Refresh failures
+
+[Real locked-file failure/recovery](modern/DIAGNOSTICS_FAILURE_NATIVE_20261011.md) verifies initial read refusal with retained diagnostics/issue, failed Refresh preserving exact displayed-snapshot Copy, fresh-view recovery and retained issue Cancel. Native exit0/no exception and preservation pass; no production/build/suite-count/payload/device/OS/push/publication change. Native clear and overlapping-worker closure remain unproved; configured update/trust, physical/genuine-media/LUT/travel/display/signing/publishing gates stay open, full goal active.
+
 ## October 11 · native diagnostic snapshot and Clipboard semantics
 
 [Real debug viewer](modern/DIAGNOSTICS_NATIVE_20261011.md) passes isolated Save/restart, frozen displayed-snapshot exact raw Clipboard Copy and explicit Refresh/current-log Copy, with normalized native textbox paste checked separately. Initial paste-only harness mismatch remains qualified. Warning-free native regressions/normal exclusion and both review exit0/no exception; live records/login/currentZIP/Mac baseline preserved. Native clear/failure/worker and configured update/trust/full physical/genuine-media/LUT/travel/display/signing/publishing acceptance remain open. No production/default-suite count/payload/device/OS/push/publication change; full goal active.

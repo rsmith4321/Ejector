@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native diagnostic read/Refresh failures recover · October 11
+
+[Owned file-lock checks](modern/DIAGNOSTICS_FAILURE_NATIVE_20261011.md) exercise the production diagnostic UI: initial read failure retains the file/saves an issue/restores controls; failed Refresh keeps the displayed 416-character snapshot, and Copy remains exact despite the current 497-character log. After lock release, fresh-view reopen/explicit Refresh pass; issue Cancel preserves attention. Native PID30408 exits0/no exception. Both read-only locks released; live files, prior fixture/evidence, settings/login absence, normal assembly/currentZIP and Mac baseline exact. No production edit/new build/suite count, clear/device/OS/push/publication action. Native clear and overlapping-worker closure remain open; full goal active. Aggregate SHA9227ccc2f9566972dfdb753dd53f6c8f2d65a7346f8bdae0ff514c07409a7c6b.
+
 ## Native debug snapshot / Clipboard / Refresh / restart · October 11
 
 [Actual diagnostic UI checks](modern/DIAGNOSTICS_NATIVE_20261011.md) verify isolated debug Save/true Quit/restart, exact raw223-character displayed-snapshot Copy despite newer330-character log, and explicit Refresh/Copy of current416-character log. Paste-only line-ending mismatch is retained/corrected by separate raw Clipboard and normalized textbox comparisons. Final warning-free engineering/native regressions and normal build/exclusion pass; both review sessions exit0/no exception. Native Clear is not clicked. Live2records/login absence/currentZIP/Mac baseline preserved; only isolated debug setting/log and generated clipboard change. No new suite/tool count, production payload/device/OS/push/publication change; full acceptance/publishing gates stay open, goal active.
