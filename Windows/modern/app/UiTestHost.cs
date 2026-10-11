@@ -94,7 +94,36 @@ namespace EasyEject.Modern {
             flyout.Click += (_, args) => { var area = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Control.MousePosition).Bounds; ToggleTrayFlyout(new System.Drawing.Point(area.Right - 140, area.Bottom - 20)); };
             var quit = new Microsoft.UI.Xaml.Controls.Button { Content = "Test tray Quit" };
             quit.Click += (_, args) => tray.ContextMenuStrip.Items.Cast<System.Windows.Forms.ToolStripItem>().Single(item => item.Text == "Quit preview").PerformClick();
-            footer.Children.Add(flyout); footer.Children.Add(quit);
+            string firstReviewedDebugText = null;
+            var debug = new Microsoft.UI.Xaml.Controls.Button { Content = "Test debug log" };
+            debug.Click += (_, args) => {
+                if (StorageBusy || settings == null || !settings.DebugEnabled) return;
+                firstReviewedDebugText ??= DebugLog.Read(Profiles.Root);
+                debugMenu.PerformClick();
+            };
+            var clipboard = new Microsoft.UI.Xaml.Controls.Button { Content = "Check pasted debug text" };
+            clipboard.Click += async (_, args) => {
+                if (firstReviewedDebugText == null || !BeginSavedReview()) return;
+                try {
+                    await EnsureVisible();
+                    string current = DebugLog.Read(Profiles.Root);
+                    string rawClipboard = System.Windows.Forms.Clipboard.GetText();
+                    Func<string, string> lines = value => value.Replace("\r\n", "\n").Replace("\r", "\n");
+                    var paste = new Microsoft.UI.Xaml.Controls.TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 160 };
+                    Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(paste, "Paste generated debug log here");
+                    paste.TextChanged += (_, changed) => File.WriteAllText(Path.Combine(UiTestHost.Root, "clipboard-check.json"),
+                        System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow,
+                            rawMatchesFirstReviewedLog = rawClipboard == firstReviewedDebugText, rawMatchesCurrentLog = rawClipboard == current,
+                            pastedLinesMatchFirstReviewedLog = lines(paste.Text) == lines(firstReviewedDebugText),
+                            pastedLinesMatchCurrentLog = lines(paste.Text) == lines(current),
+                            pastedCharacters = paste.Text.Length, rawClipboardCharacters = rawClipboard.Length,
+                            firstReviewedCharacters = firstReviewedDebugText.Length, currentCharacters = current.Length }));
+                    confirmation = MessageDialog("Generated diagnostic clipboard check", "", null);
+                    confirmation.Content = paste; await confirmation.ShowAsync();
+                } catch (Exception ex) { Summary.Text = "Generated diagnostic clipboard comparison unavailable. " + ex.Message; }
+                finally { FinishSavedReview(); }
+            };
+            footer.Children.Add(flyout); footer.Children.Add(quit); footer.Children.Add(debug); footer.Children.Add(clipboard);
         }
         // Diagnostic evidence only: UI_TESTS review builds record activation and
         // Escape routing. Never record text or other keys, and never handle a key.

@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native diagnostic snapshot and Clipboard semantics
+
+[Real debug viewer](modern/DIAGNOSTICS_NATIVE_20261011.md) passes isolated Save/restart, frozen displayed-snapshot exact raw Clipboard Copy and explicit Refresh/current-log Copy, with normalized native textbox paste checked separately. Initial paste-only harness mismatch remains qualified. Warning-free native regressions/normal exclusion and both review exit0/no exception; live records/login/currentZIP/Mac baseline preserved. Native clear/failure/worker and configured update/trust/full physical/genuine-media/LUT/travel/display/signing/publishing acceptance remain open. No production/default-suite count/payload/device/OS/push/publication change; full goal active.
+
 ## October 11 · native multiline status bounds / clipping qualification
 
 [Original native text layout](modern/FLYOUT_TEXT_NATIVE_20261011.md) contradicts status/header overlap or reported trimming; earlier screenshot-based clipping is **unconfirmed**, not a proved production bug. New short/wrapped Light/Dark native cases with one/18 generated devices pass, plus normal selected **246/0**, warning-free; native sessions exit0/PASS/no exception and preservation/normal-host exclusion pass. Production layout/currentZIP unchanged. Pixel readability/accessibility/broader displays and full genuine-media/physical/LUT/travel/trust/publishing acceptance remain open; full goal active.

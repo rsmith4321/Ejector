@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native debug snapshot / Clipboard / Refresh / restart · October 11
+
+[Actual diagnostic UI checks](modern/DIAGNOSTICS_NATIVE_20261011.md) verify isolated debug Save/true Quit/restart, exact raw223-character displayed-snapshot Copy despite newer330-character log, and explicit Refresh/Copy of current416-character log. Paste-only line-ending mismatch is retained/corrected by separate raw Clipboard and normalized textbox comparisons. Final warning-free engineering/native regressions and normal build/exclusion pass; both review sessions exit0/no exception. Native Clear is not clicked. Live2records/login absence/currentZIP/Mac baseline preserved; only isolated debug setting/log and generated clipboard change. No new suite/tool count, production payload/device/OS/push/publication change; full acceptance/publishing gates stay open, goal active.
+
 ## Native status bounds qualify suspected clipping · October 11
 
 [Native content/header measurements](modern/FLYOUT_TEXT_NATIVE_20261011.md) do **not** confirm the earlier screenshot-based flyout clipping conclusion. Original short status fits its16-pixel desired line/header with no reported trimming/viewport overlap. New engineering regressions pass short/three-line statuses in Light/Dark with one/18 generated devices, fixed footer/work-area checks and normal selected **246/0**, all warning-free. Three explicit sessions exit0/PASS/no exception; engineering methods absent normally, live records/currentZIP/Mac baseline exact. Production typography/layout unchanged. Human pixel readability and broader display/full acceptance gates stay open; no held action or publishing, goal active.
