@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native blocked completion and guarded folder return
+
+[Generated no-removal-plan completion](modern/COMPLETION_NATIVE_20261011.md) passes disabled Eject, Keep Connected default/Return and actual guarded Open Import Folder followed by safe completion return. Unregistered inspection refuses safely; read-only notification registration enables the real destination guard without runtime workers or removal authority. Warning-free normal/engineering builds, native regression and normal-host exclusion pass. Both sessions quit normally and destination/live records stay exact. This is not previously valid removal-plan expiration or physical completion eject/cleanup acceptance; full media/LUT/hardware/OS/distribution and publishing gates remain open. Production payload and default-suite counts unchanged.
+
 ## October 11 · native degraded history and exact receipt recovery
 
 [Isolated generated history](modern/HISTORY_RECOVERY_NATIVE_20261011.md) passes saved verification despite individual malformed profiles or whole-catalog warning, safe sharing suppression/reappearance after recovery, malformed JSON refusal and distinct valid JSON same-size/time receipt-hash refusal. Exact restore requires a separate manual retry, which verifies both originals with source absent. Destination/live records remain exact and all four sessions quit normally. No production/default-count/payload change; actual completion eject/cleanup, genuine media/LUT, physical destination/hardware/travel and OS/distribution acceptance remain open.

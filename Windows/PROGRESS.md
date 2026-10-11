@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native completion default and guarded folder opening · October 11
+
+[No-removal-plan completion review](modern/COMPLETION_NATIVE_20261011.md) now passes actual disabled Eject/default Keep Connected, Return, guarded Explorer launch and return to the safe completion dialog. The initial unregistered inspection correctly refused the destination; final test-only mode registers read-only notifications without runtime workers or any removal plan. Normal/engineering builds are warning-free, native presenter/compact/tray regression PASS and normal metadata excludes the test host. Both sessions quit normally; 17 generated destination files and 2 live records remain exact. No production/default-count/Release-payload change. Previously valid plan expiration, actual eject/cleanup and full physical/media/LUT/OS/trust/publishing gates stay open.
+
 ## Native history degradation, receipt refusal and manual recovery · October 11
 
 [Generated saved-history recovery](modern/HISTORY_RECOVERY_NATIVE_20261011.md) now passes verification with a malformed individual profile (sharing hidden) and a whole-catalog overflow (clear warning, verification retained). Restoring the catalog returns the manual sharing button without export. A malformed receipt refuses at parsing; a separate valid JSON one-byte receipt change with unchanged size/time refuses explicitly at exact receipt validation. Exact restoration triggers no automatic work; a fresh manual review verifies both originals. All 17 generated destination files and both live records finish exact; four owned sessions quit normally. Existing engineering modules are pinned unchanged; no source/build/default-count/Release-payload change or real hardware/media/tool/publication action. Full acceptance/publishing gates remain open.
