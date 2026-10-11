@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Rebuilt completion-focus review package · October 11
+
+Exact committed Windows source **34125fc0a3aa121a33f4ee4cf6a051a8c99cdd95** now produces the [current unsigned 0.2 review/ZIP](modern/REVIEW_020_20261011.md). Build/package exit0; every **650** ZIP entry decompresses/hashes against staging. **107459543 bytes**, SHA-256 **12bf37369652345f44ab005569063953eb62fba6026d25a01156119132145137**. KeepConnectedDialog/TrayFlyoutWindow are included, engineering host excluded; full runtime/resources/notices retained. Normal review never launched, no install/push/publication; publishing OK remains pending. Source correction passed selected **246/0** and native regression/input; earlier full **1454/0 each** remains separate baseline. Later Windows crash audit qualifies three older history-session shutdown claims; saved UI/file evidence remains scoped. Full goal/acceptance gates remain open.
+
 ## Completion keyboard default and manual sharing return corrected · October 11
 
 [Native focus evidence](modern/COMPLETION_FOCUS_20261011.md) reproduces Return opening Quick Share despite highlighted Keep Connected, including a post-sharing race missed by an early queued fix. Final synchronous focus redirection passes actual Return before/after sharing, deliberate Tab access, exact 4K reuse **0 new / 2 reused**, native regression and warning-free selected **246/0**. A separate inspection-only logger shutdown crash is reproduced/fixed; final Quit exits **0**, PASS/no exception. All 20 prior generated destination files, 3 copied records and 2 live records stay exact; only the expected audit is added. Failed candidates/premature finish/crash evidence remain recorded. **960bd75 review ZIP is superseded pending exact-commit rebuild**. Full physical/media/LUT/OS/trust and publishing approval gates remain open; goal active.

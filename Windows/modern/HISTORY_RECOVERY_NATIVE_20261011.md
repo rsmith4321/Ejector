@@ -1,5 +1,7 @@
 # Native saved-history recovery and receipt refusal · October 11, 2026
 
+Post-run shutdown audit: Windows Application Error records native crashes for PIDs **30196, 7624 and 29096** after these inspection sessions. Their PASS markers/disappearance do **not** establish normal shutdown; UI/file observations below retain their scoped evidence. The later [completion focus/shutdown investigation](COMPLETION_FOCUS_20261011.md) reproduces a passive engineering logger callback after disposal, fixes both probes and verifies a fresh native session exits 0/no exception. No equivalent exception stack was captured in these older sessions, so exact causation is not claimed.
+
 Supported computer control now verifies saved-history behavior with an unreadable individual profile, a whole-catalog failure and changed receipt, followed by a fresh manual retry. All media is the existing generated UHD/audio fixture; no genuine camera footage or physical source device is involved. Production code, engineering host, default-test count and prepared Release ZIP are unchanged.
 
 ## Isolated scope

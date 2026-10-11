@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · rebuilt completion-focus candidate
+
+[Exact-source 34125fc review](modern/REVIEW_020_20261011.md) replaces all older unsigned candidates. Build/package exit0, every 650 ZIP entry decompresses/hashes against staging; normal production metadata/resources/notices are retained and test host excluded. ZIP SHA-256 **12bf37369652345f44ab005569063953eb62fba6026d25a01156119132145137**, 107459543 bytes. No normal-app launch, live-setting/device change, push or publication. Selected **246/0** and final native exit0/no-exception evidence retain their scope; older history-session shutdown claims are qualified by subsequent Windows crash records. Publishing OK and full physical/media/LUT/OS/trust acceptance remain open; goal active.
+
 ## October 11 · safe completion keyboard focus and sharing return
 
 [Production correction](modern/COMPLETION_FOCUS_20261011.md) passes native Return→Keep Connected with sharing present, deliberate Tab/Return→manual choices, explicit 4K reuse and safe Return after sharing. Final native focus/presenter/compact/tray checks and normal **246/0** pass warning-free; normal metadata excludes engineering hooks. Separate inspection-only logger crash is fixed; final Quit exits 0/no exception. Prior generated/live files remain exact; failed queued candidates stay recorded. **960bd75 package is superseded** pending rebuild. Physical eject/veto/cleanup/valid-plan expiry, genuine footage/LUT, broad OS/DPI/travel/trusted distribution and publishing OK remain open. Full goal stays active.
