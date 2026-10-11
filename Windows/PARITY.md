@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native defaults checkpoint
+
+[Native isolated defaults and new-profile evidence](modern/DEFAULTS_NATIVE_20261011.md) now covers Save/true Quit/restart, exact saved-file preservation across cancelled drafts, Return cancelling removal/recovery warnings, inherited Use defaults choices, Custom starting from those choices and both defaults/profile draft Quit refusal. No profile enrollment, import, source write, format or eject occurs. This strengthens foreground evidence only; actual OS tray/notifications, all physical themes/DPI, hardware/power/travel, genuine media/LUT and trusted distribution remain open. Default counts and production payload remain unchanged; no whole parity row or full-port completion is claimed.
+
 ## October 11 · native UHD/audio cancellation checkpoint
 
 [Native full-resolution generated-media evidence](modern/UHD_CANCEL_RETRY_20261011.md) now covers visible Stop during encoding, preservation of one already validated/published copy, removal of unfinished work and worker exit, then separate manual **1-new / 1-reused** completion. Original/import records and all eight post-cancellation files remain exact. Both outputs independently probe/full-decode at **3840×2160/30fps with stereo AAC**, matching the baseline recipe. Final opt-in short/UHD preparations and eight admission controls pass without a default-suite count or production-payload change. Genuine camera/LUT, physical replaced destination/eject/power/travel, all DPI/themes/OS tray input and trusted distribution remain open; the full goal is not complete.

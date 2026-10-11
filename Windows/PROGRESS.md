@@ -1,5 +1,11 @@
 # Windows progress · October 10, 2026
 
+## Native defaults persistence and inheritance · October 11
+
+[Computer-controlled native defaults checks](modern/DEFAULTS_NATIVE_20261011.md) pass on a fresh isolated scope: unsaved preview choices survive actual tray callback Quit refusal; Return cancels permanent-removal and Trash-recovery warnings; explicit Save starts no import. Idle Quit/restart restores video-only, preview-off/preserved-layout choices. All-media draft Cancel, recovery-review Cancel and custom-profile Cancel retain the saved defaults' exact hash/bytes/write time. A new SD-card profile inherits defaults, Custom starts with the same choices and its changed draft also survives refused Quit. No profile is saved or device operation started; both owned processes exit normally.
+
+Current Debug module pins and final measured file/process proof are retained. The supported target inventory exposes no taskbar, so actual OS tray-icon/notification clicks remain open. No production payload/default count changes; genuine media/LUT, hardware/power/display/trust acceptance and publication OK remain separate gates.
+
 ## Native UHD/audio Stop and retry · October 11
 
 [Actual native encoding cancellation](modern/UHD_CANCEL_RETRY_20261011.md) now passes on generated 15-second **3840×2160/30fps** clips with synthetic audio. Computer control clicks Stop while encoding is active; the first validated copy/receipt remains, unfinished second work is removed, no owned FFmpeg/private work remains, and originals/import records stay exact. A new manual action reports **1 new / 1 reused**, preserving all eight files retained after cancellation. Both outputs independently probe/full-decode at full UHD with stereo AAC, matching the exact Mac/Windows sharing recipe. The isolated app quits normally.

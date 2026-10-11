@@ -1,5 +1,7 @@
 # Windows device testing
 
+**Native defaults Save/restart and inheritance:** [October 11 isolated native defaults evidence](modern/DEFAULTS_NATIVE_20261011.md) covers actual Save/restart, cancelled drafts, safe warning defaults and card-profile inheritance. This is opt-in engineering-host evidence with exact module/file/process pins; no default-suite count or OS tray-icon/notification acceptance is implied.
+
 **Native UHD/audio Stop/retry:** [full-resolution generated-media checkpoint](modern/UHD_CANCEL_RETRY_20261011.md) passes visible Stop during encoding, preserved completed copy/receipt, removed unfinished work, worker exit and separate manual retry (**1 new / 1 reused**). Both outputs independently probe/full-decode at 3840×2160/30fps with stereo AAC. This adds no production ZIP/default-suite change or genuine camera/LUT/hardware acceptance. All owned review sessions are stopped.
 
 **New isolated native sharing/restart evidence:** [generated 4K-preset creation and exact reuse](modern/SHARE_RESTART_20261011.md) now passes through the normal UI, existing supplied tools and actual idle tray Quit/restart with source absent. Originals, outputs and receipts remain exact. This is generated-codec evidence; genuine camera/LUT, physical removal/power/travel and distribution gates remain open. The engineering host is stopped; retained preferences/history are isolated.
