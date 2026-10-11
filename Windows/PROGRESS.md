@@ -1,5 +1,13 @@
 # Windows progress · October 10, 2026
 
+## Current package replay and DJI effective-color reuse · October 11
+
+[Exact40b0a26 packaged backend](modern/PACKAGED_REGRESSION_20261011.md) passes **1454/0 full**, **246/0 selected**, and **16/0 actual supplied-tool generated cases**, all exit0/empty stderr. Each parent loads matching packaged Runtime9032385a/.NET10.0.12 bytes; warning-free archived runner/Framework-fixture builds and403 source/649 review/live2/protected5+21+1+1/Mac/login/ZIP preservation pass. Aggregate SHA **19849027eb4a1f10918dcb72a42e69ccd26032cf750db7e932206c8aad27f387**. Positive official LUT explicitly NOT RUN; read-only inventory internal-only.
+
+The [named Mac DJI/Gyroflow contract trace](SHARE_REGRESSION_MAP.md) found one missing Windows assertion: a marked export requested as D-Log M then Standard must reuse the same verified copy. The [new test-only case](modern/DJI_COLOR_REUSE_20261011.md) passes within **13/0 targeted DJI checks**, PID28008 exit0, against exact packaged Runtime, with identical master/export/output/receipt hashes and no second encode. No production fix required. Explicit one-test-file overlay/402 unchanged archive entries; expanded full suite not rerun. Aggregate SHA **9b4e0f449311096c875f19135b283785bed4b870d21bf3d5897d117840ff7489**. Counts overlap; source trace does not change preserved Mac baseline or prove genuine DJI/LUT/native acceptance.
+
+Current production ZIP remains **107460521bytes**, SHA **e64714952dc971df3b93badd45ba631877fd2ce0439dd49adb72fb9df1f5d4ca**. Normal app unlaunched; no device/OS/install/signing/push/publication action. Test/doc-only milestone does not supersede40b0a26 package. Full objective and physical/genuine-media/LUT/travel/accessibility/trust/publishing gates remain open; goal active.
+
 ## Wrapped-row exact-source review and ZIP rebuilt · October 11
 
 [Current40b0a26 candidate](modern/REVIEW_020_20261011.md) includes the verified production pending-row correction. Build/package exit0; all650 ZIP entries independently decompress/hash against staging, engineering probes absent. ZIP **107460521bytes**, SHA **e64714952dc971df3b93badd45ba631877fd2ce0439dd49adb72fb9df1f5d4ca**; older candidates superseded. Native/normal246/0 evidence remains source-scoped; prior ba5661f full/tool replay is not promoted to new Release bytes. Normal app unlaunched; post-build protected source/live/fixture/destination/Mac checks pass, report SHAdb211b211a26e6c3f51469d3c6a5d2580de295610b950c0436427d762194ef63. No install/device/OS/signing/push/publication; full goal/publishing OK remain open.

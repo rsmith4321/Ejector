@@ -1,5 +1,11 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · exact current package and DJI cross-color reuse assertion
+
+[40b0a26 packaged replay](modern/PACKAGED_REGRESSION_20261011.md) passes **1454/0 full**, **246/0 selected**, **16/0 actual supplied-tool generated cases**, exit0/empty stderr; live Runtime/.NET modules match package bytes. Warning-free archived builds and exact403 source/649 review/live2/protected5+21+1+1/ZIP/Mac/login preservation pass; aggregate SHA19849027eb4a1f10918dcb72a42e69ccd26032cf750db7e932206c8aad27f387. Official positive LUT explicitly NOT RUN; read-only inventory internal-only. Current ZIP/source stays40b0a26/e64714952dc971df3b93badd45ba631877fd2ce0439dd49adb72fb9df1f5d4ca.
+
+[DJI contract map](SHARE_REGRESSION_MAP.md) separately traces named newer Macdc2c3ba, preserving working baseline384cb767. A [new independent fixture regression](modern/DJI_COLOR_REUSE_20261011.md) proves a marked Gyroflow export switches from D-Log M request to explicit Standard via exact verified reuse, zero second encodes and unchanged master/export/output/receipt hashes. **13/0 targeted DJI**, one test-file overlay against exact packaged Runtime; aggregate SHA9b4e0f449311096c875f19135b283785bed4b870d21bf3d5897d117840ff7489. No production change or new expanded default-suite claim; counts overlap. Genuine DJI/Gyroflow/official LUT/native workflow remains Partial/pending. No normal app launch/device/OS/install/push/publication; full physical/media/travel/accessibility/trust and publishing approval gates stay open, goal active.
+
 ## October 11 · current wrapped-row candidate rebuilt
 
 [Exact40b0a26 review/ZIP](modern/REVIEW_020_20261011.md) now includes the pending-row correction; build/package exit0,650 entries fully hash-verified, engineering probes excluded.107460521bytes/SHAe64714952dc971df3b93badd45ba631877fd2ce0439dd49adb72fb9df1f5d4ca. Native/normal246/0 evidence retains source scope; prior package full/tool counts remain historical. Protected source/live/fixtures/destination/Mac preserved; no normal launch/install/device/OS/push/publication. Full physical/media/LUT/travel/accessibility/trust and publishing OK gates remain open; goal active.

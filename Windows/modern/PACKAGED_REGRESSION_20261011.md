@@ -1,10 +1,28 @@
 # Exact packaged backend regression · October 11, 2026
 
+## Current wrapped-row candidate · 40b0a26
+
+The [current unsigned review](REVIEW_020_20261011.md) passes a fresh replay against its exact Release Runtime: **952832 bytes**, SHA-256 **9032385a73f61f3c330711d86821c2b3e3d7e14101aa5c38fafea0e2b271640a**, from Windows archive **40b0a2694bcc0382756411d6db112cc4c7ea9168**.
+
+| Run | Parent PID | Result |
+| --- | --- | --- |
+| Full default contracts, unchanged archived tests | 13960 | **1454 passed / 0 failed**, exit0; no real eject API used. |
+| Selected modern contracts | 26136 | **246 passed / 0 failed**, exit0; not rendered WinUI evidence. |
+| Existing supplied FFmpeg/FFprobe on generated clips | 4788 | **16 passed / 0 failed**, exit0; positive official LUT conversion explicitly **NOT RUN**. |
+
+Counts overlap and are not summed. Fresh Release/self-contained runners and unsigned Framework protocol/package fixtures build from the archived source using existing SDK10.0.401 with warnings as errors. Only stopped owned runner Runtime copies are replaced with the packaged DLL; no full Framework-suite result is claimed. Live module observations for each parent bind Runtime/coreclr/hostpolicy/System.Private.CoreLib paths, lengths and hashes to the corresponding package bytes (.NET10.0.12). All stderr files are empty. This verifies loaded paths/disk bytes, not in-memory integrity or full dependency closure.
+
+Actual-tool coverage includes generated standard-color HD/UHD framing/audio/rotation, full decode, HDR refusal, verified reuse/conflicts, changed-input/destination refusal, cancellation/partial retry, separate-process history and abrupt owner/live-encoder loss. Tool bytes remain unchanged. Injected Luna metadata does not establish genuine camera/color/compression or positive official-LUT acceptance.
+
+Evidence: `C:\Users\rsmit\.codex\EasyEjectBuildTools\Codex020-packaged-pending-wrap-20261011`, with retained build/prepare/run/finalize scripts and source/test/runner/process/module/log pins. `final.json` SHA-256 **19849027eb4a1f10918dcb72a42e69ccd26032cf750db7e932206c8aad27f387**. Finalization verifies **403 archived source entries**, **649 review files**, **2 live files**, protected groups of **5 / 21 / 1 / 1** files, source archive/ZIP, preserved Mac baseline and absent login registration. ZIP remains **107460521 bytes /650 entries**, SHA **e64714952dc971df3b93badd45ba631877fd2ce0439dd49adb72fb9df1f5d4ca**. Read-only inventory still reports only the internal disk/five volumes. Normal app unlaunched; no device/OS/install/signing/push/publication action.
+
+A subsequent [test-only DJI reuse regression](DJI_COLOR_REUSE_20261011.md) passes **13 / 0** against these same packaged Runtime bytes with one explicit test-file overlay. It does not change this archived 1454-case result, rebuild the production package, or establish genuine DJI/LUT/native acceptance. Full goal and publishing approval remain open.
+
 ## Historical accessible candidate · ba5661f
 
 Subsequent [pending-row wrapping](PENDING_ROWS_NATIVE_20261011.md) is rebuilt in the current40b0a26 candidate and supersedes this package. The following replay remains exact evidence for ba5661f's recorded bytes; no new payload run is inferred.
 
-The [current unsigned review](REVIEW_020_20261011.md) now passes a fresh replay against its exact Release Runtime bytes: **952832 bytes**, SHA-256 **`66e16077ce0156c6523a5a071faaea37e56ba51156ff5095ea79bf8c68e5eb02`**, from Windows archive **ba5661f18199a63817f6bde82adae96f079c5546**. This result supersedes the earlier package's counts for current-candidate reporting; historical evidence below remains scoped to its original bytes.
+The historical accessible review passes a fresh replay against its exact Release Runtime bytes: **952832 bytes**, SHA-256 **`66e16077ce0156c6523a5a071faaea37e56ba51156ff5095ea79bf8c68e5eb02`**, from Windows archive **ba5661f18199a63817f6bde82adae96f079c5546**. These historical results remain scoped to their original bytes.
 
 | Run | Process | Final result |
 | --- | --- | --- |

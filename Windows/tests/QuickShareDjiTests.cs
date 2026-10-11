@@ -108,6 +108,22 @@ namespace EasyEject {
                     Check(result.Created == 1 && !ShareOption(process.LastEncode, "-vf").Contains("lut3d") && receipt.Color == "Standard" && receipt.LutSha256 == null && File.ReadAllText(result.AuditPath).Contains("keeps the LUT already applied by Gyroflow"), "Gyroflow LUT applied twice");
                 }
             });
+            Test("DJI O4 Pro marked Gyroflow export reuses its verified Standard copy across color requests", delegate {
+                using (var f = new Fixture()) {
+                    var batch = DjiBatch(f, DjiMasterA); string export = GyroflowExport(batch, DjiMasterA);
+                    string originalHash = IndependentFileHash(DjiOriginal(batch, DjiMasterA)), exportHash = IndependentFileHash(export);
+                    const string marker = "Gyroflow export LUT applied: DJI O4 D-Log M";
+                    var first = RunDji(f, batch, DjiProcess(marker), QuickShareColor.DjiO4DLogM);
+                    string output = first.Outputs.Single(), receiptPath = QuickShareEngine.ReceiptPath(output);
+                    string outputHash = IndependentFileHash(output), receiptHash = IndependentFileHash(receiptPath);
+                    var process = DjiProcess(marker); var second = RunDji(f, batch, process, QuickShareColor.Standard);
+                    var receipt = ReadShareReceipt(second.Outputs.Single());
+                    Check(first.Created == 1 && second.Created == 0 && second.Reused == 1 && process.Encodes == 0 && second.Outputs.Single() == output, "Effective Standard recipe did not reuse the verified copy");
+                    Check(receipt.Color == "Standard" && receipt.LutSha256 == null && IndependentFileHash(output) == outputHash && IndependentFileHash(receiptPath) == receiptHash, "Reuse changed the prior copy or effective-color receipt");
+                    Check(IndependentFileHash(DjiOriginal(batch, DjiMasterA)) == originalHash && IndependentFileHash(export) == exportHash, "Reuse changed a master or Gyroflow export");
+                    VerifyShareOriginals(batch); CheckSharePrivateGone(batch);
+                }
+            });
             Test("DJI O4 Pro LUT is required only when needed and must be the official file", delegate {
                 using (var f = new Fixture()) {
                     var batch = DjiBatch(f, DjiMasterA); GyroflowExport(batch, DjiMasterA); var process = DjiProcess();
