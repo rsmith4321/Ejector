@@ -9,6 +9,26 @@ namespace EasyEject.Modern {
         ReviewReleaseBackend reviewReleaseBackend;
         bool useReviewReleaseBackend;
         bool? lastReviewReleaseAvailable;
+        bool reviewReleaseDeliveryPaused;
+        async Task PauseReviewReleaseDelivery(ReleaseView owner, ReleaseViewResult result) {
+            if (!UiTestHost.Review || reviewReleaseBackend == null || reviewReleaseDeliveryPaused ||
+                !File.Exists(Path.Combine(UiTestHost.Root, "release-delivery-pause.txt"))) return;
+            reviewReleaseDeliveryPaused = true;
+            // The real presenter worker is terminal. Hold only this UI handler's
+            // consumption, leaving dispatch/pulses/Close available for inspection.
+            File.WriteAllText(Path.Combine(UiTestHost.Root, "release-delivery-wait.json"),
+                System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow,
+                    action = result?.Action.ToString(), accepted = result?.Accepted,
+                    open = owner.Open, busy = owner.Busy, canClose = owner.CanClose }));
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            while (!File.Exists(Path.Combine(UiTestHost.Root, "release-delivery-release.txt"))) {
+                if (timer.Elapsed > TimeSpan.FromMinutes(5)) throw new TimeoutException("Owned generated UI delivery pause timed out.");
+                await Task.Delay(50);
+            }
+            File.WriteAllText(Path.Combine(UiTestHost.Root, "release-delivery-resumed.json"),
+                System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow,
+                    open = owner.Open, busy = owner.Busy, canClose = owner.CanClose }));
+        }
         bool ReviewReleaseActivityAvailable() {
             if (!UiTestHost.Review || reviewReleaseBackend == null) return true;
             bool value = !File.Exists(Path.Combine(UiTestHost.Root, "release-activity-busy.txt"));

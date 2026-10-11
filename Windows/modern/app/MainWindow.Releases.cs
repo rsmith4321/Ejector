@@ -90,7 +90,11 @@ namespace EasyEject.Modern {
                 Func<Task<ReleaseViewResult>, Task> finish = async operation => {
                     pendingWork = operation; render();
                     try {
-                        var result = await operation; if (closed || releaseEnding || confirmation != dialog) return;
+                        var result = await operation;
+#if UI_TESTS
+                        await PauseReviewReleaseDelivery(owner, result);
+#endif
+                        if (closed || releaseEnding || confirmation != dialog) return;
                         if (result == null) { status.Text = "Choice cancelled. No new action started."; return; }
                         if (!result.TryPresent()) { status.Text = "Review ended after activity or ownership changed. Any already published restrictive history is retained; reread before another manual action."; return; }
                         status.Text = result.Message;

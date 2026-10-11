@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native completed release result and closed-handler revocation
+
+[Real UI handler with controlled consumption pause](modern/RELEASE_DELIVERY_NATIVE_20261011.md) passes activity-cycle refusal after worker terminal, fresh explicit retry, and old-handler isolation after Close/new ordinary dialog. Native exit0/no exception, warning-free native regressions and normal **246/0**/probe exclusion/preservation pass. No production behavior/payload/trusted update/restore/install/device/OS/push/publication change. Newer-active-worker/native ZIP-folder/presentation-failure/configured trust and all full acceptance gates remain open; goal active.
+
 ## October 11 · native outstanding history picker activity revocation
 
 [Controlled actual picker transitions](modern/RELEASE_PICKER_ACTIVITY_NATIVE_20261011.md) pass stale submission refusal with zero reads after unavailable→available while the picker remains owned, followed by one fresh generated-file review, Cancel/disposal and ordinary unconfigured entry recovery. Native exit0/no exception, warning-free native regressions and normal **246/0**/probe exclusion/preservation pass. No production behavior/payload/trust/history restore/install/device/OS/push/publication change. Native ZIP/folder/queued-delivery/presentation-failure and configured trust/full physical/genuine-media/LUT/travel/display/signing/publishing gates remain open; goal active.

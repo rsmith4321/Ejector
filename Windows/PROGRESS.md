@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native terminal release result revocation and closed-handler isolation · October 11
+
+[Controlled native consumption gap](modern/RELEASE_DELIVERY_NATIVE_20261011.md) verifies a completed worker's result is refused after observed activity changes, a fresh check presents once, and an old handler resumed after Close leaves a newly opened ordinary dialog/its disposed backend unchanged. PID27316/13980 quit0/no exception. Warning-free native regressions and normal **246/0**/probe exclusion pass; live/isolated files/login absence/currentZIP/Mac baseline preserved. Test-only pause, no production behavior/payload/trust/restore/install/device/OS/push/publication claim. Remaining native overlap/pickers/presentation-failure/configured-trust/full acceptance gates stay open; goal active. Aggregate SHAed9d4e5a7a29a9dc53896852b6d19e4aa8213edc17a47a3447f63efdcb678cbc.
+
 ## Native history picker activity revocation and fresh recovery · October 11
 
 [Actual outstanding picker check](modern/RELEASE_PICKER_ACTIVITY_NATIVE_20261011.md) observes unavailable→available transitions during the same native choice, refuses its stale submission with zero backend work, then accepts exactly one fresh generated-file review. Cancel/disposal and the ordinary unconfigured entry recover; PID24520 quits0/no exception. Warning-free native regressions and normal **246/0**/engineering metadata exclusion pass. Live/isolated files, login absence, currentZIP/Mac baseline preserved. Controlled engineering hook, no production behavior/payload/trust/restore/install/device/OS/push/publication claim. Remaining pickers/queued-delivery/configured trust/full acceptance gates stay open; goal active. Aggregate SHA51ecf8e95a5df41782f909953444c7eb34820918bc882a7d2f853d6774e8e5bc.
