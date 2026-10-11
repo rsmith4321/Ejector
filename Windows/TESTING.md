@@ -1,5 +1,7 @@
 # Windows device testing
 
+**Native sharing choices:** [manual 1080p override, exact reuse and unavailable-LUT refusal](modern/SHARE_CHOICES_20261011.md) pass on the generated UHD/audio batch. Outputs independently probe/full-decode, existing originals/4K files/preferences remain exact, and missing-LUT refusal writes no destination files. Positive official LUT/genuine footage remain open; no default-suite count or production payload change.
+
 **Native defaults Save/restart and inheritance:** [October 11 isolated native defaults evidence](modern/DEFAULTS_NATIVE_20261011.md) covers actual Save/restart, cancelled drafts, safe warning defaults and card-profile inheritance. This is opt-in engineering-host evidence with exact module/file/process pins; no default-suite count or OS tray-icon/notification acceptance is implied.
 
 **Native UHD/audio Stop/retry:** [full-resolution generated-media checkpoint](modern/UHD_CANCEL_RETRY_20261011.md) passes visible Stop during encoding, preserved completed copy/receipt, removed unfinished work, worker exit and separate manual retry (**1 new / 1 reused**). Both outputs independently probe/full-decode at 3840×2160/30fps with stereo AAC. This adds no production ZIP/default-suite change or genuine camera/LUT/hardware acceptance. All owned review sessions are stopped.

@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native manual sharing choices
+
+[Generated native choice/reuse checks](modern/SHARE_CHOICES_20261011.md) now cover explicit 1080p from a preferred-4K profile, independent 1920×1080/audio probe/full decode, recipe-specific **2-reused** manual repeat and unavailable official LUT refusal with zero destination writes. Saved preferences/history/tools, full-quality originals and existing 4K outputs remain exact. This is native generated-media evidence only; positive official LUT/genuine footage and all physical/trust gates remain open. No production/default-count change or full completion claim follows.
+
 ## October 11 · native defaults checkpoint
 
 [Native isolated defaults and new-profile evidence](modern/DEFAULTS_NATIVE_20261011.md) now covers Save/true Quit/restart, exact saved-file preservation across cancelled drafts, Return cancelling removal/recovery warnings, inherited Use defaults choices, Custom starting from those choices and both defaults/profile draft Quit refusal. No profile enrollment, import, source write, format or eject occurs. This strengthens foreground evidence only; actual OS tray/notifications, all physical themes/DPI, hardware/power/travel, genuine media/LUT and trusted distribution remain open. Default counts and production payload remain unchanged; no whole parity row or full-port completion is claimed.

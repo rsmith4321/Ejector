@@ -1,5 +1,11 @@
 # Windows progress · October 10, 2026
 
+## Native manual 1080p override and missing-LUT refusal · October 11
+
+[Native sharing-choice evidence](modern/SHARE_CHOICES_20261011.md) now proves a fresh manual 1080p override of the saved 4K preference on the generated UHD/audio batch. Both new outputs independently probe/full-decode at 1920×1080/30fps with stereo AAC and matching exclusive receipts. A separate explicit repeat reports **0 new / 2 reused** and retains all 16 prior destination files; only its audit is added. The saved profile/tools/history files remain exact and every new review still defaults to saved 4K/LUT off. Requesting an unavailable official LUT refuses without changing or adding any destination file. Normal tray callback Quit exits the owned app; no owned worker/private work remains.
+
+No production code/default count/payload change. The camera is absent in this run's inventory; this is not an app-eject claim. Positive official LUT, genuine media, physical hardware/power/display and trusted distribution gates remain open. Publishing OK is still pending.
+
 ## Native defaults persistence and inheritance · October 11
 
 [Computer-controlled native defaults checks](modern/DEFAULTS_NATIVE_20261011.md) pass on a fresh isolated scope: unsaved preview choices survive actual tray callback Quit refusal; Return cancels permanent-removal and Trash-recovery warnings; explicit Save starts no import. Idle Quit/restart restores video-only, preview-off/preserved-layout choices. All-media draft Cancel, recovery-review Cancel and custom-profile Cancel retain the saved defaults' exact hash/bytes/write time. A new SD-card profile inherits defaults, Custom starts with the same choices and its changed draft also survives refused Quit. No profile is saved or device operation started; both owned processes exit normally.
