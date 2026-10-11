@@ -54,7 +54,7 @@ namespace EasyEject.Modern {
                 window.InitializeReviewControls();
                 return;
             }
-            try { await window.TestTrayQuit(); File.WriteAllText(Path.Combine(Root, "result.txt"), "PASS actual tray Quit preserves defaults draft and refuses busy/editor Quit; idle Quit closes.\r\n"); }
+            try { await window.TestTrayQuit(); File.WriteAllText(Path.Combine(Root, "result.txt"), "PASS native minimized reveal/maximized retention; actual tray Quit preserves defaults draft and refuses busy/editor Quit; idle Quit closes.\r\n"); }
             catch (Exception ex) { File.WriteAllText(Path.Combine(Root, "result.txt"), "FAIL " + ex); Environment.ExitCode = 1; }
             finally { Application.Current.Exit(); }
         }
@@ -78,7 +78,8 @@ namespace EasyEject.Modern {
                 FileMode.CreateNew, FileAccess.Write, FileShare.Read)) { AutoFlush = true };
             var observed = new HashSet<UIElement>();
             Action<string, bool?, string> record = (kind, handled, source) => trace.WriteLine(
-                System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow, kind, handled, source }));
+                System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow, kind, handled, source,
+                    presenterState = (AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter)?.State.ToString(), visible = AppWindow.IsVisible }));
             Action<UIElement> attach = element => {
                 if (!observed.Add(element)) return;
                 element.AddHandler(UIElement.PreviewKeyDownEvent, new Microsoft.UI.Xaml.Input.KeyEventHandler((sender, args) => {
@@ -104,6 +105,17 @@ namespace EasyEject.Modern {
         }
         internal async Task TestTrayQuit() {
             await EnsureVisible();
+            var presenter = (Microsoft.UI.Windowing.OverlappedPresenter)AppWindow.Presenter;
+            presenter.Minimize();
+            Require(presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Minimized, "Native presenter did not minimize.");
+            Reveal(); await Task.Delay(100);
+            Require(presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Restored, "Reveal left the native window minimized.");
+            presenter.Maximize();
+            Reveal(); await Task.Delay(100);
+            Require(presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized, "Reveal discarded maximized window state.");
+            presenter.Minimize(); await EnsureVisible();
+            Require(presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized, "Visible operation review did not restore the prior maximized window state.");
+            presenter.Restore();
             CancelOperation.Visibility = Visibility.Collapsed; Root.UpdateLayout();
             CancelOperation.Content = "Stop import"; CancelOperation.Visibility = Visibility.Visible; Root.UpdateLayout();
             Require(CancelOperation.ActualWidth > 0 && CancelOperation.ActualHeight > 0, "The newly visible Stop action has no clickable layout bounds.");

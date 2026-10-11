@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native minimize/maximize and global shortcut · October 11
+
+[Native lifecycle evidence](modern/LIFECYCLE_NATIVE_20261011.md) now proves title-bar Minimize plus actual registered shortcut restore from Explorer, maximized retention through minimize/reveal, close-to-tray with the same live process/hidden window and maximized shortcut reveal. Saving the shortcut off prevents activation; normal tray callback Quit exits. Both live configuration files stay exact and login stays unregistered. New native presenter regression and existing tray Quit/Stop checks pass in two warning-free builds. No production fix/payload/default-count change was needed; OS tray-icon/notification and physical/media/LUT/trust/publication gates remain open.
+
 ## Native Explorer-return Escape diagnostics · October 11
 
 [Passive test-only keyboard evidence](modern/KEYBOARD_PROBE_20261011.md) now passes both settings-folder and app-folder Explorer return paths: Escape reaches the dialog and dismisses it, followed by an idle settled view and normal tray Quit. The previous failure was not reproduced; its cause remains unproven. Accessibility focus differs from the received key source, so no production workaround is justified. Both diagnostic and normal-exclusion builds have zero warnings/errors; actual tray Quit/Stop regression passes. No production payload or default-count change. Hardware/media/LUT/trust and publication gates remain open.

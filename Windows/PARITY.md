@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native window lifecycle and shortcut
+
+[Supported native lifecycle checks](modern/LIFECYCLE_NATIVE_20261011.md) pass Minimize/actual global-chord restore, maximized retention, same-process close-to-tray/shortcut reveal and saved-off nonactivation. The native presenter regression and actual tray Quit/Stop checks pass in two warning-free builds. Live configuration stays exact; login stays absent. No production behavior change. OS tray-icon input, notifications and physical/media/LUT/trust/publication acceptance remain open.
+
 ## October 11 · Explorer-return keyboard evidence
 
 [Passive engineering probe](modern/KEYBOARD_PROBE_20261011.md) records received/handled Escape and native dismissal after each exact settings/app-folder Explorer return. The earlier failure is not reproduced and its cause remains unproven; production keyboard behavior is unchanged. Diagnostic and normal-exclusion builds pass without warnings, as does the actual tray Quit/Stop regression. These scoped passes do not close broad keyboard, physical/media/LUT/trust or publishing gates.
@@ -34,7 +38,7 @@ Computer control verified the generated flyout confirmation's Return/Escape safe
 
 ## Remaining software gates · October 11 (Claude)
 
-Every gate below is **implemented + unit-tested, awaiting Ryan's real test**. None is device-verified. Tests use generated fixtures, fake devices/media/power events and owned child processes. Every test process now uses its own isolated app-data folder, so the default suites never touch live settings ([progress](PROGRESS.md)).
+The software below is implemented and unit-tested; rows distinguish later scoped native evidence from remaining acceptance. None is device-verified. Default tests use generated fixtures, fake devices/media/power events and owned child processes. Every test process uses its own isolated app-data folder, so the default suites never touch live settings ([progress](PROGRESS.md)).
 
 | Gate | Code | Tests (default suite unless noted) | Status |
 | --- | --- | --- | --- |
@@ -43,9 +47,9 @@ Every gate below is **implemented + unit-tested, awaiting Ryan's real test**. No
 | Native 4K Quick Share | Existing engine/service | `manual 4K Quick Share through the native helper process…`; isolated native UI creation/reuse plus full 3840×2160/audio Stop/manual retry using supplied tools | full-resolution generated native UI pass; genuine 4K camera footage and official LUT still pending |
 | True Quit and restart with source absent | Existing persistence | `app session Quit then restart with source absent…`; actual native idle tray callback Quit/restart and separate manual exact reuse with generated source absent | generated native UI pass; physical source eject/reconnect and genuine media still pending |
 | Changed original/destination refusal, cancel and retry | Existing | Existing manual/cold sharing suites; native same-size/timestamp generated-original refusal, exact restore/fresh manual reuse, pre-export Escape and active UHD encoding Stop/partial-result/manual retry | generated native refusal/cancel/retry UI pass; physical changed destination and genuine media still pending |
-| Tray, menu, reveal; Quit idle vs busy | New shared `AppQuitPolicy` in both interfaces; a refused Quit no longer stays armed in the classic app | Four `tray …`/`Quit …`/`system close …` cases; existing tray/reveal suites | implemented + unit-tested, awaiting Ryan's real test |
+| Tray, menu, reveal; Quit idle vs busy | New shared `AppQuitPolicy` in both interfaces; a refused Quit no longer stays armed in the classic app | Four `tray …`/`Quit …`/`system close …` cases; native presenter/actual shortcut restore and maximize retention, close-to-tray, actual tray callback draft/busy refusal/idle Quit | scoped native window/shortcut/callback pass; actual OS tray-icon interaction remains pending |
 | Drafts | Quit refused while an editor is open | `refused Quit keeps an unsaved defaults draft…`; existing draft suites | implemented + unit-tested, awaiting Ryan's real test |
-| Notifications and hotkey | Existing | Existing notification/shortcut registration and conflict suites | implemented + unit-tested, awaiting Ryan's real test |
+| Notifications and hotkey | Existing | Existing notification/shortcut registration and conflict suites; native save/register/global input/restore and saved-off nonactivation | native shortcut pass in isolated scope; OS notification delivery/clicks and hardware removal review remain pending |
 | DPI and theme | Forms layout at fixed 100/150/225% scales independent of the live monitor; device window caps and scrolls its action row on small or high-scale screens; WinUI theme-resource contract | Six fixed-scale layout cases; modern `ThemeContractTests` (3) | implemented + unit-tested, awaiting Ryan's real test |
 | Long transfer, reconnect, sleep/wake, travel | Existing | `travel rehearsal: sleep mid-copy, wake, card reconnect…`; existing power/connection suites | implemented + unit-tested, awaiting Ryan's real test |
 

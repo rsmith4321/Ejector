@@ -1,5 +1,7 @@
 # Windows device testing
 
+**Native lifecycle and shortcut:** [title-bar Minimize, maximized retention, close-to-tray and actual global-chord reveal](modern/LIFECYCLE_NATIVE_20261011.md) pass in an isolated review. Saved-off chord does not activate, normal tray callback Quit exits, live configuration stays exact and login stays absent. Native presenter/tray Quit/Stop regression passes in two warning-free builds; no production fix/payload change. Actual OS tray-icon and notification input remain open.
+
 **Native Explorer-return Escape:** [passive engineering diagnostics](modern/KEYBOARD_PROBE_20261011.md) pass both exact-folder return/dismissal paths. The earlier failure was not reproduced and remains unexplained. Diagnostic and normal-exclusion builds are warning-free; tray Quit/Stop regression passes. No production keyboard or payload change.
 
 **Native Settings/update review:** [unconfigured controls, guide/folders and Save/restart](modern/SETTINGS_UPDATES_NATIVE_20261011.md) have scoped native evidence with unchanged live settings/login registration. The later keyboard probe above passes the previously unresolved paths; configured signed update/restore and physical/trust gates stay open.
