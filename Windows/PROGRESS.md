@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Wrapped-row exact-source review and ZIP rebuilt · October 11
+
+[Current40b0a26 candidate](modern/REVIEW_020_20261011.md) includes the verified production pending-row correction. Build/package exit0; all650 ZIP entries independently decompress/hash against staging, engineering probes absent. ZIP **107460521bytes**, SHA **e64714952dc971df3b93badd45ba631877fd2ce0439dd49adb72fb9df1f5d4ca**; older candidates superseded. Native/normal246/0 evidence remains source-scoped; prior ba5661f full/tool replay is not promoted to new Release bytes. Normal app unlaunched; post-build protected source/live/fixture/destination/Mac checks pass, report SHAdb211b211a26e6c3f51469d3c6a5d2580de295610b950c0436427d762194ef63. No install/device/OS/signing/push/publication; full goal/publishing OK remain open.
+
 ## Completed-import rows wrap and retain safe manual selection · October 11
 
 [Native before/after pending chooser](modern/PENDING_ROWS_NATIVE_20261011.md) confirms the production accessible name, exposes single-line clipping and verifies the corrected full two-line explanation. Binding-only XAML template/stretched rows/disabled horizontal scrolling preserve strings, index mapping,300-height vertical viewport and separate review/safe Close. Actual Return/selected Close/fresh selection reset/Escape retain pending=1/recover idle; both sessions exit0/no exception. Warning-free native regressions and normal **246/0**/engineering exclusion pass. Exact live2/prior isolated5/destination21/copied histories/Mac/login/currentZIP preservation verified. Corrected aggregate SHA0576e141cb0cff29c2443dbbc7ef0fd2f127b7c9481658c339eb49953a1aaf83; early launch-wrapper failure retained/corrected before any app launch. **ba5661f ZIP superseded pending rebuild**. No new full/tool count, real media/device/OS/install/push/publication; full goal active.

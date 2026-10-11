@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · current wrapped-row candidate rebuilt
+
+[Exact40b0a26 review/ZIP](modern/REVIEW_020_20261011.md) now includes the pending-row correction; build/package exit0,650 entries fully hash-verified, engineering probes excluded.107460521bytes/SHAe64714952dc971df3b93badd45ba631877fd2ce0439dd49adb72fb9df1f5d4ca. Native/normal246/0 evidence retains source scope; prior package full/tool counts remain historical. Protected source/live/fixtures/destination/Mac preserved; no normal launch/install/device/OS/push/publication. Full physical/media/LUT/travel/accessibility/trust and publishing OK gates remain open; goal active.
+
 ## October 11 · readable and accessible pending-import rows
 
 [Native pending chooser before/after](modern/PENDING_ROWS_NATIVE_20261011.md) proves exact provider name/full row text and fixes observed single-line clipping with wrapping. Actual Return/selection/separate action/Close/fresh reset/Escape retain pending entry/recover idle; both exits0/no exception. Warning-free native regressions/normal **246/0**/probe exclusion/preservation pass. No backend/removal authority change or new full/tool count; ba5661f ZIP superseded pending rebuild. Broader visual/screen-reader/hardware/media/LUT/travel/trust/publishing gates remain open; full goal active.

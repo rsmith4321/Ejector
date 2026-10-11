@@ -2,7 +2,7 @@
 
 ## Historical accessible candidate · ba5661f
 
-Subsequent [pending-row wrapping](PENDING_ROWS_NATIVE_20261011.md) supersedes this package pending rebuild. The following replay remains exact evidence for ba5661f's recorded bytes; no new payload run is inferred.
+Subsequent [pending-row wrapping](PENDING_ROWS_NATIVE_20261011.md) is rebuilt in the current40b0a26 candidate and supersedes this package. The following replay remains exact evidence for ba5661f's recorded bytes; no new payload run is inferred.
 
 The [current unsigned review](REVIEW_020_20261011.md) now passes a fresh replay against its exact Release Runtime bytes: **952832 bytes**, SHA-256 **`66e16077ce0156c6523a5a071faaea37e56ba51156ff5095ea79bf8c68e5eb02`**, from Windows archive **ba5661f18199a63817f6bde82adae96f079c5546**. This result supersedes the earlier package's counts for current-candidate reporting; historical evidence below remains scoped to its original bytes.
 
