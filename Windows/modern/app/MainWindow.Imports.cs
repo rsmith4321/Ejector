@@ -204,7 +204,7 @@ namespace EasyEject.Modern {
                         + (entry.Origin.Plan == null ? "\n" + entry.Origin.BlockedReason : "\n\nAffected storage:\n" + String.Join("\n", entry.Origin.Plan.Affected))
                         + (cleanup == null ? "" : "\n\n" + cleanup.Description) + sharingNote
                         + (gyroflowFirst ? "\n\n" + QuickShareProfile.GyroflowGuidance + " Quick Share is available afterwards in Import history." : "") + shareMessage;
-                    confirmation = MessageDialog(entry.HasMedia ? "Import complete. Eject now?" : "No matching media. Eject now?", message, cleanup == null ? CompletionPresentation.EjectLabel(entry) : "Clean & eject");
+                    confirmation = MessageDialog(CompletionPresentation.ChoiceTitle(entry.HasMedia), message, cleanup == null ? CompletionPresentation.EjectLabel(entry) : "Clean & eject");
                     confirmation.CloseButtonText = "Keep Connected"; confirmation.SecondaryButtonText = "Open Import Folder"; confirmation.IsPrimaryButtonEnabled = canEject;
                     bool sharingRequested = false, choosing = true; var dialog = confirmation; Button share = null; RoutedEventHandler shareChoice = null;
                     if (canShare && !gyroflowFirst) {

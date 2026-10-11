@@ -11,7 +11,7 @@ namespace EasyEject {
         bool expired;
         internal ImportCompletionDialog(ImportCompletion entry, bool canEject, string cleanupText = "", bool canShare = false, string shareMessage = "", bool gyroflowFirst = false) {
             CompletionId = entry.Id;
-            Text = entry.HasMedia ? "Import complete. Eject now?" : "No matching media. Eject now?";
+            Text = CompletionPresentation.ChoiceTitle(entry.HasMedia);
             Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi; Size = new Size(740, 500); MinimumSize = new Size(680, 440); StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
             var body = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(24) };
             var plan = entry.Origin.Plan;

@@ -21,6 +21,7 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--monitor-native") return NativeStorageMonitorSmoke();
             if (args.Length != 0) return 2;
             ConfigurationIsolationTests();
+            ThemeContractTests();
             WindowReopenTests();
             DefaultsEditTests();
             StorageControllerTests();

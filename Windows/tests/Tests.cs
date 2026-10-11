@@ -103,6 +103,8 @@ namespace EasyEject {
             if (args.Length == 1 && args[0] == "--share-batch-ownership") { ShareBatchOwnershipTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated batches and fake media processes/guards only; no real media tools/device actions."); return failed == 0 ? 0 : 1; }
             if (args.Length > 0 && args[0] == "--owned-history-probe") return OwnedHistoryProbe(args);
             if (args.Length > 0 && args[0] == "--owned-share-probe") return OwnedShareProbe(args);
+            if (args.Length > 0 && args[0] == "--app-session-probe") return AppSessionProbe(args);
+            if (args.Length == 1 && args[0] == "--app-lifecycle") { AppLifecycleTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Generated fixtures, fake devices/media and owned child processes only; no real device eject API was used."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--cold-share") { ColdQuickShareTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Separate owned fixture processes; synthetic media and fake destination identities, no real tools/eject."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--cold-history") { ColdHistoryTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Owned generated files and separate history processes only; fake device identities, no tools/eject."); return failed == 0 ? 0 : 1; }
             if (args.Length == 1 && args[0] == "--native-large-import") { NativeLargeImportTests(); Console.WriteLine(passed + " passed; " + failed + " failed. Optional allocated generated files beyond two GiB; fake device guards, no camera/tool/eject action."); return failed == 0 ? 0 : 1; }
@@ -830,6 +832,7 @@ namespace EasyEject {
             QuickShareConfigurationTests();
             SavedActionOwnershipTests(); ConnectedProfileSelectionTests(); OfflineProfileSelectionTests(); ImportSelectionTests(); DestinationConstructionTests(); ShareBatchOwnershipTests(); ManualQuickShareTests(); ColdQuickShareTests();
             ConfigurationIsolationTests();
+            AppLifecycleTests();
             TrayStorageMenuTests();
             StatusLayoutTests();
             InformationDiagnosticsTests();

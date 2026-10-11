@@ -113,7 +113,7 @@ namespace EasyEject {
             aboutMenu = new ToolStripMenuItem("About Easy Eject…", null, delegate { ViewInformation(true); }); menu.Items.Add(aboutMenu);
             installationMenu = new ToolStripMenuItem("Windows updates && installation…", null, delegate { ViewInstallation(); }); menu.Items.Add(installationMenu);
             menu.Items.Add(releaseStatusMenu);
-            menu.Items.Add("Quit", null, delegate { if (Busy) { MessageBox.Show(this, "Wait for the operation to finish or cancel the import before quitting."); return; } quit = true; Close(); });
+            menu.Items.Add("Quit", null, delegate { if (AppQuitPolicy.QuitRequested(Busy, false) != AppCloseAction.Exit) { MessageBox.Show(this, AppQuitPolicy.Refusal(Busy, false)); return; } quit = true; Close(); });
             tray = new NotifyIcon { Icon = appIcon, Text = "Easy Eject Windows prototype", Visible = true, ContextMenuStrip = menu };
             status.TextChanged += delegate { UpdateTrayPresentation(); };
             tray.DoubleClick += delegate { UserWindowReveal.Show(this); };
@@ -125,8 +125,9 @@ namespace EasyEject {
             EnabledChanged += delegate { if (!IsDisposed && !Disposing) UpdateActions(); };
             Shown += delegate { StartMonitoring(); };
             FormClosing += delegate(object sender, FormClosingEventArgs e) {
-                if (!quit && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); return; }
-                if (Busy) { e.Cancel = true; status.Text = "Wait for completion or cancel the import before closing."; return; }
+                var closing = AppQuitPolicy.Closing(quit, e.CloseReason == CloseReason.UserClosing, Busy);
+                if (closing == AppCloseAction.HideToTray) { e.Cancel = true; Hide(); return; }
+                if (closing == AppCloseAction.StayOpen) { e.Cancel = true; quit = false; status.Text = AppQuitPolicy.BusyMessage; return; }
             };
             UpdateActions();
         }

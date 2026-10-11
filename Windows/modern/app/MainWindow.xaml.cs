@@ -81,7 +81,11 @@ namespace EasyEject.Modern {
             menu.Items.Add(issueMenu); menu.Items.Add(debugMenu); menu.Items.Add(helpMenu); menu.Items.Add(aboutMenu);
             menu.Items.Add("Stop current operation", null, delegate { RequestOperationStop(); });
             stopOtherMenu.Enabled = false; stopOtherMenu.Click += delegate { if (otherReview != null) otherReview.RequestStop(); }; menu.Items.Add(stopOtherMenu);
-            menu.Items.Add("Quit preview", null, delegate { if (StorageBusy) { Reveal(); return; } quitting = true; Close(); });
+            menu.Items.Add("Quit preview", null, delegate {
+                // Open editors keep their drafts: Quit reveals them instead of discarding.
+                if (AppQuitPolicy.QuitRequested(UiBusy, StorageBusy) != AppCloseAction.Exit) { Reveal(); return; }
+                quitting = true; Close();
+            });
             menu.Opening += delegate { RebuildStorageMenu(); };
             tray = new Forms.NotifyIcon { Icon = appIcon, Text = "Easy Eject interface preview", Visible = true, ContextMenuStrip = menu };
             tray.DoubleClick += delegate { Reveal(); };
@@ -90,8 +94,9 @@ namespace EasyEject.Modern {
             AppWindow.Closing += delegate(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args) {
                 // Hiding the window keeps its dialogs, workers and tray alive.
                 // Busy protection belongs to actual Quit, not close-to-tray.
-                if (!quitting) { args.Cancel = true; AppWindow.Hide(); return; }
-                if (UiBusy) { args.Cancel = true; quitting = false; Reveal(); }
+                var closing = AppQuitPolicy.Closing(quitting, true, UiBusy);
+                if (closing == AppCloseAction.HideToTray) { args.Cancel = true; AppWindow.Hide(); return; }
+                if (closing == AppCloseAction.StayOpen) { args.Cancel = true; quitting = false; Reveal(); }
             };
             Closed += delegate {
                 closed = true; releaseChecks.Dispose(); pulse.Stop(); inventory.Dispose(); notifications.Dispose();

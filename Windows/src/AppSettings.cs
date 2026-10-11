@@ -87,6 +87,8 @@ namespace EasyEject {
             return "\n\n" + (entry.HasMedia ? "Import from " + entry.Origin.SourceDisplay + " is complete." : "No matching media on " + entry.Origin.SourceDisplay + ".")
                 + " Other storage may still have files to import.";
         }
+        // The eject choice is offered with or without matching media; Keep Connected stays the default.
+        internal static string ChoiceTitle(bool hasMedia) { return hasMedia ? "Import complete. Eject now?" : "No matching media. Eject now?"; }
         internal static string EjectLabel(ImportCompletion entry) {
             var plan = entry.Origin.Plan; return plan != null && plan.Affected.Length > 1 ? "Eject Device" : "Eject Now";
         }

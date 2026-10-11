@@ -26,6 +26,11 @@
     <Compile Include="NotificationOperationTests.cs" />
     <Compile Include="ReleaseOperationTests.cs" />
     <Compile Include="ReopenRunner.cs" />
+    <Compile Include="ThemeContractTests.cs" />
     <ProjectReference Include="..\EasyEject.Runtime.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Exact interface sources for the static theme/DPI contract; not compiled here. -->
+    <None Include="..\app\*.xaml;..\app\*.cs;..\app\app.manifest" Link="modern-app-source\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
