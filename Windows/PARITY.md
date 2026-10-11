@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · long flyout and unresolved focus delivery
+
+[Generated 18-device native flyout](modern/FLYOUT_LONG_NATIVE_20261011.md) passes keyboard/wheel reach, fixed footer/work-area geometry, safe Return/default and retained scroll, confirmation click-away retention and idle dismissal. The isolated passive probe reproduces Explorer-return Escape without a received XAML event; explicit body focus then receives/handles Escape. Cause and human keyboard acceptance remain open; no production workaround or release payload change. Normal/engineering builds and native regression pass; all sessions quit normally and existing files stay exact. This is scoped existing-monitor/150% generated UI evidence, not broad themes/DPI/monitors, real hardware/media/LUT, OS tray-icon/notifications or trusted distribution acceptance.
+
 ## October 11 · rebuilt current 0.2 package
 
 [Committed-source review 960bd75](modern/REVIEW_020_20261011.md) includes the compact storage correction. Release build/package exit 0; all 650 ZIP entries independently decompress/hash against staging, engineering host absent, full runtime/resources/notices retained. This replaces the superseded 6de85d2 candidate. Current selected **246/0** and native regression/input evidence remain scoped separately from prior shared-engine full **1454/0 each**. No normal-app launch, push, publication, hardware or live-setting changes. Publishing OK and full physical/media/LUT/trust acceptance remain open.

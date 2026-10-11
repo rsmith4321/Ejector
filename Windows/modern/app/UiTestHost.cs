@@ -15,13 +15,15 @@ namespace EasyEject.Modern {
     internal static class UiTestHost {
         internal static string Root;
         internal static bool Inspect;
+        internal static bool InspectLong;
         internal static bool Review;
         static bool smallReview;
         const string ReviewScope = "Isolated preferences; normal device discovery and manual actions. No scripted hardware action.\r\n";
         static FileStream reviewOwner;
         [STAThread] static void Main(string[] args) {
-            if (args.Length < 1 || args.Length > 2 || args.Length == 2 && args[1] != "inspect" && args[1] != "review" && args[1] != "review-restart" && args[1] != "review-small") throw new ArgumentException("An owned isolated fixture root is required.");
-            Inspect = args.Length == 2 && args[1] == "inspect";
+            if (args.Length < 1 || args.Length > 2 || args.Length == 2 && args[1] != "inspect" && args[1] != "inspect-long" && args[1] != "review" && args[1] != "review-restart" && args[1] != "review-small") throw new ArgumentException("An owned isolated fixture root is required.");
+            InspectLong = args.Length == 2 && args[1] == "inspect-long";
+            Inspect = InspectLong || args.Length == 2 && args[1] == "inspect";
             smallReview = args.Length == 2 && args[1] == "review-small";
             Review = smallReview || args.Length == 2 && (args[1] == "review" || args[1] == "review-restart");
             Root = Path.GetFullPath(args[0]);
@@ -186,9 +188,12 @@ namespace EasyEject.Modern {
                         trayFlyout.Report(answer == Microsoft.UI.Xaml.Controls.ContentDialogResult.Primary ? "Fixture request only. No device was removed." : "Keep Connected. No device action.");
                     } finally { working = false; }
                 }, RefreshTrayFlyout);
+                trayFlyout.InitializeInspectionKeyboardProbe();
                 AppWindow.Hide();
                 var area = System.Windows.Forms.Screen.PrimaryScreen.Bounds;
                 trayFlyout.ShowAt(new System.Drawing.Point(area.Right - 140, area.Bottom - 20), FlyoutView());
+                await Task.Delay(150);
+                trayFlyout.WriteInspectionLayout();
                 File.WriteAllText(Path.Combine(UiTestHost.Root, "ready.txt"), "UI fixture ready; write continue.txt to finish.");
                 while (!File.Exists(Path.Combine(UiTestHost.Root, "continue.txt"))) await Task.Delay(250);
                 Require(!closed, "UI fixture unexpectedly closed.");
@@ -198,9 +203,65 @@ namespace EasyEject.Modern {
         }
         internal TrayFlyoutView FixtureFlyout() {
             var state = new Inventory { Epoch = 1 };
-            state.Disks.Add(new Disk { Number = 700, DevInst = 700, TargetDevInst = 701, InstanceId = "fixture-disk", TargetId = "fixture-usb", Serial = "fixture-serial", Ancestors = new System.Collections.Generic.List<string> { "fixture-disk", "fixture-usb" } });
-            state.Volumes.Add(new Volume { Id = "fixture-camera", Label = "Camera · generated fixture", Serial = "fixture", Disks = new System.Collections.Generic.List<int> { 700 }, Mounts = new System.Collections.Generic.List<string> { "Z:\\" }, Group = StorageGroup.Camera });
+            for (int i = 0; i < (UiTestHost.InspectLong ? 18 : 1); i++) {
+                string disk = "fixture-disk-" + i, target = "fixture-usb-" + i;
+                state.Disks.Add(new Disk { Number = 700 + i, DevInst = (uint)(700 + i * 2), TargetDevInst = (uint)(701 + i * 2), InstanceId = disk, TargetId = target, Serial = "fixture-serial-" + i, Ancestors = new System.Collections.Generic.List<string> { disk, target } });
+                state.Volumes.Add(new Volume { Id = "fixture-volume-" + i, Label = UiTestHost.InspectLong ? "Generated device " + (i + 1).ToString("D2") + " · long label for native wrapping and scrolling review" : "Camera · generated fixture", Serial = "fixture-" + i, Disks = new System.Collections.Generic.List<int> { 700 + i }, Mounts = new System.Collections.Generic.List<string> { "Z:\\" }, Group = TrayFlyoutModel.GroupOrder[i / 6] });
+            }
             return TrayFlyoutModel.Build(new TrayFlyoutInput { State = state, Epoch = 1, MonitoringAvailable = true, SettingsLoaded = true, EditorOpen = EditorOpen, Work = UiBusy, SharingOptedIn = _ => true, Space = _ => new TrayFlyoutSpace(128000000000, 64000000000) });
+        }
+    }
+    public sealed partial class TrayFlyoutWindow {
+        // Passive inspection-only evidence. Do not record text/other keys or handle input.
+        internal void InitializeInspectionKeyboardProbe() {
+            var trace = new StreamWriter(new FileStream(Path.Combine(UiTestHost.Root,
+                "flyout-keyboard-" + Guid.NewGuid().ToString("N") + ".jsonl"),
+                FileMode.CreateNew, FileAccess.Write, FileShare.Read)) { AutoFlush = true };
+            var observed = new HashSet<UIElement>();
+            Action<string, bool?, string> record = (kind, handled, source) => trace.WriteLine(
+                System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow, kind, handled, source,
+                    visible = AppWindow.IsVisible, requestRunning }));
+            Action<UIElement> attach = element => {
+                if (!observed.Add(element)) return;
+                element.AddHandler(UIElement.PreviewKeyDownEvent, new Microsoft.UI.Xaml.Input.KeyEventHandler((sender, args) => {
+                    if (args.Key == Windows.System.VirtualKey.Escape) record("PreviewEscape", args.Handled, args.OriginalSource?.GetType().Name);
+                }), true);
+                element.AddHandler(UIElement.KeyDownEvent, new Microsoft.UI.Xaml.Input.KeyEventHandler((sender, args) => {
+                    if (args.Key == Windows.System.VirtualKey.Escape) record("Escape", args.Handled, args.OriginalSource?.GetType().Name);
+                }), true);
+                record("Attached", null, element.GetType().Name);
+            };
+            attach(Surface);
+            var timer = DispatcherQueue.CreateTimer(); timer.Interval = TimeSpan.FromMilliseconds(250);
+            timer.Tick += (_, args) => {
+                if (Surface.XamlRoot == null) return;
+                foreach (var popup in Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(Surface.XamlRoot))
+                    if (popup.Child is UIElement child) attach(child);
+            };
+            Activated += (_, args) => record("Activation", null, args.WindowActivationState.ToString());
+            Closed += (_, args) => { timer.Stop(); trace.Dispose(); };
+            timer.Start();
+        }
+        internal void WriteInspectionLayout() {
+            Surface.UpdateLayout();
+            var work = System.Windows.Forms.Screen.FromPoint(anchor).WorkingArea;
+            var location = AppWindow.Position; var size = AppWindow.Size;
+            File.WriteAllText(Path.Combine(UiTestHost.Root, "flyout-layout.json"), System.Text.Json.JsonSerializer.Serialize(new {
+                generatedDevices = UiTestHost.InspectLong ? 18 : 1,
+                scale = Surface.XamlRoot.RasterizationScale,
+                width = Surface.ActualWidth, height = Surface.ActualHeight,
+                scrollViewport = DeviceScroll.ViewportHeight, scrollableHeight = DeviceScroll.ScrollableHeight,
+                footerTop = Open.TransformToVisual(Surface).TransformPoint(new Windows.Foundation.Point()).Y,
+                footerBottom = Quit.TransformToVisual(Surface).TransformPoint(new Windows.Foundation.Point()).Y + Quit.ActualHeight,
+                physicalX = location.X, physicalY = location.Y, physicalWidth = size.Width, physicalHeight = size.Height,
+                workX = work.X, workY = work.Y, workWidth = work.Width, workHeight = work.Height }));
+            double footerTop = Open.TransformToVisual(Surface).TransformPoint(new Windows.Foundation.Point()).Y;
+            double footerBottom = Quit.TransformToVisual(Surface).TransformPoint(new Windows.Foundation.Point()).Y + Quit.ActualHeight;
+            if (location.X < work.Left || location.Y < work.Top || location.X + size.Width > work.Right || location.Y + size.Height > work.Bottom ||
+                DeviceScroll.ViewportHeight <= 0 || footerTop < 0 || footerBottom > Surface.ActualHeight + 1 ||
+                UiTestHost.InspectLong && DeviceScroll.ScrollableHeight <= 0)
+                throw new InvalidOperationException("Inspection flyout does not retain its device viewport/footer inside the monitor work area.");
+            File.WriteAllText(Path.Combine(UiTestHost.Root, "flyout-layout-pass.txt"), "PASS native flyout device viewport/footer/work-area bounds; long-list scroll extent when requested.\r\n");
         }
     }
     public sealed partial class ProfilesView {

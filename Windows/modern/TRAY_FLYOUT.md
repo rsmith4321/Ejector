@@ -1,5 +1,7 @@
 # Windows tray flyout · 0.2 preview work
 
+The [later 18-device native review](FLYOUT_LONG_NATIVE_20261011.md) adds actual keyboard/wheel reach, fixed-footer/work-area assertions and confirmation/idle dismissal evidence at this monitor's existing 150% scaling. It also reproduces missing Explorer-return Escape delivery at observed XAML roots until explicit dialog-body focus; cause/human keyboard acceptance remain open, with no production workaround.
+
 Left-click opens a compact WinUI window beside the clicked tray icon. Double-click opens the main window; right-click retains the existing menu. Camera cards, emulator cards and other external storage use the existing inventory and physical-device choices. Internal, protected and system volumes stay out of this list.
 
 The flyout shows capacity, free space and transfer protection. Import opens the existing manual import review. Quick Share appears only for an exact opted-in device profile and opens that device's saved batches; the existing manual resolution/LUT/verification flow remains authoritative. Preferences are re-read on each opening. No flyout action enables automatic import or sharing.
@@ -21,6 +23,8 @@ Run the native UI regression with PowerShell 7 and the existing SDK:
 ```
 
 This explicitly builds `UI_TESTS`, changes the entry point, and redirects all preferences to a fresh owned `ui-*` fixture folder. Discovery, automatic work and release checks do not start. It invokes the real tray callback and real WinUI controls, then exits. A separate `inspect` argument supports computer-controlled visual checks with a generated device and a confirmation whose callback has no device API. The test host is excluded from every normal review/public build. These checks do not import camera footage or eject hardware.
+
+Explicit `inspect-long` uses the same fresh-root/no-device-API inspection host with 18 generated devices across all three groups. It records/asserts native viewport/footer/work-area geometry and long-list scroll extent before `ready.txt`. Passive inspection-only activation/Escape tracing records source type, visibility and request state without handling input or recording text/other keys. Use supported computer control for input; after checking, the existing `continue.txt` gate resumes actual idle tray callback Quit. Traces and results remain in the isolated fixture; no normal app configuration is used.
 
 The explicit `review` argument instead opens normal discovery and manual workflows, titled **Easy Eject · isolated review**, with fresh isolated preferences/history. This mode accesses connected storage and requires the separately authorized device scope. It performs no scripted device action, disables the automatic-import pump and never copies live profiles into the fixture. `review-restart` reuses only an exact marked review fixture with an exclusive session lock. Test-only footer buttons open the flyout and invoke the actual tray Quit callback so supported computer control can check these paths when the Windows taskbar is not exposed. These buttons are absent from every normal build; this is an engineering test build, not the distributable review copy.
 

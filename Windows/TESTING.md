@@ -1,5 +1,7 @@
 # Windows device testing
 
+**Long flyout/focus:** [18 generated devices across all groups](modern/FLYOUT_LONG_NATIVE_20261011.md) pass native keyboard/wheel reach, fixed footer/work-area geometry, safe default/retained scroll and light-dismiss behavior. Passive tracing reproduces Explorer-return Escape delivery missing at observed XAML roots; explicit body focus then receives/handles it. Cause/human keyboard acceptance remain open. Final normal/engineering builds and native regression pass; inspection code is absent from normal metadata. No production/default-count/ZIP change.
+
 **Current package:** [960bd75 committed-source review](modern/REVIEW_020_20261011.md) replaces the superseded 6de85d2 ZIP. Release build/package exit 0, all 650 ZIP entries independently decompress/hash against staging and the engineering host is absent. Normal app remains unlaunched; no push/publication. Explicit publication OK and physical/media/LUT/trust acceptance remain open.
 
 **Compact layout:** [680×600 logical at existing 150% scaling](modern/COMPACT_STORAGE_20261011.md) reproduces/fixes a zero-height device list. Native device/footer scrolling and editor footers pass; a native regression verifies usable device space, reachable last utility and fixed Stop, and normal selected contracts pass **246/0**. These are scoped native/selected checks, not a full-suite run against the packaged Release bytes.
