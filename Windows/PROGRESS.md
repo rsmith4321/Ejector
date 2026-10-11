@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native release ShowAsync cancellation awaits worker and picker · October 11
+
+[Actual WinUI cancellation in two sessions](modern/RELEASE_PRESENTATION_NATIVE_20261011.md) removes modal/raises TaskCanceledException while existing cleanup retains exact worker or native picker/global ownership. Busy Quit refuses until worker terminal; late result never presents. Native picker stays open until actual Cancel, zero backend work; ordinary unconfigured entry recovers. PID27216/28816 quit0/no exception. Warning-free native regressions, normal **246/0**/probe exclusion, exact live/isolated/currentZIP/Mac/login preservation pass. Test-only wrapper/telemetry, no production behavior/payload/device/OS/push/publication change. General rendering/configured trust/full gates remain open; goal active. Aggregate SHA24fbbbe17837f017a48585d953c5365c071fd9d8a27929efcd2e964aae9d8ea5.
+
 ## Native diagnostic ShowAsync cancellation retains worker ownership · October 11
 
 [Actual WinUI operation cancellation](modern/DIAGNOSTICS_PRESENTATION_NATIVE_20261011.md) removes the modal/raises TaskCanceledException while real Refresh stays busy. Production finally awaits the exact worker, actual tray Quit refuses, then read/terminal/disposal/controls recover in order; fresh viewer and retained issue Cancel pass. PID27040 quits0/no exception. Warning-free native regressions/normal **246/0**/probe exclusion, exact live/settings/log/currentZIP/Mac/login preservation pass; only expected isolated issue added. Test-only wrapper/probes, no production behavior/payload/clear/device/OS/push/publication change. General rendering failures/full gates remain open; goal active. Aggregate SHA3feaf138021484341cfeb6b423b227dbef04bdefefef5d0097e59aa80efa62bc.

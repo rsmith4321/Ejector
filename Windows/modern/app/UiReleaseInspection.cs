@@ -10,6 +10,38 @@ namespace EasyEject.Modern {
         bool useReviewReleaseBackend;
         bool? lastReviewReleaseAvailable;
         bool reviewReleaseDeliveryPaused;
+        void RecordReviewReleaseLifetime(string kind, ReleaseView owner, Task worker, Task picker) {
+            if (!UiTestHost.Review || !File.Exists(Path.Combine(UiTestHost.Root, "release-cancel-presentation.txt"))) return;
+            File.AppendAllText(Path.Combine(UiTestHost.Root, "release-presentation.jsonl"),
+                System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow, kind,
+                    busy = owner?.Busy, nested = owner?.Nested, open = owner?.Open, canClose = owner?.CanClose,
+                    workerCompleted = worker?.IsCompleted, pickerCompleted = picker?.IsCompleted,
+                    savedReviewWorking = working, ending = releaseEnding, dialogPresent = confirmation != null }) + "\r\n");
+        }
+        async Task ShowReviewReleasePresentation(ContentDialog dialog, ReleaseView owner) {
+            if (!UiTestHost.Review || reviewReleaseBackend == null ||
+                !File.Exists(Path.Combine(UiTestHost.Root, "release-cancel-presentation.txt"))) {
+                await dialog.ShowAsync(); return;
+            }
+            var operation = dialog.ShowAsync(); var timer = System.Diagnostics.Stopwatch.StartNew();
+            while (!File.Exists(Path.Combine(UiTestHost.Root, "release-presentation-cancel-now.txt"))) {
+                if (operation.Status != Windows.Foundation.AsyncStatus.Started) { await operation; return; }
+                if (timer.Elapsed > TimeSpan.FromMinutes(5)) throw new TimeoutException("Owned release presentation inspection timed out.");
+                await Task.Delay(50);
+            }
+            if (!owner.Busy) throw new InvalidOperationException("Release presentation cancellation inspection requires an owned picker or worker.");
+            RecordReviewReleaseLifetime("CancelRequested", owner, null, null);
+            try {
+                operation.Cancel(); RecordReviewReleaseLifetime("CancelReturned", owner, null, null);
+                await operation; RecordReviewReleaseLifetime("ShowReturned", owner, null, null);
+            } catch (Exception ex) {
+                File.WriteAllText(Path.Combine(UiTestHost.Root, "release-presentation-exception.json"),
+                    System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow,
+                        type = ex.GetType().FullName, hresult = ex.HResult, message = ex.Message,
+                        busy = owner.Busy, nested = owner.Nested }));
+                throw;
+            }
+        }
         async Task PauseReviewReleaseDelivery(ReleaseView owner, ReleaseViewResult result) {
             if (!UiTestHost.Review || reviewReleaseBackend == null || reviewReleaseDeliveryPaused ||
                 !File.Exists(Path.Combine(UiTestHost.Root, "release-delivery-pause.txt"))) return;

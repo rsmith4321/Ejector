@@ -138,14 +138,28 @@ namespace EasyEject.Modern {
                     if (pendingChoice != null && !selecting && owner.Nested) { var cancelled = owner.FinishConfirmation(pendingChoice, false); pendingChoice = null; }
                     if (!owner.CanClose || selecting) { args.Cancel = true; owner.Cancel(); status.Text = "Wait for the current picker or release worker before closing."; render(); }
                 };
-                releaseRender = render; render(); await dialog.ShowAsync();
+                releaseRender = render; render();
+#if UI_TESTS
+                await ShowReviewReleasePresentation(dialog, owner);
+#else
+                await dialog.ShowAsync();
+#endif
             } catch (Exception ex) { if (!closed) Summary.Text = "Windows update review did not finish. " + ex.Message; }
             finally {
                 releaseEnding = true; releaseRender = null; if (owner != null) { owner.SetAvailable(false); owner.Cancel(); }
+#if UI_TESTS
+                RecordReviewReleaseLifetime("FinallyEntered", owner, pendingWork, pendingPicker);
+#endif
                 if (pendingPicker != null) try { await pendingPicker; } catch { }
                 if (pendingWork != null) try { await pendingWork; } catch { }
                 if (pendingChoice != null && owner != null) try { if (selecting) await owner.FinishSelection(pendingChoice, null); else await owner.FinishConfirmation(pendingChoice, false); } catch { }
+#if UI_TESTS
+                RecordReviewReleaseLifetime("OwnedOperationsTerminal", owner, pendingWork, pendingPicker);
+#endif
                 if (owner != null) owner.Dispose(); releaseView = null; releaseDialog = null; releaseEnding = false; releaseChecks.SetReviewOpen(false); FinishSavedReview();
+#if UI_TESTS
+                RecordReviewReleaseLifetime("Disposed", owner, pendingWork, pendingPicker);
+#endif
             }
         }
     }

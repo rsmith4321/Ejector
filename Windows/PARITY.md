@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native release presentation cancellation retains owned operations
+
+[Real ShowAsync cancellation with held worker or actual Windows picker](modern/RELEASE_PRESENTATION_NATIVE_20261011.md) proves exact cleanup waits, worker busy Quit refusal/late-result rejection, picker zero work and ordinary unconfigured entry recovery. Both native exits0/no exception; warning-free native regressions, normal **246/0**/engineering exclusion/preservation pass. No production behavior/payload/device/OS/push/publication change. General rendering failures, configured update acceptance and full physical/genuine-media/LUT/travel/display/signing/publishing gates remain open; goal active.
+
 ## October 11 · native diagnostic presentation cancellation and cleanup lifetime
 
 [Real ShowAsync cancellation during real Refresh](modern/DIAGNOSTICS_PRESENTATION_NATIVE_20261011.md) proves TaskCanceledException/modal removal retains exact worker/global ownership until terminal, busy Quit refusal and post-work disposal/fresh-view/issue recovery. Native exit0/no exception, warning-free native regressions, normal **246/0**/probe exclusion and preservation pass. No production behavior/payload/clear/device/OS/push/publication change. General XAML rendering failures, native clear and full physical/genuine-media/LUT/travel/display/configured trust/signing/publishing gates stay open; goal active.
