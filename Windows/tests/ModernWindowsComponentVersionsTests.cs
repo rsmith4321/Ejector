@@ -11,7 +11,7 @@ namespace EasyEject {
                 string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, WindowsReleaseManifest.Executable);
                 var before = AppDomain.CurrentDomain.GetAssemblies();
                 using (var held = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-                    held.Position = 13; ModernWindowsComponentVersions.Require(path, held, new ModernWindowsDependencyConfiguration.AssetVersions("owned classic fixture", "0.1.0.0", "0.1.0.0"), CancellationToken.None);
+                    held.Position = 13; ModernWindowsComponentVersions.Require(path, held, new ModernWindowsDependencyConfiguration.AssetVersions("owned classic fixture", "0.2.0.0", "0.2.0.0"), CancellationToken.None);
                     Check(held.Position == 13, "Metadata inspection moved held stream position");
                 }
                 Check(!AppDomain.CurrentDomain.GetAssemblies().Except(before).Any(assembly => assembly.GetName().Name == "EasyEject.Windows"), "Fixture code was loaded");
@@ -19,8 +19,8 @@ namespace EasyEject {
             Test("actual component file and assembly version mismatches independently refuse", delegate {
                 string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, WindowsReleaseManifest.Executable);
                 using (var held = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-                    Throws<SafetyException>(() => ModernWindowsComponentVersions.Require(path, held, new ModernWindowsDependencyConfiguration.AssetVersions("owned", null, "0.1.0.1"), CancellationToken.None));
-                    Throws<SafetyException>(() => ModernWindowsComponentVersions.Require(path, held, new ModernWindowsDependencyConfiguration.AssetVersions("owned", "0.1.0.1", null), CancellationToken.None));
+                    Throws<SafetyException>(() => ModernWindowsComponentVersions.Require(path, held, new ModernWindowsDependencyConfiguration.AssetVersions("owned", null, "0.2.0.1"), CancellationToken.None));
+                    Throws<SafetyException>(() => ModernWindowsComponentVersions.Require(path, held, new ModernWindowsDependencyConfiguration.AssetVersions("owned", "0.2.0.1", null), CancellationToken.None));
                 }
             });
             Test("actual component metadata refuses another path cancellation and absent manifests", delegate {
@@ -29,7 +29,7 @@ namespace EasyEject {
                     using (var held = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read)) {
                         Throws<SafetyException>(() => ModernWindowsComponentVersions.Require(Path.Combine(fixture.Source, "other.dll"), held, new ModernWindowsDependencyConfiguration.AssetVersions("owned", null, null), CancellationToken.None));
                         using (var cancel = new CancellationTokenSource()) { cancel.Cancel(); Throws<OperationCanceledException>(() => ModernWindowsComponentVersions.Require(path, held, new ModernWindowsDependencyConfiguration.AssetVersions("owned", null, null), cancel.Token)); }
-                        Throws<SafetyException>(() => ModernWindowsComponentVersions.Require(path, held, new ModernWindowsDependencyConfiguration.AssetVersions("owned", null, "0.1.0.0"), CancellationToken.None));
+                        Throws<SafetyException>(() => ModernWindowsComponentVersions.Require(path, held, new ModernWindowsDependencyConfiguration.AssetVersions("owned", null, "0.2.0.0"), CancellationToken.None));
                         Throws<SafetyException>(() => ModernWindowsComponentVersions.Require(path, held, new ModernWindowsDependencyConfiguration.AssetVersions("owned", "0.0.0.0", null), CancellationToken.None));
                     }
                 }
@@ -59,7 +59,7 @@ namespace EasyEject {
         }
         static int ModernComponentVersionsSample(string folder) {
             byte[] json = File.ReadAllBytes(Path.Combine(folder, ModernWindowsDependencyConfiguration.Name));
-            byte[] stable = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(json).Replace("0.1.0-dev", "0.1.0"));
+            byte[] stable = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(json).Replace("0.2.0-dev", "0.2.0"));
             var assets = ModernWindowsDependencyConfiguration.Validate(stable, ActualDependencyDeclaration(folder));
             Test("actual declared component versions match read-only sample without adding candidate assemblies", delegate {
                 var before = AppDomain.CurrentDomain.GetAssemblies();

@@ -46,7 +46,7 @@ namespace EasyEject {
             NativeHostPublish(fixture, NativeHostStable(host)); ModernIdentityPublish(fixture, ModernIdentityStable(managed));
             BackendIdentityPublish(fixture, ModernIdentityStable(backendBytes));
             ComponentPublish(fixture, "Microsoft.WindowsAppRuntime.dll", ModernIdentityStable(backendBytes));
-            ModernRuntimePublish(fixture, ModernRuntimeJson()); DependencyPublish(fixture, DependencyJson("0.1.0.0").Replace("2.0.0.0", "0.1.0.0"));
+            ModernRuntimePublish(fixture, ModernRuntimeJson()); DependencyPublish(fixture, DependencyJson("0.2.0.0").Replace("2.0.0.0", "0.2.0.0"));
         }
         static int ModernApplicationPackageSample(string folder) {
             byte[] host = File.ReadAllBytes(Path.Combine(folder, "EasyEject.Modern.exe"));
@@ -57,7 +57,7 @@ namespace EasyEject {
                     ApplicationPackageFixture(fixture, host, managed, backendBytes);
                     var review = ApplicationPackage(fixture);
                     try {
-                        Check(review.Folder == SafePaths.Normalize(fixture.Root) && review.Release.Version == "0.1.0.0", "Composed identity was lost");
+                        Check(review.Folder == SafePaths.Normalize(fixture.Root) && review.Release.Version == "0.2.0.0", "Composed identity was lost");
                         Throws<IOException>(() => File.WriteAllText(fixture.PathFor("EasyEject.Modern.dll"), "changed"));
                         Throws<IOException>(() => File.WriteAllText(fixture.PathFor(ModernWindowsDependencyConfiguration.Name), "changed"));
                         review.Revalidate(CancellationToken.None);
@@ -83,7 +83,7 @@ namespace EasyEject {
             });
             Test("modern composed application refuses conflicting dependency runtime after valid application configuration", delegate {
                 using (var fixture = new ModernPackageFixture()) {
-                    ApplicationPackageFixture(fixture, host, managed, backendBytes); DependencyPublish(fixture, DependencyJson("0.1.0.0").Replace("10.0.12", "10.0.13"));
+                    ApplicationPackageFixture(fixture, host, managed, backendBytes); DependencyPublish(fixture, DependencyJson("0.2.0.0").Replace("10.0.12", "10.0.13"));
                     using (var content = fixture.Review()) { ModernWindowsAppHostIdentity.Require(content, CancellationToken.None); ModernWindowsManagedApplicationIdentity.Require(content, CancellationToken.None); ModernWindowsRuntimeConfiguration.Require(content, CancellationToken.None); }
                     Throws<SafetyException>(() => { using (var unexpected = ApplicationPackage(fixture)) { } }); fixture.RequireReleased();
                 }
@@ -113,18 +113,18 @@ namespace EasyEject {
             Test("modern composed application refuses authenticated component file version mismatch", delegate {
                 using (var fixture = new ModernPackageFixture()) {
                     ApplicationPackageFixture(fixture, host, managed, backendBytes);
-                    string deps = DependencyJson("0.1.0.0").Replace("2.0.0.0", "0.1.0.0");
+                    string deps = DependencyJson("0.2.0.0").Replace("2.0.0.0", "0.2.0.0");
                     int sdk = deps.IndexOf("lib/net6.0/Microsoft.WindowsAppRuntime.dll", StringComparison.Ordinal); Check(sdk > 0, "Fixture SDK asset absent");
-                    deps = deps.Substring(0, sdk) + deps.Substring(sdk).Replace("\"fileVersion\":\"0.1.0.0\"", "\"fileVersion\":\"0.1.0.1\""); DependencyPublish(fixture, deps);
+                    deps = deps.Substring(0, sdk) + deps.Substring(sdk).Replace("\"fileVersion\":\"0.2.0.0\"", "\"fileVersion\":\"0.2.0.1\""); DependencyPublish(fixture, deps);
                     Throws<SafetyException>(() => { using (var unexpected = ApplicationPackage(fixture)) { } }); fixture.RequireReleased();
                 }
             });
             Test("modern composed application refuses authenticated component assembly version mismatch", delegate {
                 using (var fixture = new ModernPackageFixture()) {
                     ApplicationPackageFixture(fixture, host, managed, backendBytes);
-                    string deps = DependencyJson("0.1.0.0").Replace("2.0.0.0", "0.1.0.0");
+                    string deps = DependencyJson("0.2.0.0").Replace("2.0.0.0", "0.2.0.0");
                     int sdk = deps.IndexOf("lib/net6.0/Microsoft.WindowsAppRuntime.dll", StringComparison.Ordinal); Check(sdk > 0, "Fixture SDK asset absent");
-                    deps = deps.Substring(0, sdk) + deps.Substring(sdk).Replace("\"assemblyVersion\":\"0.1.0.0\"", "\"assemblyVersion\":\"0.1.0.1\""); DependencyPublish(fixture, deps);
+                    deps = deps.Substring(0, sdk) + deps.Substring(sdk).Replace("\"assemblyVersion\":\"0.2.0.0\"", "\"assemblyVersion\":\"0.2.0.1\""); DependencyPublish(fixture, deps);
                     Throws<SafetyException>(() => { using (var unexpected = ApplicationPackage(fixture)) { } }); fixture.RequireReleased();
                 }
             });

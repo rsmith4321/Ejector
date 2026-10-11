@@ -95,7 +95,7 @@ namespace EasyEject {
                 Check(held.Length > 0 && held.Length <= ModernWindowsDependencyConfiguration.MaximumBytes, "Sample size unsupported"); var stamp = Native.Info(held.SafeFileHandle); string hash = VerifiedImporter.Hash(held, CancellationToken.None); bytes = new byte[(int)held.Length]; held.Position = 0; int done = 0; while (done < bytes.Length) { int n = held.Read(bytes, done, bytes.Length - done); Check(n > 0, "Incomplete sample"); done += n; }
                 var release = ActualDependencyDeclaration(Path.GetDirectoryName(path));
                 Test("modern actual development dependency sample refuses stable project declaration", delegate { Throws<SafetyException>(() => ModernWindowsDependencyConfiguration.Validate(bytes, release)); });
-                string stable = Encoding.UTF8.GetString(bytes).Replace("0.1.0-dev", "0.1.0");
+                string stable = Encoding.UTF8.GetString(bytes).Replace("0.2.0-dev", "0.2.0");
                 Test("modern actual dependency snapshot admits unchanged complete graph under explicit synthetic stable declaration", delegate { ModernWindowsDependencyConfiguration.Validate(Encoding.UTF8.GetBytes(stable), release); });
                 Test("modern actual dependency snapshot refuses absent inventoried asset and substituted runtime version", delegate {
                     Check(release.Files.Any(file => file.Name == "System.Text.Json.dll"), "Actual missing-asset case has no original asset");
@@ -115,7 +115,7 @@ namespace EasyEject {
         static ModernWindowsReleaseManifest ActualDependencyDeclaration(string folder, string omit = null) {
             // Synthetic declaration of observed names, not authentication of this
             // unsigned sample folder. No content-review approval is asserted.
-            var f = new ModernManifestFixture { Version = "0.1.0.0" };
+            var f = new ModernManifestFixture { Version = "0.2.0.0" };
             foreach (string path in Directory.GetFiles(folder, "*", SearchOption.AllDirectories)) { string name = path.Substring(folder.Length + 1).Replace('\\', '/'); if (name != omit && !f.Files.Any(file => file.Name == name)) f.Files.Add(new WindowsReleaseFile(name, new FileInfo(path).Length, new string('a', 64))); } return f.Parse();
         }
     }

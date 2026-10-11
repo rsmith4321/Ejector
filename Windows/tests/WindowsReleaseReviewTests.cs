@@ -63,7 +63,7 @@ namespace EasyEject {
                 using (var f = new WindowsChannelFixture()) {
                     var offer = f.Offer(); string dev = WindowsReleaseReviewSession.Describe(offer, ApplicationInformation.Version);
                     Check(dev.Contains("cannot be compared") && dev.Contains(offer.Release.ArchiveHash) && dev.Contains(offer.Release.ArchiveUrl.AbsoluteUri) && dev.Contains("publisher attestation") && dev.Contains("expires UTC"), "Review hid exact release identity or asserted current development build");
-                    Check(WindowsReleaseReviewSession.Describe(offer, "0.1.0.0").Contains("does not verify the installed files") && WindowsReleaseReviewSession.Describe(offer, "0.0.0.1").Contains("newer stable") && WindowsReleaseReviewSession.Describe(offer, "1.0.0.0").Contains("older than"), "Numeric comparison grants executable trust");
+                    Check(WindowsReleaseReviewSession.Describe(offer, "0.2.0.0").Contains("does not verify the installed files") && WindowsReleaseReviewSession.Describe(offer, "0.0.0.1").Contains("newer stable") && WindowsReleaseReviewSession.Describe(offer, "1.0.0.0").Contains("older than"), "Numeric comparison grants executable trust");
                 }
             });
             Test("Manual review refused new check clears prior selected ZIP and offer before retry", () => {

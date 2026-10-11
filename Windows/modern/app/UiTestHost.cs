@@ -70,6 +70,10 @@ namespace EasyEject.Modern {
         }
         internal async Task TestTrayQuit() {
             await EnsureVisible();
+            CancelOperation.Visibility = Visibility.Collapsed; Root.UpdateLayout();
+            CancelOperation.Content = "Stop import"; CancelOperation.Visibility = Visibility.Visible; Root.UpdateLayout();
+            Require(CancelOperation.ActualWidth > 0 && CancelOperation.ActualHeight > 0, "The newly visible Stop action has no clickable layout bounds.");
+            CancelOperation.Visibility = Visibility.Collapsed; Root.UpdateLayout();
             var quitItem = tray.ContextMenuStrip.Items.Cast<System.Windows.Forms.ToolStripItem>().Single(item => item.Text == "Quit preview");
             DefaultsPanel.Visibility = Visibility.Visible; StorageView.Visibility = Visibility.Collapsed;
             await DefaultsPanel.StartEdit();

@@ -9,10 +9,10 @@ namespace EasyEject {
     public static partial class Tests {
         static void ModernWindowsAppHostIdentityTests() {
             Test("modern native apphost resource policy requires exact stable application and versions", delegate {
-                var values = new[] { "Easy Eject", "Easy Eject for Windows", "EasyEject.Modern.dll", "EasyEject.Modern.dll", "0.1.0.0", "0.1.0.0", "0.1.0.0" };
+                var values = new[] { "Easy Eject", "Easy Eject for Windows", "EasyEject.Modern.dll", "EasyEject.Modern.dll", "0.2.0.0", "0.2.0.0", "0.2.0.0" };
                 NativeHostResources(values);
-                for (int i = 0; i < values.Length; i++) { var changed = (string[])values.Clone(); changed[i] = i < 4 ? "Other" : "0.1.0-dev"; Throws<SafetyException>(() => NativeHostResources(changed)); changed[i] = null; Throws<SafetyException>(() => NativeHostResources(changed)); }
-                var mismatch = (string[])values.Clone(); mismatch[6] = "0.1.0.1"; Throws<SafetyException>(() => NativeHostResources(mismatch));
+                for (int i = 0; i < values.Length; i++) { var changed = (string[])values.Clone(); changed[i] = i < 4 ? "Other" : "0.2.0-dev"; Throws<SafetyException>(() => NativeHostResources(changed)); changed[i] = null; Throws<SafetyException>(() => NativeHostResources(changed)); }
+                var mismatch = (string[])values.Clone(); mismatch[6] = "0.2.0.1"; Throws<SafetyException>(() => NativeHostResources(mismatch));
             });
             Test("modern native apphost parser refuses absent truncated excessive and nonnative snapshots", delegate {
                 foreach (var bytes in new[] { null, new byte[0], new byte[64], new byte[ModernWindowsAppHostIdentity.MaximumBytes + 1] }) Throws<SafetyException>(() => ModernWindowsAppHostIdentity.RequireLayout(bytes, CancellationToken.None));
@@ -28,11 +28,11 @@ namespace EasyEject {
         }
         static void NativeHostResources(string[] values) { ModernWindowsAppHostIdentity.RequireResources(values[0], values[1], values[2], values[3], values[4], values[5], values[6]); }
         static byte[] NativeHostStable(byte[] sample) {
-            byte[] bytes = (byte[])sample.Clone(); byte[] replacement = new byte[Encoding.Unicode.GetByteCount("0.1.0-dev\0")]; Encoding.Unicode.GetBytes("0.1.0.0\0").CopyTo(replacement, 0);
-            Check(PatchFixtureBytes(bytes, Encoding.Unicode.GetBytes("0.1.0-dev\0"), replacement) == 1, "Ambiguous owned product-version resource patch"); return bytes;
+            byte[] bytes = (byte[])sample.Clone(); byte[] replacement = new byte[Encoding.Unicode.GetByteCount("0.2.0-dev\0")]; Encoding.Unicode.GetBytes("0.2.0.0\0").CopyTo(replacement, 0);
+            Check(PatchFixtureBytes(bytes, Encoding.Unicode.GetBytes("0.2.0-dev\0"), replacement) == 1, "Ambiguous owned product-version resource patch"); return bytes;
         }
         static void NativeHostPublish(ModernPackageFixture f, byte[] bytes) {
-            string name = "EasyEject.Modern.exe"; File.WriteAllBytes(f.PathFor(name), bytes); f.Metadata.Files.RemoveAll(value => value.Name == name); f.Metadata.Files.Add(new WindowsReleaseFile(name, bytes.Length, WindowsSignerEvidence.Hash(bytes))); f.Metadata.Version = "0.1.0.0"; f.Publish();
+            string name = "EasyEject.Modern.exe"; File.WriteAllBytes(f.PathFor(name), bytes); f.Metadata.Files.RemoveAll(value => value.Name == name); f.Metadata.Files.Add(new WindowsReleaseFile(name, bytes.Length, WindowsSignerEvidence.Hash(bytes))); f.Metadata.Version = "0.2.0.0"; f.Publish();
         }
         static void NativeHostActualResource(byte[] bytes, string version) {
             using (var f = new Fixture()) {
@@ -51,11 +51,11 @@ namespace EasyEject {
         }
         static void ModernWindowsAppHostActualTests(byte[] sample) {
             Test("modern native apphost reads actual owned development host and refuses its stable release resource claim", delegate {
-                ModernWindowsAppHostIdentity.RequireLayout(sample, CancellationToken.None); Throws<SafetyException>(() => NativeHostActualResource(sample, "0.1.0.0"));
+                ModernWindowsAppHostIdentity.RequireLayout(sample, CancellationToken.None); Throws<SafetyException>(() => NativeHostActualResource(sample, "0.2.0.0"));
             });
             Test("modern native apphost accepts exact owned stable resource copy and authenticated held binding", delegate {
-                byte[] bytes = NativeHostStable(sample); NativeHostActualResource(bytes, "0.1.0.0");
-                using (var f = new ModernPackageFixture()) { NativeHostPublish(f, bytes); using (var review = f.Review()) { ModernWindowsAppHostIdentity.Require(review, CancellationToken.None); Throws<IOException>(() => File.WriteAllText(f.PathFor("EasyEject.Modern.exe"), "changed")); } Check(File.ReadAllBytes(f.PathFor("EasyEject.Modern.exe")).SequenceEqual(bytes), "Native host modified"); f.RequireReleased(); f.Metadata.Version = "0.1.0.1"; f.Publish(); using (var review = f.Review()) Throws<SafetyException>(() => ModernWindowsAppHostIdentity.Require(review, CancellationToken.None)); f.RequireReleased(); }
+                byte[] bytes = NativeHostStable(sample); NativeHostActualResource(bytes, "0.2.0.0");
+                using (var f = new ModernPackageFixture()) { NativeHostPublish(f, bytes); using (var review = f.Review()) { ModernWindowsAppHostIdentity.Require(review, CancellationToken.None); Throws<IOException>(() => File.WriteAllText(f.PathFor("EasyEject.Modern.exe"), "changed")); } Check(File.ReadAllBytes(f.PathFor("EasyEject.Modern.exe")).SequenceEqual(bytes), "Native host modified"); f.RequireReleased(); f.Metadata.Version = "0.2.0.1"; f.Publish(); using (var review = f.Review()) Throws<SafetyException>(() => ModernWindowsAppHostIdentity.Require(review, CancellationToken.None)); f.RequireReleased(); }
             });
             Test("modern native apphost refuses incompatible architecture subsystem CLR and unmapped entry point", delegate {
                 foreach (string kind in new[] { "x86", "arm64", "console", "dll", "clr", "entry", "entrydata", "headers", "raw", "overlap" }) {
@@ -88,8 +88,8 @@ namespace EasyEject {
                 }
             });
             Test("modern native apphost actual resources reject altered product title and original file name", delegate {
-                foreach (string field in new[] { "Easy Eject\0", "Easy Eject for Windows\0", "EasyEject.Modern.dll\0", "0.1.0.0\0" }) {
-                    byte[] bytes = NativeHostStable(sample); byte[] pattern = Encoding.Unicode.GetBytes(field), changed = (byte[])pattern.Clone(); changed[0] = (byte)'X'; int count = PatchFixtureBytes(bytes, pattern, changed); Check(count >= 1, "Actual resource mutation found no value"); Throws<SafetyException>(() => NativeHostActualResource(bytes, "0.1.0.0"));
+                foreach (string field in new[] { "Easy Eject\0", "Easy Eject for Windows\0", "EasyEject.Modern.dll\0", "0.2.0.0\0" }) {
+                    byte[] bytes = NativeHostStable(sample); byte[] pattern = Encoding.Unicode.GetBytes(field), changed = (byte[])pattern.Clone(); changed[0] = (byte)'X'; int count = PatchFixtureBytes(bytes, pattern, changed); Check(count >= 1, "Actual resource mutation found no value"); Throws<SafetyException>(() => NativeHostActualResource(bytes, "0.2.0.0"));
                 }
             });
             Test("modern native apphost retains fresh signer cancellation and hold release across actual-byte review", delegate {

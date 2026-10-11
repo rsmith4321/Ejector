@@ -14,11 +14,11 @@ namespace EasyEject {
             internal string History { get { return Path.Combine(Archive.Package.Owned.Destination, WindowsReleaseChecks.ModernHistoryDirectory); } }
             internal ModernChannelFixture(ModernArchiveFixture archive = null) {
                 Archive = archive ?? new ModernArchiveFixture();
-                if (archive == null) { Archive.Package.Metadata.Version = "0.1.0.0"; Archive.Package.Publish(); Archive.Write(); }
-                else Check(Archive.Package.Metadata.Version == "0.1.0.0" && File.Exists(Archive.Path), "Supplied channel fixture must already contain its stable ZIP");
+                if (archive == null) { Archive.Package.Metadata.Version = "0.2.0.0"; Archive.Package.Publish(); Archive.Write(); }
+                else Check(Archive.Package.Metadata.Version == "0.2.0.0" && File.Exists(Archive.Path), "Supplied channel fixture must already contain its stable ZIP");
                 Channel = ApprovedWindowsChannel.Modern("https://example.invalid/modern/channel.json", "https://example.invalid/modern/channel.json.p7s", "https://downloads.example.invalid/modern/releases/", Archive.Package.Signing.Publisher());
             }
-            internal string Text(string version = "0.1.0.0", long? issued = null, long? expires = null) {
+            internal string Text(string version = "0.2.0.0", long? issued = null, long? expires = null) {
                 string name = "EasyEject.Modern-" + version + "-x64.zip";
                 return "{\"format\":2,\"kind\":\"windows-modern-channel\",\"application\":\"EasyEject.Modern\",\"platform\":\"windows-x64\",\"channel\":\"stable\",\"issuedUtc\":" + (issued ?? Seconds - 60) + ",\"expiresUtc\":" + (expires ?? Seconds + 3600) + ",\"release\":{\"version\":\"" + version + "\",\"sourceRevision\":\"" + Archive.Package.Metadata.Source + "\",\"manifestSha256\":\"" + Hash(ModernWindowsReleaseManifest.ManifestName) + "\",\"manifestSignatureSha256\":\"" + Hash(ModernWindowsReleaseManifest.SignatureName) + "\",\"certificateSha256\":\"" + Archive.Package.Signing.Evidence().CertificateHash + "\",\"archive\":{\"name\":\"" + name + "\",\"url\":\"" + Channel.Archives.AbsoluteUri + version + "/" + name + "\",\"length\":" + new FileInfo(Archive.Path).Length + ",\"sha256\":\"" + WindowsSignerEvidence.Hash(File.ReadAllBytes(Archive.Path)) + "\"}}}";
             }
@@ -37,8 +37,8 @@ namespace EasyEject {
             Test("modern signed channel binds the modern archive manifest inventory and signer", delegate {
                 using (var f = new ModernChannelFixture()) using (var archive = f.Archive.Review()) {
                     var offer = f.Offer(); offer.VerifyArchive(archive, CancellationToken.None);
-                    Check(offer.Release.Version == archive.Release.Version && offer.Release.SourceRevision == archive.Release.SourceRevision && offer.Release.ArchiveName == "EasyEject.Modern-0.1.0.0-x64.zip" && offer.Release.ManifestHash == archive.Authenticated.BodyHash, "Modern binding lost identity");
-                    Check(offer.Release.Compare("0.1.0-dev") == WindowsReleaseComparison.UncomparableLocalVersion, "Development app became current");
+                    Check(offer.Release.Version == archive.Release.Version && offer.Release.SourceRevision == archive.Release.SourceRevision && offer.Release.ArchiveName == "EasyEject.Modern-0.2.0.0-x64.zip" && offer.Release.ManifestHash == archive.Authenticated.BodyHash, "Modern binding lost identity");
+                    Check(offer.Release.Compare("0.2.0-dev") == WindowsReleaseComparison.UncomparableLocalVersion, "Development app became current");
                 }
             });
             Test("modern policy is distinct even with identical endpoints and publisher pins", delegate {
@@ -58,8 +58,8 @@ namespace EasyEject {
             });
             Test("modern archive location refuses classic filename alternate origins and version aliases", delegate {
                 using (var f = new ModernChannelFixture()) {
-                    string good = f.Channel.Archives.AbsoluteUri + "0.1.0.0/EasyEject.Modern-0.1.0.0-x64.zip";
-                    foreach (string bad in new[] { good.Replace("downloads.example.invalid", "foreign.invalid"), good.Replace("https:", "http:"), good + "?x=1", good.Replace("/0.1.0.0/", "/0.2.0.0/"), good.Replace(".zip", "%2ezip"), good.Replace("EasyEject.Modern", "EasyEject.Windows") }) Throws<SafetyException>(() => f.Offer(f.Text().Replace(good, bad)));
+                    string good = f.Channel.Archives.AbsoluteUri + "0.2.0.0/EasyEject.Modern-0.2.0.0-x64.zip";
+                    foreach (string bad in new[] { good.Replace("downloads.example.invalid", "foreign.invalid"), good.Replace("https:", "http:"), good + "?x=1", good.Replace("/0.2.0.0/", "/0.3.0.0/"), good.Replace(".zip", "%2ezip"), good.Replace("EasyEject.Modern", "EasyEject.Windows") }) Throws<SafetyException>(() => f.Offer(f.Text().Replace(good, bad)));
                     Throws<SafetyException>(() => f.Offer(f.Text().Replace("EasyEject.Modern-", "EasyEject.Windows-")));
                 }
             });
@@ -71,7 +71,7 @@ namespace EasyEject {
             });
             Test("modern channel rejects schema types duplicates trailing JSON and invalid identity bounds", delegate {
                 using (var f = new ModernChannelFixture()) {
-                    string text = f.Text(); foreach (string bad in new[] { text.Insert(1, "\"format\":2,"), text.Insert(1, "\"foreign\":1,"), text.Replace("\"format\":2", "\"format\":\"2\""), text + "{}", text.Replace("stable", "beta"), text.Replace("windows-x64", "macos-x64"), text.Replace(f.Archive.Package.Metadata.Source, "unknown"), text.Replace("\"length\":" + new FileInfo(f.Archive.Path).Length, "\"length\":2147483649"), text.Replace("0.1.0.0", "0.1.0-dev") }) Throws<SafetyException>(() => f.Offer(bad));
+                    string text = f.Text(); foreach (string bad in new[] { text.Insert(1, "\"format\":2,"), text.Insert(1, "\"foreign\":1,"), text.Replace("\"format\":2", "\"format\":\"2\""), text + "{}", text.Replace("stable", "beta"), text.Replace("windows-x64", "macos-x64"), text.Replace(f.Archive.Package.Metadata.Source, "unknown"), text.Replace("\"length\":" + new FileInfo(f.Archive.Path).Length, "\"length\":2147483649"), text.Replace("0.2.0.0", "0.2.0-dev") }) Throws<SafetyException>(() => f.Offer(bad));
                 }
             });
             Test("modern channel time rules expire metadata before later archive work", delegate {
@@ -82,7 +82,7 @@ namespace EasyEject {
             });
             Test("modern exact archive binding refuses every changed signed artifact field", delegate {
                 using (var f = new ModernChannelFixture()) using (var archive = f.Archive.Review()) {
-                    string text = f.Text(); foreach (string changed in new[] { text.Replace(archive.Hash, new string('a', 64)), text.Replace("\"length\":" + archive.Length, "\"length\":" + (archive.Length + 1)), text.Replace(archive.Authenticated.BodyHash, new string('a', 64)), text.Replace(archive.Authenticated.SignatureHash, new string('a', 64)), text.Replace(archive.Authenticated.Signer.CertificateHash, new string('a', 64)), text.Replace(archive.Release.SourceRevision, new string('a', 40)), f.Text("0.2.0.0") }) {
+                    string text = f.Text(); foreach (string changed in new[] { text.Replace(archive.Hash, new string('a', 64)), text.Replace("\"length\":" + archive.Length, "\"length\":" + (archive.Length + 1)), text.Replace(archive.Authenticated.BodyHash, new string('a', 64)), text.Replace(archive.Authenticated.SignatureHash, new string('a', 64)), text.Replace(archive.Authenticated.Signer.CertificateHash, new string('a', 64)), text.Replace(archive.Release.SourceRevision, new string('a', 40)), f.Text("0.3.0.0") }) {
                         var offer = f.Offer(changed); Check(Throws<SafetyException>(() => offer.VerifyArchive(archive, CancellationToken.None)).Message.Contains("does not match"), "Different signed artifact accepted");
                     }
                 }
@@ -107,16 +107,16 @@ namespace EasyEject {
             });
             Test("modern process high water retains rollback equivocation and immutable-release restrictions", delegate {
                 using (var f = new ModernChannelFixture()) {
-                    var ledger = new WindowsChannelHighWater(f.Channel); ledger.Accept(f.Offer(f.Text("0.2.0.0", f.Seconds - 20)), CancellationToken.None);
-                    foreach (string bad in new[] { f.Text("0.3.0.0", f.Seconds - 30), f.Text("0.1.0.0", f.Seconds - 10), f.Text("0.2.0.0", f.Seconds - 20, f.Seconds + 4000), f.Text("0.2.0.0", f.Seconds - 10).Replace(f.Hash(ModernWindowsReleaseManifest.ManifestName), new string('a', 64)) }) Throws<SafetyException>(() => ledger.Accept(f.Offer(bad), CancellationToken.None));
-                    ledger.Accept(f.Offer(f.Text("0.2.0.0", f.Seconds - 10)), CancellationToken.None);
+                    var ledger = new WindowsChannelHighWater(f.Channel); ledger.Accept(f.Offer(f.Text("0.3.0.0", f.Seconds - 20)), CancellationToken.None);
+                    foreach (string bad in new[] { f.Text("0.4.0.0", f.Seconds - 30), f.Text("0.2.0.0", f.Seconds - 10), f.Text("0.3.0.0", f.Seconds - 20, f.Seconds + 4000), f.Text("0.3.0.0", f.Seconds - 10).Replace(f.Hash(ModernWindowsReleaseManifest.ManifestName), new string('a', 64)) }) Throws<SafetyException>(() => ledger.Accept(f.Offer(bad), CancellationToken.None));
+                    ledger.Accept(f.Offer(f.Text("0.3.0.0", f.Seconds - 10)), CancellationToken.None);
                 }
             });
             Test("modern user-bound replay survives restart and refuses rollback without a cached offer", delegate {
                 using (var f = new ModernChannelFixture()) {
-                    var high = f.Offer(f.Text("0.2.0.0", f.Seconds - 20)); new WindowsChannelReplayStore(f.History).Accept(f.Channel, high, CancellationToken.None, null);
+                    var high = f.Offer(f.Text("0.3.0.0", f.Seconds - 20)); new WindowsChannelReplayStore(f.History).Accept(f.Channel, high, CancellationToken.None, null);
                     string path = Path.Combine(f.History, WindowsChannelReplayStore.FileName), hash = WindowsSignerEvidence.Hash(File.ReadAllBytes(path));
-                    Throws<SafetyException>(() => new WindowsChannelReplayStore(f.History).Accept(f.Channel, f.Offer(f.Text("0.1.0.0", f.Seconds - 10)), CancellationToken.None, null)); Check(WindowsSignerEvidence.Hash(File.ReadAllBytes(path)) == hash, "Restart rollback changed state");
+                    Throws<SafetyException>(() => new WindowsChannelReplayStore(f.History).Accept(f.Channel, f.Offer(f.Text("0.2.0.0", f.Seconds - 10)), CancellationToken.None, null)); Check(WindowsSignerEvidence.Hash(File.ReadAllBytes(path)) == hash, "Restart rollback changed state");
                 }
             });
             Test("modern replay refuses classic state without rewriting or automatically resetting it", delegate {
@@ -163,9 +163,9 @@ namespace EasyEject {
             });
             Test("modern factory restart reports rollback failure and preserves restrictive history", delegate {
                 using (var f = new ModernChannelFixture()) {
-                    using (var c = f.Coordinator(f.Text("0.2.0.0", f.Seconds - 20))) { c.Start(); c.PublishIdle(true); Check(UpdateManual(c).Outcome == WindowsUpdateCheckOutcome.Accepted, "Initial high floor failed"); }
+                    using (var c = f.Coordinator(f.Text("0.3.0.0", f.Seconds - 20))) { c.Start(); c.PublishIdle(true); Check(UpdateManual(c).Outcome == WindowsUpdateCheckOutcome.Accepted, "Initial high floor failed"); }
                     string path = Path.Combine(f.History, WindowsChannelReplayStore.FileName), hash = WindowsSignerEvidence.Hash(File.ReadAllBytes(path));
-                    using (var c = f.Coordinator(f.Text("0.1.0.0", f.Seconds - 10))) { c.Start(); c.PublishIdle(true); var result = UpdateManual(c); Check(result.Outcome == WindowsUpdateCheckOutcome.Failed && result.Offer == null && result.Message.Contains("rolled back"), "Factory delivered rollback offer"); }
+                    using (var c = f.Coordinator(f.Text("0.2.0.0", f.Seconds - 10))) { c.Start(); c.PublishIdle(true); var result = UpdateManual(c); Check(result.Outcome == WindowsUpdateCheckOutcome.Failed && result.Offer == null && result.Message.Contains("rolled back"), "Factory delivered rollback offer"); }
                     Check(WindowsSignerEvidence.Hash(File.ReadAllBytes(path)) == hash, "Failed check reset history");
                 }
             });

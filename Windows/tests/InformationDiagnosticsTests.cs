@@ -128,7 +128,7 @@ namespace EasyEject {
                     Check(Object.ReferenceEquals(dialog.AcceptButton, dialog.CancelButton) && ((Button)dialog.AcceptButton).Text == "Close", "Unexpected default information action");
                     Check(dialog.Content.Text.Contains(about ? ApplicationInformation.Version : "Full-quality originals remain unchanged by default."), "Missing version or original-retention guidance");
                 }
-                Check(ApplicationInformation.About.Contains("Development version") && ApplicationInformation.About.Contains("No Windows release or update channel is configured yet"), "Prototype described as a final release");
+                Check(ApplicationInformation.About.Contains("Preview version") && ApplicationInformation.About.Contains("unsigned preview") && ApplicationInformation.About.Contains("No automatic update channel is configured"), "Unsigned preview described as a final release or configured updater");
                 Check(typeof(Program).Assembly.GetName().Version != new Version(0, 0, 0, 0), "Executable has no version identity");
             });
             Test("tray Help About and debug actions are unavailable during work and scan", delegate {

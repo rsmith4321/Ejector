@@ -15,8 +15,8 @@ namespace EasyEject {
                     var before = AppDomain.CurrentDomain.GetAssemblies(); string hash = WindowsSignerEvidence.Hash(File.ReadAllBytes(path));
                     using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) {
                         var identity = WindowsManagedIdentity.Read(stream);
-                        Check(identity.Name == "EasyEject.Windows" && identity.Version == "0.1.0.0" && identity.Title == "Easy Eject for Windows" && identity.Product == "Easy Eject" && identity.FileVersion == "0.1.0.0" && identity.InformationalVersion == "0.1.0-dev", "Native metadata identity differs from actual app");
-                        Throws<SafetyException>(() => identity.Require("0.1.0.0"));
+                        Check(identity.Name == "EasyEject.Windows" && identity.Version == "0.2.0.0" && identity.Title == "Easy Eject for Windows" && identity.Product == "Easy Eject" && identity.FileVersion == "0.2.0.0" && identity.InformationalVersion == "0.2.0-dev", "Native metadata identity differs from actual app");
+                        Throws<SafetyException>(() => identity.Require("0.2.0.0"));
                     }
                     Check(!AppDomain.CurrentDomain.GetAssemblies().Except(before).Any(a => a.GetName().Name == "EasyEject.Windows") && hash == WindowsSignerEvidence.Hash(File.ReadAllBytes(path)), "Metadata review loaded or altered candidate");
                 }
@@ -31,10 +31,10 @@ namespace EasyEject {
             });
             Test("Managed identity checks every declared application and version field", delegate {
                 foreach (string field in new[] { "name", "version", "AssemblyProductAttribute", "AssemblyTitleAttribute", "AssemblyFileVersionAttribute", "AssemblyInformationalVersionAttribute" }) {
-                    var attributes = new System.Collections.Generic.Dictionary<string, string> { { "System.Reflection.AssemblyProductAttribute", "Easy Eject" }, { "System.Reflection.AssemblyTitleAttribute", "Easy Eject for Windows" }, { "System.Reflection.AssemblyFileVersionAttribute", "0.1.0.0" }, { "System.Reflection.AssemblyInformationalVersionAttribute", "0.1.0.0" } };
-                    new WindowsManagedIdentity("EasyEject.Windows", "0.1.0.0", attributes).Require("0.1.0.0");
-                    if (field.StartsWith("Assembly", StringComparison.Ordinal)) { attributes["System.Reflection." + field] = "changed"; Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Windows", "0.1.0.0", attributes).Require("0.1.0.0")); attributes.Remove("System.Reflection." + field); Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Windows", "0.1.0.0", attributes)); }
-                    else Throws<SafetyException>(() => new WindowsManagedIdentity(field == "name" ? "OtherApp" : "EasyEject.Windows", field == "version" ? "0.1.0.1" : "0.1.0.0", attributes).Require("0.1.0.0"));
+                    var attributes = new System.Collections.Generic.Dictionary<string, string> { { "System.Reflection.AssemblyProductAttribute", "Easy Eject" }, { "System.Reflection.AssemblyTitleAttribute", "Easy Eject for Windows" }, { "System.Reflection.AssemblyFileVersionAttribute", "0.2.0.0" }, { "System.Reflection.AssemblyInformationalVersionAttribute", "0.2.0.0" } };
+                    new WindowsManagedIdentity("EasyEject.Windows", "0.2.0.0", attributes).Require("0.2.0.0");
+                    if (field.StartsWith("Assembly", StringComparison.Ordinal)) { attributes["System.Reflection." + field] = "changed"; Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Windows", "0.2.0.0", attributes).Require("0.2.0.0")); attributes.Remove("System.Reflection." + field); Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Windows", "0.2.0.0", attributes)); }
+                    else Throws<SafetyException>(() => new WindowsManagedIdentity(field == "name" ? "OtherApp" : "EasyEject.Windows", field == "version" ? "0.2.0.1" : "0.2.0.0", attributes).Require("0.2.0.0"));
                 }
             });
             Test("Package review rejects changed managed identity despite unchanged matching native resources", delegate {
@@ -46,8 +46,8 @@ namespace EasyEject {
                     else {
                         // File and informational attributes may share a single identical heap blob.
                         // A resource-stable development fixture retains a distinct informational blob.
-                        if (field == "informational") { bytes = File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(typeof(Tests).Assembly.Location), WindowsReleaseManifest.Executable)); Check(PatchFixtureBytes(bytes, Encoding.Unicode.GetBytes("0.1.0-dev\0"), Encoding.Unicode.GetBytes("0.1.0.0\0\0\0")) == 1, "Fixture resource patch missing"); PatchFixtureAttribute(bytes, "0.1.0-dev", "0.1.0.1"); }
-                        else PatchFixtureAttribute(bytes, "0.1.0.0", "0.1.0.1", 2);
+                        if (field == "informational") { bytes = File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(typeof(Tests).Assembly.Location), WindowsReleaseManifest.Executable)); Check(PatchFixtureBytes(bytes, Encoding.Unicode.GetBytes("0.2.0-dev\0"), Encoding.Unicode.GetBytes("0.2.0.0\0\0\0")) == 1, "Fixture resource patch missing"); PatchFixtureAttribute(bytes, "0.2.0-dev", "0.2.0.1"); }
+                        else PatchFixtureAttribute(bytes, "0.2.0.0", "0.2.0.1", 2);
                     }
                     File.WriteAllBytes(path, bytes); f.Publish(); Check(RefusePackage(() => f.Review()).Message.Contains("managed Windows application/version identity"), "Native resource identity concealed changed managed " + field);
                 }

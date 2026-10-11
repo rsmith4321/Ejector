@@ -88,7 +88,7 @@ namespace EasyEject {
             Test("Windows ZIP contents authenticate without extraction writes or executable verification", delegate {
                 using (var f = new WindowsArchiveFixture()) {
                     var before = Directory.GetFiles(f.Package.Files.Root, "*", SearchOption.AllDirectories).ToDictionary(p => p, p => WindowsSignerEvidence.Hash(File.ReadAllBytes(p)));
-                    using (var review = f.Review()) { Check(review.Release.Version == "0.1.0.0" && review.Length == new FileInfo(f.Path).Length && review.Hash == before[f.Path] && f.Package.ExecutableTrust.Calls == 0 && f.Package.CertificateTrust.Calls == 1, "Archive preflight claims executable trust or lacks contents proof"); review.Revalidate(CancellationToken.None); }
+                    using (var review = f.Review()) { Check(review.Release.Version == "0.2.0.0" && review.Length == new FileInfo(f.Path).Length && review.Hash == before[f.Path] && f.Package.ExecutableTrust.Calls == 0 && f.Package.CertificateTrust.Calls == 1, "Archive preflight claims executable trust or lacks contents proof"); review.Revalidate(CancellationToken.None); }
                     Check(Directory.GetFiles(f.Package.Files.Root, "*", SearchOption.AllDirectories).Length == before.Count && before.All(p => File.Exists(p.Key) && p.Value == WindowsSignerEvidence.Hash(File.ReadAllBytes(p.Key))), "Archive inspection wrote or extracted files");
                 }
             });

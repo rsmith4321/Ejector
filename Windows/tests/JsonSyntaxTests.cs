@@ -31,7 +31,7 @@ namespace EasyEject {
             byte[] before = File.ReadAllBytes(body), signed = File.ReadAllBytes(signature);
             Throws<SafetyException>(() => { using (var review = f.Review()) {} });
             Check(File.ReadAllBytes(body).SequenceEqual(before) && File.ReadAllBytes(signature).SequenceEqual(signed), "Malformed package syntax rewrote authenticated evidence");
-            f.Publish(); using (var fresh = f.Review()) Check(fresh.Release.Version == "0.1.0.0", "Fresh exact signed fixture retained refused leases");
+            f.Publish(); using (var fresh = f.Review()) Check(fresh.Release.Version == "0.2.0.0", "Fresh exact signed fixture retained refused leases");
         } }
         static void JsonSyntaxTests() {
             Test("saved cleanup settings reject a trailing object comma without rewriting preferences", () => RefuseJsonRecord("app-settings.json", Encoding.UTF8.GetBytes("{\"CleanCardsOnEject\":true,}"), root => AppSettings.Load(root), ReplaySerialize(new AppSettings(), typeof(AppSettings))));
@@ -79,7 +79,7 @@ namespace EasyEject {
             Test("held signed package review rejects missing file-array separators without weakening exact trust", () => RefusePackageSyntax(text => { Check(text.Contains("},{"), "Expected generated package file separators"); return text.Replace("},{", "} {"); }));
             Test("signed Windows channel rejects authenticated trailing-comma offer and permits fresh exact offer", () => { using (var f = new WindowsChannelFixture()) {
                 string valid = f.Text(), corrupt = valid.Substring(0, valid.Length - 1) + ",}"; Throws<SafetyException>(() => f.Offer(corrupt));
-                Check(f.Offer(valid).Release.Version == "0.1.0.0", "Fresh valid channel offer failed after syntax refusal");
+                Check(f.Offer(valid).Release.Version == "0.2.0.0", "Fresh valid channel offer failed after syntax refusal");
             } });
             Test("valid unknown JSON tokens escapes whitespace and deeply nested legacy values preserve settings and encodings", () => { using (var f = new Fixture()) {
                 string future = "[null,true,false,0,-0,0.0,-1.25e-2,1E+2,1e400,{},[],{\"text\":\"α } ] \\\" \\\\ \\/ \\b \\f \\n \\r \\t \\u0041 \\uD83D\\uDE00\"}," + new string('[', 1024) + "0" + new string(']', 1024) + "]";
@@ -89,7 +89,7 @@ namespace EasyEject {
                 }
             } });
             Test("signed metadata valid whitespace still binds trust while semantic schema restrictions remain", () => { using (var f = new WindowsChannelFixture()) {
-                string valid = "\r\n\t " + f.Text() + " \r\n\t"; Check(f.Offer(valid).Release.Version == "0.1.0.0", "Valid signed whitespace changed exact offer");
+                string valid = "\r\n\t " + f.Text() + " \r\n\t"; Check(f.Offer(valid).Release.Version == "0.2.0.0", "Valid signed whitespace changed exact offer");
                 Throws<SafetyException>(() => f.Offer(f.Text().Replace("\"format\":1", "\"format\":1e0")));
             } });
             Test("malformed literal escape control and truncated nested content keep the serialization error contract", () => {

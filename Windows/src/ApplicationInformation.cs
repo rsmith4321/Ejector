@@ -5,9 +5,9 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("Easy Eject for Windows")]
 [assembly: AssemblyProduct("Easy Eject")]
-[assembly: AssemblyVersion("0.1.0.0")]
-[assembly: AssemblyFileVersion("0.1.0.0")]
-[assembly: AssemblyInformationalVersion("0.1.0-dev")]
+[assembly: AssemblyVersion("0.2.0.0")]
+[assembly: AssemblyFileVersion("0.2.0.0")]
+[assembly: AssemblyInformationalVersion("0.2.0-dev")]
 
 namespace EasyEject {
     internal static class ApplicationInformation {
@@ -16,7 +16,7 @@ namespace EasyEject {
         }
         internal static string About { get { return AboutFor(".NET Framework 4.8"); } }
         internal static string ModernAbout { get { return AboutFor(".NET 10 / WinUI 3"); } }
-        static string AboutFor(string platform) { return "Easy Eject for Windows\r\nDevelopment version " + Version + "\r\n\r\nWindows 11 x64 / " + platform + "\r\n\r\nThis local development build is part of the full Windows port. Real camera/card compatibility, foreground behavior and trusted signing still need acceptance testing. No Windows release or update channel is configured yet.\r\n\r\nSettings, saved profiles, exact import history and debug logs are stored separately from the executable in local application data. Closing the device window hides it in the tray; Quit exits after active work finishes or is cancelled."; }
+        static string AboutFor(string platform) { return "Easy Eject for Windows\r\nPreview version " + Version + "\r\n\r\nWindows 11 x64 / " + platform + "\r\n\r\nThis unsigned preview is part of the full Windows port. Real camera/card compatibility, foreground behavior and trusted signing still need acceptance testing. No automatic update channel is configured.\r\n\r\nSettings, saved profiles, exact import history and debug logs are stored separately from the executable in local application data. Closing the device window hides it in the tray. Quit requires no active work or open editor; save or cancel the editor first."; }
         internal static string Help { get { return HelpFor(false); } }
         internal static string ModernHelp { get { return HelpFor(true); } }
         static string HelpFor(bool modern) { return

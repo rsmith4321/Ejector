@@ -36,8 +36,8 @@ namespace EasyEject {
                 ModernIdentityPublish(fixture, ModernIdentityStable(File.ReadAllBytes(fixture.PathFor("EasyEject.Modern.dll"))));
                 BackendIdentityPublish(fixture, ModernIdentityStable(File.ReadAllBytes(fixture.PathFor("EasyEject.Runtime.dll"))));
                 string deps = File.ReadAllText(fixture.PathFor(ModernWindowsDependencyConfiguration.Name));
-                Check(deps.Contains("0.1.0-dev"), "Expected explicit development sample");
-                DependencyPublish(fixture, deps.Replace("0.1.0-dev", "0.1.0"));
+                Check(deps.Contains("0.2.0-dev"), "Expected explicit development sample");
+                DependencyPublish(fixture, deps.Replace("0.2.0-dev", "0.2.0"));
                 foreach (string name in new[] { "README.txt", "LICENSE.txt" }) ComponentPublish(fixture, name, Encoding.UTF8.GetBytes("Owned test placeholder; no distribution approval: " + name));
                 Check(fixture.Metadata.Files.Count == ReviewedMicrosoftVendorLayout.Files.Count + 11, "Unexpected composed fixture membership");
                 fixture.Publish(); return fixture;
@@ -48,7 +48,7 @@ namespace EasyEject {
                 using (var fixture = PinnedVendorFixture(folder)) {
                     var review = ApplicationPackage(fixture, CancellationToken.None, ReviewedMicrosoftVendorLayout.CreateLocalReviewApproval());
                     try {
-                        Check(review.Release.Files.Count == 650 && review.Release.Version == "0.1.0.0", "Full composed identity lost");
+                        Check(review.Release.Files.Count == 650 && review.Release.Version == "0.2.0.0", "Full composed identity lost");
                         foreach (string name in new[] { "coreclr.dll", "Microsoft.UI.Xaml.Controls.pri", "af-ZA/Microsoft.ui.xaml.dll.mui", "ThirdPartyNotices/Microsoft.NETCore.App.Runtime.win-x64-10.0.12/LICENSE.TXT", "EasyEject.Modern.dll", ModernWindowsDependencyConfiguration.Name })
                             Throws<IOException>(() => File.WriteAllText(fixture.PathFor(name), "changed"));
                         review.Revalidate(CancellationToken.None);

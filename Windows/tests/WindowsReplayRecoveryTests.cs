@@ -13,7 +13,7 @@ namespace EasyEject {
             internal readonly WindowsReleaseReviewSession Review;
             internal readonly string Backup; internal int Providers;
             internal ReplayRecoveryFixture(Action<string, string> checkpoint = null) {
-                Files.Accept(Files.Store(), Files.Offer(issued: Files.Channel.Seconds - 50)); Store = Files.Store(checkpoint); Backup = ReplayBackupPath(Files, Files.Offer("0.2.0.0", Files.Channel.Seconds - 20));
+                Files.Accept(Files.Store(), Files.Offer(issued: Files.Channel.Seconds - 50)); Store = Files.Store(checkpoint); Backup = ReplayBackupPath(Files, Files.Offer("0.3.0.0", Files.Channel.Seconds - 20));
                 Checks = new WindowsUpdateCoordinator(true, _ => Task.FromResult(Files.Offer()), () => Files.Channel.Now, TimeSpan.FromDays(1), true, () => { Providers++; return Store; });
                 Checks.PublishIdle(true); Checks.SetReviewOpen(true); Checks.Start(); Review = new WindowsReleaseReviewSession(Checks, Files.Channel.Channel); Review.PublishAvailable(true);
             }
@@ -27,7 +27,7 @@ namespace EasyEject {
                 using (var f = new ReplayRecoveryFixture()) { string hash = ReplayHash(f.Files); Check(f.Providers == 0 && f.Review.CanBackup && !f.Review.CanRestoreBackup, "Provider eagerly accessed or restore initially offered");
                     var result = f.Inspect(false); Check(result.Accepted && !f.Review.CanRestoreBackup && ReplayHash(f.Files) == hash, "Read performed restoration"); Throws<SafetyException>(() => f.Review.RestoreBackupAsync(result.Id, CancellationToken.None));
                     Check(f.Review.TryPresent(result) && !f.Review.TryPresent(result) && f.Review.CanRestoreBackup, "Presentation not one use"); Throws<SafetyException>(() => f.Review.RestoreBackupAsync(result.Id + 1, CancellationToken.None));
-                    Check(f.Restore(result.Id).Accepted && ReplaySavedFloor(f.Files).Version == "0.2.0.0" && !f.Review.CanRestoreBackup && !f.Review.CanArchive && !f.Review.CanExtracted, "Restore omitted floor or retained release authority");
+                    Check(f.Restore(result.Id).Accepted && ReplaySavedFloor(f.Files).Version == "0.3.0.0" && !f.Review.CanRestoreBackup && !f.Review.CanArchive && !f.Review.CanExtracted, "Restore omitted floor or retained release authority");
                     Throws<SafetyException>(() => f.Review.RestoreBackupAsync(result.Id, CancellationToken.None)); CheckBackupReleased(f.Backup); }
             });
             Test("recovery idle cancellation releases backup without changing target", () => {
@@ -67,7 +67,7 @@ namespace EasyEject {
                 WindowsReleaseReviewSession owner = null;
                 using (var f = new ReplayRecoveryFixture((stage, _) => { if (stage == "After publication" && owner != null) { owner.PublishAvailable(false); owner.PublishAvailable(true); } })) {
                     owner = f.Review; var backup = f.Inspect(); var result = ChannelAwait(() => f.Review.RestoreBackupAsync(backup.Id, CancellationToken.None));
-                    Check(result.Cancelled && result.Message.Contains("publication already completed") && ReplaySavedFloor(f.Files).Version == "0.2.0.0" && !f.Review.CanRestoreBackup, "Stopped restore reported no durable effect or retained permission"); CheckBackupReleased(f.Backup); }
+                    Check(result.Cancelled && result.Message.Contains("publication already completed") && ReplaySavedFloor(f.Files).Version == "0.3.0.0" && !f.Review.CanRestoreBackup, "Stopped restore reported no durable effect or retained permission"); CheckBackupReleased(f.Backup); }
             });
             Test("configured checks without persistent store expose no recovery action", () => {
                 using (var f = new UpdateCoordinatorFixture()) using (var checks = f.Create()) using (var review = new WindowsReleaseReviewSession(checks, f.Channel.Channel)) {
@@ -84,7 +84,7 @@ namespace EasyEject {
                 using (var f = new ReplayFixture()) { var channel = f.Channel; int roots = 0; var transport = ChannelTransport(channel, channel.Text(issued: channel.Seconds - 50));
                     using (var checks = WindowsReleaseChecks.Create(channel.Channel, () => { roots++; return f.Root; }, transport, new WindowsManifestTrust(channel.Archive.Package.CertificateTrust), () => channel.Now, false)) {
                         checks.PublishIdle(true); Check(UpdateManual(checks).Outcome == WindowsUpdateCheckOutcome.Accepted, "Initial native check failed"); string old = ReplayBackupPath(f);
-                        transport.Fetch = ChannelTransport(channel, channel.Text("0.2.0.0", channel.Seconds - 20)).Fetch; Check(UpdateManual(checks).Outcome == WindowsUpdateCheckOutcome.Accepted, "Advanced native check failed"); File.Delete(f.PathValue); checks.SetReviewOpen(true);
+                        transport.Fetch = ChannelTransport(channel, channel.Text("0.3.0.0", channel.Seconds - 20)).Fetch; Check(UpdateManual(checks).Outcome == WindowsUpdateCheckOutcome.Accepted, "Advanced native check failed"); File.Delete(f.PathValue); checks.SetReviewOpen(true);
                         using (var review = new WindowsReleaseReviewSession(checks, channel.Channel)) { review.PublishAvailable(true); var result = ChannelAwait(() => review.BackupAsync(old, CancellationToken.None)); Check(review.TryPresent(result) && !result.Accepted && result.Message.Contains("rolled back") && !File.Exists(f.PathValue), "Recovery used fresh store and forgot observed high water"); }
                         Check(roots == 1 && Object.ReferenceEquals(checks.ReplayStore(), checks.ReplayStore()), "Factory created independent stores");
                     } }
@@ -93,7 +93,7 @@ namespace EasyEject {
                 using (var f = new ReplayRecoveryFixture()) using (var folders = new InstallationFolders(f.Files.Root, f.Files.Root, _ => { throw new Exception("Unrequested open"); })) {
                     WindowsReleaseReviewDialog dialog = null; using (dialog = new WindowsReleaseReviewDialog(ApplicationInformation.Version, f.Review, folders, () => { if (dialog != null) dialog.PublishAvailable(true); })) {
                         string hash = ReplayHash(f.Files); PumpShareSetup(dialog.RunAction(() => f.Review.BackupAsync(f.Backup, CancellationToken.None)));
-                        bool ownedText = false; PumpShareSetup(dialog.ConfirmBackup(text => { ownedText = dialog.NestedReview && !f.Review.CanCheck && text.Contains("0.2.0.0") && text.Contains("UTC") && !text.Contains("epoch seconds"); return false; }));
+                        bool ownedText = false; PumpShareSetup(dialog.ConfirmBackup(text => { ownedText = dialog.NestedReview && !f.Review.CanCheck && text.Contains("0.3.0.0") && text.Contains("UTC") && !text.Contains("epoch seconds"); return false; }));
                         Check(ownedText && ReplayHash(f.Files) == hash && !dialog.RestoreBackup.Enabled && dialog.BackupStatus.Text.Contains("changed no update history"), "Cancel wrote settings, left restore live or omitted exact owned review"); CheckBackupReleased(f.Backup); }
                 }
             });
@@ -101,7 +101,7 @@ namespace EasyEject {
                 using (var f = new ReplayRecoveryFixture()) using (var folders = new InstallationFolders(f.Files.Root, f.Files.Root, _ => {})) {
                     WindowsReleaseReviewDialog dialog = null; using (dialog = new WindowsReleaseReviewDialog(ApplicationInformation.Version, f.Review, folders, () => { if (dialog != null) dialog.PublishAvailable(true); })) {
                         PumpShareSetup(dialog.RunAction(() => f.Review.BackupAsync(f.Backup, CancellationToken.None))); PumpShareSetup(dialog.ConfirmBackup(_ => true));
-                        Check(ReplaySavedFloor(f.Files).Version == "0.2.0.0" && dialog.BackupStatus.Text.Contains("Update history restored") && !dialog.RestoreBackup.Enabled && !dialog.VerifyArchive.Enabled && dialog.ReleaseContent.Text.Contains("again"), "Confirmed recovery omitted effect or kept release authority"); CheckBackupReleased(f.Backup); }
+                        Check(ReplaySavedFloor(f.Files).Version == "0.3.0.0" && dialog.BackupStatus.Text.Contains("Update history restored") && !dialog.RestoreBackup.Enabled && !dialog.VerifyArchive.Enabled && dialog.ReleaseContent.Text.Contains("again"), "Confirmed recovery omitted effect or kept release authority"); CheckBackupReleased(f.Backup); }
                 }
             });
             Test("hidden confirmation refuses current-file replacement while dialog is open", () => {
@@ -109,14 +109,14 @@ namespace EasyEject {
                     WindowsReleaseReviewDialog dialog = null; using (dialog = new WindowsReleaseReviewDialog(ApplicationInformation.Version, f.Review, folders, () => { if (dialog != null) dialog.PublishAvailable(true); })) {
                         PumpShareSetup(dialog.RunAction(() => f.Review.BackupAsync(f.Backup, CancellationToken.None))); byte[] old = File.ReadAllBytes(f.Files.PathValue);
                         PumpShareSetup(dialog.ConfirmBackup(_ => { File.Move(f.Files.PathValue, f.Files.PathValue + ".moved"); File.WriteAllBytes(f.Files.PathValue, old); return true; }));
-                        Check(dialog.BackupStatus.Text.Contains("changed after review") && ReplaySavedFloor(f.Files).Version == "0.1.0.0" && !dialog.RestoreBackup.Enabled, "Confirmation accepted replacement target"); }
+                        Check(dialog.BackupStatus.Text.Contains("changed after review") && ReplaySavedFloor(f.Files).Version == "0.2.0.0" && !dialog.RestoreBackup.Enabled, "Confirmation accepted replacement target"); }
                 }
             });
             Test("hidden confirmation uses immutable reviewed evidence rather than replaced display text", () => {
                 using (var f = new ReplayRecoveryFixture()) using (var folders = new InstallationFolders(f.Files.Root, f.Files.Root, _ => {})) {
                     WindowsReleaseReviewDialog dialog = null; using (dialog = new WindowsReleaseReviewDialog(ApplicationInformation.Version, f.Review, folders, () => { if (dialog != null) dialog.PublishAvailable(true); })) {
                         PumpShareSetup(dialog.RunAction(() => f.Review.BackupAsync(f.Backup, CancellationToken.None))); dialog.BackupContent.Text = "replaced display text"; bool exact = false;
-                        PumpShareSetup(dialog.ConfirmBackup(text => { exact = text.Contains(f.Backup) && text.Contains(f.Files.PathValue) && text.Contains("Current update history: 0.1.0.0") && !text.Contains("replaced display text"); return false; })); Check(exact && !dialog.RestoreBackup.Enabled, "Confirmation trusted mutable display or retained cancelled review"); }
+                        PumpShareSetup(dialog.ConfirmBackup(text => { exact = text.Contains(f.Backup) && text.Contains(f.Files.PathValue) && text.Contains("Current update history: 0.2.0.0") && !text.Contains("replaced display text"); return false; })); Check(exact && !dialog.RestoreBackup.Enabled, "Confirmation trusted mutable display or retained cancelled review"); }
                 }
             });
             Test("closed hidden recovery view rejects late worker output and releases backup", () => {

@@ -7,7 +7,7 @@ using System.Threading;
 
 namespace EasyEject {
     public static partial class Tests {
-        static Dictionary<string, string> ModernIdentityAttributes(string version = "0.1.0.0") {
+        static Dictionary<string, string> ModernIdentityAttributes(string version = "0.2.0.0") {
             return new Dictionary<string, string> {
                 { "System.Reflection.AssemblyProductAttribute", "Easy Eject" }, { "System.Reflection.AssemblyTitleAttribute", "Easy Eject for Windows" },
                 { "System.Reflection.AssemblyFileVersionAttribute", version }, { "System.Reflection.AssemblyInformationalVersionAttribute", version }
@@ -16,13 +16,13 @@ namespace EasyEject {
         static void ModernWindowsManagedIdentityTests() {
             Test("modern managed identity requires exact application title product and stable versions", delegate {
                 foreach (string field in new[] { "name", "version", "AssemblyProductAttribute", "AssemblyTitleAttribute", "AssemblyFileVersionAttribute", "AssemblyInformationalVersionAttribute" }) {
-                    var attributes = ModernIdentityAttributes(); new WindowsManagedIdentity("EasyEject.Modern", "0.1.0.0", attributes).RequireModern("0.1.0.0");
-                    if (field.StartsWith("Assembly", StringComparison.Ordinal)) { attributes["System.Reflection." + field] = "changed"; Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Modern", "0.1.0.0", attributes).RequireModern("0.1.0.0")); }
-                    else Throws<SafetyException>(() => new WindowsManagedIdentity(field == "name" ? "EasyEject.Windows" : "EasyEject.Modern", field == "version" ? "0.1.0.1" : "0.1.0.0", attributes).RequireModern("0.1.0.0"));
+                    var attributes = ModernIdentityAttributes(); new WindowsManagedIdentity("EasyEject.Modern", "0.2.0.0", attributes).RequireModern("0.2.0.0");
+                    if (field.StartsWith("Assembly", StringComparison.Ordinal)) { attributes["System.Reflection." + field] = "changed"; Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Modern", "0.2.0.0", attributes).RequireModern("0.2.0.0")); }
+                    else Throws<SafetyException>(() => new WindowsManagedIdentity(field == "name" ? "EasyEject.Windows" : "EasyEject.Modern", field == "version" ? "0.2.0.1" : "0.2.0.0", attributes).RequireModern("0.2.0.0"));
                 }
             });
             Test("modern managed identity refuses unstable noncanonical and absent release versions", delegate {
-                foreach (string version in new[] { null, "", "0.0.0.0", "0.1.0-dev", "0.1.0", "00.1.0.0", "0.1.0.0+source" }) Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Modern", version, ModernIdentityAttributes(version)).RequireModern(version));
+                foreach (string version in new[] { null, "", "0.0.0.0", "0.2.0-dev", "0.2.0", "00.2.0.0", "0.2.0.0+source" }) Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Modern", version, ModernIdentityAttributes(version)).RequireModern(version));
                 new WindowsManagedIdentity("EasyEject.Modern", "1.2.3.4", ModernIdentityAttributes("1.2.3.4")).RequireModern("1.2.3.4");
             });
             Test("modern and classic metadata policies never substitute each other", delegate {
@@ -32,8 +32,8 @@ namespace EasyEject {
                     Check(NativeManagedMetadata.Read(metadata).Name == "EasyEject.Windows", "Classic core identity changed");
                     Throws<SafetyException>(() => NativeManagedMetadata.ReadModern(metadata, entryPoint));
                 }
-                Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Modern", "0.1.0.0", ModernIdentityAttributes()).Require("0.1.0.0"));
-                Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Windows", "0.1.0.0", ModernIdentityAttributes()).RequireModern("0.1.0.0"));
+                Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Modern", "0.2.0.0", ModernIdentityAttributes()).Require("0.2.0.0"));
+                Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Windows", "0.2.0.0", ModernIdentityAttributes()).RequireModern("0.2.0.0"));
             });
             Test("modern metadata importer refuses missing malformed snapshots and unsupported entry point tokens", delegate {
                 foreach (uint token in new[] { 0U, 0x06000000U, 0x04000001U, 0x86000001U }) Throws<SafetyException>(() => NativeManagedMetadata.ReadModern(new byte[32], token));
@@ -57,7 +57,7 @@ namespace EasyEject {
                 }
             }
         }
-        static byte[] ModernIdentityStable(byte[] sample) { byte[] bytes = (byte[])sample.Clone(); PatchFixtureAttribute(bytes, "0.1.0-dev", "0.1.0.0"); return bytes; }
+        static byte[] ModernIdentityStable(byte[] sample) { byte[] bytes = (byte[])sample.Clone(); PatchFixtureAttribute(bytes, "0.2.0-dev", "0.2.0.0"); return bytes; }
         static int ModernIdentityClr(byte[] bytes) { int pe = (int)BitConverter.ToUInt32(bytes, 60); return FixtureRvaOffset(bytes, pe + 24 + 240, BitConverter.ToUInt16(bytes, pe + 6), BitConverter.ToUInt32(bytes, pe + 24 + 224)); }
         static byte[] ModernIdentityMetadata(byte[] bytes, out int start) {
             int pe = (int)BitConverter.ToUInt32(bytes, 60), clr = ModernIdentityClr(bytes);
@@ -66,18 +66,18 @@ namespace EasyEject {
         }
         static void ModernIdentityPublish(ModernPackageFixture fixture, byte[] bytes) {
             string name = "EasyEject.Modern.dll"; File.WriteAllBytes(fixture.PathFor(name), bytes); fixture.Metadata.Files.RemoveAll(file => file.Name == name);
-            fixture.Metadata.Files.Add(new WindowsReleaseFile(name, bytes.Length, WindowsSignerEvidence.Hash(bytes))); fixture.Metadata.Version = "0.1.0.0"; fixture.Publish();
+            fixture.Metadata.Files.Add(new WindowsReleaseFile(name, bytes.Length, WindowsSignerEvidence.Hash(bytes))); fixture.Metadata.Version = "0.2.0.0"; fixture.Publish();
         }
         static void ModernWindowsManagedActualIdentityTests(byte[] sample) {
             Test("modern native metadata reads actual development app without loading or executing it", delegate {
                 var before = AppDomain.CurrentDomain.GetAssemblies(); string hash = WindowsSignerEvidence.Hash(sample);
                 var identity = ModernIdentityBytes(sample);
-                Check(identity.Name == "EasyEject.Modern" && identity.Version == "0.1.0.0" && identity.Product == "Easy Eject" && identity.Title == "Easy Eject for Windows" && identity.FileVersion == "0.1.0.0" && identity.InformationalVersion == "0.1.0-dev", "Actual modern identity differs");
-                Throws<SafetyException>(() => identity.RequireModern("0.1.0.0"));
+                Check(identity.Name == "EasyEject.Modern" && identity.Version == "0.2.0.0" && identity.Product == "Easy Eject" && identity.Title == "Easy Eject for Windows" && identity.FileVersion == "0.2.0.0" && identity.InformationalVersion == "0.2.0-dev", "Actual modern identity differs");
+                Throws<SafetyException>(() => identity.RequireModern("0.2.0.0"));
                 Check(WindowsSignerEvidence.Hash(sample) == hash && !AppDomain.CurrentDomain.GetAssemblies().Except(before).Any(assembly => assembly.GetName().Name == "EasyEject.Modern"), "Candidate loaded or source bytes changed");
             });
             Test("modern native metadata accepts owned stable attribute patch and refuses classic core policy", delegate {
-                byte[] bytes = ModernIdentityStable(sample); ModernIdentityBytes(bytes, identity => identity.RequireModern("0.1.0.0"));
+                byte[] bytes = ModernIdentityStable(sample); ModernIdentityBytes(bytes, identity => identity.RequireModern("0.2.0.0"));
                 int start; byte[] metadata = ModernIdentityMetadata(bytes, out start); Throws<SafetyException>(() => NativeManagedMetadata.Read(metadata));
             });
             Test("modern actual managed identity independently refuses altered application and attribute versions", delegate {
@@ -88,9 +88,9 @@ namespace EasyEject {
                     if (field == "name") Check(PatchFixtureBytes(bytes, Encoding.UTF8.GetBytes("\0EasyEject.Modern\0"), Encoding.UTF8.GetBytes("\0OtherApp!.Modern\0")) == 1, "Ambiguous modern name fixture");
                     else if (field == "product") PatchFixtureAttribute(bytes, "Easy Eject", "Other App!");
                     else if (field == "title") PatchFixtureAttribute(bytes, "Easy Eject for Windows", "Other App! for Windows");
-                    else if (field == "informational") PatchFixtureAttribute(bytes, "0.1.0-dev", "0.1.0.1");
-                    else PatchFixtureAttribute(bytes, "0.1.0.0", "0.1.0.1", 2);
-                    Throws<SafetyException>(() => ModernIdentityBytes(bytes, identity => identity.RequireModern("0.1.0.0")));
+                    else if (field == "informational") PatchFixtureAttribute(bytes, "0.2.0-dev", "0.2.0.1");
+                    else PatchFixtureAttribute(bytes, "0.2.0.0", "0.2.0.1", 2);
+                    Throws<SafetyException>(() => ModernIdentityBytes(bytes, identity => identity.RequireModern("0.2.0.0")));
                 }
             });
             Test("modern actual metadata refuses missing and duplicate identity attributes", delegate {
@@ -133,7 +133,7 @@ namespace EasyEject {
                     byte[] bytes = ModernIdentityStable(sample); ModernIdentityPublish(fixture, bytes);
                     using (var review = fixture.Review()) { ModernWindowsManagedApplicationIdentity.Require(review, CancellationToken.None); Throws<IOException>(() => File.WriteAllText(fixture.PathFor("EasyEject.Modern.dll"), "changed")); }
                     Check(File.ReadAllBytes(fixture.PathFor("EasyEject.Modern.dll")).SequenceEqual(bytes), "Managed bytes changed"); fixture.RequireReleased();
-                    fixture.Metadata.Version = "0.1.0.1"; fixture.Publish(); using (var review = fixture.Review()) Throws<SafetyException>(() => ModernWindowsManagedApplicationIdentity.Require(review, CancellationToken.None)); fixture.RequireReleased();
+                    fixture.Metadata.Version = "0.2.0.1"; fixture.Publish(); using (var review = fixture.Review()) Throws<SafetyException>(() => ModernWindowsManagedApplicationIdentity.Require(review, CancellationToken.None)); fixture.RequireReleased();
                 }
             });
             Test("modern actual managed layer refreshes revoked signer and cancellation before granting identity", delegate {

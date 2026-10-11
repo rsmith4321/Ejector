@@ -11,8 +11,10 @@ namespace EasyEject.Modern {
             double width = double.IsInfinity(available.Width) ? double.MaxValue : Math.Max(0, available.Width);
             double x = 0, y = 0, rowHeight = 0, usedWidth = 0;
             foreach (var child in Children) {
-                if (child.Visibility == Visibility.Collapsed) continue;
+                // Measure even collapsed children so XAML tracks their parent layout
+                // dependency when a Stop/debug action becomes visible later.
                 child.Measure(new Size(width, double.PositiveInfinity));
+                if (child.Visibility == Visibility.Collapsed) continue;
                 var size = child.DesiredSize;
                 if (x > 0 && x + size.Width > width) { y += rowHeight + Gap; x = 0; rowHeight = 0; }
                 usedWidth = Math.Max(usedWidth, x + size.Width); x += size.Width + Gap; rowHeight = Math.Max(rowHeight, size.Height);

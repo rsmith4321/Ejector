@@ -15,10 +15,10 @@ namespace EasyEject {
                 string app = Path.Combine(Path.GetDirectoryName(typeof(Tests).Assembly.Location), WindowsReleaseManifest.Executable);
                 byte[] bytes = File.ReadAllBytes(app);
                 if (releaseVersion) {
-                    byte[] old = Encoding.Unicode.GetBytes("0.1.0-dev\0"), next = Encoding.Unicode.GetBytes("0.1.0.0\0\0\0"); int found = 0;
+                    byte[] old = Encoding.Unicode.GetBytes("0.2.0-dev\0"), next = Encoding.Unicode.GetBytes("0.2.0.0\0\0\0"); int found = 0;
                     found = PatchFixtureBytes(bytes, old, next);
                     Check(found == 1, "Could not patch only the disposable product-version resource");
-                    if (managedReleaseVersion) PatchFixtureAttribute(bytes, "0.1.0-dev", "0.1.0.0");
+                    if (managedReleaseVersion) PatchFixtureAttribute(bytes, "0.2.0-dev", "0.2.0.0");
                 }
                 File.WriteAllBytes(Path.Combine(Root, WindowsReleaseManifest.Executable), bytes);
                 File.Copy(Path.Combine(Path.GetDirectoryName(app), WindowsReleaseManifest.Configuration), Path.Combine(Root, WindowsReleaseManifest.Configuration));
@@ -26,7 +26,7 @@ namespace EasyEject {
                 File.WriteAllText(Path.Combine(Root, "LICENSE.txt"), "Disposable test licensing text. Not an actual license grant.", new UTF8Encoding(false)); Publish();
             }
             internal string ManifestText() {
-                return "{\"format\":1,\"application\":\"EasyEject.Windows\",\"platform\":\"windows-x64\",\"version\":\"0.1.0.0\",\"sourceRevision\":\"384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c\",\"files\":[" + String.Join(",", WindowsReleaseManifest.PayloadNames.Select(n => "{\"name\":\"" + n + "\",\"length\":" + new FileInfo(Path.Combine(Root, n)).Length + ",\"sha256\":\"" + WindowsSignerEvidence.Hash(File.ReadAllBytes(Path.Combine(Root, n))) + "\"}")) + "]}";
+                return "{\"format\":1,\"application\":\"EasyEject.Windows\",\"platform\":\"windows-x64\",\"version\":\"0.2.0.0\",\"sourceRevision\":\"384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c\",\"files\":[" + String.Join(",", WindowsReleaseManifest.PayloadNames.Select(n => "{\"name\":\"" + n + "\",\"length\":" + new FileInfo(Path.Combine(Root, n)).Length + ",\"sha256\":\"" + WindowsSignerEvidence.Hash(File.ReadAllBytes(Path.Combine(Root, n))) + "\"}")) + "]}";
             }
             internal void Publish(string text = null, byte[] bytes = null) { byte[] body = bytes ?? Encoding.UTF8.GetBytes(text ?? ManifestText()); File.WriteAllBytes(Path.Combine(Root, WindowsReleaseManifest.ManifestName), body); File.WriteAllBytes(Path.Combine(Root, WindowsReleaseManifest.SignatureName), Signing.Sign(body)); }
             internal WindowsPackageReview Review(CancellationToken cancel = default(CancellationToken), IWindowsExecutableTrust executable = null, IWindowsManifestTrust manifest = null) { return new WindowsPackageReview(Root, Signing.Publisher(), executable ?? ExecutableTrust, manifest ?? new WindowsManifestTrust(CertificateTrust), cancel); }
@@ -76,7 +76,7 @@ namespace EasyEject {
                 using (var f = new WindowsPackageFixture()) {
                     var before = Directory.GetFiles(f.Root).ToDictionary(Path.GetFileName, p => WindowsSignerEvidence.Hash(File.ReadAllBytes(p)));
                     using (var review = f.Review()) {
-                        Check(review.Release.Version == "0.1.0.0" && review.Release.SourceRevision == "384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c" && review.Release.Files.Count == 4 && review.Authenticated.BodyHash == before[WindowsReleaseManifest.ManifestName], "Package identity/inventory is incomplete");
+                        Check(review.Release.Version == "0.2.0.0" && review.Release.SourceRevision == "384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c" && review.Release.Files.Count == 4 && review.Authenticated.BodyHash == before[WindowsReleaseManifest.ManifestName], "Package identity/inventory is incomplete");
                         review.Revalidate(CancellationToken.None); Check(f.ExecutableTrust.Calls == 2 && f.CertificateTrust.Calls == 2, "Revalidation did not refresh both native trust roles");
                         Check(Directory.GetFiles(f.Root).All(p => before[Path.GetFileName(p)] == WindowsSignerEvidence.Hash(File.ReadAllBytes(p))) && Directory.GetFileSystemEntries(f.Root).Length == 6, "Review wrote, extracted or installed contents");
                     }
@@ -153,13 +153,13 @@ namespace EasyEject {
                 }
             });
             Test("Windows package refuses wrong application platform format source and nonstable version", delegate {
-                foreach (string value in new[] { "macos-x64", "windows-arm64", "EasyEject.Mac", "format2", "bad-source", "0.1.0-dev", "0.1.0", "00.1.0.0", "0.0.0.0", "65536.1.0.0", "0.1.0.1" }) using (var f = new WindowsPackageFixture()) {
+                foreach (string value in new[] { "macos-x64", "windows-arm64", "EasyEject.Mac", "format2", "bad-source", "0.2.0-dev", "0.2.0", "00.2.0.0", "0.0.0.0", "65536.1.0.0", "0.2.0.1" }) using (var f = new WindowsPackageFixture()) {
                     string text = f.ManifestText();
                     if (value.StartsWith("macos") || value.StartsWith("windows")) text = text.Replace("windows-x64", value);
                     else if (value.StartsWith("Easy")) text = text.Replace("EasyEject.Windows\"", value + "\"");
                     else if (value == "format2") text = text.Replace("\"format\":1", "\"format\":2");
                     else if (value == "bad-source") text = text.Replace("384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c", new string('A', 40));
-                    else text = text.Replace("0.1.0.0", value);
+                    else text = text.Replace("0.2.0.0", value);
                     f.Publish(text); RefusePackage(() => f.Review());
                 }
             });

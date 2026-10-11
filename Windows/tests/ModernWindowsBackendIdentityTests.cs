@@ -8,15 +8,15 @@ namespace EasyEject {
         static void ModernWindowsBackendIdentityTests() {
             Test("modern backend identity binds exact library role product title and all release versions", delegate {
                 foreach (string field in new[] { "name", "version", "AssemblyProductAttribute", "AssemblyTitleAttribute", "AssemblyFileVersionAttribute", "AssemblyInformationalVersionAttribute" }) {
-                    var attributes = ModernIdentityAttributes(); new WindowsManagedIdentity("EasyEject.Runtime", "0.1.0.0", attributes).RequireModernBackend("0.1.0.0");
-                    if (field.StartsWith("Assembly", StringComparison.Ordinal)) { attributes["System.Reflection." + field] = "changed"; Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Runtime", "0.1.0.0", attributes).RequireModernBackend("0.1.0.0")); }
-                    else Throws<SafetyException>(() => new WindowsManagedIdentity(field == "name" ? "EasyEject.Modern" : "EasyEject.Runtime", field == "version" ? "0.1.0.1" : "0.1.0.0", attributes).RequireModernBackend("0.1.0.0"));
+                    var attributes = ModernIdentityAttributes(); new WindowsManagedIdentity("EasyEject.Runtime", "0.2.0.0", attributes).RequireModernBackend("0.2.0.0");
+                    if (field.StartsWith("Assembly", StringComparison.Ordinal)) { attributes["System.Reflection." + field] = "changed"; Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Runtime", "0.2.0.0", attributes).RequireModernBackend("0.2.0.0")); }
+                    else Throws<SafetyException>(() => new WindowsManagedIdentity(field == "name" ? "EasyEject.Modern" : "EasyEject.Runtime", field == "version" ? "0.2.0.1" : "0.2.0.0", attributes).RequireModernBackend("0.2.0.0"));
                 }
             });
             Test("modern backend stable version and application policies never substitute each other", delegate {
-                foreach (string version in new[] { null, "", "0.0.0.0", "0.1.0-dev", "0.1.0", "00.1.0.0", "0.1.0.0+source" }) Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Runtime", version, ModernIdentityAttributes(version)).RequireModernBackend(version));
-                var valid = new WindowsManagedIdentity("EasyEject.Runtime", "0.1.0.0", ModernIdentityAttributes());
-                Throws<SafetyException>(() => valid.RequireModern("0.1.0.0")); Throws<SafetyException>(() => valid.Require("0.1.0.0"));
+                foreach (string version in new[] { null, "", "0.0.0.0", "0.2.0-dev", "0.2.0", "00.2.0.0", "0.2.0.0+source" }) Throws<SafetyException>(() => new WindowsManagedIdentity("EasyEject.Runtime", version, ModernIdentityAttributes(version)).RequireModernBackend(version));
+                var valid = new WindowsManagedIdentity("EasyEject.Runtime", "0.2.0.0", ModernIdentityAttributes());
+                Throws<SafetyException>(() => valid.RequireModern("0.2.0.0")); Throws<SafetyException>(() => valid.Require("0.2.0.0"));
                 new WindowsManagedIdentity("EasyEject.Runtime", "1.2.3.4", ModernIdentityAttributes("1.2.3.4")).RequireModernBackend("1.2.3.4");
             });
             Test("modern backend DLL reader refuses an actual classic executable", delegate {
@@ -46,16 +46,16 @@ namespace EasyEject {
             byte[] sample = File.ReadAllBytes(path), stable = ModernIdentityStable(sample); string originalHash = WindowsSignerEvidence.Hash(sample);
             Test("modern backend actual development metadata is read without loading or executing sample code", delegate {
                 var before = AppDomain.CurrentDomain.GetAssemblies(); var identity = BackendIdentityBytes(sample);
-                Check(identity.Name == "EasyEject.Runtime" && identity.Version == "0.1.0.0" && identity.FileVersion == "0.1.0.0" && identity.InformationalVersion == "0.1.0-dev", "Actual backend identity differs");
-                Throws<SafetyException>(() => identity.RequireModernBackend("0.1.0.0"));
+                Check(identity.Name == "EasyEject.Runtime" && identity.Version == "0.2.0.0" && identity.FileVersion == "0.2.0.0" && identity.InformationalVersion == "0.2.0-dev", "Actual backend identity differs");
+                Throws<SafetyException>(() => identity.RequireModernBackend("0.2.0.0"));
                 var added = AppDomain.CurrentDomain.GetAssemblies().Except(before).ToArray();
                 Console.WriteLine("Metadata sample newly loaded assemblies: " + String.Join(", ", added.Select(assembly => assembly.GetName().Name).ToArray()));
                 Check(!added.Any(assembly => assembly.GetName().Name == "EasyEject.Runtime") && WindowsSignerEvidence.Hash(sample) == originalHash, "Sample backend was loaded or altered");
             });
             Test("modern backend stable owned copy admits library role and rejects main application substitution", delegate {
-                BackendIdentityBytes(stable).RequireModernBackend("0.1.0.0");
+                BackendIdentityBytes(stable).RequireModernBackend("0.2.0.0");
                 Throws<SafetyException>(() => ModernIdentityBytes(stable));
-                Throws<SafetyException>(() => BackendIdentityBytes(stable).RequireModern("0.1.0.0"));
+                Throws<SafetyException>(() => BackendIdentityBytes(stable).RequireModern("0.2.0.0"));
             });
             Test("modern backend PE requires x64 DLL console layout managed library flags and no method entry", delegate {
                 for (int mutation = 0; mutation < 6; mutation++) {
@@ -71,12 +71,12 @@ namespace EasyEject {
             });
             Test("modern backend actual altered product and informational version refuse release admission", delegate {
                 byte[] bytes = (byte[])stable.Clone(); PatchFixtureAttribute(bytes, "Easy Eject", "Fake Eject");
-                Throws<SafetyException>(() => BackendIdentityBytes(bytes).RequireModernBackend("0.1.0.0"));
-                Throws<SafetyException>(() => BackendIdentityBytes(sample).RequireModernBackend("0.1.0.0"));
+                Throws<SafetyException>(() => BackendIdentityBytes(bytes).RequireModernBackend("0.2.0.0"));
+                Throws<SafetyException>(() => BackendIdentityBytes(sample).RequireModernBackend("0.2.0.0"));
             });
             Test("modern backend authenticated owned library remains held through repeat identity checks", delegate {
                 using (var fixture = new ModernPackageFixture()) {
-                    fixture.Metadata.Version = "0.1.0.0"; BackendIdentityPublish(fixture, stable);
+                    fixture.Metadata.Version = "0.2.0.0"; BackendIdentityPublish(fixture, stable);
                     using (var review = fixture.Review()) {
                         ModernWindowsBackendIdentity.Require(review, CancellationToken.None);
                         Throws<IOException>(() => File.WriteAllText(fixture.PathFor("EasyEject.Runtime.dll"), "changed"));

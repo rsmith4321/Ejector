@@ -159,7 +159,7 @@ namespace EasyEject {
             Test("Channel discovery authenticates metadata then signature with fresh native trust and no archive fetch", () => {
                 using (var f = new WindowsChannelFixture()) {
                     var transport = ChannelTransport(f); var discovery = ChannelDiscovery(f, transport); var offer = ChannelCheck(discovery);
-                    Check(discovery.Configured && offer.Release.Version == "0.1.0.0" && transport.Metadata == 1 && transport.Signature == 1 && f.Archive.Package.CertificateTrust.Calls == 2, "Wrong fetch/trust sequence or extra operation");
+                    Check(discovery.Configured && offer.Release.Version == "0.2.0.0" && transport.Metadata == 1 && transport.Signature == 1 && f.Archive.Package.CertificateTrust.Calls == 2, "Wrong fetch/trust sequence or extra operation");
                 }
             });
             Test("Channel discovery unconfigured or denied admission never fetches or authenticates", () => {
@@ -179,7 +179,7 @@ namespace EasyEject {
             Test("Channel discovery freezes metadata before another transport callback can mutate it", () => {
                 using (var f = new WindowsChannelFixture()) {
                     byte[] body = Encoding.UTF8.GetBytes(f.Text()), signature = f.Archive.Package.Signing.Sign(body); var transport = new ChannelTransportFixture { Fetch = (channel, resource, cancel) => { if (resource == WindowsChannelResource.Metadata) return Task.FromResult(body); body[0] = 0; return Task.FromResult(signature); } };
-                    Check(ChannelCheck(ChannelDiscovery(f, transport)).Release.Version == "0.1.0.0" && body[0] == 0, "Caller mutated frozen metadata");
+                    Check(ChannelCheck(ChannelDiscovery(f, transport)).Release.Version == "0.2.0.0" && body[0] == 0, "Caller mutated frozen metadata");
                 }
             });
             Test("Channel discovery refuses missing or excessive transport metadata before signature/trust", () => {
@@ -197,7 +197,7 @@ namespace EasyEject {
                 using (var f = new WindowsChannelFixture()) {
                     byte[] body = Encoding.UTF8.GetBytes(f.Text()), signature = f.Archive.Package.Signing.Sign(body); body[0] = 0;
                     var transport = new ChannelTransportFixture { Fetch = (channel, resource, cancel) => Task.FromResult(resource == WindowsChannelResource.Metadata ? body : signature) }; var discovery = ChannelDiscovery(f, transport);
-                    Throws<SafetyException>(() => ChannelCheck(discovery)); Check(transport.Metadata == 1 && transport.Signature == 1 && f.Archive.Package.CertificateTrust.Calls == 0, "Cryptographic mismatch retried or trusted"); body[0] = (byte)'{'; Check(ChannelCheck(discovery).Release.Version == "0.1.0.0" && transport.Metadata == 2, "Failed check kept its slot");
+                    Throws<SafetyException>(() => ChannelCheck(discovery)); Check(transport.Metadata == 1 && transport.Signature == 1 && f.Archive.Package.CertificateTrust.Calls == 0, "Cryptographic mismatch retried or trusted"); body[0] = (byte)'{'; Check(ChannelCheck(discovery).Release.Version == "0.2.0.0" && transport.Metadata == 2, "Failed check kept its slot");
                 }
             });
             Test("Channel discovery scope loss after either fetch prevents subsequent work", () => {
@@ -218,42 +218,42 @@ namespace EasyEject {
                 using (var f = new WindowsChannelFixture()) {
                     byte[] body = Encoding.UTF8.GetBytes(f.Text(expires: f.Seconds + 60)), signature = f.Archive.Package.Signing.Sign(body);
                     var transport = new ChannelTransportFixture { Fetch = (channel, resource, token) => { if (resource == WindowsChannelResource.Signature) f.Now = f.Now.AddMinutes(2); return Task.FromResult(resource == WindowsChannelResource.Metadata ? body : signature); } }; var discovery = ChannelDiscovery(f, transport);
-                    Check(Throws<SafetyException>(() => ChannelCheck(discovery)).Message.Contains("expired"), "Expired network result became an offer"); transport.Fetch = ChannelTransport(f).Fetch; Check(ChannelCheck(discovery).Release.Version == "0.1.0.0", "Expired check retained its slot");
+                    Check(Throws<SafetyException>(() => ChannelCheck(discovery)).Message.Contains("expired"), "Expired network result became an offer"); transport.Fetch = ChannelTransport(f).Fetch; Check(ChannelCheck(discovery).Release.Version == "0.2.0.0", "Expired check retained its slot");
                 }
             });
             Test("Channel discovery refuses concurrent checks and releases a cancelled slot", () => {
                 using (var f = new WindowsChannelFixture()) using (var cancel = new CancellationTokenSource()) using (var entered = new ManualResetEventSlim()) {
                     var pending = new TaskCompletionSource<byte[]>(); var transport = new ChannelTransportFixture { Fetch = (channel, resource, token) => { token.Register(() => pending.TrySetCanceled()); entered.Set(); return pending.Task; } }; var discovery = ChannelDiscovery(f, transport);
                     var work = Task.Run(() => discovery.CheckAsync(cancel.Token)); Check(entered.Wait(2000), "Pending discovery did not enter"); Check(Throws<SafetyException>(() => ChannelCheck(discovery)).Message.Contains("already in progress") && transport.Metadata == 1, "Duplicate started another request"); cancel.Cancel(); Throws<OperationCanceledException>(() => ChannelAwait(() => work));
-                    transport.Fetch = ChannelTransport(f).Fetch; Check(ChannelCheck(discovery).Release.Version == "0.1.0.0" && transport.Metadata == 2 && transport.Signature == 1, "Cancelled check did not release slot");
+                    transport.Fetch = ChannelTransport(f).Fetch; Check(ChannelCheck(discovery).Release.Version == "0.2.0.0" && transport.Metadata == 2 && transport.Signature == 1, "Cancelled check did not release slot");
                 }
             });
             Test("Channel discovery native trust failure retains manual retry and returns no offer", () => {
                 using (var f = new WindowsChannelFixture()) {
                     var transport = ChannelTransport(f); var discovery = ChannelDiscovery(f, transport); f.Archive.Package.CertificateTrust.Throw = true; Throws<SafetyException>(() => ChannelCheck(discovery)); f.Archive.Package.CertificateTrust.Throw = false;
-                    Check(ChannelCheck(discovery).Release.Version == "0.1.0.0" && transport.Metadata == 2 && transport.Signature == 2 && f.Archive.Package.CertificateTrust.Calls == 3, "Failed trust consumed slot or automatically retried");
+                    Check(ChannelCheck(discovery).Release.Version == "0.2.0.0" && transport.Metadata == 2 && transport.Signature == 2 && f.Archive.Package.CertificateTrust.Calls == 3, "Failed trust consumed slot or automatically retried");
                 }
             });
             Test("Channel discovery scope loss during initial/final native trust never consumes replay state", () => {
                 using (var f = new WindowsChannelFixture()) foreach (int lostAt in new[] { 1, 2 }) {
-                    int allowed = 1, start = f.Archive.Package.CertificateTrust.Calls; var transport = ChannelTransport(f, f.Text("0.2.0.0", f.Seconds - 20)); var discovery = ChannelDiscovery(f, transport, () => Volatile.Read(ref allowed) != 0);
+                    int allowed = 1, start = f.Archive.Package.CertificateTrust.Calls; var transport = ChannelTransport(f, f.Text("0.3.0.0", f.Seconds - 20)); var discovery = ChannelDiscovery(f, transport, () => Volatile.Read(ref allowed) != 0);
                     f.Archive.Package.CertificateTrust.During = () => { if (f.Archive.Package.CertificateTrust.Calls - start == lostAt) Interlocked.Exchange(ref allowed, 0); };
                     Throws<SafetyException>(() => ChannelCheck(discovery)); Check(f.Archive.Package.CertificateTrust.Calls - start == lostAt, "Lost native scope continued authentication"); f.Archive.Package.CertificateTrust.During = null; Interlocked.Exchange(ref allowed, 1);
-                    transport.Fetch = ChannelTransport(f, f.Text("0.1.0.0", f.Seconds - 50)).Fetch; Check(ChannelCheck(discovery).Release.Version == "0.1.0.0", "Failed scope advanced high water");
+                    transport.Fetch = ChannelTransport(f, f.Text("0.2.0.0", f.Seconds - 50)).Fetch; Check(ChannelCheck(discovery).Release.Version == "0.2.0.0", "Failed scope advanced high water");
                 }
             });
             Test("Channel discovery cancellation during final native trust does not consume replay state", () => {
                 using (var f = new WindowsChannelFixture()) using (var cancel = new CancellationTokenSource()) {
-                    var transport = ChannelTransport(f, f.Text("0.2.0.0", f.Seconds - 20)); var discovery = ChannelDiscovery(f, transport); f.Archive.Package.CertificateTrust.During = () => { if (f.Archive.Package.CertificateTrust.Calls == 2) cancel.Cancel(); };
-                    Throws<OperationCanceledException>(() => ChannelCheck(discovery, cancel.Token)); f.Archive.Package.CertificateTrust.During = null; transport.Fetch = ChannelTransport(f, f.Text("0.1.0.0", f.Seconds - 50)).Fetch;
-                    Check(ChannelCheck(discovery).Release.Version == "0.1.0.0", "Cancelled native acceptance advanced replay state");
+                    var transport = ChannelTransport(f, f.Text("0.3.0.0", f.Seconds - 20)); var discovery = ChannelDiscovery(f, transport); f.Archive.Package.CertificateTrust.During = () => { if (f.Archive.Package.CertificateTrust.Calls == 2) cancel.Cancel(); };
+                    Throws<OperationCanceledException>(() => ChannelCheck(discovery, cancel.Token)); f.Archive.Package.CertificateTrust.During = null; transport.Fetch = ChannelTransport(f, f.Text("0.2.0.0", f.Seconds - 50)).Fetch;
+                    Check(ChannelCheck(discovery).Release.Version == "0.2.0.0", "Cancelled native acceptance advanced replay state");
                 }
             });
             Test("Channel discovery enforces accepted process replay ordering across later checks", () => {
                 using (var f = new WindowsChannelFixture()) {
-                    var transport = ChannelTransport(f, f.Text("0.2.0.0", f.Seconds - 20)); var discovery = ChannelDiscovery(f, transport); Check(ChannelCheck(discovery).Release.Version == "0.2.0.0", "Initial offer failed");
-                    transport.Fetch = ChannelTransport(f, f.Text("0.1.0.0", f.Seconds - 50)).Fetch; Check(Throws<SafetyException>(() => ChannelCheck(discovery)).Message.Contains("rolled back"), "Older discovery overwrote accepted high water");
-                    transport.Fetch = ChannelTransport(f, f.Text("0.2.0.0", f.Seconds - 20)).Fetch; Check(ChannelCheck(discovery).Release.Version == "0.2.0.0" && transport.Metadata == 3 && transport.Signature == 3, "Refusal blocked equivalent manual retry");
+                    var transport = ChannelTransport(f, f.Text("0.3.0.0", f.Seconds - 20)); var discovery = ChannelDiscovery(f, transport); Check(ChannelCheck(discovery).Release.Version == "0.3.0.0", "Initial offer failed");
+                    transport.Fetch = ChannelTransport(f, f.Text("0.2.0.0", f.Seconds - 50)).Fetch; Check(Throws<SafetyException>(() => ChannelCheck(discovery)).Message.Contains("rolled back"), "Older discovery overwrote accepted high water");
+                    transport.Fetch = ChannelTransport(f, f.Text("0.3.0.0", f.Seconds - 20)).Fetch; Check(ChannelCheck(discovery).Release.Version == "0.3.0.0" && transport.Metadata == 3 && transport.Signature == 3, "Refusal blocked equivalent manual retry");
                 }
             });
         }
