@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Current accessible package passes exact-backend regression · October 11
+
+[Fresh ba5661f packaged replay](modern/PACKAGED_REGRESSION_20261011.md) passes **1454/0 full**, **246/0 selected** and **16/0 supplied-tool cases**, all exit0/empty stderr, with each parent loading exact current Release Runtime and matching packaged .NET10.0.12 core bytes. Counts overlap; official LUT conversion explicitly NOT RUN. Warning-free unchanged archived test/Framework fixture builds; no new full Framework claim. Finalization verifies402 archived source files,649 review files,live2/isolated5/prior destination21, currentZIP/Mac/login preservation. ZIP remains107460193bytes/SHAa49f4e12bb50b3dfbc1bd5e5a75073379bd46c977df7fc7ea65e87c0ecd15e60. Aggregate SHAc32611d45bdbba6b0519fa757404ce0faae167f2780f1a52284b61e73d4afcee. Read-only inventory still internal-only; no normal app launch/device/OS/install/signing/push/publication. Full acceptance/publishing OK stay open; goal active.
+
 ## Exact-source accessibility review and unsigned ZIP rebuilt · October 11
 
 [Current ba5661f candidate](modern/REVIEW_020_20261011.md) includes native accessible row/control names. Normal Release build/package exit0; all650 ZIP entries independently decompress/hash against staging; engineering probes excluded, row ToString retained. ZIP **107460193 bytes**, SHA **a49f4e12bb50b3dfbc1bd5e5a75073379bd46c977df7fc7ea65e87c0ecd15e60**. 0040e58/all earlier candidates superseded. Current source warning-free selected246/0/native acceptance remain scoped; earlier full/tool replay not claimed on new payload. Normal app unlaunched; live/isolated/destination/Mac preserved; no install/device/OS/push/publication. Full gates and publishing OK remain open; goal active.

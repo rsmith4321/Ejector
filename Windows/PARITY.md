@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · exact current-package backend replay
+
+[Current ba5661f replay](modern/PACKAGED_REGRESSION_20261011.md) passes **1454/0 full**, **246/0 selected**, **16/0 supplied-tool cases**, exact Release Runtime/bundled .NET10.0.12 module pins, exit0/empty stderr. Counts overlap; positive official LUT explicitly NOT RUN.402 source files/649 review files/live2/isolated5/prior destination21/ZIP/Mac/login preservation independently pass. Aggregate SHAc32611d45bdbba6b0519fa757404ce0faae167f2780f1a52284b61e73d4afcee. This refreshes current software evidence without promoting fixtures to native/hardware/genuine-media/travel/trust acceptance. No normal launch/device/OS/install/push/publication; full goal active and publishing OK pending.
+
 ## October 11 · rebuilt exact-source accessible review candidate
 
 [ba5661f normal Release review/ZIP](modern/REVIEW_020_20261011.md) now includes accessible production rows/controls; build/package exit0,650 entries independently hashed, engineering probes absent. ZIP SHA **a49f4e12bb50b3dfbc1bd5e5a75073379bd46c977df7fc7ea65e87c0ecd15e60**,107460193bytes. Older candidates superseded. Selected246/0/native tests retain their source scope; prior packaged full/tool counts do not apply to new bytes. No normal launch/install/device/OS/push/publication; full acceptance and publishing OK remain open; goal active.
