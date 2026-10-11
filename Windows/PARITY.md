@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · rebuilt 0040e58 review candidate
+
+[Current exact-source review](modern/REVIEW_020_20261011.md) includes the pending-picker Close correction, superseding 34125fc. Build/package exit0 and every 650 ZIP entry hashes against staging; engineering methods absent in Release metadata. ZIP **107459831 bytes**, SHA-256 **e941e2c49a9bb88d65d6d24234e6cd2fbcd711350ef2c7cf43105a7e56198bb4**. Normal app unlaunched, no install/device/live-setting/push/publication action. Full physical/media/LUT/OS/travel/trust acceptance and publishing OK remain open; goal active.
+
 ## October 11 · pending-picker keyboard default corrected
 
 [Completed imports Close focus](modern/PENDING_PICKER_FOCUS_20261011.md) corrects the prior Return→row-selection mismatch while preserving deliberate keyboard selection and explicit fresh review. Native before regression fails; fixed factory/input/regressions and warning-free selected **246/0** pass. Native exit0/no exception; destination/live/copied records exact. **34125fc ZIP superseded pending rebuild**. Full import timing/physical/media/LUT/OS/travel/trust and publishing OK remain open; no hardware/live-setting/push/publication action.

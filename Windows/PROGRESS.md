@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Rebuilt pending-picker review · October 11
+
+Production **0040e581768b349be702d2dc09ff666112082da6** now produces the [current unsigned 0.2 review/ZIP](modern/REVIEW_020_20261011.md), superseding 34125fc. Build/package exit0; all 650 entries decompress/hash against staging; Release metadata retains the production picker/flyout and excludes engineering methods. ZIP **107459831 bytes**, SHA-256 **e941e2c49a9bb88d65d6d24234e6cd2fbcd711350ef2c7cf43105a7e56198bb4**. Native before/after/input/regression and warning-free selected **246/0** remain scoped source evidence. No normal launch, install, device/live-setting change, push or publication. Publishing OK and full acceptance remain open; shared Mac packet updated for pickup.
+
 ## Completed-import picker honors initial Close · October 11
 
 [Production keyboard correction](modern/PENDING_PICKER_FOCUS_20261011.md) makes first Return close the pending picker without selecting/consuming a choice. Before native factory regression fails; after passes late programmatic redirection and deliberate selection. Actual Return-close, Shift+Tab/Return row selection, explicit Review and completion Escape pass. Engineering/native regressions and normal selected **246/0** are warning-free; native Quit exits0/no exception, 21 destination files/1 copied history/2 live records stay exact. **34125fc review ZIP is superseded pending exact-commit rebuild.** Full physical/media/LUT/OS/trust and publishing gates stay open; goal active.
