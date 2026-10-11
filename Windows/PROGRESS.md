@@ -1,10 +1,14 @@
 # Windows progress · October 10, 2026
 
+## Native Explorer-return Escape diagnostics · October 11
+
+[Passive test-only keyboard evidence](modern/KEYBOARD_PROBE_20261011.md) now passes both settings-folder and app-folder Explorer return paths: Escape reaches the dialog and dismisses it, followed by an idle settled view and normal tray Quit. The previous failure was not reproduced; its cause remains unproven. Accessibility focus differs from the received key source, so no production workaround is justified. Both diagnostic and normal-exclusion builds have zero warnings/errors; actual tray Quit/Stop regression passes. No production payload or default-count change. Hardware/media/LUT/trust and publication gates remain open.
+
 ## Native Settings and unconfigured update review · October 11
 
 [Scoped native Settings/update evidence](modern/SETTINGS_UPDATES_NATIVE_20261011.md) confirms missing-channel release/history controls disabled, correct guide version/paths and both exact-folder Explorer buttons. Only automatic release checks are saved off in isolated preferences; true Quit/restart restores that choice, and an opposite draft Cancel preserves the saved file exactly. Both owned processes quit normally, the login Run value stays absent and both live configuration files remain exact.
 
-Escape after Explorer focus return does not dismiss the guide, while explicit Close and a separate direct text-focus Escape reproduction succeed. This remains an unresolved focus/input case, not a blanket selectable-text defect or keyboard pass. An initial raw-JSON defaults assertion is corrected against nullable field preservation. No production source/payload/default-count change or configured signed update acceptance; physical/LUT/trust and publication gates remain open.
+In that run Escape after Explorer focus return did not dismiss the guide, while explicit Close and a separate direct text-focus Escape reproduction succeeded. The later diagnostic run above passes both folder-return paths without changing production behavior; the older cause remains unproven. An initial raw-JSON defaults assertion is corrected against nullable field preservation. No production source/payload/default-count change or configured signed update acceptance; physical/LUT/trust and publication gates remain open.
 
 ## Native manual 1080p override and missing-LUT refusal · October 11
 

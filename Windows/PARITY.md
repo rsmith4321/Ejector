@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · Explorer-return keyboard evidence
+
+[Passive engineering probe](modern/KEYBOARD_PROBE_20261011.md) records received/handled Escape and native dismissal after each exact settings/app-folder Explorer return. The earlier failure is not reproduced and its cause remains unproven; production keyboard behavior is unchanged. Diagnostic and normal-exclusion builds pass without warnings, as does the actual tray Quit/Stop regression. These scoped passes do not close broad keyboard, physical/media/LUT/trust or publishing gates.
+
 ## October 11 · native Settings/update scope
 
 [Native isolated Settings/update review](modern/SETTINGS_UPDATES_NATIVE_20261011.md) now verifies disabled unconfigured release/history controls, guide paths/exact-folder navigation, automatic-check Save/true Quit/restart and exact Cancel preservation. Login remains absent and both live configuration files remain exact. Post-Explorer Escape focus/input remains unresolved despite passing direct Escape reproduction; configured signed update/restore/worker acceptance and physical/media/LUT/trust gates are still open. No production/default-count change or full completion claim follows.

@@ -1,6 +1,8 @@
 # Windows device testing
 
-**Native Settings/update review:** [unconfigured controls, guide/folders and Save/restart](modern/SETTINGS_UPDATES_NATIVE_20261011.md) have scoped native evidence with unchanged live settings/login registration. Escape after Explorer focus return remains unresolved; configured signed update/restore and physical/trust gates stay open.
+**Native Explorer-return Escape:** [passive engineering diagnostics](modern/KEYBOARD_PROBE_20261011.md) pass both exact-folder return/dismissal paths. The earlier failure was not reproduced and remains unexplained. Diagnostic and normal-exclusion builds are warning-free; tray Quit/Stop regression passes. No production keyboard or payload change.
+
+**Native Settings/update review:** [unconfigured controls, guide/folders and Save/restart](modern/SETTINGS_UPDATES_NATIVE_20261011.md) have scoped native evidence with unchanged live settings/login registration. The later keyboard probe above passes the previously unresolved paths; configured signed update/restore and physical/trust gates stay open.
 
 **Native sharing choices:** [manual 1080p override, exact reuse and unavailable-LUT refusal](modern/SHARE_CHOICES_20261011.md) pass on the generated UHD/audio batch. Outputs independently probe/full-decode, existing originals/4K files/preferences remain exact, and missing-LUT refusal writes no destination files. Positive official LUT/genuine footage remain open; no default-suite count or production payload change.
 

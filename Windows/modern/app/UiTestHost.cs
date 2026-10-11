@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
@@ -61,12 +62,45 @@ namespace EasyEject.Modern {
     public sealed partial class MainWindow {
         static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
         internal void InitializeReviewControls() {
+            InitializeReviewKeyboardProbe();
             var footer = (Microsoft.UI.Xaml.Controls.StackPanel)Navigation.PaneFooter;
             var flyout = new Microsoft.UI.Xaml.Controls.Button { Content = "Test tray flyout" };
             flyout.Click += (_, args) => { var area = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Control.MousePosition).Bounds; ToggleTrayFlyout(new System.Drawing.Point(area.Right - 140, area.Bottom - 20)); };
             var quit = new Microsoft.UI.Xaml.Controls.Button { Content = "Test tray Quit" };
             quit.Click += (_, args) => tray.ContextMenuStrip.Items.Cast<System.Windows.Forms.ToolStripItem>().Single(item => item.Text == "Quit preview").PerformClick();
             footer.Children.Add(flyout); footer.Children.Add(quit);
+        }
+        // Diagnostic evidence only: UI_TESTS review builds record activation and
+        // Escape routing. Never record text or other keys, and never handle a key.
+        void InitializeReviewKeyboardProbe() {
+            var trace = new StreamWriter(new FileStream(Path.Combine(UiTestHost.Root,
+                "keyboard-probe-" + Guid.NewGuid().ToString("N") + ".jsonl"),
+                FileMode.CreateNew, FileAccess.Write, FileShare.Read)) { AutoFlush = true };
+            var observed = new HashSet<UIElement>();
+            Action<string, bool?, string> record = (kind, handled, source) => trace.WriteLine(
+                System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow, kind, handled, source }));
+            Action<UIElement> attach = element => {
+                if (!observed.Add(element)) return;
+                element.AddHandler(UIElement.PreviewKeyDownEvent, new Microsoft.UI.Xaml.Input.KeyEventHandler((sender, args) => {
+                    if (args.Key == Windows.System.VirtualKey.Escape)
+                        record("PreviewEscape", args.Handled, args.OriginalSource?.GetType().Name);
+                }), true);
+                element.AddHandler(UIElement.KeyDownEvent, new Microsoft.UI.Xaml.Input.KeyEventHandler((sender, args) => {
+                    if (args.Key == Windows.System.VirtualKey.Escape)
+                        record("Escape", args.Handled, args.OriginalSource?.GetType().Name);
+                }), true);
+                record("Attached", null, element.GetType().Name);
+            };
+            attach(Root);
+            var timer = DispatcherQueue.CreateTimer(); timer.Interval = TimeSpan.FromMilliseconds(250);
+            timer.Tick += (_, args) => {
+                if (Root.XamlRoot == null) return;
+                foreach (var popup in Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(Root.XamlRoot))
+                    if (popup.Child is UIElement child) attach(child);
+            };
+            Activated += (_, args) => record("Activation", null, args.WindowActivationState.ToString());
+            Closed += (_, args) => { timer.Stop(); trace.Dispose(); };
+            timer.Start();
         }
         internal async Task TestTrayQuit() {
             await EnsureVisible();
