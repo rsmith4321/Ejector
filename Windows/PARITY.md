@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native degraded history and exact receipt recovery
+
+[Isolated generated history](modern/HISTORY_RECOVERY_NATIVE_20261011.md) passes saved verification despite individual malformed profiles or whole-catalog warning, safe sharing suppression/reappearance after recovery, malformed JSON refusal and distinct valid JSON same-size/time receipt-hash refusal. Exact restore requires a separate manual retry, which verifies both originals with source absent. Destination/live records remain exact and all four sessions quit normally. No production/default-count/payload change; actual completion eject/cleanup, genuine media/LUT, physical destination/hardware/travel and OS/distribution acceptance remain open.
+
 ## October 11 · long flyout and unresolved focus delivery
 
 [Generated 18-device native flyout](modern/FLYOUT_LONG_NATIVE_20261011.md) passes keyboard/wheel reach, fixed footer/work-area geometry, safe Return/default and retained scroll, confirmation click-away retention and idle dismissal. The isolated passive probe reproduces Explorer-return Escape without a received XAML event; explicit body focus then receives/handles Escape. Cause and human keyboard acceptance remain open; no production workaround or release payload change. Normal/engineering builds and native regression pass; all sessions quit normally and existing files stay exact. This is scoped existing-monitor/150% generated UI evidence, not broad themes/DPI/monitors, real hardware/media/LUT, OS tray-icon/notifications or trusted distribution acceptance.

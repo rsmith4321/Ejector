@@ -1,5 +1,7 @@
 # Windows device testing
 
+**Native degraded history:** [malformed individual profile/catalog-wide warning and exact receipt recovery](modern/HISTORY_RECOVERY_NATIVE_20261011.md) pass on the existing generated UHD batch. Verification remains available while sharing is suppressed; catalog recovery returns manual sharing without export. Malformed and separately valid-but-changed receipts refuse; exact restore starts no automatic work and fresh manual verification passes. Four normal Quits, exact destination/live records; no source/build/count/ZIP change or physical acceptance.
+
 **Long flyout/focus:** [18 generated devices across all groups](modern/FLYOUT_LONG_NATIVE_20261011.md) pass native keyboard/wheel reach, fixed footer/work-area geometry, safe default/retained scroll and light-dismiss behavior. Passive tracing reproduces Explorer-return Escape delivery missing at observed XAML roots; explicit body focus then receives/handles it. Cause/human keyboard acceptance remain open. Final normal/engineering builds and native regression pass; inspection code is absent from normal metadata. No production/default-count/ZIP change.
 
 **Current package:** [960bd75 committed-source review](modern/REVIEW_020_20261011.md) replaces the superseded 6de85d2 ZIP. Release build/package exit 0, all 650 ZIP entries independently decompress/hash against staging and the engineering host is absent. Normal app remains unlaunched; no push/publication. Explicit publication OK and physical/media/LUT/trust acceptance remain open.
