@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Exact-source accessibility review and unsigned ZIP rebuilt · October 11
+
+[Current ba5661f candidate](modern/REVIEW_020_20261011.md) includes native accessible row/control names. Normal Release build/package exit0; all650 ZIP entries independently decompress/hash against staging; engineering probes excluded, row ToString retained. ZIP **107460193 bytes**, SHA **a49f4e12bb50b3dfbc1bd5e5a75073379bd46c977df7fc7ea65e87c0ecd15e60**. 0040e58/all earlier candidates superseded. Current source warning-free selected246/0/native acceptance remain scoped; earlier full/tool replay not claimed on new payload. Normal app unlaunched; live/isolated/destination/Mac preserved; no install/device/OS/push/publication. Full gates and publishing OK remain open; goal active.
+
 ## Production accessible names verified in native UI · October 11
 
 [Native accessibility correction](modern/ACCESSIBILITY_NAMES_NATIVE_20261011.md) replaces storage/profile class-name rows with displayed details and labels key lists/selectors/diagnostic text. Actual profile selection, history/manual4K prompt Cancel and ordinary dialog recovery pass; PID30912 exits0/no exception. Final warning-free native regressions/normal **246/0**/host exclusion and live2/isolated5/destination21/Mac/login preservation pass. Pending list is source/factory-tested, not separately provider-observed; human accessibility remains open. **0040e58 ZIP superseded pending rebuild**, preserved exact. No export/device/OS/push/publication action. Aggregate SHAb38710eae522a99e2c08f9193b1893566da20b9dcf58564026832ced96855122; full goal active.

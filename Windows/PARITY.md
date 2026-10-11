@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · rebuilt exact-source accessible review candidate
+
+[ba5661f normal Release review/ZIP](modern/REVIEW_020_20261011.md) now includes accessible production rows/controls; build/package exit0,650 entries independently hashed, engineering probes absent. ZIP SHA **a49f4e12bb50b3dfbc1bd5e5a75073379bd46c977df7fc7ea65e87c0ecd15e60**,107460193bytes. Older candidates superseded. Selected246/0/native tests retain their source scope; prior packaged full/tool counts do not apply to new bytes. No normal launch/install/device/OS/push/publication; full acceptance and publishing OK remain open; goal active.
+
 ## October 11 · production accessible rows and control labels
 
 [Actual native provider checks](modern/ACCESSIBILITY_NAMES_NATIVE_20261011.md) verify descriptive storage/profile rows, named key lists/selectors/log text, unchanged selection/manual sharing Cancel and recovery. Final warning-free native regressions/normal **246/0**/exclusion/preservation pass; exit0/no exception. Pending-list name remains source/factory scope; human screen-reader/broader accessibility/full acceptance remain open. **0040e58 ZIP superseded pending rebuild** for production labels. No export/device/OS/push/publication action; goal active.
