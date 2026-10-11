@@ -1,5 +1,11 @@
 # Windows progress · October 10, 2026
 
+## Native UHD/audio Stop and retry · October 11
+
+[Actual native encoding cancellation](modern/UHD_CANCEL_RETRY_20261011.md) now passes on generated 15-second **3840×2160/30fps** clips with synthetic audio. Computer control clicks Stop while encoding is active; the first validated copy/receipt remains, unfinished second work is removed, no owned FFmpeg/private work remains, and originals/import records stay exact. A new manual action reports **1 new / 1 reused**, preserving all eight files retained after cancellation. Both outputs independently probe/full-decode at full UHD with stereo AAC, matching the exact Mac/Windows sharing recipe. The isolated app quits normally.
+
+The opt-in helper adds only a fixed isolated UHD/audio recipe. Final warning-free matching-Release compilation, eight admission refusals and positive preparations for both short/UHD modes pass. Short fixture bytes remain unchanged. Script comparison/channel-assumption mistakes and their exact corrections are retained. No production payload/default-suite count or prepared ZIP change; genuine media/LUT, physical hardware/power/travel and trusted distribution gates remain open. Publication approval is still pending.
+
 ## Native manual 4K preset and source-absent restart · October 11
 
 Follow-up native generated-file checks now reject a one-byte saved-original change with size/timestamp preserved: **0 new / 0 reused / 0 published**, no destination file changes or additions. Exact exclusive restoration starts no automatic action; a fresh manual retry reuses both outputs, preserving all eleven prior files and adding only its own audit. Escape cancellation before export preserves all twelve files without a new audit. The owned process quits normally. These results and the corrected distinct Debug engineering / Release helper backend pins are recorded in [the evidence](modern/SHARE_RESTART_20261011.md). The final helper is explicitly recompiled against its matching Release backend; all eight refusal controls pass again. No default test count or production ZIP change follows.

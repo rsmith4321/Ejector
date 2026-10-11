@@ -57,7 +57,7 @@ A further fresh sharing review tests pre-export cancellation. Return opens the f
 | `changed-original-retry-files.json` | `9072FAA5B3EB350AE72A2EDCA18F186ADC7304CB8335DDB3C5F4D051D9E7739E` |
 | `cancel-files-unchanged.json` | `2BA122374003319A27454704C11175B9EB8DAE1DBD83203D3A40605BAD001989` |
 
-`changed-original-backup.bin`, `changed-original-restored.json` and all earlier receipts remain retained. No device action, real-media modification, new tool, live configuration write or production payload change occurs. Actual native encoding cancellation and physical destination replacement remain pending.
+`changed-original-backup.bin`, `changed-original-restored.json` and all earlier receipts remain retained. No device action, real-media modification, new tool, live configuration write or production payload change occurs. Subsequent [generated UHD/audio checks](UHD_CANCEL_RETRY_20261011.md) cover native encoding Stop/partial-result preservation/manual retry; physical destination replacement remains pending.
 
 ## Additional native settings/flyout observations
 

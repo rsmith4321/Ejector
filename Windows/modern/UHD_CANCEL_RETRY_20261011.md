@@ -1,0 +1,48 @@
+# Native UHD export Stop and manual retry · October 11, 2026
+
+The isolated WinUI host now has an actual Stop-during-encoding pass using generated 15-second 3840×2160 video with synthetic audio. Stop preserves a previously completed, verified output, cancels the unfinished second encode, removes its private work and leaves no owned FFmpeg worker. A separate manual retry reuses the completed output and creates the second. Both outputs independently probe and fully decode at 3840×2160/30fps with stereo AAC. This is generated-media evidence, not genuine camera footage, official LUT/color/audio fidelity, device eject, power/travel or trusted distribution acceptance.
+
+## Bounded preparation
+
+`NativeHistoryFixture` adds the explicit eight-argument mode:
+
+```text
+--prepare-owned-isolated-native-uhd-video-history NEW_FIXTURE_ROOT INITIALIZED_STOPPED_REVIEW_ROOT EXPECTED_BACKEND_SHA256 FFMPEG_EXE FFMPEG_SHA256 FFPROBE_EXE FFPROBE_SHA256
+```
+
+It retains the existing exact-backend, supplied-executable, owned ordinary path, review marker and exclusive owner-lock checks. It is isolated preparation only: no seed mode, live preference/history publication or real source/eject API. The generated profile starts with sharing, automatic import, original removal, recovery and eject prompt off. Only the fixed UHD mode selects this recipe; no arbitrary input file, dimensions, duration or tool arguments are accepted.
+
+The helper generates two identical 15-second **3840×2160 / 30fps / H.264** test-pattern clips with a synthetic 440Hz, **48kHz mono AAC** tone. It probes these exact properties and fully decodes the generated source. Generation uses two video encoder threads and a 180-second contained-process deadline; full decode has a 90-second deadline. The existing short recipe remains one-second, silent 640×360 and uses its original 30-second deadlines. A `free` MP4 box carries synthetic Luna selection identity only. No actual camera model is inferred.
+
+Helper build: existing SDK10.0.401/cache, `Windows/modern/tools/NativeHistoryFixture.csproj`, `publish --no-restore -c Release -r win-x64 --self-contained true`, `EasyEjectBuildRoot=...\Codex020-isolated-video-helper-20261011\build`, and explicit Release reference `EasyEjectFixtureBackend=C:\Users\rsmit\.codex\EasyEjectBuildTools\ClaudeReview-6de85d2\review\app\EasyEject.Runtime.dll`. Final output is `C:\Users\rsmit\.codex\EasyEjectBuildTools\Codex020-uhd-video-helper-20261011\runner-v2`. The matching backend is `707E55B543E5424D464D94DAF4997652061E1D205B4BBA2D8E0C5C7AB9B3BB16`. The final warning-free build log is `Codex020-uhd-video-helper-v2-20261011.log`; helper assembly SHA-256 **BBE3DE6ED35DE98217C4EE744C700C63DE1EFAD6532F72A1BEDB831B123AAFB0**. Earlier `runner`/compile log are retained separately; the final source tightens duration admission to also refuse non-finite values.
+
+All eight final admission controls refuse with exit1 and absent requested roots: missing mode, wrong backend, outside root, uninitialized review, active owner, wrong tool hash, wrong marker and unsupported UHD seed. `admission-v2.json` and `v2-*.log` retain exact reasons. Final positive preparation runs both recipes against a separately initialized/stopped isolated scope. `final-positive-preparations.json`, argument files and logs remain in the helper packet. Both return exit0, `Seeded=false`, exact two-file source-absent verification, changed-original/destination and cancellation refusals, and fresh verification retry. The short recipe's original hashes remain exactly `E8DCD8BB1916DB8933332A811C98931973A4D3293CA49BD563A0DD9D449AA03B`.
+
+Final positive proof paths are `C:\Users\rsmit\.codex\EasyEjectBuildTools\Codex020-final-short-helper-regression-20261011\fixture-receipt.json` (SHA-256 **1F182EC0B375DFAC8CB188A5DE22CCE637B21E856743B15C29181AA6A3D5948F**) and `...\Codex020-final-uhd-helper-regression-20261011\fixture-receipt.json` (**D60CFFED51A6DB4F4F624CEC06F180AD3F8AEDFE56C4A6AB603845C5F2EA6573**). These additional preparations remain private and were not published to app history.
+
+## Actual native Stop/retry
+
+The normal engineering host is `C:\Users\rsmit\.codex\EasyEjectBuildTools\Codex020-ui-layout-20261011\bin\EasyEject.Modern\Debug\net10.0-windows10.0.26100.0\win-x64\EasyEject.Modern.exe`, with the distinct Debug backend **6F38BE334769E31A918D23CACB1E8E5CDA04D40AEE087FC6AB27C7ED9181359F**. No production application is rebuilt. The review app initializes `C:\Users\rsmit\.codex\EasyEjectFixtures\ui-uhd-review-20261011`, then exits through its actual idle tray Quit callback before exclusive fixture publication.
+
+Initial generated fixture `C:\Users\rsmit\.codex\EasyEjectBuildTools\Codex020-native-uhd-fixture-20261011` retains `fixture-receipt.json` and the exact prepared record ledger. Only the stopped isolated review receives those exclusive profile/history records and a copy of the previously UI-selected, unchanged tool setup. Source is retained under `retained-source`; the original source path is absent. Each imported original is **78599567 bytes**, SHA-256 **E8BF384FEB63C80BC1C960B30D6B4470D4E9C275C39D7878CFA488692BB81C05**.
+
+1. PID29908 restarts that isolated scope. Saved profiles shows sharing Off. Normal offline Edit explicitly enables manual Quick Share, **4K / Standard**, with LUT off. Automatic import, removal, recovery and eject prompt remain off. Save starts no import/export.
+2. Native history selects the exact two-file generated batch, then Quick Share opens a separate size/LUT confirmation. The explicit Create action starts normal production encoding. The UI visibly reports **Creating sharing copy: 76%**, with an enabled, laid-out **Stop export** button. A read-only process census records actual supplied FFmpeg PID18712, parent29908, its generated first-original input and owned private output path.
+3. Computer control clicks Stop export. The refreshed UI has reached the second encode at **30%** and reports stopping; terminal status says cancellation, **1 new / 0 reused, 1/1 published files/receipts**, originals unchanged and retry manual. The first output had already completed probe/full-decode/exclusive publication. No second output or receipt remains, no private `.easy-share-<id>` folder remains and no FFmpeg process targeting this fixture remains.
+4. All five pre-existing originals/import-receipt/import-audit/unrelated-file hashes, sizes and write times match the pre-export snapshot. The first completed output/receipt and cancelled-attempt audit remain. The cancellation audit ends at the second `Before encode` entry; it is not claimed to contain a terminal cancellation line. The UI terminal result is recorded separately above.
+5. No automatic retry occurs. A new history → Quick Share → explicit Create action reports **1 new / 1 reused**. All eight files present after cancellation retain exact hashes, sizes and write times, including the first output/receipt and cancelled audit. Only the second completed output/receipt and a new successful retry audit are added. Its terminal log records `new 1 | reused 1 | skipped MP4 0`.
+6. Both outputs independently probe and fully decode with the same existing pinned FFmpeg/FFprobe. Each is **46187052 bytes**, SHA-256 **446A77D3BFB2D4B2426633EF7AB25EEE17A22D10895F24E4BD9A09EF332975F4**, **3840×2160 / 30fps / H.264 / 15 seconds / 48kHz stereo AAC**. This confirms the baseline sharing recipe's stereo conversion of the synthetic mono tone, rather than channel-count preservation. Exact baseline `384cb767...:Ejector/EasyShare.swift` and Windows `QuickSharePlan` both specify `-ac 2`.
+7. Close the success result and invoke actual idle tray Quit: PID29908 exits normally. The separate final-helper initialization process PID14696 also quits normally. No real device action, format, cleanup, user-footage import, system setting or live configuration write occurs.
+
+The first post-Stop file-comparison script misread a single OrderedDictionary's `.Count` as the number of matches. Repeating with an explicit array confirms all five exact pre-existing files; the correction is retained in evidence. The first independent output assertion wrongly expected mono channels and stopped before decode. It was corrected against the exact Mac/Windows stereo contract; both full decodes then pass. Neither script mistake is presented as an application failure or a passing original check.
+
+| Evidence in native generated fixture | SHA-256 |
+| --- | --- |
+| `fixture-receipt.json` | `FD1D51A507A90276F37B0872FCCC2D4C879B301ADD00E1766F9F0E9CFAC20E98` |
+| `after-cancel-files.json` | `F4DDAF0FAE38B8C95E3A2A0CA4278AC1ABB4757E6A25407BA46F3FC527599BB6` |
+| `after-retry-files.json` | `9040C2069E4E0BE5B6908867C2A7CA03FFAA3268D4C07FDD223E6E8E657F4CF2` |
+| `independent-uhd-output-validation.json` | `741CFC31AF8E3D3C84DDA0522F10AED5F4A7D5C12CD1AA5CD4A5232DB547B190` |
+
+`active-encode-workers.json`, `before-export-files.json`, `isolated-records.json`, preparation command arguments and both audit attempts remain retained. Existing supplied tool hashes are unchanged: FFmpeg **6C03ED874BF9C219D3BA865339B48A106EEF11FAC07E8E53BB599AC59214469D**, FFprobe **FB41BE6F4386DF4625D13EEC932EC926BE4744853759C7C100947EDC7B917096**. Nothing is installed.
+
+These opt-in checks add no default-suite count: earlier candidate full suites remain **1454/0** each runtime and **246/0** selected modern. Production payload and the prepared 0.2 ZIP remain unchanged; publishing still requires Ryan's OK. Genuine camera/LUT/subjective fidelity, whole-camera eject/veto/reconnect, actual replaced destination, physical DPI/themes/OS tray interaction, notification/power/travel and clean-machine/trusted distribution remain open. The full goal stays active.
