@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · exact Release backend and completion audit
+
+[Current packaged DLL replay](modern/PACKAGED_REGRESSION_20261011.md) passes full **1454/0**, selected **246/0** and supplied-tool **16/0** on exact Release Runtime and matching bundled .NET10.0.12 core bytes, with live module records and exit0. Counts overlap; no full WinUI/physical/LUT/trusted-distribution equivalence is inferred. Source/archive/review/ZIP/tool/live-record preservation passes, Mac baseline unchanged; no external device currently appears in read-only inventory. [Full-goal requirement/gate audit](COMPLETION_GATES_20261011.md) retains genuine media/official LUT/physical grouping/notification/travel/normal-loader/signing/publishing requirements. No production/payload change or held action; goal active.
+
 ## October 11 · rebuilt 0040e58 review candidate
 
 [Current exact-source review](modern/REVIEW_020_20261011.md) includes the pending-picker Close correction, superseding 34125fc. Build/package exit0 and every 650 ZIP entry hashes against staging; engineering methods absent in Release metadata. ZIP **107459831 bytes**, SHA-256 **e941e2c49a9bb88d65d6d24234e6cd2fbcd711350ef2c7cf43105a7e56198bb4**. Normal app unlaunched, no install/device/live-setting/push/publication action. Full physical/media/LUT/OS/travel/trust acceptance and publishing OK remain open; goal active.

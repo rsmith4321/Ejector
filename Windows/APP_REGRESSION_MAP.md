@@ -1,5 +1,7 @@
 # App regression contract audit · October 6, 2026
 
+October 11 [exact packaged-backend replay](modern/PACKAGED_REGRESSION_20261011.md), source0040e58: full1454/0, selected246/0 and supplied-tool16/0 on the exact Release Runtime and matching bundled .NET10.0.12 core bytes. These strengthen the mapped software/file/service properties, not complete live WinUI/physical integration. [Current full-goal audit](COMPLETION_GATES_20261011.md) retains the remaining acceptance scope; no assertion mapping is promoted solely by aggregate counts.
+
 Baseline: Mac `384cb767ffbbb87ec5fe67f45d0b4d0ce324ad7c`. This extends the separate [media mapping](REGRESSION_MAP.md). It inventories app harnesses and starts an assertion-based mapping of defaults, completion, notifications and grouped/bulk actions. It does not establish full-project parity or native foreground/hardware acceptance. Read the named assertions and implementation before relying on a row; related test names alone are insufficient.
 
 **Fixture** means applicable policy/file/control assertions exist on Windows. **Partial** means related evidence is narrower than the Mac integration/property. **Platform** identifies an Apple-specific implementation whose applicable user behavior must still be preserved. **Pending** means the named harness has not received its complete assertion mapping here. Actual device and foreground integrations remain pending regardless of a Fixture row.

@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Exact packaged backend replay and full-goal audit · October 11
+
+The current **0040e58** [packaged backend](modern/PACKAGED_REGRESSION_20261011.md) now passes **1454/0 full**, **246/0 selected** and **16/0 existing supplied-tool cases**, separately, against exact Release Runtime SHA **771d34714946c7c2a90dd8a85ce637b42e7946d03b1756e3d94a5685f4bf09ed**. Every parent is observed loading that DLL and the matching bundled .NET10.0.12 core modules; all exit0/empty stderr. All 386 extracted archive files, 649 review files, ZIP, supplied executables and 2live records stay exact; Mac baseline diff is empty. No normal WinUI app/physical device/LUT/signing/push/publication action or product-source change. [Full-goal audit](COMPLETION_GATES_20261011.md) records requirements and missing proof without replacing them with fixture success. Fresh read-only inventory has no external source. Current ZIP remains exact/unpublished; full goal active.
+
 ## Rebuilt pending-picker review · October 11
 
 Production **0040e581768b349be702d2dc09ff666112082da6** now produces the [current unsigned 0.2 review/ZIP](modern/REVIEW_020_20261011.md), superseding 34125fc. Build/package exit0; all 650 entries decompress/hash against staging; Release metadata retains the production picker/flyout and excludes engineering methods. ZIP **107459831 bytes**, SHA-256 **e941e2c49a9bb88d65d6d24234e6cd2fbcd711350ef2c7cf43105a7e56198bb4**. Native before/after/input/regression and warning-free selected **246/0** remain scoped source evidence. No normal launch, install, device/live-setting change, push or publication. Publishing OK and full acceptance remain open; shared Mac packet updated for pickup.
