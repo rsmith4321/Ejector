@@ -8,6 +8,18 @@ namespace EasyEject.Modern {
     public sealed partial class MainWindow {
         ReviewReleaseBackend reviewReleaseBackend;
         bool useReviewReleaseBackend;
+        bool? lastReviewReleaseAvailable;
+        bool ReviewReleaseActivityAvailable() {
+            if (!UiTestHost.Review || reviewReleaseBackend == null) return true;
+            bool value = !File.Exists(Path.Combine(UiTestHost.Root, "release-activity-busy.txt"));
+            if (lastReviewReleaseAvailable != value) {
+                lastReviewReleaseAvailable = value;
+                File.AppendAllText(Path.Combine(UiTestHost.Root, "release-activity.jsonl"),
+                    System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow, available = value,
+                        nested = releaseView.Nested, busy = releaseView.Busy, canClose = releaseView.CanClose }) + "\r\n");
+            }
+            return value;
+        }
         void InitializeReleaseReviewProbe(StackPanel footer) {
             var button = new Button { Content = "Test release workflows" };
             button.Click += (_, args) => {
@@ -20,8 +32,10 @@ namespace EasyEject.Modern {
             footer.Children.Add(button);
         }
         IReleaseViewBackend CreateReviewReleaseBackend() {
-            if (!UiTestHost.Review || !useReviewReleaseBackend)
+            if (!UiTestHost.Review || !useReviewReleaseBackend) {
+                reviewReleaseBackend = null;
                 return WindowsReleaseViewBackend.ForModern(releaseChecks, WindowsReleaseChecks.ModernProductionChannel, ApplicationInformation.Version, components: WindowsReleaseChecks.ModernProductionComponents);
+            }
             useReviewReleaseBackend = false;
             return reviewReleaseBackend = new ReviewReleaseBackend(UiTestHost.Root);
         }

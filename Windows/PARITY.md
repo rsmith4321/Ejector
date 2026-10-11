@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native outstanding history picker activity revocation
+
+[Controlled actual picker transitions](modern/RELEASE_PICKER_ACTIVITY_NATIVE_20261011.md) pass stale submission refusal with zero reads after unavailable→available while the picker remains owned, followed by one fresh generated-file review, Cancel/disposal and ordinary unconfigured entry recovery. Native exit0/no exception, warning-free native regressions and normal **246/0**/probe exclusion/preservation pass. No production behavior/payload/trust/history restore/install/device/OS/push/publication change. Native ZIP/folder/queued-delivery/presentation-failure and configured trust/full physical/genuine-media/LUT/travel/display/signing/publishing gates remain open; goal active.
+
 ## October 11 · native update foreground ownership and safe cancellation
 
 [Real presenter/native history picker](modern/RELEASE_FOREGROUND_NATIVE_20261011.md) passes controlled Stop/Close worker retention, revoked result refusal, picker cancellation/exact generated-file selection and Return keeping current history. Backend is explicitly generated/read-only, not production update trust; zero Restore runs. Native exit0/no exception, warning-free final native regressions and normal **246/0**/probe exclusion/preservation pass. No production behavior/channel/payload/history restore/install/device/OS/push/publication change. Configured trust, remaining picker/restore/queued-delivery and full physical/genuine-media/LUT/travel/display/signing/publishing gates remain open; full goal active.

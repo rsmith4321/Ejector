@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native history picker activity revocation and fresh recovery · October 11
+
+[Actual outstanding picker check](modern/RELEASE_PICKER_ACTIVITY_NATIVE_20261011.md) observes unavailable→available transitions during the same native choice, refuses its stale submission with zero backend work, then accepts exactly one fresh generated-file review. Cancel/disposal and the ordinary unconfigured entry recover; PID24520 quits0/no exception. Warning-free native regressions and normal **246/0**/engineering metadata exclusion pass. Live/isolated files, login absence, currentZIP/Mac baseline preserved. Controlled engineering hook, no production behavior/payload/trust/restore/install/device/OS/push/publication claim. Remaining pickers/queued-delivery/configured trust/full acceptance gates stay open; goal active. Aggregate SHA51ecf8e95a5df41782f909953444c7eb34820918bc882a7d2f853d6774e8e5bc.
+
 ## Native release Stop / picker / Keep-current checks · October 11
 
 [Actual release foreground flow](modern/RELEASE_FOREGROUND_NATIVE_20261011.md), using a labeled read-only generated backend behind the real presenter, verifies Stop/Close retaining an uncooperative worker, late-result refusal, native picker Cancel/no work and exact generated-file selection, plus Return cancelling inline restore with zero Restore runs. PID4776 exits0/no exception. Initial helper CS0414 compile is retained/corrected; final warning-free native regressions and normal **246/0**/probe exclusion pass. Live/isolated files, login absence, currentZIP/Mac baseline preserved. Test-only hooks; no real update authentication/channel/history restore/install/device/OS/push/publication action. Remaining configured trust/pickers/restore/queued-delivery/full acceptance gates stay open; goal active. Aggregate SHAbe5d01ee84de2d0559190b426611c27d02e065060e33eff7cd6f5ac0a6697188.

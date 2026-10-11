@@ -14,7 +14,13 @@ namespace EasyEject.Modern {
         void UpdateReleaseActivity() {
             if (releaseChecks == null) return;
             releaseChecks.SetAutomatic(settings == null || settings.AutomaticUpdatesEnabled);
-            if (releaseView != null) { releaseView.SetAvailable(!closed && !releaseEnding && working && confirmation == releaseDialog && releaseDialog != null && !inventory.Scanning && !automaticReading && !DefaultsPanel.Busy && !ProfilesPanel.Busy && !SettingsPanel.Busy); if (releaseRender != null) releaseRender(); }
+            if (releaseView != null) {
+                bool available = !closed && !releaseEnding && working && confirmation == releaseDialog && releaseDialog != null && !inventory.Scanning && !automaticReading && !DefaultsPanel.Busy && !ProfilesPanel.Busy && !SettingsPanel.Busy;
+#if UI_TESTS
+                available &= ReviewReleaseActivityAvailable();
+#endif
+                releaseView.SetAvailable(available); if (releaseRender != null) releaseRender();
+            }
             else { releaseChecks.SetReviewOpen(StorageBusy || confirmation != null); releaseChecks.PublishIdle(!closed && started && !StorageBusy && !inventory.Scanning && confirmation == null); }
         }
         async Task PulseModernReleases() {
