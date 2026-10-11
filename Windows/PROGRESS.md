@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native old release delivery preserves newer active work · October 11
+
+[Same-dialog concurrency follow-up](modern/RELEASE_DELIVERY_NATIVE_20261011.md#follow-up-old-consumption-during-a-newer-active-worker) resumes an old terminal result while a second worker is held. Old delivery is refused with busy controls retained and byte-exact unchanged backend trace; second worker then presents once. PID27440 quits0/no exception. Warning-free native regressions/normal **246/0**/probe exclusion and live/isolated/login/currentZIP/Mac preservation pass. Test-only second-worker hold; no production behavior/payload/trust/restore/install/device/OS/push/publication change. Native ZIP/folder/presentation-failure/configured trust/full acceptance gates remain open; goal active. Aggregate SHA2c53bf091a64676c5d58591bbb52aedf653dfcf9280ab565d6432a4a146d4379.
+
 ## Native terminal release result revocation and closed-handler isolation · October 11
 
 [Controlled native consumption gap](modern/RELEASE_DELIVERY_NATIVE_20261011.md) verifies a completed worker's result is refused after observed activity changes, a fresh check presents once, and an old handler resumed after Close leaves a newly opened ordinary dialog/its disposed backend unchanged. PID27316/13980 quit0/no exception. Warning-free native regressions and normal **246/0**/probe exclusion pass; live/isolated files/login absence/currentZIP/Mac baseline preserved. Test-only pause, no production behavior/payload/trust/restore/install/device/OS/push/publication claim. Remaining native overlap/pickers/presentation-failure/configured-trust/full acceptance gates stay open; goal active. Aggregate SHAed9d4e5a7a29a9dc53896852b6d19e4aa8213edc17a47a3447f63efdcb678cbc.

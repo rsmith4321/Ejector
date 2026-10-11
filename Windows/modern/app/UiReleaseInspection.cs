@@ -86,9 +86,11 @@ namespace EasyEject.Modern {
         public async Task<ReleaseViewResult> Run(WindowsReleaseReviewAction action, string path, long confirmation) {
             held = true; runs++; Record("Started", action, path);
             try {
-                if (action == WindowsReleaseReviewAction.Check && runs == 1) {
+                bool secondHold = runs == 2 && File.Exists(Path.Combine(root, "release-second-worker-hold.txt"));
+                if (action == WindowsReleaseReviewAction.Check && (runs == 1 || secondHold)) {
+                    string release = Path.Combine(root, secondHold ? "release-second-worker-release.txt" : "release-worker-release.txt");
                     var timer = System.Diagnostics.Stopwatch.StartNew();
-                    while (!File.Exists(Path.Combine(root, "release-worker-release.txt"))) {
+                    while (!File.Exists(release)) {
                         if (timer.Elapsed > TimeSpan.FromMinutes(3)) throw new TimeoutException("Owned generated release worker timed out.");
                         await Task.Delay(50).ConfigureAwait(false);
                     }

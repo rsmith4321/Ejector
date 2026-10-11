@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native old release result cannot cancel newer active worker
+
+[Actual same-dialog overlap](modern/RELEASE_DELIVERY_NATIVE_20261011.md#follow-up-old-consumption-during-a-newer-active-worker) verifies old consumption refusal while newer work stays busy, zero backend mutation/cancellation by that delivery, and exactly one subsequent newer result. Native exit0/no exception; warning-free native regressions, normal **246/0**/probe exclusion/preservation pass. Controlled engineering hold, no production behavior/payload/trust/restore/install/device/OS/push/publication claim. Native ZIP/folder/XAML failures/configured trust and full acceptance gates remain open; goal active.
+
 ## October 11 · native completed release result and closed-handler revocation
 
 [Real UI handler with controlled consumption pause](modern/RELEASE_DELIVERY_NATIVE_20261011.md) passes activity-cycle refusal after worker terminal, fresh explicit retry, and old-handler isolation after Close/new ordinary dialog. Native exit0/no exception, warning-free native regressions and normal **246/0**/probe exclusion/preservation pass. No production behavior/payload/trusted update/restore/install/device/OS/push/publication change. Newer-active-worker/native ZIP-folder/presentation-failure/configured trust and all full acceptance gates remain open; goal active.
