@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · safe completion keyboard focus and sharing return
+
+[Production correction](modern/COMPLETION_FOCUS_20261011.md) passes native Return→Keep Connected with sharing present, deliberate Tab/Return→manual choices, explicit 4K reuse and safe Return after sharing. Final native focus/presenter/compact/tray checks and normal **246/0** pass warning-free; normal metadata excludes engineering hooks. Separate inspection-only logger crash is fixed; final Quit exits 0/no exception. Prior generated/live files remain exact; failed queued candidates stay recorded. **960bd75 package is superseded** pending rebuild. Physical eject/veto/cleanup/valid-plan expiry, genuine footage/LUT, broad OS/DPI/travel/trusted distribution and publishing OK remain open. Full goal stays active.
+
 ## October 11 · native blocked completion and guarded folder return
 
 [Generated no-removal-plan completion](modern/COMPLETION_NATIVE_20261011.md) passes disabled Eject, Keep Connected default/Return and actual guarded Open Import Folder followed by safe completion return. Unregistered inspection refuses safely; read-only notification registration enables the real destination guard without runtime workers or removal authority. Warning-free normal/engineering builds, native regression and normal-host exclusion pass. Both sessions quit normally and destination/live records stay exact. This is not previously valid removal-plan expiration or physical completion eject/cleanup acceptance; full media/LUT/hardware/OS/distribution and publishing gates remain open. Production payload and default-suite counts unchanged.

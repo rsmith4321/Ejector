@@ -207,9 +207,12 @@ namespace EasyEject.Modern {
                         + (entry.Origin.Plan == null ? "\n" + entry.Origin.BlockedReason : "\n\nAffected storage:\n" + String.Join("\n", entry.Origin.Plan.Affected))
                         + (cleanup == null ? "" : "\n\n" + cleanup.Description) + sharingNote
                         + (gyroflowFirst ? "\n\n" + QuickShareProfile.GyroflowGuidance + " Quick Share is available afterwards in Import history." : "") + shareMessage;
-                    confirmation = MessageDialog(CompletionPresentation.ChoiceTitle(entry.HasMedia), message, cleanup == null ? CompletionPresentation.EjectLabel(entry) : "Clean & eject");
-                    confirmation.CloseButtonText = "Keep Connected"; confirmation.SecondaryButtonText = "Open Import Folder"; confirmation.IsPrimaryButtonEnabled = canEject;
-                    bool sharingRequested = false, choosing = true; var dialog = confirmation; Button share = null; RoutedEventHandler shareChoice = null;
+                    var dialog = new KeepConnectedDialog { XamlRoot = Root.XamlRoot, Title = CompletionPresentation.ChoiceTitle(entry.HasMedia),
+                        Content = new ScrollViewer { MaxHeight = 360, Content = Wrapped(message) },
+                        PrimaryButtonText = cleanup == null ? CompletionPresentation.EjectLabel(entry) : "Clean & eject",
+                        SecondaryButtonText = "Open Import Folder", IsPrimaryButtonEnabled = canEject };
+                    confirmation = dialog;
+                    bool sharingRequested = false, choosing = true; Button share = null; RoutedEventHandler shareChoice = null;
                     if (canShare && !gyroflowFirst) {
                         var body = new StackPanel { Spacing = 16 }; body.Children.Add(Wrapped(message));
                         share = new Button { Content = "Quick Share…" }; body.Children.Add(share);
@@ -221,6 +224,7 @@ namespace EasyEject.Modern {
                     try { UpdateActions(); answer = await dialog.ShowAsync(); }
                     finally { choosing = false; if (share != null) share.Click -= shareChoice; }
                     confirmation = null;
+                    if (!dialog.SafeInitialFocus) throw new SafetyException("Completion review could not focus Keep Connected. No removal was requested. Open a fresh review.");
                     if (sharingRequested) {
                         bool shared = await PerformQuickShare(entry.Batch);
                         if (!QuickSharePresentation.ReturnToCompletion(completions, entry, shared)) break;

@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Completion keyboard default and manual sharing return corrected · October 11
+
+[Native focus evidence](modern/COMPLETION_FOCUS_20261011.md) reproduces Return opening Quick Share despite highlighted Keep Connected, including a post-sharing race missed by an early queued fix. Final synchronous focus redirection passes actual Return before/after sharing, deliberate Tab access, exact 4K reuse **0 new / 2 reused**, native regression and warning-free selected **246/0**. A separate inspection-only logger shutdown crash is reproduced/fixed; final Quit exits **0**, PASS/no exception. All 20 prior generated destination files, 3 copied records and 2 live records stay exact; only the expected audit is added. Failed candidates/premature finish/crash evidence remain recorded. **960bd75 review ZIP is superseded pending exact-commit rebuild**. Full physical/media/LUT/OS/trust and publishing approval gates remain open; goal active.
+
 ## Native completion default and guarded folder opening · October 11
 
 [No-removal-plan completion review](modern/COMPLETION_NATIVE_20261011.md) now passes actual disabled Eject/default Keep Connected, Return, guarded Explorer launch and return to the safe completion dialog. The initial unregistered inspection correctly refused the destination; final test-only mode registers read-only notifications without runtime workers or any removal plan. Normal/engineering builds are warning-free, native presenter/compact/tray regression PASS and normal metadata excludes the test host. Both sessions quit normally; 17 generated destination files and 2 live records remain exact. No production/default-count/Release-payload change. Previously valid plan expiration, actual eject/cleanup and full physical/media/LUT/OS/trust/publishing gates stay open.

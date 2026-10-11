@@ -49,7 +49,9 @@ namespace EasyEject.Modern {
             WinRT.ComWrappersSupport.InitializeComWrappers();
             Application.Start(_ => {
                 SynchronizationContext.SetSynchronizationContext(new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread()));
-                new App(new TrayStartupGate(), false, () => {});
+                var app = new App(new TrayStartupGate(), false, () => {});
+                // Preserve engineering-host exceptions without handling/suppressing them.
+                app.UnhandledException += (_, args) => File.AppendAllText(Path.Combine(Root, "unhandled.txt"), args.Exception + "\r\n");
             });
         }
         internal static async void Run(MainWindow window) {
@@ -97,9 +99,13 @@ namespace EasyEject.Modern {
                 "keyboard-probe-" + Guid.NewGuid().ToString("N") + ".jsonl"),
                 FileMode.CreateNew, FileAccess.Write, FileShare.Read)) { AutoFlush = true };
             var observed = new HashSet<UIElement>();
-            Action<string, bool?, string> record = (kind, handled, source) => trace.WriteLine(
+            bool stopped = false;
+            Action<string, bool?, string> record = (kind, handled, source) => {
+                if (stopped) return;
+                trace.WriteLine(
                 System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow, kind, handled, source,
                     presenterState = (AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter)?.State.ToString(), visible = AppWindow.IsVisible }));
+            };
             Action<UIElement> attach = element => {
                 if (!observed.Add(element)) return;
                 element.AddHandler(UIElement.PreviewKeyDownEvent, new Microsoft.UI.Xaml.Input.KeyEventHandler((sender, args) => {
@@ -115,16 +121,17 @@ namespace EasyEject.Modern {
             attach(Root);
             var timer = DispatcherQueue.CreateTimer(); timer.Interval = TimeSpan.FromMilliseconds(250);
             timer.Tick += (_, args) => {
-                if (Root.XamlRoot == null) return;
+                if (stopped || Root.XamlRoot == null) return;
                 foreach (var popup in Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(Root.XamlRoot))
                     if (popup.Child is UIElement child) attach(child);
             };
             Activated += (_, args) => record("Activation", null, args.WindowActivationState.ToString());
-            Closed += (_, args) => { timer.Stop(); trace.Dispose(); };
+            Closed += (_, args) => { stopped = true; timer.Stop(); trace.Dispose(); };
             timer.Start();
         }
         internal async Task TestTrayQuit() {
             await EnsureVisible();
+            await TestCompletionSafeFocus();
             var presenter = (Microsoft.UI.Windowing.OverlappedPresenter)AppWindow.Presenter;
             presenter.Minimize();
             Require(presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Minimized, "Native presenter did not minimize.");
@@ -206,6 +213,35 @@ namespace EasyEject.Modern {
             }
             quitItem.PerformClick(); Require(closed, "Idle tray Quit did not close.");
         }
+        async Task TestCompletionSafeFocus() {
+            foreach (bool sharing in new[] { false, true }) {
+                var dialog = new KeepConnectedDialog { XamlRoot = Root.XamlRoot, Title = "Completion focus fixture",
+                    Content = Scrolling(Wrapped("Generated fixture only. No device action.")), PrimaryButtonText = "Eject Now", IsPrimaryButtonEnabled = false };
+                var share = new Microsoft.UI.Xaml.Controls.Button { Content = "Quick Share…" };
+                if (sharing) {
+                    var body = new Microsoft.UI.Xaml.Controls.StackPanel(); body.Children.Add(Wrapped("Generated fixture only.")); body.Children.Add(share);
+                    dialog.Content = Scrolling(body);
+                }
+                var opened = new TaskCompletionSource<bool>(); dialog.Opened += (_, args) => opened.TrySetResult(true);
+                var shown = dialog.ShowAsync();
+                await Task.WhenAny(opened.Task, Task.Delay(5000));
+                if (!opened.Task.IsCompleted) { dialog.Hide(); await shown; throw new InvalidOperationException("Native completion focus fixture did not open."); }
+                await Task.Yield();
+                await Task.Delay(500);
+                var focus = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(Root.XamlRoot) as Microsoft.UI.Xaml.Controls.Button;
+                bool safe = dialog.SafeInitialFocus && focus != null && focus.Name == "CloseButton";
+                if (sharing && safe) {
+                    // A late framework/activation pass stays safe before navigation.
+                    share.Focus(FocusState.Programmatic);
+                    safe = (Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(Root.XamlRoot) as Microsoft.UI.Xaml.Controls.Button)?.Name == "CloseButton";
+                    Require(share.Focus(FocusState.Keyboard), "Completion sharing is not keyboard focusable.");
+                    Require(object.ReferenceEquals(Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(Root.XamlRoot), share), "Safe initial focus trapped deliberate keyboard navigation.");
+                }
+                dialog.Hide(); await shown;
+                Require(safe, "Completion initial focus did not choose Keep Connected; sharing=" + sharing + "; focusReady=" + dialog.SafeInitialFocus + "; focus=" + (focus?.Content?.ToString() ?? "not a button") + "; " + dialog.FocusDiagnostics);
+                Require(!sharing || share.IsEnabled && share.IsTabStop, "Safe initial focus removed keyboard access to Quick Share.");
+            }
+        }
         internal TrayFlyoutView FixtureFlyout() {
             var state = new Inventory { Epoch = 1 };
             for (int i = 0; i < (UiTestHost.InspectLong ? 18 : 1); i++) {
@@ -259,9 +295,13 @@ namespace EasyEject.Modern {
                 "flyout-keyboard-" + Guid.NewGuid().ToString("N") + ".jsonl"),
                 FileMode.CreateNew, FileAccess.Write, FileShare.Read)) { AutoFlush = true };
             var observed = new HashSet<UIElement>();
-            Action<string, bool?, string> record = (kind, handled, source) => trace.WriteLine(
+            bool stopped = false;
+            Action<string, bool?, string> record = (kind, handled, source) => {
+                if (stopped) return;
+                trace.WriteLine(
                 System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow, kind, handled, source,
                     visible = AppWindow.IsVisible, requestRunning }));
+            };
             Action<UIElement> attach = element => {
                 if (!observed.Add(element)) return;
                 element.AddHandler(UIElement.PreviewKeyDownEvent, new Microsoft.UI.Xaml.Input.KeyEventHandler((sender, args) => {
@@ -275,12 +315,12 @@ namespace EasyEject.Modern {
             attach(Surface);
             var timer = DispatcherQueue.CreateTimer(); timer.Interval = TimeSpan.FromMilliseconds(250);
             timer.Tick += (_, args) => {
-                if (Surface.XamlRoot == null) return;
+                if (stopped || Surface.XamlRoot == null) return;
                 foreach (var popup in Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(Surface.XamlRoot))
                     if (popup.Child is UIElement child) attach(child);
             };
             Activated += (_, args) => record("Activation", null, args.WindowActivationState.ToString());
-            Closed += (_, args) => { timer.Stop(); trace.Dispose(); };
+            Closed += (_, args) => { stopped = true; timer.Stop(); trace.Dispose(); };
             timer.Start();
         }
         internal void WriteInspectionLayout() {
