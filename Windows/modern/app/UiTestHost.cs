@@ -16,12 +16,14 @@ namespace EasyEject.Modern {
         internal static string Root;
         internal static bool Inspect;
         internal static bool Review;
+        static bool smallReview;
         const string ReviewScope = "Isolated preferences; normal device discovery and manual actions. No scripted hardware action.\r\n";
         static FileStream reviewOwner;
         [STAThread] static void Main(string[] args) {
-            if (args.Length < 1 || args.Length > 2 || args.Length == 2 && args[1] != "inspect" && args[1] != "review" && args[1] != "review-restart") throw new ArgumentException("An owned isolated fixture root is required.");
+            if (args.Length < 1 || args.Length > 2 || args.Length == 2 && args[1] != "inspect" && args[1] != "review" && args[1] != "review-restart" && args[1] != "review-small") throw new ArgumentException("An owned isolated fixture root is required.");
             Inspect = args.Length == 2 && args[1] == "inspect";
-            Review = args.Length == 2 && (args[1] == "review" || args[1] == "review-restart");
+            smallReview = args.Length == 2 && args[1] == "review-small";
+            Review = smallReview || args.Length == 2 && (args[1] == "review" || args[1] == "review-restart");
             Root = Path.GetFullPath(args[0]);
             string parent = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "EasyEjectFixtures");
             if (!String.Equals(Path.GetDirectoryName(Root), parent, StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(Root).StartsWith("ui-", StringComparison.Ordinal)) throw new ArgumentException("UI test root must be an owned ui- fixture child.");
@@ -52,6 +54,7 @@ namespace EasyEject.Modern {
                 window.Closed += (_, args) => { reviewOwner?.Dispose(); Application.Current.Exit(); };
                 File.WriteAllText(Path.Combine(Root, "review-scope.txt"), ReviewScope);
                 window.InitializeReviewControls();
+                if (smallReview) await window.InitializeSmallReview();
                 return;
             }
             try { await window.TestTrayQuit(); File.WriteAllText(Path.Combine(Root, "result.txt"), "PASS native minimized reveal/maximized retention; actual tray Quit preserves defaults draft and refuses busy/editor Quit; idle Quit closes.\r\n"); }
@@ -61,6 +64,17 @@ namespace EasyEject.Modern {
     }
     public sealed partial class MainWindow {
         static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+        internal async Task InitializeSmallReview() {
+            await EnsureVisible();
+            double scale = Root.XamlRoot.RasterizationScale;
+            AppWindow.Resize(new Windows.Graphics.SizeInt32((int)Math.Ceiling(680 * scale), (int)Math.Ceiling(600 * scale)));
+            await Task.Delay(150); Root.UpdateLayout();
+            File.WriteAllText(Path.Combine(UiTestHost.Root, "small-window.json"), System.Text.Json.JsonSerializer.Serialize(new {
+                requestedWidth = 680, requestedHeight = 600, rasterizationScale = scale,
+                clientWidth = Root.ActualWidth, clientHeight = Root.ActualHeight,
+                cardsHeight = StorageCards.ActualHeight, footerHeight = StorageFooter.ActualHeight,
+                physicalWidth = AppWindow.Size.Width, physicalHeight = AppWindow.Size.Height }));
+        }
         internal void InitializeReviewControls() {
             InitializeReviewKeyboardProbe();
             var footer = (Microsoft.UI.Xaml.Controls.StackPanel)Navigation.PaneFooter;
@@ -116,6 +130,21 @@ namespace EasyEject.Modern {
             presenter.Minimize(); await EnsureVisible();
             Require(presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized, "Visible operation review did not restore the prior maximized window state.");
             presenter.Restore();
+            var originalSize = AppWindow.Size;
+            double compactScale = Root.XamlRoot.RasterizationScale;
+            AppWindow.Resize(new Windows.Graphics.SizeInt32((int)Math.Ceiling(680 * compactScale), (int)Math.Ceiling(600 * compactScale)));
+            await Task.Delay(100); Root.UpdateLayout();
+            Require(StorageCards.ActualHeight >= 96, "Compact storage window has no usable device list; height=" + StorageCards.ActualHeight);
+            CancelOperation.Visibility = Visibility.Visible; Root.UpdateLayout();
+            StorageActions.ChangeView(null, Double.MaxValue, null, true); await Task.Delay(100); Root.UpdateLayout();
+            var stopBounds = CancelOperation.TransformToVisual(Root).TransformBounds(new Windows.Foundation.Rect(0, 0, CancelOperation.ActualWidth, CancelOperation.ActualHeight));
+            var actionsBounds = StorageActions.TransformToVisual(Root).TransformBounds(new Windows.Foundation.Rect(0, 0, StorageActions.ActualWidth, StorageActions.ActualHeight));
+            var aboutBounds = AboutButton.TransformToVisual(Root).TransformBounds(new Windows.Foundation.Rect(0, 0, AboutButton.ActualWidth, AboutButton.ActualHeight));
+            Require(StorageCards.ActualHeight >= 96 && StorageActions.ScrollableHeight > 0, "Compact action viewport displaced the device list or did not scroll.");
+            Require(stopBounds.Height > 0 && stopBounds.Top >= 0 && stopBounds.Bottom <= actionsBounds.Top && actionsBounds.Bottom <= Root.ActualHeight, "Compact Stop is outside the visible fixed footer.");
+            Require(aboutBounds.Top >= actionsBounds.Top && aboutBounds.Bottom <= actionsBounds.Bottom, "Last utility action is not reachable through the compact footer scroll.");
+            CancelOperation.Visibility = Visibility.Collapsed; StorageActions.ChangeView(null, 0, null, true);
+            AppWindow.Resize(originalSize); await Task.Delay(100); Root.UpdateLayout();
             CancelOperation.Visibility = Visibility.Collapsed; Root.UpdateLayout();
             CancelOperation.Content = "Stop import"; CancelOperation.Visibility = Visibility.Visible; Root.UpdateLayout();
             Require(CancelOperation.ActualWidth > 0 && CancelOperation.ActualHeight > 0, "The newly visible Stop action has no clickable layout bounds.");

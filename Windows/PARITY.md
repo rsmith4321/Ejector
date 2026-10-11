@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · compact storage layout correction
+
+[Native 680×600/150% layout](modern/COMPACT_STORAGE_20261011.md) exposes and fixes a zero-height device list: bounded scrolling actions/results retain device space, with Stop fixed outside the scroller. Native compact scrolling/actions/editor footers and **246/0** normal selected contracts pass; native regression reproduces before failure and passes after. No engine/classic change or new full-default count. The prepared 6de85d2 package is superseded pending rebuild. Physical/media/LUT/trust, broader DPI/monitor/busy-operation acceptance and publishing OK remain open.
+
 ## October 11 · native persisted issue recovery
 
 [Scoped native issue checks](modern/ISSUE_NATIVE_20261011.md) pass initially empty-state reread, default Cancel, acknowledgement/restart, changed-record stale-save refusal, distinct live/saved explanations, explicit recovery without acknowledgement and separate Dismiss/restart. Generated isolated warnings use real production review/publication paths; no genuine operation failed or retried. Live configuration stays exact and all processes quit normally. No source/payload/default-count change. Physical/media/LUT/trust and explicit publication gates remain open.

@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Compact storage layout correction · October 11
+
+[Native compact layout](modern/COMPACT_STORAGE_20261011.md) reproduces five reported volumes with a zero-height device list at 680×600 logical/150% scaling. The footer now scrolls within a height cap and Stop stays fixed outside it. Regression changes **height=0 failure → PASS** for usable device space, reachable last utility and fixed Stop. Native device/footer scrolling, About and Settings/defaults/generated-profile editor footers pass; normal selected contracts **246/0**, both builds warning-free. Live files remain exact; all owned reviews quit normally. The previous 6de85d2 review/ZIP is superseded and must be rebuilt before publication. Physical/media/LUT/trust and explicit publishing gates stay open.
+
 ## Native persisted issue recovery · October 11
 
 [Generated isolated issue evidence](modern/ISSUE_NATIVE_20261011.md) passes empty-state reread, Cancel-default preservation, explicit acknowledgement and exact true Quit/restart. A record changed during an open dialog makes stale Dismiss refuse without overwriting; fresh review shows both explanations, default Cancel preserves the changed record, explicit recovery preserves acknowledgement status and a separate Dismiss survives another restart. All three processes quit normally; live files stay exact, login stays absent and only the isolated issue record is written. No source/build/payload/default-count change or real operation failure is claimed; physical/media/LUT/trust/publication gates remain open.

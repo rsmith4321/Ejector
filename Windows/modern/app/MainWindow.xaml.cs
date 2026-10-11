@@ -125,6 +125,11 @@ namespace EasyEject.Modern {
             };
         }
         internal void Reveal() { reopen.Request(); }
+        void StorageView_SizeChanged(object sender, SizeChangedEventArgs args) {
+            // Bound wrapped actions/results so a small window still has a device
+            // list. Stop lives outside the scroller and stays directly reachable.
+            StorageFooter.MaxHeight = Math.Max(120, args.NewSize.Height * 0.45);
+        }
         internal Task StartRuntime() {
 #if UI_TESTS
             return runtimeStart ?? (runtimeStart = UiTestHost.Review ? StartRuntimeCore() : Task.CompletedTask);
