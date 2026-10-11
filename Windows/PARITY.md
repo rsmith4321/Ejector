@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native diagnostic presentation cancellation and cleanup lifetime
+
+[Real ShowAsync cancellation during real Refresh](modern/DIAGNOSTICS_PRESENTATION_NATIVE_20261011.md) proves TaskCanceledException/modal removal retains exact worker/global ownership until terminal, busy Quit refusal and post-work disposal/fresh-view/issue recovery. Native exit0/no exception, warning-free native regressions, normal **246/0**/probe exclusion and preservation pass. No production behavior/payload/clear/device/OS/push/publication change. General XAML rendering failures, native clear and full physical/genuine-media/LUT/travel/display/configured trust/signing/publishing gates stay open; goal active.
+
 ## October 11 · native release ZIP/folder choices and honest refusal
 
 [Real OS pickers](modern/RELEASE_PATH_PICKERS_NATIVE_20261011.md) pass cancel/no work, exact owned selected-path handoff, deliberately refused action/error recovery and ordinary unconfigured entry isolation. Native exit0/no exception, warning-free native regressions and normal **246/0**/engineering exclusion/preservation pass. No production behavior/payload/package trust/restore/install/device/OS/push/publication change. Genuine configured package/ZIP/folder acceptance, XAML failures and full physical/media/LUT/travel/display/signing/publishing gates remain open; goal active.

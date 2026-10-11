@@ -109,13 +109,27 @@ namespace EasyEject.Modern {
                     finally { worker = false; render(); }
                 };
                 dialog.Closing += delegate(ContentDialog sender, ContentDialogClosingEventArgs args) { if (worker || owner.Busy) { args.Cancel = true; status.Text = "Wait for the current log operation before closing."; } };
-                render(); await dialog.ShowAsync();
+                render();
+#if UI_TESTS
+                await ShowReviewDiagnostics(dialog, owner);
+#else
+                await dialog.ShowAsync();
+#endif
             } catch (Exception ex) { Summary.Text = "Debug log could not be reviewed. Existing diagnostics were retained. " + ex.Message; RecordModernIssue(Summary.Text); }
             finally {
                 // Even if XAML presentation fails, the exact log worker retains its
                 // view until the file operation ends; no second action is admitted.
+                #if UI_TESTS
+                RecordReviewDiagnosticsLifetime("FinallyEntered", owner, pendingWork);
+                #endif
                 if (pendingWork != null) try { await pendingWork; } catch { }
+                #if UI_TESTS
+                RecordReviewDiagnosticsLifetime("WorkerTerminal", owner, pendingWork);
+                #endif
                 if (owner != null) owner.Dispose(); FinishSavedReview();
+                #if UI_TESTS
+                RecordReviewDiagnosticsLifetime("Disposed", owner, pendingWork);
+                #endif
             }
         }
     }

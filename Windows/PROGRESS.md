@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native diagnostic ShowAsync cancellation retains worker ownership · October 11
+
+[Actual WinUI operation cancellation](modern/DIAGNOSTICS_PRESENTATION_NATIVE_20261011.md) removes the modal/raises TaskCanceledException while real Refresh stays busy. Production finally awaits the exact worker, actual tray Quit refuses, then read/terminal/disposal/controls recover in order; fresh viewer and retained issue Cancel pass. PID27040 quits0/no exception. Warning-free native regressions/normal **246/0**/probe exclusion, exact live/settings/log/currentZIP/Mac/login preservation pass; only expected isolated issue added. Test-only wrapper/probes, no production behavior/payload/clear/device/OS/push/publication change. General rendering failures/full gates remain open; goal active. Aggregate SHA3feaf138021484341cfeb6b423b227dbef04bdefefef5d0097e59aa80efa62bc.
+
 ## Native ZIP/folder cancellation, exact paths and refusal recovery · October 11
 
 [Actual native picker checks](modern/RELEASE_PATH_PICKERS_NATIVE_20261011.md) cancel both choices with zero work, then hand off exact generated ZIP/folder paths to the deliberately refusing backend. Error UI and actions recover; ordinary unconfigured entry keeps remote actions disabled. PID30372 quits0/no exception. Warning-free native regressions/normal **246/0**/probe exclusion and target/live/isolated/login/currentZIP/Mac preservation pass. Test-only choice admission; no production behavior/payload/trusted package verification/restore/install/device/OS/push/publication claim. Configured acceptance/XAML lifetime/full gates stay open; goal active. Aggregate SHAf2ec781a02ee3c20fd511a6fa2ccd15380065aa737aeaa7222c51d5b42d0c72c.

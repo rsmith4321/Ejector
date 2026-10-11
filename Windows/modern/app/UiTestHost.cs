@@ -137,6 +137,38 @@ namespace EasyEject.Modern {
             footer.Children.Add(flyout); footer.Children.Add(quit); footer.Children.Add(debug); footer.Children.Add(clipboard); footer.Children.Add(pauseDebug);
         }
         int pauseNextDebugRefresh;
+        void RecordReviewDiagnosticsLifetime(string kind, DiagnosticsReview owner, Task worker) {
+            if (!UiTestHost.Review || !File.Exists(Path.Combine(UiTestHost.Root, "debug-cancel-presentation.txt"))) return;
+            File.AppendAllText(Path.Combine(UiTestHost.Root, "debug-presentation.jsonl"),
+                System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow, kind,
+                    busy = owner?.Busy, open = owner?.Open, workerCompleted = worker?.IsCompleted,
+                    savedReviewWorking = working, dialogPresent = confirmation != null }) + "\r\n");
+        }
+        async Task ShowReviewDiagnostics(Microsoft.UI.Xaml.Controls.ContentDialog dialog, DiagnosticsReview owner) {
+            if (!UiTestHost.Review || !File.Exists(Path.Combine(UiTestHost.Root, "debug-cancel-presentation.txt"))) {
+                await dialog.ShowAsync(); return;
+            }
+            var operation = dialog.ShowAsync();
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            while (!File.Exists(Path.Combine(UiTestHost.Root, "debug-presentation-cancel-now.txt"))) {
+                if (operation.Status != Windows.Foundation.AsyncStatus.Started) { await operation; return; }
+                if (timer.Elapsed > TimeSpan.FromMinutes(5)) throw new TimeoutException("Owned diagnostic presentation inspection timed out.");
+                await Task.Delay(50);
+            }
+            if (!owner.Busy) throw new InvalidOperationException("Presentation cancellation inspection requires the exact active diagnostic worker.");
+            RecordReviewDiagnosticsLifetime("CancelRequested", owner, null);
+            try {
+                operation.Cancel();
+                RecordReviewDiagnosticsLifetime("CancelReturned", owner, null);
+                await operation;
+                RecordReviewDiagnosticsLifetime("ShowReturned", owner, null);
+            } catch (Exception ex) {
+                File.WriteAllText(Path.Combine(UiTestHost.Root, "debug-presentation-exception.json"),
+                    System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow,
+                        type = ex.GetType().FullName, hresult = ex.HResult, message = ex.Message, busy = owner.Busy }));
+                throw;
+            }
+        }
         DiagnosticsReview CreateReviewDiagnostics(string root) {
             if (!UiTestHost.Review || Interlocked.Exchange(ref pauseNextDebugRefresh, 0) == 0)
                 return new DiagnosticsReview(root);
