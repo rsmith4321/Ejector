@@ -64,9 +64,14 @@ namespace EasyEject.Modern {
     // Never authenticates a release, accesses replay state, restores or installs.
     internal sealed class ReviewReleaseBackend : IReleaseViewBackend {
         readonly string root, history; readonly object traceLock = new object();
+        readonly bool pickerInspection;
         volatile bool available, held, closed;
         long backup; int runs, presentations;
-        internal ReviewReleaseBackend(string root) { this.root = root; history = Path.Combine(root, "generated-history.json"); Record("Created"); }
+        internal ReviewReleaseBackend(string root) {
+            this.root = root; history = Path.Combine(root, "generated-history.json");
+            pickerInspection = File.Exists(Path.Combine(root, "release-picker-inspection.txt"));
+            Record("Created");
+        }
         void Record(string kind, WindowsReleaseReviewAction? action = null, string path = null) {
             lock (traceLock) File.AppendAllText(Path.Combine(root, "release-backend.jsonl"),
                 System.Text.Json.JsonSerializer.Serialize(new { utc = DateTime.UtcNow, kind, action = action?.ToString(), path, held, runs, presentations, backup }) + "\r\n");
@@ -75,8 +80,10 @@ namespace EasyEject.Modern {
         public bool Busy => held;
         bool Ready => available && !held && !closed;
         public bool CanCheck => Ready;
-        public bool CanArchive => false;
-        public bool CanExtracted => false;
+        // Opt-in picker inspection admits UI choices only. Run still refuses
+        // these actions before reading, authenticating or installing a payload.
+        public bool CanArchive => Ready && pickerInspection;
+        public bool CanExtracted => Ready && pickerInspection;
         public bool CanBackup => Ready;
         public bool CanRestore => Ready && backup != 0;
         public long BackupId => backup;

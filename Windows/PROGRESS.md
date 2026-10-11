@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native ZIP/folder cancellation, exact paths and refusal recovery · October 11
+
+[Actual native picker checks](modern/RELEASE_PATH_PICKERS_NATIVE_20261011.md) cancel both choices with zero work, then hand off exact generated ZIP/folder paths to the deliberately refusing backend. Error UI and actions recover; ordinary unconfigured entry keeps remote actions disabled. PID30372 quits0/no exception. Warning-free native regressions/normal **246/0**/probe exclusion and target/live/isolated/login/currentZIP/Mac preservation pass. Test-only choice admission; no production behavior/payload/trusted package verification/restore/install/device/OS/push/publication claim. Configured acceptance/XAML lifetime/full gates stay open; goal active. Aggregate SHAf2ec781a02ee3c20fd511a6fa2ccd15380065aa737aeaa7222c51d5b42d0c72c.
+
 ## Native old release delivery preserves newer active work · October 11
 
 [Same-dialog concurrency follow-up](modern/RELEASE_DELIVERY_NATIVE_20261011.md#follow-up-old-consumption-during-a-newer-active-worker) resumes an old terminal result while a second worker is held. Old delivery is refused with busy controls retained and byte-exact unchanged backend trace; second worker then presents once. PID27440 quits0/no exception. Warning-free native regressions/normal **246/0**/probe exclusion and live/isolated/login/currentZIP/Mac preservation pass. Test-only second-worker hold; no production behavior/payload/trust/restore/install/device/OS/push/publication change. Native ZIP/folder/presentation-failure/configured trust/full acceptance gates remain open; goal active. Aggregate SHA2c53bf091a64676c5d58591bbb52aedf653dfcf9280ab565d6432a4a146d4379.

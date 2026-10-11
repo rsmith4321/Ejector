@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native release ZIP/folder choices and honest refusal
+
+[Real OS pickers](modern/RELEASE_PATH_PICKERS_NATIVE_20261011.md) pass cancel/no work, exact owned selected-path handoff, deliberately refused action/error recovery and ordinary unconfigured entry isolation. Native exit0/no exception, warning-free native regressions and normal **246/0**/engineering exclusion/preservation pass. No production behavior/payload/package trust/restore/install/device/OS/push/publication change. Genuine configured package/ZIP/folder acceptance, XAML failures and full physical/media/LUT/travel/display/signing/publishing gates remain open; goal active.
+
 ## October 11 · native old release result cannot cancel newer active worker
 
 [Actual same-dialog overlap](modern/RELEASE_DELIVERY_NATIVE_20261011.md#follow-up-old-consumption-during-a-newer-active-worker) verifies old consumption refusal while newer work stays busy, zero backend mutation/cancellation by that delivery, and exactly one subsequent newer result. Native exit0/no exception; warning-free native regressions, normal **246/0**/probe exclusion/preservation pass. Controlled engineering hold, no production behavior/payload/trust/restore/install/device/OS/push/publication claim. Native ZIP/folder/XAML failures/configured trust and full acceptance gates remain open; goal active.
