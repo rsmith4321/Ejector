@@ -1,0 +1,22 @@
+Easy Eject for Windows
+Copyright (c) 2026 Ryan Smith Photography, LLC. All rights reserved.
+
+Permission is granted to download, install and use this software, free of
+charge, for personal or commercial purposes.
+
+You may not, without prior written permission from Ryan Smith Photography, LLC:
+  - redistribute, sell, rent, lend or sublicense the software;
+  - modify, adapt or create derivative works of it; or
+  - reverse engineer, decompile or disassemble it, except to the extent that
+    applicable law expressly permits this despite this limitation.
+
+Third-party components included with this software are licensed under their
+own terms, listed in THIRD-PARTY-NOTICES.txt and the ThirdPartyNotices folder.
+Those terms apply to those components instead of this license.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL RYAN SMITH
+PHOTOGRAPHY, LLC BE LIABLE FOR ANY CLAIM, DAMAGES (INCLUDING LOSS OF DATA) OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
