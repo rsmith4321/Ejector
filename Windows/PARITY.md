@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · native notification/pending/no-media scope
+
+[Native generated inspection](modern/NOTIFICATION_PENDING_NATIVE_20261011.md) verifies notification-off/pending retention, actual no-media Return/Escape, empty/nonempty pending picker and fresh explicit review. Pending-list Return selects its row without executing review/eject; it does not close. Enabled shell Shown→Closed callbacks preserve the pending choice, but no supported notification surface is exposed: visible delivery and actual click/reveal remain open. Both native sessions exit0/no exception; warning-free engineering regressions/normal build and engineering-metadata exclusion pass. All 21 destination files, 2 live records and copied histories stay exact; no new production payload/default-count/device/publication claim. Current 34125fc ZIP and full acceptance/publishing holds remain unchanged; goal active.
+
 ## October 11 · rebuilt completion-focus candidate
 
 [Exact-source 34125fc review](modern/REVIEW_020_20261011.md) replaces all older unsigned candidates. Build/package exit0, every 650 ZIP entry decompresses/hashes against staging; normal production metadata/resources/notices are retained and test host excluded. ZIP SHA-256 **12bf37369652345f44ab005569063953eb62fba6026d25a01156119132145137**, 107459543 bytes. No normal-app launch, live-setting/device change, push or publication. Selected **246/0** and final native exit0/no-exception evidence retain their scope; older history-session shutdown claims are qualified by subsequent Windows crash records. Publishing OK and full physical/media/LUT/OS/trust acceptance remain open; goal active.

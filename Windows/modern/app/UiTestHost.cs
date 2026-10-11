@@ -19,14 +19,16 @@ namespace EasyEject.Modern {
         internal static bool Inspect;
         internal static bool InspectLong;
         internal static bool InspectCompletion;
+        internal static bool InspectNotifications;
         internal static bool Review;
         static bool smallReview;
         const string ReviewScope = "Isolated preferences; normal device discovery and manual actions. No scripted hardware action.\r\n";
         static FileStream reviewOwner;
         [STAThread] static void Main(string[] args) {
-            if (args.Length < 1 || args.Length > 2 || args.Length == 2 && args[1] != "inspect" && args[1] != "inspect-long" && args[1] != "inspect-completion" && args[1] != "review" && args[1] != "review-restart" && args[1] != "review-small") throw new ArgumentException("An owned isolated fixture root is required.");
+            if (args.Length < 1 || args.Length > 2 || args.Length == 2 && args[1] != "inspect" && args[1] != "inspect-long" && args[1] != "inspect-completion" && args[1] != "inspect-notifications" && args[1] != "review" && args[1] != "review-restart" && args[1] != "review-small") throw new ArgumentException("An owned isolated fixture root is required.");
             InspectLong = args.Length == 2 && args[1] == "inspect-long";
-            InspectCompletion = args.Length == 2 && args[1] == "inspect-completion";
+            InspectNotifications = args.Length == 2 && args[1] == "inspect-notifications";
+            InspectCompletion = InspectNotifications || args.Length == 2 && args[1] == "inspect-completion";
             Inspect = InspectCompletion || InspectLong || args.Length == 2 && args[1] == "inspect";
             smallReview = args.Length == 2 && args[1] == "review-small";
             Review = smallReview || args.Length == 2 && (args[1] == "review" || args[1] == "review-restart");
@@ -189,6 +191,7 @@ namespace EasyEject.Modern {
             Require(prompt.DefaultButton == Microsoft.UI.Xaml.Controls.ContentDialogButton.Close && prompt.CloseButtonText == "Keep Connected", "Native eject prompt has an unsafe default.");
             if (UiTestHost.Inspect) {
                 if (UiTestHost.InspectCompletion) InitializeCompletionInspection();
+                if (UiTestHost.InspectNotifications) InitializeNotificationInspection();
                 trayFlyout = new TrayFlyoutWindow(Reveal, () => { Reveal(); OpenSettings(); }, RequestQuit, async (device, kind) => {
                     if (kind != "eject") { Reveal(); return; }
                     working = true;
@@ -262,8 +265,7 @@ namespace EasyEject.Modern {
             Require(notifications.Available, "Completion inspection requires real storage notifications.");
             File.WriteAllText(Path.Combine(UiTestHost.Root, "completion-monitoring.txt"),
                 "Read-only storage notifications registered. No runtime pump or hardware removal plan.\r\n");
-            var review = new Microsoft.UI.Xaml.Controls.Button { Content = "Test blocked completion" };
-            review.Click += async (_, args) => {
+            Func<bool, Task> reviewCompletion = async hasMedia => {
                 if (StorageBusy) return;
                 try {
                     var batches = await Task.Run(() => ImportHistory.Load());
@@ -279,13 +281,21 @@ namespace EasyEject.Modern {
                     var origin = new ImportCompletionOrigin(state, batch.ProfileId, source);
                     Require(origin.Plan == null, "Completion inspection must never grant a hardware removal plan.");
                     var entry = new ImportCompletion(origin, batch.DeviceName, batch.Folder, batch.DestinationRoot, batch.Destination,
-                        true, "Generated completion fixture only. No hardware removal plan. Two saved generated originals remain verified.", batch);
+                        hasMedia, hasMedia ? "Generated completion fixture only. No hardware removal plan. Two saved generated originals remain verified."
+                            : "Generated no-media completion fixture only. No files imported and no hardware removal plan.", hasMedia ? batch : null);
                     completions.Insert(entry);
                     await ReviewImportCompletion(entry.Id);
                     File.AppendAllText(Path.Combine(UiTestHost.Root, "completion-inspection.txt"), Summary.Text + "\r\n");
                 } catch (Exception ex) { Summary.Text = "Completion fixture stopped. " + ex.Message; }
             };
+            var review = new Microsoft.UI.Xaml.Controls.Button { Content = "Test blocked completion" };
+            review.Click += async (_, args) => await reviewCompletion(true);
             ((Microsoft.UI.Xaml.Controls.StackPanel)Navigation.PaneFooter).Children.Add(review);
+            if (UiTestHost.InspectNotifications) {
+                var empty = new Microsoft.UI.Xaml.Controls.Button { Content = "Test no-media completion" };
+                empty.Click += async (_, args) => await reviewCompletion(false);
+                ((Microsoft.UI.Xaml.Controls.StackPanel)Navigation.PaneFooter).Children.Add(empty);
+            }
         }
     }
     public sealed partial class TrayFlyoutWindow {
