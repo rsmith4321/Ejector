@@ -1,5 +1,9 @@
 # Full Windows port · parity and acceptance
 
+## October 11 · scoped native Light/Dark/Default rendering
+
+[Actual app-scoped theme input](modern/THEME_NATIVE_20261011.md) confirms main/flyout Light/Dark brushes and Windows Default restoration at existing150% scale. Engineering regressions and normal **246/0** pass warning-free; normal metadata excludes the probes, native exit0/no exception, live records/currentZIP/Mac baseline exact. **Flyout status glyph clipping requires investigation**; actual OS/high-contrast transitions, broader scaling/monitors/accessibility and all genuine-media/physical/LUT/travel/trust/publishing gates remain open. No production preference, OS setting, device action or payload change; full goal active.
+
 ## October 11 · exact Release backend and completion audit
 
 [Current packaged DLL replay](modern/PACKAGED_REGRESSION_20261011.md) passes full **1454/0**, selected **246/0** and supplied-tool **16/0** on exact Release Runtime and matching bundled .NET10.0.12 core bytes, with live module records and exit0. Counts overlap; no full WinUI/physical/LUT/trusted-distribution equivalence is inferred. Source/archive/review/ZIP/tool/live-record preservation passes, Mac baseline unchanged; no external device currently appears in read-only inventory. [Full-goal requirement/gate audit](COMPLETION_GATES_20261011.md) retains genuine media/official LUT/physical grouping/notification/travel/normal-loader/signing/publishing requirements. No production/payload change or held action; goal active.

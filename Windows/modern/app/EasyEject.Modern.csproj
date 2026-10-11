@@ -31,6 +31,10 @@
     <ProjectReference Include="..\EasyEject.Runtime.csproj" />
     <Content Include="..\..\assets\EasyEject.png" Link="Assets\EasyEject.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <ItemGroup Condition="'$(EasyEjectUiTests)' == 'true'">
+    <!-- App-scoped rendering probes are engineering-only; production follows Windows. -->
+    <Compile Include="..\tests\UiThemeInspection.cs" />
+  </ItemGroup>
   <!-- WinUI generates this PRI in the build output, but the SDK's publish
        list does not include it. Without it, unpackaged XAML startup fails. -->
   <Target Name="PublishEasyEjectXamlResources" AfterTargets="ComputeResolvedFilesToPublishList">

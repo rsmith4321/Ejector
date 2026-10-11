@@ -1,5 +1,9 @@
 # Windows progress · October 10, 2026
 
+## Native Light/Dark/Windows app-scoped rendering · October 11
+
+[Engineering theme inspection](modern/THEME_NATIVE_20261011.md) verifies actual visual-tree Light/Dark brush changes and Default restoration in main window/18-device tray flyout at existing150% scale, with a Light defaults-editor Cancel. Final native root/focus/presenter/compact/tray regression and normal selected **246/0** pass warning-free; native exit0/no exception, normal metadata excludes theme probes. Two live records/zero isolated saves/current0040e58 ZIP/Mac baseline stay exact. **Flyout status-line glyph clipping is observed and remains a follow-up**; viewport/footer bounds alone do not establish full layout acceptance. No OS setting/media/device/production-payload/push/publication change; broader OS/display/physical/LUT/trust and publishing gates remain open, goal active.
+
 ## Exact packaged backend replay and full-goal audit · October 11
 
 The current **0040e58** [packaged backend](modern/PACKAGED_REGRESSION_20261011.md) now passes **1454/0 full**, **246/0 selected** and **16/0 existing supplied-tool cases**, separately, against exact Release Runtime SHA **771d34714946c7c2a90dd8a85ce637b42e7946d03b1756e3d94a5685f4bf09ed**. Every parent is observed loading that DLL and the matching bundled .NET10.0.12 core modules; all exit0/empty stderr. All 386 extracted archive files, 649 review files, ZIP, supplied executables and 2live records stay exact; Mac baseline diff is empty. No normal WinUI app/physical device/LUT/signing/push/publication action or product-source change. [Full-goal audit](COMPLETION_GATES_20261011.md) records requirements and missing proof without replacing them with fixture success. Fresh read-only inventory has no external source. Current ZIP remains exact/unpublished; full goal active.

@@ -20,13 +20,15 @@ namespace EasyEject.Modern {
         internal static bool InspectLong;
         internal static bool InspectCompletion;
         internal static bool InspectNotifications;
+        internal static bool InspectThemes;
         internal static bool Review;
         static bool smallReview;
         const string ReviewScope = "Isolated preferences; normal device discovery and manual actions. No scripted hardware action.\r\n";
         static FileStream reviewOwner;
         [STAThread] static void Main(string[] args) {
-            if (args.Length < 1 || args.Length > 2 || args.Length == 2 && args[1] != "inspect" && args[1] != "inspect-long" && args[1] != "inspect-completion" && args[1] != "inspect-notifications" && args[1] != "review" && args[1] != "review-restart" && args[1] != "review-small") throw new ArgumentException("An owned isolated fixture root is required.");
-            InspectLong = args.Length == 2 && args[1] == "inspect-long";
+            if (args.Length < 1 || args.Length > 2 || args.Length == 2 && args[1] != "inspect" && args[1] != "inspect-long" && args[1] != "inspect-completion" && args[1] != "inspect-notifications" && args[1] != "inspect-themes" && args[1] != "review" && args[1] != "review-restart" && args[1] != "review-small") throw new ArgumentException("An owned isolated fixture root is required.");
+            InspectThemes = args.Length == 2 && args[1] == "inspect-themes";
+            InspectLong = InspectThemes || args.Length == 2 && args[1] == "inspect-long";
             InspectNotifications = args.Length == 2 && args[1] == "inspect-notifications";
             InspectCompletion = InspectNotifications || args.Length == 2 && args[1] == "inspect-completion";
             Inspect = InspectCompletion || InspectLong || args.Length == 2 && args[1] == "inspect";
@@ -133,6 +135,7 @@ namespace EasyEject.Modern {
         }
         internal async Task TestTrayQuit() {
             await EnsureVisible();
+            await TestNativeThemeRendering();
             await TestCompletionSafeFocus();
             await TestPendingPickerFocus();
             var presenter = (Microsoft.UI.Windowing.OverlappedPresenter)AppWindow.Presenter;
@@ -205,6 +208,7 @@ namespace EasyEject.Modern {
                     } finally { working = false; }
                 }, RefreshTrayFlyout);
                 trayFlyout.InitializeInspectionKeyboardProbe();
+                if (UiTestHost.InspectThemes) InitializeThemeInspection();
                 AppWindow.Hide();
                 var area = System.Windows.Forms.Screen.PrimaryScreen.Bounds;
                 trayFlyout.ShowAt(new System.Drawing.Point(area.Right - 140, area.Bottom - 20), FlyoutView());
