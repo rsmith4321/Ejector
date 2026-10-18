@@ -98,6 +98,9 @@ import UserNotifications
         isIssueDismissed = true
     }
 
+    /// Records each new warning in imports.log so it can be read after it is dismissed.
+    func logIssue() { logEjectEvent("Needs attention | \(message)") }
+
     func save(_ profile: DroneProfile) {
         guard !busy else { return }
         var updated = profiles

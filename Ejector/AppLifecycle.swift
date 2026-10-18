@@ -10,6 +10,8 @@ import Combine
     private var configured = false
     private let importer = DroneImportManager.shared
     private let manager = DriveManager.shared
+    private var connectedCards = 0
+    private var attentionShown = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -52,6 +54,14 @@ import Combine
         item?.button?.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         let cards = manager.drives.filter { $0.isCameraCard || $0.isEmulatorCard }
         let count = Set(cards.map { ImportVolumes.physicalID($0.url) ?? $0.url.path }).count
+        // Unplugging every card resolves the issue it raised, so clear the warning icon on its own.
+        // The explanation stays in Device Media Imports as the last (dismissed) issue.
+        if count == 0, connectedCards > 0, importer.needsAttention { importer.dismissIssue() }
+        connectedCards = count
+        if importer.needsAttention != attentionShown {
+            attentionShown = importer.needsAttention
+            if attentionShown { importer.logIssue() }
+        }
         item?.button?.title = importer.menuTitle.isEmpty ? (count > 0 ? "\(count)" : "") : importer.menuTitle
         item?.button?.toolTip = importer.needsAttention
             ? "Easy Eject: choose View Issue for details."
@@ -104,7 +114,7 @@ import Combine
         menu.addItem(.separator())
         if importer.busy { heading("\(importer.activeName): \(importer.menuTitle)", menu) }
         else if importer.needsAttention {
-            add("View Issue…", #selector(imports), menu, icon: "exclamationmark.triangle")
+            add("View Issue…", #selector(viewIssue), menu, icon: "exclamationmark.triangle")
         }
         add("Device Media Imports…", #selector(imports), menu)
         #if APP_STORE
@@ -145,9 +155,41 @@ import Combine
         sender.menu?.cancelTracking(); item?.menu?.cancelTracking()
         other(drive, clean: true)
     }
-    @objc private func imports() { openWindow?("importsWindow"); NSApp.activate() }
-    @objc private func help() { openWindow?("helpWindow"); NSApp.activate() }
-    @objc private func logs() { openWindow?("debugWindow"); NSApp.activate() }
+    @objc private func imports() { show("importsWindow") }
+    /// Shows the issue in a plain alert so it never depends on a SwiftUI window being available.
+    @objc private func viewIssue() {
+        item?.menu?.cancelTracking()
+        DispatchQueue.main.async { [self] in
+            let alert = NSAlert(); alert.alertStyle = .warning
+            alert.messageText = "Easy Eject needs attention"
+            alert.informativeText = importer.message
+            alert.addButton(withTitle: "Dismiss")
+            alert.addButton(withTitle: "Open Imports Window")
+            alert.addButton(withTitle: "Close")
+            NSApp.activate()
+            switch alert.runModal() {
+            case .alertFirstButtonReturn: importer.dismissIssue()
+            case .alertSecondButtonReturn: imports()
+            default: break
+            }
+        }
+    }
+    @objc private func help() { show("helpWindow") }
+    @objc private func logs() { show("debugWindow") }
+    /// Brings a window forward even when it already exists but is hidden or behind other apps.
+    private func show(_ id: String) {
+        item?.menu?.cancelTracking()
+        DispatchQueue.main.async { [self] in
+            NSApp.activate()
+            if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == id }), openWindow == nil || window.isVisible {
+                window.makeKeyAndOrderFront(nil); window.orderFrontRegardless(); return
+            }
+            openWindow?(id)
+            DispatchQueue.main.async {
+                NSApp.windows.first { $0.identifier?.rawValue == id }?.orderFrontRegardless()
+            }
+        }
+    }
     @objc private func settings() { openSettings?(); NSApp.activate() }
     @objc private func refresh() { manager.fetchDrives(clearCache: true); importer.refresh() }
     @objc private func updates() { UpdateChannel.checkForUpdates() }
