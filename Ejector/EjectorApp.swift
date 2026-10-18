@@ -576,6 +576,14 @@ struct HelpView: View {
                         Text("Notifications confirm ejection. With Ask to eject after import enabled, a dialog offers Keep Connected and Eject Now after import or when no media matches your options. Keep Connected is the default. Wait for confirmation that the device is safe to unplug. Eject also remains available in the menu and import window. Toggle notifications in Settings.")
                     }
 
+                    #if !APP_STORE
+                    helpSection("AirDrop Inbox", icon: "square.and.arrow.down.on.square") {
+                        Text("Turn on AirDrop Inbox in Settings to sort files AirDropped to this Mac. Easy Eject moves them out of Downloads to the folder you choose and converts HEIC photos to JPEG, keeping the date, location and camera details. Only files macOS marks as received by AirDrop are touched; browser downloads stay where they are.")
+                        Text("Easy Eject waits until each file has finished arriving and never overwrites a file: a name that is taken gets a number. The original HEIC goes to the Trash (Put Back still works) or is kept, as you choose. AirDrops that were already in Downloads wait for Process Earlier AirDrops. Choose Open AirDrop Folder in the menu to see them.")
+                            .padding(.top, 2)
+                    }
+
+                    #endif
                     helpSection("Menu Bar Badge", icon: "number.circle") {
                         Text("When recognized camera or emulator cards are connected, the menu bar counts each physical disk once. Progress and errors take priority.")
                     }

@@ -27,6 +27,9 @@ import Combine
             .sink { [weak self] _ in self?.imports() }.store(in: &observations)
         updateStatus()
         UpdateChannel.start()
+        #if !APP_STORE
+        AirDropInboxModel.shared.launch()
+        #endif
     }
     func configure(openWindow: @escaping (String) -> Void, openSettings: @escaping () -> Void) {
         self.openWindow = openWindow; self.openSettings = openSettings
@@ -117,6 +120,9 @@ import Combine
             add("View Issue…", #selector(viewIssue), menu, icon: "exclamationmark.triangle")
         }
         add("Device Media Imports…", #selector(imports), menu)
+        #if !APP_STORE
+        if AirDropInboxModel.shared.enabled { add("Open AirDrop Folder", #selector(openAirDropFolder), menu) }
+        #endif
         #if APP_STORE
         add("Authorize a Card…", #selector(authorize), menu)
         #endif
@@ -195,6 +201,9 @@ import Combine
     @objc private func updates() { UpdateChannel.checkForUpdates() }
     @objc private func about() { NSApp.activate(); NSApp.orderFrontStandardAboutPanel() }
     @objc private func quit() { NSApp.terminate(nil) }
+    #if !APP_STORE
+    @objc private func openAirDropFolder() { AirDropInboxModel.shared.openOutputFolder() }
+    #endif
     #if APP_STORE
     @objc private func authorize() {
         item?.menu?.cancelTracking()

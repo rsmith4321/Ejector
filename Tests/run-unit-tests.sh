@@ -14,6 +14,7 @@ sentinel=$(mktemp -d "$PWD/build/sentinel.XXXXXX")/not-used.txt
 RUNARG=$sentinel run ImportEngineTests Ejector/MediaImportEngine.swift Ejector/ScopedFolder.swift Ejector/MetadataCleaner.swift Tests/ImportEngineTests.swift
 RUNARG="" 
 run BulkEjectPolicyTests Ejector/MediaImportEngine.swift Ejector/BulkEjectPolicy.swift Tests/BulkEjectPolicyTests.swift
+run AirDropInboxTests Ejector/AirDropInboxCore.swift Tests/AirDropInboxTests.swift
 run StoreEjectPolicyTests -D APP_STORE Ejector/StoreEjectPolicy.swift Tests/StoreEjectPolicyTests.swift
 run GroupedUnmountTests Ejector/ImportVolumes.swift Tests/GroupedUnmountTests.swift
 run ImportCompletionNotificationTests Ejector/ImportCompletionNotification.swift Tests/ImportCompletionNotificationTests.swift

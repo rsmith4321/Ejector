@@ -51,6 +51,10 @@ struct SettingsView: View {
                     Divider()
                     ImportDefaultsView()
                     Divider()
+                    #if !APP_STORE
+                    AirDropInboxView()
+                    Divider()
+                    #endif
                     Text("Keyboard Shortcut").font(.headline)
                     Toggle("Enable Global Eject Shortcut", isOn: $shortcutEnabled).onChange(of: shortcutEnabled) { _, _ in shortcut.start() }
                     HStack {
