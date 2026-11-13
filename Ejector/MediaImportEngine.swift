@@ -324,11 +324,16 @@ nonisolated struct MediaImportEngine {
         let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
         defer { try? handle.close() }
         var hash = SHA256(), done: Int64 = 0
-        while true {
+        var more = true
+        while more {
             try cancellation.check()
-            guard let data = try handle.read(upToCount: 4 * 1024 * 1024), !data.isEmpty else { break }
-            hash.update(data: data); done += Int64(data.count)
-            progress(total == 0 ? 1 : Double(done) / Double(total))
+            // FileHandle returns autoreleased chunks. Without a pool per chunk a whole import,
+            // which runs as one block on the import queue, keeps every chunk it read in memory.
+            try autoreleasepool {
+                guard let data = try handle.read(upToCount: 4 * 1024 * 1024), !data.isEmpty else { more = false; return }
+                hash.update(data: data); done += Int64(data.count)
+                progress(total == 0 ? 1 : Double(done) / Double(total))
+            }
         }
         return hash.finalize().map { String(format: "%02x", $0) }.joined()
     }
@@ -539,12 +544,15 @@ nonisolated struct MediaImportEngine {
         guard inputFD >= 0 else { throw ImportFailure("Cannot open source for copying.") }
         let input = FileHandle(fileDescriptor: inputFD, closeOnDealloc: true)
         defer { try? input.close() }
-        var copied: Int64 = 0
-        while true {
+        var copied: Int64 = 0, more = true
+        while more {
             try cancellation.check()
-            guard let data = try input.read(upToCount: 4 * 1024 * 1024), !data.isEmpty else { break }
-            try output.write(contentsOf: data); copied += Int64(data.count)
-            progress("Importing", before.size == 0 ? 1 : Double(copied) / Double(before.size))
+            // One pool per chunk, for the same reason as in hash(_:cancellation:progress:).
+            try autoreleasepool {
+                guard let data = try input.read(upToCount: 4 * 1024 * 1024), !data.isEmpty else { more = false; return }
+                try output.write(contentsOf: data); copied += Int64(data.count)
+                progress("Importing", before.size == 0 ? 1 : Double(copied) / Double(before.size))
+            }
         }
         try output.synchronize()
         guard fcntl(fd, F_FULLFSYNC) == 0 else { throw ImportFailure("Could not flush the saved copy to storage. Original kept.") }

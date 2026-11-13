@@ -72,7 +72,10 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             .merge(with: center.publisher(for: NSWorkspace.didRenameVolumeNotification))
             .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
             .sink { [weak self] _ in
-                self?.fetchDrives(clearCache: true)
+                // Keep the folder checks already done for drives that stay mounted, so plugging in
+                // a card does not touch (and wake) every other external disk. fetchDrives drops the
+                // entries of volumes that are gone; Refresh List rescans everything.
+                self?.fetchDrives()
             }
             .store(in: &cancellables)
 
@@ -83,7 +86,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
             .store(in: &cancellables)
 
         DroneImportManager.shared.$profiles.dropFirst().sink { [weak self] _ in
-            self?.fetchDrives(clearCache: true)
+            self?.fetchDrives()
         }.store(in: &cancellables)
         NotificationCenter.default.publisher(for: .init("CardAccessChanged"))
             .sink { [weak self] _ in self?.fetchDrives(clearCache: true) }.store(in: &cancellables)
@@ -371,7 +374,7 @@ class DriveManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate
                         LogManager.shared.log("Could not eject \(drive.name): \(error.localizedDescription)")
                         if notify { self.sendNotification(title: "Could not eject \(drive.name)", body: error.localizedDescription) }
                     } else {
-                        self.fetchDrives(clearCache: true)
+                        self.fetchDrives()
                         let body = clean ? "Removed \(cleanedCount) metadata files and ejected \(drive.name)." : "Ejected \(drive.name)."
                         LogManager.shared.log(body)
                         if notify { self.sendNotification(title: "Easy Eject", body: body) }

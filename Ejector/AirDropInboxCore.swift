@@ -326,6 +326,10 @@ enum AirDropInbox {
             let ns = error as NSError
             let posix = (ns.userInfo[NSUnderlyingErrorKey] as? NSError).flatMap { $0.domain == NSPOSIXErrorDomain ? $0.code : nil }
             if ns.code == NSFileReadNoSuchFileError || ns.code == NSFileNoSuchFileError || posix == Int(ENOENT) { return .missing(url) }
+            // A folder on a drive that is not connected fails with a permission error, because nothing
+            // may create /Volumes/<name>. That is a missing destination, not a privacy setting.
+            let parts = url.standardizedFileURL.pathComponents
+            if parts.count >= 3, parts[1] == "Volumes", !FileManager.default.fileExists(atPath: "/Volumes/" + parts[2]) { return .missing(url) }
             return .noAccess(url)
         }
     }

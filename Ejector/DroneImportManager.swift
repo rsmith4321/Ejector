@@ -218,7 +218,6 @@ import UserNotifications
             #else
             var stale = false
             let destination = try URL(resolvingBookmarkData: profile.destinationBookmark, options: [.withoutUI, .withoutMounting], bookmarkDataIsStale: &stale)
-            guard !stale else { throw ImportFailure("Choose the destination folder again to refresh its permission.") }
             let accessed = destination.startAccessingSecurityScopedResource()
             #endif
             do {
@@ -228,6 +227,24 @@ import UserNotifications
                       ImportVolumes.physicalID(source) != ImportVolumes.physicalID(destinationVolume) else {
                     throw ImportFailure("Choose a destination on a different disk from the device.")
                 }
+                #if !APP_STORE
+                let destinationBookmark: Data
+                if stale {
+                    // A stale bookmark still resolves: the folder was renamed or moved, or the drive
+                    // came back at another path. The checks above prove it is on the enrolled drive,
+                    // so renew the bookmark as the Store edition does instead of stopping the import.
+                    guard let fresh = try? destination.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil) else {
+                        throw ImportFailure("Choose the destination folder again to refresh its permission.")
+                    }
+                    var updated = storedProfile
+                    updated.destinationBookmark = fresh; updated.destinationLabel = destination.path
+                    save(updated)
+                    guard profiles.contains(updated) else { throw ImportFailure("Cannot save the refreshed destination folder. Import stopped.") }
+                    destinationBookmark = fresh
+                } else { destinationBookmark = profile.destinationBookmark }
+                #else
+                let destinationBookmark = profile.destinationBookmark
+                #endif
                 #if !APP_STORE
                 let media = source.appendingPathComponent(profile.mediaPath).standardizedFileURL
                 guard MediaImportEngine.isWithin(media, source),
@@ -290,11 +307,11 @@ import UserNotifications
                             let entry = ImportCompletion(id: completionID, source: source, volumeID: profile.id,
                                 physicalID: originalSourceDisk, connection: connection, deviceName: profile.name,
                                 hasMedia: result.hasSelectedMedia, folder: self.lastFolder!,
-                                destinationBookmark: profile.destinationBookmark, destinationVolumeID: profile.destinationVolumeID)
+                                destinationBookmark: destinationBookmark, destinationVolumeID: profile.destinationVolumeID)
                             #if !APP_STORE
                             if !result.verifiedMedia.isEmpty {
                                 let batch = QuickShareImport(id: completionID, profileID: profile.id, deviceName: profile.name,
-                                    date: Date(), folder: result.folder, destinationBookmark: profile.destinationBookmark,
+                                    date: Date(), folder: result.folder, destinationBookmark: destinationBookmark,
                                     destinationVolumeID: profile.destinationVolumeID, originals: result.verifiedMedia)
                                 self.completedImports.insert(batch, at: 0)
                                 self.completedImports = Array(self.completedImports.prefix(20))
@@ -447,7 +464,8 @@ import UserNotifications
             var stale = false
             let destination = try URL(resolvingBookmarkData: batch.destinationBookmark,
                 options: [.withoutUI, .withoutMounting], bookmarkDataIsStale: &stale)
-            guard !stale else { throw ImportFailure("The saved import permission expired. Choose the destination again and reimport to restore Quick Share access.") }
+            // A stale bookmark still resolves. The folder and volume checks below decide whether the
+            // saved import is still where it was, so staleness alone does not block Quick Share.
             let accessed = destination.startAccessingSecurityScopedResource()
             do {
                 try MediaImportEngine.checkPath(batch.folder)

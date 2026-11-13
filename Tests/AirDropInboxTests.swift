@@ -218,6 +218,7 @@ import CoreGraphics
             let a = dl.appendingPathComponent("IMG_M.HEIC"); makeHEIC(a); tag(a, agent: "sharingd"); age(a)
             let r = run(AirDropInbox.Processor(), AirDropInbox.Options(watchFolder: dl, destination: URL(fileURLWithPath: "/Volumes/No Such Drive \(UUID().uuidString)/AirDrop")))
             check(r.destinationProblem != nil, "destination problem reported")
+            if case .missing = r.destinationProblem {} else { check(false, "an unplugged drive is reported as missing, not as a privacy problem") }
             check(fm.fileExists(atPath: a.path), "AirDrop stays in Downloads")
         }
 

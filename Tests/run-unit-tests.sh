@@ -1,5 +1,9 @@
 #!/bin/zsh
 # Compiles and runs the self-contained unit test executables against this worktree.
+# Not run here, because they need things a unit run does not have:
+#   ImportEjectPromptTests (shows real dialogs on screen), EasyShareTests, DJIO4QuickShareTests and
+#   GyroflowLUTBridgeTests (sample footage, a LUT and ffmpeg), MountedVolumeImportTest (a test disk),
+#   and the *IntegrationTests, which the run-*-integration.py scripts drive with a signed app.
 set -u
 cd "${0:A:h}/.."
 out=build/tests; mkdir -p $out; rc=0

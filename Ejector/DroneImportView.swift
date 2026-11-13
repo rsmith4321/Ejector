@@ -81,7 +81,7 @@ struct DroneImportView: View {
                                         Button("Import now") { importer.importNow(storedProfile) }
                                         Button("Edit") { editing = storedProfile }
                                         Spacer()
-                                        Button("Remove profile") { importer.remove(profile.id) }
+                                        Button("Remove profile") { confirmRemoval(profile) }
                                     }.disabled(importer.busy)
                                 }.frame(maxWidth: .infinity, alignment: .leading).padding(4)
                             }
@@ -129,6 +129,14 @@ struct DroneImportView: View {
         .alert("Import setup", isPresented: Binding(get: { setupError != nil }, set: { if !$0 { setupError = nil } })) {
             Button("OK") { setupError = nil }
         } message: { Text(setupError ?? "") }
+    }
+
+    private func confirmRemoval(_ profile: DroneProfile) {
+        let alert = NSAlert()
+        alert.messageText = "Remove the \(profile.name) profile?"
+        alert.informativeText = "Easy Eject forgets this device's import settings. Imported files and files on the device are not changed."
+        alert.addButton(withTitle: "Remove Profile"); alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn { importer.remove(profile.id) }
     }
 
     private func enroll() {

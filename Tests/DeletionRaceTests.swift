@@ -147,6 +147,21 @@ import Darwin
             try check(failure { _ = try MetadataCleaner.clean(card, validate: {}) } != nil, "linked root refused")
             try check(exists(victim), "outside fixture survived")
         }
+        try test("cleanup skips protected system folders and unreadable folders") { _, card, _, _ in
+            let system = card.appendingPathComponent(".DocumentRevisions-V100"), locked = card.appendingPathComponent("locked")
+            let open = card.appendingPathComponent("open")
+            for folder in [system, locked, open] { try fm.createDirectory(at: folder, withIntermediateDirectories: true) }
+            for folder in [system, locked, open] { try Data("metadata".utf8).write(to: folder.appendingPathComponent("._clip.mp4")) }
+            // Mode 0111 matches what macOS sets on .DocumentRevisions-V100: searchable, not readable.
+            chmod(system.path, 0o111); chmod(locked.path, 0o111)
+            defer { chmod(system.path, 0o755); chmod(locked.path, 0o755) }
+            let count = try MetadataCleaner.clean(card, validate: {})
+            try check(count == 1, "only the readable folder was cleaned: \(count)")
+            chmod(system.path, 0o755); chmod(locked.path, 0o755)
+            try check(exists(system.appendingPathComponent("._clip.mp4")), "system folder left alone")
+            try check(exists(locked.appendingPathComponent("._clip.mp4")), "unreadable folder left alone")
+            try check(!exists(open.appendingPathComponent("._clip.mp4")), "readable folder cleaned")
+        }
         print("\(passed) tests passed, \(failed) failed")
         if failed > 0 { exit(1) }
     }

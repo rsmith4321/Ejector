@@ -3,7 +3,11 @@ import Darwin
 
 nonisolated enum MetadataCleaner {
     static func clean(_ root: URL, validate: () throws -> Void) throws -> Int {
-        let skipped: Set<String> = [".Spotlight-V100", ".Trashes", ".fseventsd", ".TemporaryItems"]
+        // System-owned folders macOS keeps on its own volumes. They hold no card metadata, and
+        // several of them (.DocumentRevisions-V100 on every Mac-formatted drive) cannot be opened.
+        let skipped: Set<String> = [".Spotlight-V100", ".Trashes", ".fseventsd", ".TemporaryItems",
+                                    ".DocumentRevisions-V100", ".PKInstallSandboxManager",
+                                    ".PKInstallSandboxManager-SystemSoftware", ".MobileBackups", ".vol"]
         var count = 0
         try validate(); try MediaImportEngine.checkPath(root)
         // Every step below is relative to a descriptor opened from the checked root,
@@ -41,7 +45,12 @@ nonisolated enum MetadataCleaner {
                 if (entry.st_mode & S_IFMT) == S_IFLNK { continue }
                 if (entry.st_mode & S_IFMT) == S_IFDIR {
                     let child = openat(folder, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-                    guard child >= 0 else { throw ImportFailure("Cannot scan \(item). Authorize this card or check its file permissions.") }
+                    guard child >= 0 else {
+                        // A folder this user may not read cannot be cleaned either. Leave it as it is
+                        // instead of refusing to eject; nothing inside it is touched.
+                        if errno == EACCES || errno == EPERM { continue }
+                        throw ImportFailure("Cannot scan \(item). Authorize this card or check its file permissions.")
+                    }
                     defer { close(child) }
                     var opened = stat()
                     guard fstat(child, &opened) == 0, opened.st_dev == entry.st_dev,
